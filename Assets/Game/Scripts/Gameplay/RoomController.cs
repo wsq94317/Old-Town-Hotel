@@ -17,6 +17,31 @@ public class RoomController : MonoBehaviour
         ApplyStateVisual();
     }
 
+    private void OnMouseDown()
+    {
+        CycleState();
+        ApplyStateVisual();
+    }
+
+    public void CycleState()
+    {
+        switch (currentState)
+        {
+            case RoomState.Dirty:
+                currentState = RoomState.Cleaning;
+                break;
+            case RoomState.Cleaning:
+                currentState = RoomState.AwaitingInspection;
+                break;
+            case RoomState.AwaitingInspection:
+                currentState = RoomState.Ready;
+                break;
+            case RoomState.Ready:
+                currentState = RoomState.Dirty;
+                break;
+        }
+    }
+
     public void ApplyStateVisual()
     {
         if (roomRenderer == null)
