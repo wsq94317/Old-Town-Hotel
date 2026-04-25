@@ -258,6 +258,7 @@ GameObject:
   - component: {fileID: 139948306}
   - component: {fileID: 139948305}
   - component: {fileID: 139948304}
+  - component: {fileID: 139948307}
   m_Layer: 0
   m_Name: Room_1_4
   m_TagString: Untagged
@@ -295,8 +296,8 @@ BoxCollider:
     serializedVersion: 2
     m_Bits: 0
   m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
+  m_IsTrigger: 1
+  m_ProvidesContacts: 1
   m_Enabled: 1
   serializedVersion: 3
   m_Size: {x: 1, y: 1, z: 1}
@@ -358,6 +359,23 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 139948302}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!114 &139948307
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 139948302}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7a66ae28a5cd0574eb119c0c7ed75ec2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RoomController
+  currentState: 0
+  dirtyMaterial: {fileID: 2100000, guid: d35b9b9341694c34e869dcc1568ed796, type: 2}
+  cleaningMaterial: {fileID: 2100000, guid: addbd98133a58284380994769b69b72b, type: 2}
+  awaitingInspectionMaterial: {fileID: 2100000, guid: ffa911cf8dd31c740ba1bf439a36defc, type: 2}
+  readyMaterial: {fileID: 2100000, guid: 9f5f40a9ae0db0f43b2b3917fd6d2ace, type: 2}
 --- !u!1 &148202667
 GameObject:
   m_ObjectHideFlags: 0
@@ -370,6 +388,7 @@ GameObject:
   - component: {fileID: 148202671}
   - component: {fileID: 148202670}
   - component: {fileID: 148202669}
+  - component: {fileID: 148202672}
   m_Layer: 0
   m_Name: Room_3_1
   m_TagString: Untagged
@@ -407,8 +426,8 @@ BoxCollider:
     serializedVersion: 2
     m_Bits: 0
   m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
+  m_IsTrigger: 1
+  m_ProvidesContacts: 1
   m_Enabled: 1
   serializedVersion: 3
   m_Size: {x: 1, y: 1, z: 1}
@@ -470,6 +489,23 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 148202667}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!114 &148202672
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 148202667}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7a66ae28a5cd0574eb119c0c7ed75ec2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RoomController
+  currentState: 0
+  dirtyMaterial: {fileID: 2100000, guid: d35b9b9341694c34e869dcc1568ed796, type: 2}
+  cleaningMaterial: {fileID: 2100000, guid: addbd98133a58284380994769b69b72b, type: 2}
+  awaitingInspectionMaterial: {fileID: 2100000, guid: ffa911cf8dd31c740ba1bf439a36defc, type: 2}
+  readyMaterial: {fileID: 2100000, guid: 9f5f40a9ae0db0f43b2b3917fd6d2ace, type: 2}
 --- !u!1 &231603547
 GameObject:
   m_ObjectHideFlags: 0
@@ -482,6 +518,7 @@ GameObject:
   - component: {fileID: 231603551}
   - component: {fileID: 231603550}
   - component: {fileID: 231603549}
+  - component: {fileID: 231603552}
   m_Layer: 0
   m_Name: Room_2_1
   m_TagString: Untagged
@@ -519,8 +556,8 @@ BoxCollider:
     serializedVersion: 2
     m_Bits: 0
   m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
+  m_IsTrigger: 1
+  m_ProvidesContacts: 1
   m_Enabled: 1
   serializedVersion: 3
   m_Size: {x: 1, y: 1, z: 1}
@@ -582,6 +619,23 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 231603547}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!114 &231603552
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 231603547}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7a66ae28a5cd0574eb119c0c7ed75ec2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RoomController
+  currentState: 0
+  dirtyMaterial: {fileID: 2100000, guid: d35b9b9341694c34e869dcc1568ed796, type: 2}
+  cleaningMaterial: {fileID: 2100000, guid: addbd98133a58284380994769b69b72b, type: 2}
+  awaitingInspectionMaterial: {fileID: 2100000, guid: ffa911cf8dd31c740ba1bf439a36defc, type: 2}
+  readyMaterial: {fileID: 2100000, guid: 9f5f40a9ae0db0f43b2b3917fd6d2ace, type: 2}
 --- !u!1 &290801152
 GameObject:
   m_ObjectHideFlags: 0
@@ -594,6 +648,7 @@ GameObject:
   - component: {fileID: 290801156}
   - component: {fileID: 290801155}
   - component: {fileID: 290801154}
+  - component: {fileID: 290801157}
   m_Layer: 0
   m_Name: Room_3_4
   m_TagString: Untagged
@@ -631,8 +686,8 @@ BoxCollider:
     serializedVersion: 2
     m_Bits: 0
   m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
+  m_IsTrigger: 1
+  m_ProvidesContacts: 1
   m_Enabled: 1
   serializedVersion: 3
   m_Size: {x: 1, y: 1, z: 1}
@@ -694,6 +749,23 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 290801152}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!114 &290801157
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 290801152}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7a66ae28a5cd0574eb119c0c7ed75ec2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RoomController
+  currentState: 0
+  dirtyMaterial: {fileID: 2100000, guid: d35b9b9341694c34e869dcc1568ed796, type: 2}
+  cleaningMaterial: {fileID: 2100000, guid: addbd98133a58284380994769b69b72b, type: 2}
+  awaitingInspectionMaterial: {fileID: 2100000, guid: ffa911cf8dd31c740ba1bf439a36defc, type: 2}
+  readyMaterial: {fileID: 2100000, guid: 9f5f40a9ae0db0f43b2b3917fd6d2ace, type: 2}
 --- !u!1 &317910527
 GameObject:
   m_ObjectHideFlags: 0
@@ -706,6 +778,7 @@ GameObject:
   - component: {fileID: 317910531}
   - component: {fileID: 317910530}
   - component: {fileID: 317910529}
+  - component: {fileID: 317910532}
   m_Layer: 0
   m_Name: Room_3_2
   m_TagString: Untagged
@@ -743,8 +816,8 @@ BoxCollider:
     serializedVersion: 2
     m_Bits: 0
   m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
+  m_IsTrigger: 1
+  m_ProvidesContacts: 1
   m_Enabled: 1
   serializedVersion: 3
   m_Size: {x: 1, y: 1, z: 1}
@@ -806,6 +879,23 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 317910527}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!114 &317910532
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 317910527}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7a66ae28a5cd0574eb119c0c7ed75ec2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RoomController
+  currentState: 0
+  dirtyMaterial: {fileID: 2100000, guid: d35b9b9341694c34e869dcc1568ed796, type: 2}
+  cleaningMaterial: {fileID: 2100000, guid: addbd98133a58284380994769b69b72b, type: 2}
+  awaitingInspectionMaterial: {fileID: 2100000, guid: ffa911cf8dd31c740ba1bf439a36defc, type: 2}
+  readyMaterial: {fileID: 2100000, guid: 9f5f40a9ae0db0f43b2b3917fd6d2ace, type: 2}
 --- !u!1 &338221481
 GameObject:
   m_ObjectHideFlags: 0
@@ -818,6 +908,7 @@ GameObject:
   - component: {fileID: 338221485}
   - component: {fileID: 338221484}
   - component: {fileID: 338221483}
+  - component: {fileID: 338221486}
   m_Layer: 0
   m_Name: 'Room_2_2 '
   m_TagString: Untagged
@@ -855,8 +946,8 @@ BoxCollider:
     serializedVersion: 2
     m_Bits: 0
   m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
+  m_IsTrigger: 1
+  m_ProvidesContacts: 1
   m_Enabled: 1
   serializedVersion: 3
   m_Size: {x: 1, y: 1, z: 1}
@@ -918,6 +1009,23 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 338221481}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!114 &338221486
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 338221481}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7a66ae28a5cd0574eb119c0c7ed75ec2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RoomController
+  currentState: 0
+  dirtyMaterial: {fileID: 2100000, guid: d35b9b9341694c34e869dcc1568ed796, type: 2}
+  cleaningMaterial: {fileID: 2100000, guid: addbd98133a58284380994769b69b72b, type: 2}
+  awaitingInspectionMaterial: {fileID: 2100000, guid: ffa911cf8dd31c740ba1bf439a36defc, type: 2}
+  readyMaterial: {fileID: 2100000, guid: 9f5f40a9ae0db0f43b2b3917fd6d2ace, type: 2}
 --- !u!1 &564012995
 GameObject:
   m_ObjectHideFlags: 0
@@ -930,6 +1038,7 @@ GameObject:
   - component: {fileID: 564012999}
   - component: {fileID: 564012998}
   - component: {fileID: 564012997}
+  - component: {fileID: 564013000}
   m_Layer: 0
   m_Name: Room_1_3
   m_TagString: Untagged
@@ -967,8 +1076,8 @@ BoxCollider:
     serializedVersion: 2
     m_Bits: 0
   m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
+  m_IsTrigger: 1
+  m_ProvidesContacts: 1
   m_Enabled: 1
   serializedVersion: 3
   m_Size: {x: 1, y: 1, z: 1}
@@ -1030,6 +1139,23 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 564012995}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!114 &564013000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 564012995}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7a66ae28a5cd0574eb119c0c7ed75ec2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RoomController
+  currentState: 0
+  dirtyMaterial: {fileID: 2100000, guid: d35b9b9341694c34e869dcc1568ed796, type: 2}
+  cleaningMaterial: {fileID: 2100000, guid: addbd98133a58284380994769b69b72b, type: 2}
+  awaitingInspectionMaterial: {fileID: 2100000, guid: ffa911cf8dd31c740ba1bf439a36defc, type: 2}
+  readyMaterial: {fileID: 2100000, guid: 9f5f40a9ae0db0f43b2b3917fd6d2ace, type: 2}
 --- !u!1 &1275587743
 GameObject:
   m_ObjectHideFlags: 0
@@ -1223,6 +1349,7 @@ GameObject:
   - component: {fileID: 1478877271}
   - component: {fileID: 1478877270}
   - component: {fileID: 1478877269}
+  - component: {fileID: 1478877272}
   m_Layer: 0
   m_Name: Room_1_2
   m_TagString: Untagged
@@ -1260,8 +1387,8 @@ BoxCollider:
     serializedVersion: 2
     m_Bits: 0
   m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
+  m_IsTrigger: 1
+  m_ProvidesContacts: 1
   m_Enabled: 1
   serializedVersion: 3
   m_Size: {x: 1, y: 1, z: 1}
@@ -1323,6 +1450,23 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1478877267}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!114 &1478877272
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1478877267}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7a66ae28a5cd0574eb119c0c7ed75ec2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RoomController
+  currentState: 0
+  dirtyMaterial: {fileID: 2100000, guid: d35b9b9341694c34e869dcc1568ed796, type: 2}
+  cleaningMaterial: {fileID: 2100000, guid: addbd98133a58284380994769b69b72b, type: 2}
+  awaitingInspectionMaterial: {fileID: 2100000, guid: ffa911cf8dd31c740ba1bf439a36defc, type: 2}
+  readyMaterial: {fileID: 2100000, guid: 9f5f40a9ae0db0f43b2b3917fd6d2ace, type: 2}
 --- !u!1 &1493957346
 GameObject:
   m_ObjectHideFlags: 0
@@ -1335,6 +1479,7 @@ GameObject:
   - component: {fileID: 1493957350}
   - component: {fileID: 1493957349}
   - component: {fileID: 1493957348}
+  - component: {fileID: 1493957351}
   m_Layer: 0
   m_Name: Room_3_3
   m_TagString: Untagged
@@ -1372,8 +1517,8 @@ BoxCollider:
     serializedVersion: 2
     m_Bits: 0
   m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
+  m_IsTrigger: 1
+  m_ProvidesContacts: 1
   m_Enabled: 1
   serializedVersion: 3
   m_Size: {x: 1, y: 1, z: 1}
@@ -1435,6 +1580,23 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1493957346}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!114 &1493957351
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1493957346}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7a66ae28a5cd0574eb119c0c7ed75ec2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RoomController
+  currentState: 0
+  dirtyMaterial: {fileID: 2100000, guid: d35b9b9341694c34e869dcc1568ed796, type: 2}
+  cleaningMaterial: {fileID: 2100000, guid: addbd98133a58284380994769b69b72b, type: 2}
+  awaitingInspectionMaterial: {fileID: 2100000, guid: ffa911cf8dd31c740ba1bf439a36defc, type: 2}
+  readyMaterial: {fileID: 2100000, guid: 9f5f40a9ae0db0f43b2b3917fd6d2ace, type: 2}
 --- !u!1 &1601865946
 GameObject:
   m_ObjectHideFlags: 0
@@ -1447,6 +1609,7 @@ GameObject:
   - component: {fileID: 1601865950}
   - component: {fileID: 1601865949}
   - component: {fileID: 1601865948}
+  - component: {fileID: 1601865951}
   m_Layer: 0
   m_Name: Room_1_1
   m_TagString: Untagged
@@ -1484,8 +1647,8 @@ BoxCollider:
     serializedVersion: 2
     m_Bits: 0
   m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
+  m_IsTrigger: 1
+  m_ProvidesContacts: 1
   m_Enabled: 1
   serializedVersion: 3
   m_Size: {x: 1, y: 1, z: 1}
@@ -1547,6 +1710,23 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1601865946}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!114 &1601865951
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1601865946}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7a66ae28a5cd0574eb119c0c7ed75ec2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RoomController
+  currentState: 0
+  dirtyMaterial: {fileID: 2100000, guid: d35b9b9341694c34e869dcc1568ed796, type: 2}
+  cleaningMaterial: {fileID: 2100000, guid: addbd98133a58284380994769b69b72b, type: 2}
+  awaitingInspectionMaterial: {fileID: 2100000, guid: ffa911cf8dd31c740ba1bf439a36defc, type: 2}
+  readyMaterial: {fileID: 2100000, guid: 9f5f40a9ae0db0f43b2b3917fd6d2ace, type: 2}
 --- !u!1 &1649791621
 GameObject:
   m_ObjectHideFlags: 0
@@ -1559,6 +1739,7 @@ GameObject:
   - component: {fileID: 1649791625}
   - component: {fileID: 1649791624}
   - component: {fileID: 1649791623}
+  - component: {fileID: 1649791626}
   m_Layer: 0
   m_Name: Room_2_3
   m_TagString: Untagged
@@ -1596,8 +1777,8 @@ BoxCollider:
     serializedVersion: 2
     m_Bits: 0
   m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
+  m_IsTrigger: 1
+  m_ProvidesContacts: 1
   m_Enabled: 1
   serializedVersion: 3
   m_Size: {x: 1, y: 1, z: 1}
@@ -1659,6 +1840,23 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1649791621}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!114 &1649791626
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1649791621}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7a66ae28a5cd0574eb119c0c7ed75ec2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RoomController
+  currentState: 0
+  dirtyMaterial: {fileID: 2100000, guid: d35b9b9341694c34e869dcc1568ed796, type: 2}
+  cleaningMaterial: {fileID: 2100000, guid: addbd98133a58284380994769b69b72b, type: 2}
+  awaitingInspectionMaterial: {fileID: 2100000, guid: ffa911cf8dd31c740ba1bf439a36defc, type: 2}
+  readyMaterial: {fileID: 2100000, guid: 9f5f40a9ae0db0f43b2b3917fd6d2ace, type: 2}
 --- !u!1 &1702268769
 GameObject:
   m_ObjectHideFlags: 0
@@ -1783,6 +1981,7 @@ GameObject:
   - component: {fileID: 2076645889}
   - component: {fileID: 2076645888}
   - component: {fileID: 2076645887}
+  - component: {fileID: 2076645890}
   m_Layer: 0
   m_Name: Room_2_4
   m_TagString: Untagged
@@ -1820,8 +2019,8 @@ BoxCollider:
     serializedVersion: 2
     m_Bits: 0
   m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
+  m_IsTrigger: 1
+  m_ProvidesContacts: 1
   m_Enabled: 1
   serializedVersion: 3
   m_Size: {x: 1, y: 1, z: 1}
@@ -1883,6 +2082,23 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2076645885}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!114 &2076645890
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2076645885}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7a66ae28a5cd0574eb119c0c7ed75ec2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RoomController
+  currentState: 0
+  dirtyMaterial: {fileID: 2100000, guid: d35b9b9341694c34e869dcc1568ed796, type: 2}
+  cleaningMaterial: {fileID: 2100000, guid: addbd98133a58284380994769b69b72b, type: 2}
+  awaitingInspectionMaterial: {fileID: 2100000, guid: ffa911cf8dd31c740ba1bf439a36defc, type: 2}
+  readyMaterial: {fileID: 2100000, guid: 9f5f40a9ae0db0f43b2b3917fd6d2ace, type: 2}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

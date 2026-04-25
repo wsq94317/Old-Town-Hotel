@@ -11,16 +11,23 @@ public class RoomController : MonoBehaviour
 
     private Renderer roomRenderer;
 
+    private void Awake()
+    {
+        Debug.Log($"{gameObject.name} Awake");
+    }
+
     private void Start()
     {
+        Debug.Log($"{gameObject.name} Start");
+
         roomRenderer = GetComponent<Renderer>();
         ApplyStateVisual();
     }
 
     private void OnMouseDown()
     {
+        Debug.Log($"{gameObject.name} OnMouseDown triggered");
         CycleState();
-        ApplyStateVisual();
     }
 
     public void CycleState()
@@ -40,6 +47,8 @@ public class RoomController : MonoBehaviour
                 currentState = RoomState.Dirty;
                 break;
         }
+
+        ApplyStateVisual();
     }
 
     public void ApplyStateVisual()
@@ -51,6 +60,7 @@ public class RoomController : MonoBehaviour
 
         if (roomRenderer == null)
         {
+            Debug.LogWarning($"{gameObject.name} has no Renderer.");
             return;
         }
 
