@@ -4,6 +4,7 @@ using TMPro;
 
 public class Room2DController : MonoBehaviour
 {
+    public string roomName = "Room 101";
     public Room2DState currentState = Room2DState.Dirty;
 
     [Header("Optional State Visuals")]
@@ -17,8 +18,12 @@ public class Room2DController : MonoBehaviour
     public Image roomImage;
 
     [Header("Optional UI")]
+    public Text roomNameLabel;
     public Text stateLabel;
+    public Text nextActionLabel;
+    public TMP_Text roomNameLabelTextMeshPro;
     public TMP_Text stateLabelTextMeshPro;
+    public TMP_Text nextActionLabelTextMeshPro;
 
     public Color dirtyColor = new Color(0.65f, 0.45f, 0.35f);
     public Color cleaningColor = new Color(0.35f, 0.65f, 0.9f);
@@ -104,9 +109,29 @@ public class Room2DController : MonoBehaviour
             stateLabel.text = GetStateDisplayName();
         }
 
+        if (nextActionLabel != null)
+        {
+            nextActionLabel.text = GetNextActionDisplayName();
+        }
+
+        if (roomNameLabel != null)
+        {
+            roomNameLabel.text = roomName;
+        }
+
         if (stateLabelTextMeshPro != null)
         {
             stateLabelTextMeshPro.text = GetStateDisplayName();
+        }
+
+        if (nextActionLabelTextMeshPro != null)
+        {
+            nextActionLabelTextMeshPro.text = GetNextActionDisplayName();
+        }
+
+        if (roomNameLabelTextMeshPro != null)
+        {
+            roomNameLabelTextMeshPro.text = roomName;
         }
     }
 
@@ -145,6 +170,21 @@ public class Room2DController : MonoBehaviour
                 return "Ready";
             default:
                 return "Dirty";
+        }
+    }
+
+    private string GetNextActionDisplayName()
+    {
+        switch (currentState)
+        {
+            case Room2DState.Cleaning:
+                return "Next: Finish Cleaning";
+            case Room2DState.AwaitingInspection:
+                return "Next: Inspect Room";
+            case Room2DState.Ready:
+                return "Next: Guest Check In";
+            default:
+                return "Next: Start Cleaning";
         }
     }
 }

@@ -15,7 +15,8 @@ public class Room2DPrototypeNotes : MonoBehaviour
     // 6. Drag the room SpriteRenderer or Image into the controller.
     // 7. Optionally create one child object per state and assign them to the visual slots.
     // 8. Add simple UI Buttons that call SetDirty, SetCleaning, SetAwaitingInspection, SetReady, or CycleToNextState.
-    // 9. Add a UI Text label and assign it to stateLabel so Play Mode shows the current room state.
+    // 9. Add UI labels for roomName, current state, and next action.
+    // 10. Assign TMP labels to the TextMeshPro fields if using Text (TMP).
 
     // First visual target:
     // Dirty = messy room color or overlay.
