@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
 
 public class Room2DController : MonoBehaviour
 {
@@ -14,6 +15,10 @@ public class Room2DController : MonoBehaviour
     [Header("Optional Tint Target")]
     public SpriteRenderer roomSpriteRenderer;
     public Image roomImage;
+
+    [Header("Optional UI")]
+    public Text stateLabel;
+    public TMP_Text stateLabelTextMeshPro;
 
     public Color dirtyColor = new Color(0.65f, 0.45f, 0.35f);
     public Color cleaningColor = new Color(0.35f, 0.65f, 0.9f);
@@ -93,6 +98,16 @@ public class Room2DController : MonoBehaviour
         {
             roomImage.color = stateColor;
         }
+
+        if (stateLabel != null)
+        {
+            stateLabel.text = GetStateDisplayName();
+        }
+
+        if (stateLabelTextMeshPro != null)
+        {
+            stateLabelTextMeshPro.text = GetStateDisplayName();
+        }
     }
 
     private void SetVisualActive(GameObject visual, bool isActive)
@@ -115,6 +130,21 @@ public class Room2DController : MonoBehaviour
                 return readyColor;
             default:
                 return dirtyColor;
+        }
+    }
+
+    private string GetStateDisplayName()
+    {
+        switch (currentState)
+        {
+            case Room2DState.Cleaning:
+                return "Cleaning";
+            case Room2DState.AwaitingInspection:
+                return "Awaiting Inspection";
+            case Room2DState.Ready:
+                return "Ready";
+            default:
+                return "Dirty";
         }
     }
 }
