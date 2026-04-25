@@ -28,12 +28,13 @@ Hotel_Rooms_2D_Proto
 
 ## Room Entity Development Flow
 1. Room data entity: identity, floor, room number, state, action count.
-2. Room visual controller: state color, state markers, UI labels.
+2. Room visual controller: state color and state markers.
 3. Room fake-depth visual: shadow, floor, back wall, side walls, furniture sorting.
-4. Room UI feedback: room name, state, next action, action count.
+4. Room label view: per-room TMP labels under each room entity.
 5. Room overview: scene-level counts for Dirty, Cleaning, AwaitingInspection, Ready.
 6. Room interaction: one main action button that advances the room workflow.
-7. Room layout scale-up: duplicate one working room into multiple rooms and floors.
+7. Room prefab: convert one working room entity into a reusable Unity Prefab.
+8. Room layout scale-up: duplicate one working prefab into multiple rooms and floors.
 
 ## Coding Rules
 - Keep systems small and simple

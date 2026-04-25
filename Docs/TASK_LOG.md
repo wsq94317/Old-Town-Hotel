@@ -16,6 +16,7 @@ Build first playable fake-3D 2D room entity prototype.
 - Room2DFakeDepthVisual created for simple sprite layer ordering
 - Room2DOverview created for scene-level room state counts
 - Room2DController now auto-finds Room2DOverview for easier room duplication
+- Room2DLabelView created for per-room TMP labels under each room entity
 
 ## Next
 - Attach Room2DEntity to Room_A_2D in Unity
@@ -24,3 +25,4 @@ Build first playable fake-3D 2D room entity prototype.
 - Create Shadow, Floor, BackWall, LeftWall, RightWall sprite children
 - Duplicate one working room after the first room entity feels correct
 - Rename duplicated rooms and update each Room2DEntity room number
+- Convert the finished Room_A_2D object into a reusable Unity Prefab

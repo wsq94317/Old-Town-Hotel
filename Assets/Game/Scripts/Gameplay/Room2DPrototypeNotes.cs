@@ -20,9 +20,10 @@ public class Room2DPrototypeNotes : MonoBehaviour
     // 11. Drag the room SpriteRenderer or Image into the controller.
     // 12. Optionally create one child object per state and assign them to the visual slots.
     // 13. Add simple UI Buttons that call PerformNextAction or the direct state methods.
-    // 14. Add UI labels for roomName, current state, next action, and action count.
-    // 15. Assign TMP labels to the TextMeshPro fields if using Text (TMP).
-    // 16. Add Room2DOverview to a scene UI object for summary counts across rooms.
+    // 14. Add a Room2DLabelView child object under each room entity.
+    // 15. Put roomName, current state, next action, and action count TMP labels under that child.
+    // 16. Assign those TMP labels to Room2DLabelView.
+    // 17. Add Room2DOverview to a scene UI object for summary counts across rooms.
 
     // First visual target:
     // Dirty = messy room color or overlay.
@@ -41,6 +42,10 @@ public class Room2DPrototypeNotes : MonoBehaviour
     // Room overview target:
     // Count how many rooms are Dirty, Cleaning, AwaitingInspection, and Ready.
     // This becomes useful once the first room is duplicated into multiple room entities.
+
+    // Prefab target:
+    // Once Room_A_2D contains entity, controller, visuals, and label view, drag it into Assets/Game/Prefabs.
+    // Unity Prefabs are the reusable room "class instances" for building many rooms.
 
     // Do not add front desk, lounge, random events, or old 3D click logic here yet.
 }

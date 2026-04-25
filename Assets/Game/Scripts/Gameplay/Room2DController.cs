@@ -1,10 +1,10 @@
 using UnityEngine;
 using UnityEngine.UI;
-using TMPro;
 
 public class Room2DController : MonoBehaviour
 {
     public Room2DEntity roomEntity;
+    public Room2DLabelView labelView;
     public Room2DOverview roomOverview;
     public string roomName = "Room 101";
     public Room2DState currentState = Room2DState.Dirty;
@@ -20,12 +20,6 @@ public class Room2DController : MonoBehaviour
     public SpriteRenderer roomSpriteRenderer;
     public Image roomImage;
 
-    [Header("Optional UI")]
-    public TMP_Text roomNameLabelTextMeshPro;
-    public TMP_Text stateLabelTextMeshPro;
-    public TMP_Text nextActionLabelTextMeshPro;
-    public TMP_Text actionCountLabelTextMeshPro;
-
     public Color dirtyColor = new Color(0.65f, 0.45f, 0.35f);
     public Color cleaningColor = new Color(0.35f, 0.65f, 0.9f);
     public Color awaitingInspectionColor = new Color(0.95f, 0.8f, 0.35f);
@@ -34,6 +28,7 @@ public class Room2DController : MonoBehaviour
     private void Awake()
     {
         FindRoomEntityIfNeeded();
+        FindLabelViewIfNeeded();
         FindRoomOverviewIfNeeded();
     }
 
@@ -46,6 +41,7 @@ public class Room2DController : MonoBehaviour
     private void OnValidate()
     {
         FindRoomEntityIfNeeded();
+        FindLabelViewIfNeeded();
         ApplyStateVisual();
     }
 
@@ -139,25 +135,7 @@ public class Room2DController : MonoBehaviour
             roomImage.color = stateColor;
         }
 
-        if (stateLabelTextMeshPro != null)
-        {
-            stateLabelTextMeshPro.text = GetStateDisplayName();
-        }
-
-        if (nextActionLabelTextMeshPro != null)
-        {
-            nextActionLabelTextMeshPro.text = GetNextActionDisplayName();
-        }
-
-        if (roomNameLabelTextMeshPro != null)
-        {
-            roomNameLabelTextMeshPro.text = GetRoomName();
-        }
-
-        if (actionCountLabelTextMeshPro != null)
-        {
-            actionCountLabelTextMeshPro.text = GetActionCountDisplayName();
-        }
+        RefreshLabelView();
     }
 
     private void SetVisualActive(GameObject visual, bool isActive)
@@ -183,66 +161,6 @@ public class Room2DController : MonoBehaviour
         }
     }
 
-    private string GetStateDisplayName()
-    {
-        if (roomEntity != null)
-        {
-            return roomEntity.GetStateDisplayName();
-        }
-
-        switch (currentState)
-        {
-            case Room2DState.Cleaning:
-                return "Cleaning";
-            case Room2DState.AwaitingInspection:
-                return "Awaiting Inspection";
-            case Room2DState.Ready:
-                return "Ready";
-            default:
-                return "Dirty";
-        }
-    }
-
-    private string GetNextActionDisplayName()
-    {
-        if (roomEntity != null)
-        {
-            return roomEntity.GetNextActionDisplayName();
-        }
-
-        switch (currentState)
-        {
-            case Room2DState.Cleaning:
-                return "Next: Finish Cleaning";
-            case Room2DState.AwaitingInspection:
-                return "Next: Approve Inspection";
-            case Room2DState.Ready:
-                return "Next: Simulate Checkout";
-            default:
-                return "Next: Start Cleaning";
-        }
-    }
-
-    private string GetActionCountDisplayName()
-    {
-        if (roomEntity != null)
-        {
-            return roomEntity.GetActionCountDisplayName();
-        }
-
-        return "Actions: " + actionCount;
-    }
-
-    private string GetRoomName()
-    {
-        if (roomEntity != null)
-        {
-            return roomEntity.roomName;
-        }
-
-        return roomName;
-    }
-
     private Room2DState GetCurrentState()
     {
         if (roomEntity != null)
@@ -261,6 +179,14 @@ public class Room2DController : MonoBehaviour
         }
     }
 
+    private void FindLabelViewIfNeeded()
+    {
+        if (labelView == null)
+        {
+            labelView = GetComponentInChildren<Room2DLabelView>(true);
+        }
+    }
+
     private void FindRoomOverviewIfNeeded()
     {
         if (roomOverview == null)
@@ -276,6 +202,16 @@ public class Room2DController : MonoBehaviour
         if (roomOverview != null)
         {
             roomOverview.RefreshSummary();
+        }
+    }
+
+    private void RefreshLabelView()
+    {
+        FindLabelViewIfNeeded();
+
+        if (labelView != null && roomEntity != null)
+        {
+            labelView.Refresh(roomEntity);
         }
     }
 }
