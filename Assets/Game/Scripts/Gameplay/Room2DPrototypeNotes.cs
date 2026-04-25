@@ -22,6 +22,7 @@ public class Room2DPrototypeNotes : MonoBehaviour
     // 13. Add simple UI Buttons that call PerformNextAction or the direct state methods.
     // 14. Add UI labels for roomName, current state, next action, and action count.
     // 15. Assign TMP labels to the TextMeshPro fields if using Text (TMP).
+    // 16. Add Room2DOverview to a scene UI object for summary counts across rooms.
 
     // First visual target:
     // Dirty = messy room color or overlay.
@@ -36,6 +37,10 @@ public class Room2DPrototypeNotes : MonoBehaviour
     // Shadow = front layer for the current prototype.
     // Furniture = simple sprite blocks above floor/back wall.
     // True angled side walls should wait until we have real sprites or polygon art.
+
+    // Room overview target:
+    // Count how many rooms are Dirty, Cleaning, AwaitingInspection, and Ready.
+    // This becomes useful once the first room is duplicated into multiple room entities.
 
     // Do not add front desk, lounge, random events, or old 3D click logic here yet.
 }

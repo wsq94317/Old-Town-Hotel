@@ -5,6 +5,7 @@ using TMPro;
 public class Room2DController : MonoBehaviour
 {
     public Room2DEntity roomEntity;
+    public Room2DOverview roomOverview;
     public string roomName = "Room 101";
     public Room2DState currentState = Room2DState.Dirty;
     public int actionCount;
@@ -62,6 +63,7 @@ public class Room2DController : MonoBehaviour
         }
 
         ApplyStateVisual();
+        RefreshOverview();
     }
 
     public void SetDirty()
@@ -95,6 +97,7 @@ public class Room2DController : MonoBehaviour
         {
             roomEntity.PerformNextAction();
             ApplyStateVisual();
+            RefreshOverview();
             return;
         }
 
@@ -277,6 +280,14 @@ public class Room2DController : MonoBehaviour
         if (roomEntity == null)
         {
             roomEntity = GetComponent<Room2DEntity>();
+        }
+    }
+
+    private void RefreshOverview()
+    {
+        if (roomOverview != null)
+        {
+            roomOverview.RefreshSummary();
         }
     }
 }

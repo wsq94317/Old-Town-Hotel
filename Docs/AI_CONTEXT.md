@@ -31,8 +31,9 @@ Hotel_Rooms_2D_Proto
 2. Room visual controller: state color, state markers, UI labels.
 3. Room fake-depth visual: shadow, floor, back wall, side walls, furniture sorting.
 4. Room UI feedback: room name, state, next action, action count.
-5. Room interaction: one main action button that advances the room workflow.
-6. Room layout scale-up: duplicate one working room into multiple rooms and floors.
+5. Room overview: scene-level counts for Dirty, Cleaning, AwaitingInspection, Ready.
+6. Room interaction: one main action button that advances the room workflow.
+7. Room layout scale-up: duplicate one working room into multiple rooms and floors.
 
 ## Coding Rules
 - Keep systems small and simple
