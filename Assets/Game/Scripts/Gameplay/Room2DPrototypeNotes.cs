@@ -14,7 +14,7 @@ public class Room2DPrototypeNotes : MonoBehaviour
     // 5. Attach Room2DController to the room root object.
     // 6. Drag the room SpriteRenderer or Image into the controller.
     // 7. Optionally create one child object per state and assign them to the visual slots.
-    // 8. Add simple UI Buttons that call SetDirty, SetCleaning, SetAwaitingInspection, SetReady, or CycleToNextState.
+    // 8. Add simple UI Buttons that call PerformNextAction or the direct state methods.
     // 9. Add UI labels for roomName, current state, and next action.
     // 10. Assign TMP labels to the TextMeshPro fields if using Text (TMP).
 

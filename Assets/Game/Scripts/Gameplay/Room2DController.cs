@@ -68,6 +68,11 @@ public class Room2DController : MonoBehaviour
 
     public void CycleToNextState()
     {
+        PerformNextAction();
+    }
+
+    public void PerformNextAction()
+    {
         switch (currentState)
         {
             case Room2DState.Dirty:
@@ -180,9 +185,9 @@ public class Room2DController : MonoBehaviour
             case Room2DState.Cleaning:
                 return "Next: Finish Cleaning";
             case Room2DState.AwaitingInspection:
-                return "Next: Inspect Room";
+                return "Next: Approve Inspection";
             case Room2DState.Ready:
-                return "Next: Guest Check In";
+                return "Next: Simulate Checkout";
             default:
                 return "Next: Start Cleaning";
         }
