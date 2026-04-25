@@ -1,13 +1,12 @@
 using TMPro;
 using UnityEngine;
-using UnityEngine.UI;
 
 public class Room2DOverview : MonoBehaviour
 {
+    public bool autoFindRoomsOnRefresh = true;
     public Room2DEntity[] rooms;
 
     [Header("Optional UI")]
-    public Text summaryLabel;
     public TMP_Text summaryLabelTextMeshPro;
 
     private void Start()
@@ -61,11 +60,6 @@ public class Room2DOverview : MonoBehaviour
             + "  Inspect: " + awaitingInspectionCount
             + "  Ready: " + readyCount;
 
-        if (summaryLabel != null)
-        {
-            summaryLabel.text = summaryText;
-        }
-
         if (summaryLabelTextMeshPro != null)
         {
             summaryLabelTextMeshPro.text = summaryText;
@@ -74,7 +68,7 @@ public class Room2DOverview : MonoBehaviour
 
     private void FindRoomsIfNeeded()
     {
-        if (rooms == null || rooms.Length == 0)
+        if (autoFindRoomsOnRefresh || rooms == null || rooms.Length == 0)
         {
             rooms = FindObjectsByType<Room2DEntity>(FindObjectsSortMode.None);
         }

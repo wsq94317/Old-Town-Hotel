@@ -21,10 +21,6 @@ public class Room2DController : MonoBehaviour
     public Image roomImage;
 
     [Header("Optional UI")]
-    public Text roomNameLabel;
-    public Text stateLabel;
-    public Text nextActionLabel;
-    public Text actionCountLabel;
     public TMP_Text roomNameLabelTextMeshPro;
     public TMP_Text stateLabelTextMeshPro;
     public TMP_Text nextActionLabelTextMeshPro;
@@ -38,10 +34,12 @@ public class Room2DController : MonoBehaviour
     private void Awake()
     {
         FindRoomEntityIfNeeded();
+        FindRoomOverviewIfNeeded();
     }
 
     private void Start()
     {
+        FindRoomOverviewIfNeeded();
         ApplyStateVisual();
     }
 
@@ -139,26 +137,6 @@ public class Room2DController : MonoBehaviour
         if (roomImage != null)
         {
             roomImage.color = stateColor;
-        }
-
-        if (stateLabel != null)
-        {
-            stateLabel.text = GetStateDisplayName();
-        }
-
-        if (nextActionLabel != null)
-        {
-            nextActionLabel.text = GetNextActionDisplayName();
-        }
-
-        if (roomNameLabel != null)
-        {
-            roomNameLabel.text = GetRoomName();
-        }
-
-        if (actionCountLabel != null)
-        {
-            actionCountLabel.text = GetActionCountDisplayName();
         }
 
         if (stateLabelTextMeshPro != null)
@@ -283,8 +261,18 @@ public class Room2DController : MonoBehaviour
         }
     }
 
+    private void FindRoomOverviewIfNeeded()
+    {
+        if (roomOverview == null)
+        {
+            roomOverview = FindFirstObjectByType<Room2DOverview>();
+        }
+    }
+
     private void RefreshOverview()
     {
+        FindRoomOverviewIfNeeded();
+
         if (roomOverview != null)
         {
             roomOverview.RefreshSummary();
