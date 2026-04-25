@@ -14,6 +14,7 @@ public class Room2DPrototypeNotes : MonoBehaviour
     // 5. Attach Room2DController to the room root object.
     // 6. Drag the room SpriteRenderer or Image into the controller.
     // 7. Optionally create one child object per state and assign them to the visual slots.
+    // 8. Add simple UI Buttons that call SetDirty, SetCleaning, SetAwaitingInspection, SetReady, or CycleToNextState.
 
     // First visual target:
     // Dirty = messy room color or overlay.

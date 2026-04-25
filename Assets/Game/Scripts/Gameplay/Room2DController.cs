@@ -36,6 +36,45 @@ public class Room2DController : MonoBehaviour
         ApplyStateVisual();
     }
 
+    public void SetDirty()
+    {
+        SetState(Room2DState.Dirty);
+    }
+
+    public void SetCleaning()
+    {
+        SetState(Room2DState.Cleaning);
+    }
+
+    public void SetAwaitingInspection()
+    {
+        SetState(Room2DState.AwaitingInspection);
+    }
+
+    public void SetReady()
+    {
+        SetState(Room2DState.Ready);
+    }
+
+    public void CycleToNextState()
+    {
+        switch (currentState)
+        {
+            case Room2DState.Dirty:
+                SetState(Room2DState.Cleaning);
+                break;
+            case Room2DState.Cleaning:
+                SetState(Room2DState.AwaitingInspection);
+                break;
+            case Room2DState.AwaitingInspection:
+                SetState(Room2DState.Ready);
+                break;
+            default:
+                SetState(Room2DState.Dirty);
+                break;
+        }
+    }
+
     public void ApplyStateVisual()
     {
         SetVisualActive(dirtyVisual, currentState == Room2DState.Dirty);
