@@ -13,9 +13,11 @@ Build first playable fake-3D 2D room entity prototype.
 - Room2DController created
 - Room2DEntity created
 - Room color, state marker, labels, button flow, and action count working
+- Room2DFakeDepthVisual created for simple sprite layer ordering
 
 ## Next
 - Attach Room2DEntity to Room_A_2D in Unity
 - Use Room2DEntity as the room data source
-- Improve fake-3D 2D room art with simple sprite layers
+- Attach Room2DFakeDepthVisual to Room_A_2D in Unity
+- Create Shadow, Floor, BackWall, LeftWall, RightWall sprite children
 - Duplicate one working room after the first room entity feels correct

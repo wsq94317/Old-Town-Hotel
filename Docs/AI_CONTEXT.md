@@ -28,10 +28,11 @@ Hotel_Rooms_2D_Proto
 
 ## Room Entity Development Flow
 1. Room data entity: identity, floor, room number, state, action count.
-2. Room visual controller: state color, state markers, fake-3D 2D sprite layers.
-3. Room UI feedback: room name, state, next action, action count.
-4. Room interaction: one main action button that advances the room workflow.
-5. Room layout scale-up: duplicate one working room into multiple rooms and floors.
+2. Room visual controller: state color, state markers, UI labels.
+3. Room fake-depth visual: shadow, floor, back wall, side walls, furniture sorting.
+4. Room UI feedback: room name, state, next action, action count.
+5. Room interaction: one main action button that advances the room workflow.
+6. Room layout scale-up: duplicate one working room into multiple rooms and floors.
 
 ## Coding Rules
 - Keep systems small and simple
