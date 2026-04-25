@@ -10,13 +10,16 @@ public class Room2DPrototypeNotes : MonoBehaviour
     // 1. Use a portrait Game view.
     // 2. Use an Orthographic camera.
     // 3. Build one room from flat 2D sprites or UI Images.
-    // 4. Fake depth with layered sprites, shadows, scale, and sorting order.
-    // 5. Attach Room2DController to the room root object.
-    // 6. Drag the room SpriteRenderer or Image into the controller.
-    // 7. Optionally create one child object per state and assign them to the visual slots.
-    // 8. Add simple UI Buttons that call PerformNextAction or the direct state methods.
-    // 9. Add UI labels for roomName, current state, and next action.
-    // 10. Assign TMP labels to the TextMeshPro fields if using Text (TMP).
+    // 4. Attach Room2DEntity to the room root object for room data.
+    // 5. Attach Room2DController to the room root object for visuals and UI.
+    // 6. Drag the Room2DEntity component into the controller's roomEntity field.
+    // 7. Fake depth with layered sprites, shadows, scale, and sorting order.
+    // 8. Drag the room SpriteRenderer or Image into the controller.
+    // 9. Optionally create one child object per state and assign them to the visual slots.
+    // 10. Add simple UI Buttons that call PerformNextAction or the direct state methods.
+    // 11. Add UI labels for roomName, current state, and next action.
+    // 12. Assign TMP labels to the TextMeshPro fields if using Text (TMP).
+    // 11. Optionally add an action count label to confirm each next-action click is recorded.
 
     // First visual target:
     // Dirty = messy room color or overlay.

@@ -555,7 +555,7 @@ Transform:
   m_GameObject: {fileID: 1177333698}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: -1.25, z: 0}
+  m_LocalPosition: {x: 0, y: -1.25, z: -5}
   m_LocalScale: {x: 4, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -1318,6 +1318,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Room2DController
   roomName: Room 101
   currentState: 0
+  actionCount: 0
   dirtyVisual: {fileID: 1034778967}
   cleaningVisual: {fileID: 1365866616}
   awaitingInspectionVisual: {fileID: 1581020483}
@@ -1327,9 +1328,11 @@ MonoBehaviour:
   roomNameLabel: {fileID: 0}
   stateLabel: {fileID: 0}
   nextActionLabel: {fileID: 0}
+  actionCountLabel: {fileID: 0}
   roomNameLabelTextMeshPro: {fileID: 1362744709}
   stateLabelTextMeshPro: {fileID: 1747229622}
   nextActionLabelTextMeshPro: {fileID: 1284856301}
+  actionCountLabelTextMeshPro: {fileID: 0}
   dirtyColor: {r: 0.65, g: 0.45, b: 0.35, a: 1}
   cleaningColor: {r: 0.35, g: 0.65, b: 0.9, a: 1}
   awaitingInspectionColor: {r: 0.95, g: 0.8, b: 0.35, a: 1}
@@ -1483,7 +1486,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0, y: -83}
+  m_AnchoredPosition: {x: 0, y: 69}
   m_SizeDelta: {x: 200, y: 50}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1 &1826808603

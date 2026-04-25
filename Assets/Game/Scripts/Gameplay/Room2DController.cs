@@ -4,8 +4,10 @@ using TMPro;
 
 public class Room2DController : MonoBehaviour
 {
+    public Room2DEntity roomEntity;
     public string roomName = "Room 101";
     public Room2DState currentState = Room2DState.Dirty;
+    public int actionCount;
 
     [Header("Optional State Visuals")]
     public GameObject dirtyVisual;
@@ -21,14 +23,21 @@ public class Room2DController : MonoBehaviour
     public Text roomNameLabel;
     public Text stateLabel;
     public Text nextActionLabel;
+    public Text actionCountLabel;
     public TMP_Text roomNameLabelTextMeshPro;
     public TMP_Text stateLabelTextMeshPro;
     public TMP_Text nextActionLabelTextMeshPro;
+    public TMP_Text actionCountLabelTextMeshPro;
 
     public Color dirtyColor = new Color(0.65f, 0.45f, 0.35f);
     public Color cleaningColor = new Color(0.35f, 0.65f, 0.9f);
     public Color awaitingInspectionColor = new Color(0.95f, 0.8f, 0.35f);
     public Color readyColor = new Color(0.45f, 0.8f, 0.45f);
+
+    private void Awake()
+    {
+        FindRoomEntityIfNeeded();
+    }
 
     private void Start()
     {
@@ -37,12 +46,21 @@ public class Room2DController : MonoBehaviour
 
     private void OnValidate()
     {
+        FindRoomEntityIfNeeded();
         ApplyStateVisual();
     }
 
     public void SetState(Room2DState newState)
     {
-        currentState = newState;
+        if (roomEntity != null)
+        {
+            roomEntity.SetState(newState);
+        }
+        else
+        {
+            currentState = newState;
+        }
+
         ApplyStateVisual();
     }
 
@@ -73,6 +91,15 @@ public class Room2DController : MonoBehaviour
 
     public void PerformNextAction()
     {
+        if (roomEntity != null)
+        {
+            roomEntity.PerformNextAction();
+            ApplyStateVisual();
+            return;
+        }
+
+        actionCount++;
+
         switch (currentState)
         {
             case Room2DState.Dirty:
@@ -92,10 +119,12 @@ public class Room2DController : MonoBehaviour
 
     public void ApplyStateVisual()
     {
-        SetVisualActive(dirtyVisual, currentState == Room2DState.Dirty);
-        SetVisualActive(cleaningVisual, currentState == Room2DState.Cleaning);
-        SetVisualActive(awaitingInspectionVisual, currentState == Room2DState.AwaitingInspection);
-        SetVisualActive(readyVisual, currentState == Room2DState.Ready);
+        Room2DState visualState = GetCurrentState();
+
+        SetVisualActive(dirtyVisual, visualState == Room2DState.Dirty);
+        SetVisualActive(cleaningVisual, visualState == Room2DState.Cleaning);
+        SetVisualActive(awaitingInspectionVisual, visualState == Room2DState.AwaitingInspection);
+        SetVisualActive(readyVisual, visualState == Room2DState.Ready);
 
         Color stateColor = GetStateColor();
 
@@ -121,7 +150,12 @@ public class Room2DController : MonoBehaviour
 
         if (roomNameLabel != null)
         {
-            roomNameLabel.text = roomName;
+            roomNameLabel.text = GetRoomName();
+        }
+
+        if (actionCountLabel != null)
+        {
+            actionCountLabel.text = GetActionCountDisplayName();
         }
 
         if (stateLabelTextMeshPro != null)
@@ -136,7 +170,12 @@ public class Room2DController : MonoBehaviour
 
         if (roomNameLabelTextMeshPro != null)
         {
-            roomNameLabelTextMeshPro.text = roomName;
+            roomNameLabelTextMeshPro.text = GetRoomName();
+        }
+
+        if (actionCountLabelTextMeshPro != null)
+        {
+            actionCountLabelTextMeshPro.text = GetActionCountDisplayName();
         }
     }
 
@@ -150,7 +189,7 @@ public class Room2DController : MonoBehaviour
 
     private Color GetStateColor()
     {
-        switch (currentState)
+        switch (GetCurrentState())
         {
             case Room2DState.Cleaning:
                 return cleaningColor;
@@ -165,6 +204,11 @@ public class Room2DController : MonoBehaviour
 
     private string GetStateDisplayName()
     {
+        if (roomEntity != null)
+        {
+            return roomEntity.GetStateDisplayName();
+        }
+
         switch (currentState)
         {
             case Room2DState.Cleaning:
@@ -180,6 +224,11 @@ public class Room2DController : MonoBehaviour
 
     private string GetNextActionDisplayName()
     {
+        if (roomEntity != null)
+        {
+            return roomEntity.GetNextActionDisplayName();
+        }
+
         switch (currentState)
         {
             case Room2DState.Cleaning:
@@ -190,6 +239,44 @@ public class Room2DController : MonoBehaviour
                 return "Next: Simulate Checkout";
             default:
                 return "Next: Start Cleaning";
+        }
+    }
+
+    private string GetActionCountDisplayName()
+    {
+        if (roomEntity != null)
+        {
+            return roomEntity.GetActionCountDisplayName();
+        }
+
+        return "Actions: " + actionCount;
+    }
+
+    private string GetRoomName()
+    {
+        if (roomEntity != null)
+        {
+            return roomEntity.roomName;
+        }
+
+        return roomName;
+    }
+
+    private Room2DState GetCurrentState()
+    {
+        if (roomEntity != null)
+        {
+            return roomEntity.currentState;
+        }
+
+        return currentState;
+    }
+
+    private void FindRoomEntityIfNeeded()
+    {
+        if (roomEntity == null)
+        {
+            roomEntity = GetComponent<Room2DEntity>();
         }
     }
 }

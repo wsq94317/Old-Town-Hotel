@@ -16,14 +16,22 @@ Old downtown travel hotel.
 - Random incidents like cockroach complaints
 
 ## Current Prototype Goal
-Build the Room View prototype first:
-- 3 floors
-- 4 rooms per floor
+Build the fake-3D 2D Room View prototype first inside the current Unity project:
+- One clear room entity first
 - Simple room state visualization
+- UI labels for room name, current state, next action, and action count
+- Beginner-friendly scene setup in Unity
 - States: Dirty, Cleaning, AwaitingInspection, Ready
 
 ## Current Scene
-Hotel_Rooms
+Hotel_Rooms_2D_Proto
+
+## Room Entity Development Flow
+1. Room data entity: identity, floor, room number, state, action count.
+2. Room visual controller: state color, state markers, fake-3D 2D sprite layers.
+3. Room UI feedback: room name, state, next action, action count.
+4. Room interaction: one main action button that advances the room workflow.
+5. Room layout scale-up: duplicate one working room into multiple rooms and floors.
 
 ## Coding Rules
 - Keep systems small and simple
