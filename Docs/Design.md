@@ -296,37 +296,48 @@ Dirty
 Cleaning
 AwaitingInspection
 Ready
+Occupied
 
 后续可扩展：
 
-Occupied
 CheckOutDue
 Blocked
 DeepCleanDue
 10.2 当前原型要求
 
-原型阶段只做以下四种：
+原型阶段现在包含以下五种：
 
 Dirty
 Cleaning
 AwaitingInspection
 Ready
+Occupied
 10.3 正常状态流转
 
-Dirty
+Ready
+→ Occupied
+→ Dirty
 → Cleaning
 → AwaitingInspection
 → Ready
 
+说明：
+
+Ready 表示空房、干净、可以入住。
+Occupied 表示客人正在房间中。
+Dirty 表示客人退房后产生了清洁需求。
+
 10.4 后续扩展流转
 
-Occupied
+后续可以扩展为：
+
+Ready
+→ Occupied
 → CheckOutDue
 → Dirty
 → Cleaning
 → AwaitingInspection
 → Ready
-→ Occupied
 
 10.5 失败 / 异常流转
 
@@ -346,6 +357,27 @@ AwaitingInspection
 必要时的小图标
 后续可能有 ETA 紧急标识
 后续可能有“已预分配”标记
+
+10.7 房间和评价相关属性
+
+后续房间需要拆分多个质量属性，不要只用一个“干净/不干净”判断：
+
+清洁度
+陈旧程度 / 磨损程度
+噪音
+舒适度
+房型或面积
+
+一个房间可以是干净的，但因为陈旧或磨损让高要求客人不满意。
+
+后续评分系统应同时考虑客人偏好和房间属性。
+
+旧版简化流转记录：
+
+Dirty
+→ Cleaning
+→ AwaitingInspection
+→ Ready
 11. 客人系统设计
 11.1 当前原型客人目标
 
@@ -385,9 +417,17 @@ ETA
 靠电梯
 远离电梯
 安静
+高洁净度要求
+不能接受陈旧房间
 无要求
 
-当前原型可先不做。
+当前原型先记录需求，不实现完整客人匹配。
+
+11.5 客人评价 User Story
+
+作为一个对清洁度要求极高的客人，我希望被分配到足够干净、维护状态也足够好的房间，否则即使房间完成了清洁，我也可能因为陈旧、磨损或不符合偏好而给出较差评价。
+
+作为酒店管理者，我希望每个已入住客人都能和一个 Occupied 房间一一对应，这样退房、清洁需求和最终评价都能追溯到具体房间。
 
 12. 前台系统设计
 12.1 前台人数

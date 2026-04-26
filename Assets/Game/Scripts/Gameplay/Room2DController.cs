@@ -15,6 +15,7 @@ public class Room2DController : MonoBehaviour
     public GameObject cleaningVisual;
     public GameObject awaitingInspectionVisual;
     public GameObject readyVisual;
+    public GameObject occupiedVisual;
     public GameObject selectedVisual;
 
     [Header("Optional Tint Target")]
@@ -25,6 +26,7 @@ public class Room2DController : MonoBehaviour
     public Color cleaningColor = new Color(0.35f, 0.65f, 0.9f);
     public Color awaitingInspectionColor = new Color(0.95f, 0.8f, 0.35f);
     public Color readyColor = new Color(0.45f, 0.8f, 0.45f);
+    public Color occupiedColor = new Color(0.75f, 0.6f, 0.9f);
 
     private void Awake()
     {
@@ -81,6 +83,11 @@ public class Room2DController : MonoBehaviour
         SetState(Room2DState.Ready);
     }
 
+    public void SetOccupied()
+    {
+        SetState(Room2DState.Occupied);
+    }
+
     public void CycleToNextState()
     {
         PerformNextAction();
@@ -109,10 +116,18 @@ public class Room2DController : MonoBehaviour
             case Room2DState.AwaitingInspection:
                 SetState(Room2DState.Ready);
                 break;
+            case Room2DState.Ready:
+                SetState(Room2DState.Occupied);
+                break;
             default:
                 SetState(Room2DState.Dirty);
                 break;
         }
+    }
+
+    public void SimulateCheckIn()
+    {
+        PerformRoomAction(entity => entity.SimulateCheckIn(), Room2DState.Occupied);
     }
 
     public void SimulateCheckout()
@@ -143,6 +158,7 @@ public class Room2DController : MonoBehaviour
         SetVisualActive(cleaningVisual, visualState == Room2DState.Cleaning);
         SetVisualActive(awaitingInspectionVisual, visualState == Room2DState.AwaitingInspection);
         SetVisualActive(readyVisual, visualState == Room2DState.Ready);
+        SetVisualActive(occupiedVisual, visualState == Room2DState.Occupied);
 
         Color stateColor = GetStateColor();
 
@@ -201,6 +217,8 @@ public class Room2DController : MonoBehaviour
                 return awaitingInspectionColor;
             case Room2DState.Ready:
                 return readyColor;
+            case Room2DState.Occupied:
+                return occupiedColor;
             default:
                 return dirtyColor;
         }

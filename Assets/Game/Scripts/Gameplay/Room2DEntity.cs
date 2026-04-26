@@ -55,10 +55,25 @@ public class Room2DEntity : MonoBehaviour
             case Room2DState.AwaitingInspection:
                 ApproveInspection();
                 break;
+            case Room2DState.Ready:
+                SimulateCheckIn();
+                break;
             default:
                 SimulateCheckout();
                 break;
         }
+    }
+
+    public bool SimulateCheckIn()
+    {
+        if (!CanSimulateCheckIn())
+        {
+            return false;
+        }
+
+        actionCount++;
+        EnterState(Room2DState.Occupied, false);
+        return true;
     }
 
     public bool SimulateCheckout()
@@ -111,6 +126,11 @@ public class Room2DEntity : MonoBehaviour
 
     public bool CanSimulateCheckout()
     {
+        return currentState == Room2DState.Occupied;
+    }
+
+    public bool CanSimulateCheckIn()
+    {
         return currentState == Room2DState.Ready;
     }
 
@@ -139,6 +159,8 @@ public class Room2DEntity : MonoBehaviour
                 return "Awaiting Inspection";
             case Room2DState.Ready:
                 return "Ready";
+            case Room2DState.Occupied:
+                return "Occupied";
             default:
                 return "Dirty";
         }
@@ -153,6 +175,8 @@ public class Room2DEntity : MonoBehaviour
             case Room2DState.AwaitingInspection:
                 return "Next: Approve Inspection";
             case Room2DState.Ready:
+                return "Next: Simulate Check In";
+            case Room2DState.Occupied:
                 return "Next: Simulate Checkout";
             default:
                 return guestCheckedOut ? "Next: Start Cleaning" : "Next: Wait for Checkout";
@@ -191,6 +215,7 @@ public class Room2DEntity : MonoBehaviour
         switch (currentState)
         {
             case Room2DState.Ready:
+            case Room2DState.Occupied:
                 guestCheckedOut = false;
                 break;
             default:

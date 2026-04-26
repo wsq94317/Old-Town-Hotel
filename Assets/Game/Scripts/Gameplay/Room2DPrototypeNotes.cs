@@ -53,10 +53,12 @@ public class Room2DPrototypeNotes : MonoBehaviour
     // Avoid room click/raycast logic until the room prefab structure is stable.
 
     // Checkout target:
-    // Ready means the room is not checked out and does not need cleaning.
-    // Simulate Checkout moves Ready to Dirty and marks guestCheckedOut true.
+    // Ready means the room is clean, vacant, and can receive a guest.
+    // Occupied means a guest is currently staying in the room.
+    // Simulate Check In moves Ready to Occupied.
+    // Simulate Checkout moves Occupied to Dirty and marks guestCheckedOut true.
     // Dirty, Cleaning, and AwaitingInspection represent the post-checkout cleaning path.
-    // Explicit workflow actions are SimulateCheckout, StartCleaning, FinishCleaning, and ApproveInspection.
+    // Explicit workflow actions are SimulateCheckIn, SimulateCheckout, StartCleaning, FinishCleaning, and ApproveInspection.
     // Each explicit workflow action should only succeed from its valid current state.
 
     // Timing target:
@@ -67,9 +69,17 @@ public class Room2DPrototypeNotes : MonoBehaviour
 
     // Prototype loop target:
     // Add Room2DPrototypeLoop to a scene manager object when testing multiple rooms.
-    // Simulate Next Checkout finds the first Ready room and turns it Dirty.
+    // Simulate Next Check In finds the first Ready room and turns it Occupied.
+    // Simulate Next Checkout finds the first Occupied room and turns it Dirty.
+    // Simulate Next Guest Step checks out an Occupied room, or checks in a Ready room if none are occupied.
     // This creates room-cleaning demand without building the front desk system yet.
-    // Keep autoSimulateCheckoutDuringPlay off unless you intentionally want timed checkouts.
+    // Keep autoSimulateGuestFlowDuringPlay off unless you intentionally want timed guest flow.
+
+    // Guest-room story target:
+    // Later, one guest should be assigned to one Occupied room.
+    // Guests can have preferences such as high cleanliness expectations.
+    // Rooms can have separate quality attributes such as cleanliness and oldness/wear.
+    // A room may be clean but still feel old, which can reduce the guest's review.
 
     // Prefab target:
     // Once Room_A_2D contains entity, controller, visuals, and label view, drag it into Assets/Game/Prefabs.

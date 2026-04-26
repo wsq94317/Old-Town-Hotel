@@ -101,6 +101,7 @@ public class Room2DOverview : MonoBehaviour
         int cleaningCount = 0;
         int awaitingInspectionCount = 0;
         int readyCount = 0;
+        int occupiedCount = 0;
         int checkedOutCount = 0;
         float oldestDirtySeconds = 0f;
 
@@ -122,6 +123,9 @@ public class Room2DOverview : MonoBehaviour
                 case Room2DState.Ready:
                     readyCount++;
                     break;
+                case Room2DState.Occupied:
+                    occupiedCount++;
+                    break;
                 default:
                     dirtyCount++;
                     oldestDirtySeconds = Mathf.Max(oldestDirtySeconds, rooms[i].stateElapsedSeconds);
@@ -138,6 +142,7 @@ public class Room2DOverview : MonoBehaviour
             + "  Cleaning: " + cleaningCount
             + "  Inspect: " + awaitingInspectionCount
             + "  Ready: " + readyCount
+            + "  Occupied: " + occupiedCount
             + "  Checked Out: " + checkedOutCount
             + "  Oldest Dirty: " + FormatSeconds(oldestDirtySeconds);
 

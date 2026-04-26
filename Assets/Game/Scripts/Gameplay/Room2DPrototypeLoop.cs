@@ -3,14 +3,15 @@ using UnityEngine;
 public class Room2DPrototypeLoop : MonoBehaviour
 {
     public bool autoFindReferences = true;
-    public bool selectCheckedOutRoom = true;
-    public bool autoSimulateCheckoutDuringPlay;
-    public float autoCheckoutIntervalSeconds = 12f;
+    public bool selectChangedRoom = true;
+    public bool autoSimulateGuestFlowDuringPlay;
+    public float autoGuestFlowIntervalSeconds = 12f;
     public Room2DOverview roomOverview;
     public Room2DSelectionManager selectionManager;
+    public int simulatedCheckInCount;
     public int simulatedCheckoutCount;
 
-    private float autoCheckoutTimer;
+    private float autoGuestFlowTimer;
 
     private void Start()
     {
@@ -19,19 +20,34 @@ public class Room2DPrototypeLoop : MonoBehaviour
 
     private void Update()
     {
-        if (!autoSimulateCheckoutDuringPlay)
+        if (!autoSimulateGuestFlowDuringPlay)
         {
             return;
         }
 
-        autoCheckoutTimer += Time.deltaTime;
-        if (autoCheckoutTimer < autoCheckoutIntervalSeconds)
+        autoGuestFlowTimer += Time.deltaTime;
+        if (autoGuestFlowTimer < autoGuestFlowIntervalSeconds)
         {
             return;
         }
 
-        autoCheckoutTimer = 0f;
-        SimulateNextCheckout();
+        autoGuestFlowTimer = 0f;
+        SimulateNextGuestStep();
+    }
+
+    [ContextMenu("Simulate Next Guest Step")]
+    public void SimulateNextGuestStep()
+    {
+        FindReferencesIfNeeded();
+
+        if (FindFirstOccupiedRoom() != null)
+        {
+            SimulateNextCheckout();
+        }
+        else
+        {
+            SimulateNextCheckIn();
+        }
     }
 
     [ContextMenu("Simulate Next Checkout")]
@@ -39,7 +55,7 @@ public class Room2DPrototypeLoop : MonoBehaviour
     {
         FindReferencesIfNeeded();
 
-        Room2DController room = FindFirstReadyRoom();
+        Room2DController room = FindFirstOccupiedRoom();
         if (room == null || room.roomEntity == null)
         {
             return;
@@ -53,7 +69,7 @@ public class Room2DPrototypeLoop : MonoBehaviour
         simulatedCheckoutCount++;
         room.ApplyStateVisual();
 
-        if (selectCheckedOutRoom && selectionManager != null)
+        if (selectChangedRoom && selectionManager != null)
         {
             selectionManager.SelectRoom(room);
         }
@@ -64,15 +80,45 @@ public class Room2DPrototypeLoop : MonoBehaviour
         }
     }
 
-    public void SetAutoCheckoutEnabled(bool isEnabled)
+    [ContextMenu("Simulate Next Check In")]
+    public void SimulateNextCheckIn()
     {
-        autoSimulateCheckoutDuringPlay = isEnabled;
-        autoCheckoutTimer = 0f;
+        FindReferencesIfNeeded();
+
+        Room2DController room = FindFirstReadyRoom();
+        if (room == null || room.roomEntity == null)
+        {
+            return;
+        }
+
+        if (!room.roomEntity.SimulateCheckIn())
+        {
+            return;
+        }
+
+        simulatedCheckInCount++;
+        room.ApplyStateVisual();
+
+        if (selectChangedRoom && selectionManager != null)
+        {
+            selectionManager.SelectRoom(room);
+        }
+
+        if (roomOverview != null)
+        {
+            roomOverview.RefreshSummary();
+        }
     }
 
-    public void ToggleAutoCheckout()
+    public void SetAutoGuestFlowEnabled(bool isEnabled)
     {
-        SetAutoCheckoutEnabled(!autoSimulateCheckoutDuringPlay);
+        autoSimulateGuestFlowDuringPlay = isEnabled;
+        autoGuestFlowTimer = 0f;
+    }
+
+    public void ToggleAutoGuestFlow()
+    {
+        SetAutoGuestFlowEnabled(!autoSimulateGuestFlowDuringPlay);
     }
 
     private void FindReferencesIfNeeded()
@@ -110,7 +156,7 @@ public class Room2DPrototypeLoop : MonoBehaviour
                 continue;
             }
 
-            if (!rooms[i].roomEntity.CanSimulateCheckout())
+            if (!rooms[i].roomEntity.CanSimulateCheckIn())
             {
                 continue;
             }
@@ -122,6 +168,32 @@ public class Room2DPrototypeLoop : MonoBehaviour
         }
 
         return firstReadyRoom;
+    }
+
+    private Room2DController FindFirstOccupiedRoom()
+    {
+        Room2DController[] rooms = GetRoomControllers();
+        Room2DController firstOccupiedRoom = null;
+
+        for (int i = 0; i < rooms.Length; i++)
+        {
+            if (rooms[i] == null || rooms[i].roomEntity == null)
+            {
+                continue;
+            }
+
+            if (!rooms[i].roomEntity.CanSimulateCheckout())
+            {
+                continue;
+            }
+
+            if (firstOccupiedRoom == null || GetRoomNumber(rooms[i]) < GetRoomNumber(firstOccupiedRoom))
+            {
+                firstOccupiedRoom = rooms[i];
+            }
+        }
+
+        return firstOccupiedRoom;
     }
 
     private Room2DController[] GetRoomControllers()
