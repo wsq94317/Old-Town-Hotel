@@ -4,6 +4,8 @@ using UnityEngine;
 public class Room2DOverview : MonoBehaviour
 {
     public bool autoFindRoomsOnRefresh = true;
+    public bool refreshSummaryDuringPlay = true;
+    public float summaryRefreshInterval = 1f;
     public int prototypeStartFloor = 1;
     public int prototypeStartRoomNumber = 101;
     public bool numberRoomsByScenePosition = true;
@@ -13,9 +15,28 @@ public class Room2DOverview : MonoBehaviour
     [Header("Optional UI")]
     public TMP_Text summaryLabelTextMeshPro;
 
+    private float summaryRefreshTimer;
+
     private void Start()
     {
         FindRoomsIfNeeded();
+        RefreshSummary();
+    }
+
+    private void Update()
+    {
+        if (!refreshSummaryDuringPlay)
+        {
+            return;
+        }
+
+        summaryRefreshTimer += Time.deltaTime;
+        if (summaryRefreshTimer < summaryRefreshInterval)
+        {
+            return;
+        }
+
+        summaryRefreshTimer = 0f;
         RefreshSummary();
     }
 
@@ -81,6 +102,7 @@ public class Room2DOverview : MonoBehaviour
         int awaitingInspectionCount = 0;
         int readyCount = 0;
         int checkedOutCount = 0;
+        float oldestDirtySeconds = 0f;
 
         for (int i = 0; i < rooms.Length; i++)
         {
@@ -102,6 +124,7 @@ public class Room2DOverview : MonoBehaviour
                     break;
                 default:
                     dirtyCount++;
+                    oldestDirtySeconds = Mathf.Max(oldestDirtySeconds, rooms[i].stateElapsedSeconds);
                     break;
             }
 
@@ -115,7 +138,8 @@ public class Room2DOverview : MonoBehaviour
             + "  Cleaning: " + cleaningCount
             + "  Inspect: " + awaitingInspectionCount
             + "  Ready: " + readyCount
-            + "  Checked Out: " + checkedOutCount;
+            + "  Checked Out: " + checkedOutCount
+            + "  Oldest Dirty: " + FormatSeconds(oldestDirtySeconds);
 
         if (summaryLabelTextMeshPro != null)
         {
@@ -194,5 +218,19 @@ public class Room2DOverview : MonoBehaviour
         }
 
         return candidatePosition.x < currentPosition.x;
+    }
+
+    private string FormatSeconds(float seconds)
+    {
+        int wholeSeconds = Mathf.FloorToInt(seconds);
+        int minutes = wholeSeconds / 60;
+        int remainingSeconds = wholeSeconds % 60;
+
+        if (minutes > 0)
+        {
+            return minutes + "m " + remainingSeconds + "s";
+        }
+
+        return remainingSeconds + "s";
     }
 }

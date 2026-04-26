@@ -59,6 +59,12 @@ public class Room2DPrototypeNotes : MonoBehaviour
     // Explicit workflow actions are SimulateCheckout, StartCleaning, FinishCleaning, and ApproveInspection.
     // Each explicit workflow action should only succeed from its valid current state.
 
+    // Timing target:
+    // Room2DEntity tracks stateElapsedSeconds while the scene is playing.
+    // The timer resets whenever the room enters a new state.
+    // For now, Room2DOverview uses this only to show the oldest Dirty room wait time.
+    // Later this can drive cleaning priority without adding front desk or worker systems yet.
+
     // Prefab target:
     // Once Room_A_2D contains entity, controller, visuals, and label view, drag it into Assets/Game/Prefabs.
     // Unity Prefabs are the reusable room "class instances" for building many rooms.

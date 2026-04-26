@@ -9,10 +9,22 @@ public class Room2DEntity : MonoBehaviour
     public Room2DState currentState = Room2DState.Dirty;
     public bool guestCheckedOut = true;
     public int actionCount;
+    public bool trackStateTime = true;
+    public float stateElapsedSeconds;
 
     private void OnValidate()
     {
         SyncCheckoutFlagForState();
+    }
+
+    private void Update()
+    {
+        if (!trackStateTime)
+        {
+            return;
+        }
+
+        stateElapsedSeconds += Time.deltaTime;
     }
 
     public void SetIdentity(int newFloorNumber, int newRoomNumber)
@@ -27,6 +39,7 @@ public class Room2DEntity : MonoBehaviour
     {
         currentState = newState;
         SyncCheckoutFlagForState();
+        ResetStateTimer();
     }
 
     public void PerformNextAction()
@@ -56,8 +69,7 @@ public class Room2DEntity : MonoBehaviour
         }
 
         actionCount++;
-        currentState = Room2DState.Dirty;
-        guestCheckedOut = true;
+        EnterState(Room2DState.Dirty, true);
         return true;
     }
 
@@ -69,8 +81,7 @@ public class Room2DEntity : MonoBehaviour
         }
 
         actionCount++;
-        currentState = Room2DState.Cleaning;
-        guestCheckedOut = true;
+        EnterState(Room2DState.Cleaning, true);
         return true;
     }
 
@@ -82,8 +93,7 @@ public class Room2DEntity : MonoBehaviour
         }
 
         actionCount++;
-        currentState = Room2DState.AwaitingInspection;
-        guestCheckedOut = true;
+        EnterState(Room2DState.AwaitingInspection, true);
         return true;
     }
 
@@ -95,8 +105,7 @@ public class Room2DEntity : MonoBehaviour
         }
 
         actionCount++;
-        currentState = Room2DState.Ready;
-        guestCheckedOut = false;
+        EnterState(Room2DState.Ready, false);
         return true;
     }
 
@@ -158,6 +167,23 @@ public class Room2DEntity : MonoBehaviour
     public string GetCheckoutDisplayName()
     {
         return guestCheckedOut ? "Checked Out" : "Not Checked Out";
+    }
+
+    public string GetStateTimeDisplayName()
+    {
+        return "State Time: " + Mathf.FloorToInt(stateElapsedSeconds) + "s";
+    }
+
+    private void EnterState(Room2DState newState, bool newGuestCheckedOut)
+    {
+        currentState = newState;
+        guestCheckedOut = newGuestCheckedOut;
+        ResetStateTimer();
+    }
+
+    private void ResetStateTimer()
+    {
+        stateElapsedSeconds = 0f;
     }
 
     private void SyncCheckoutFlagForState()
