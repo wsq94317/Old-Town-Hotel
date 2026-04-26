@@ -172,11 +172,14 @@ public class Room2DController : MonoBehaviour
         }
     }
 
-    private void PerformRoomAction(System.Action<Room2DEntity> entityAction, Room2DState fallbackState)
+    private void PerformRoomAction(System.Func<Room2DEntity, bool> entityAction, Room2DState fallbackState)
     {
         if (roomEntity != null)
         {
-            entityAction(roomEntity);
+            if (!entityAction(roomEntity))
+            {
+                return;
+            }
         }
         else
         {

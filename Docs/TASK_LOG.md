@@ -25,6 +25,7 @@ Build first playable fake-3D 2D room entity prototype.
 - Room2DEntity now tracks whether the guest has checked out
 - Room2DOverview assigns prototype room numbers by scene position
 - Room2DEntity now exposes explicit room workflow actions
+- Room workflow actions now guard against invalid state transitions
 
 ## Next
 - Attach Room2DEntity to Room_A_2D in Unity
@@ -38,4 +39,5 @@ Build first playable fake-3D 2D room entity prototype.
 - Use Room2DOverview context menu tools to test multi-room states quickly
 - Keep cleaning flow tied to checked-out rooms before adding guest/front-desk systems
 - Prefer explicit room actions before expanding into guest/front-desk systems
+- Use CanStartCleaning/CanFinishCleaning/CanApproveInspection guards when adding workers or UI states
 - Convert the finished Room_A_2D object into a reusable Unity Prefab

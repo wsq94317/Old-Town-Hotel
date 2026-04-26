@@ -48,32 +48,76 @@ public class Room2DEntity : MonoBehaviour
         }
     }
 
-    public void SimulateCheckout()
+    public bool SimulateCheckout()
     {
+        if (!CanSimulateCheckout())
+        {
+            return false;
+        }
+
         actionCount++;
         currentState = Room2DState.Dirty;
         guestCheckedOut = true;
+        return true;
     }
 
-    public void StartCleaning()
+    public bool StartCleaning()
     {
+        if (!CanStartCleaning())
+        {
+            return false;
+        }
+
         actionCount++;
         currentState = Room2DState.Cleaning;
         guestCheckedOut = true;
+        return true;
     }
 
-    public void FinishCleaning()
+    public bool FinishCleaning()
     {
+        if (!CanFinishCleaning())
+        {
+            return false;
+        }
+
         actionCount++;
         currentState = Room2DState.AwaitingInspection;
         guestCheckedOut = true;
+        return true;
     }
 
-    public void ApproveInspection()
+    public bool ApproveInspection()
     {
+        if (!CanApproveInspection())
+        {
+            return false;
+        }
+
         actionCount++;
         currentState = Room2DState.Ready;
         guestCheckedOut = false;
+        return true;
+    }
+
+    public bool CanSimulateCheckout()
+    {
+        return currentState == Room2DState.Ready;
+    }
+
+    public bool CanStartCleaning()
+    {
+        return currentState == Room2DState.Dirty && guestCheckedOut;
+    }
+
+    public bool CanFinishCleaning()
+    {
+        return currentState == Room2DState.Cleaning;
+    }
+
+    public bool CanApproveInspection()
+    {
+        return currentState == Room2DState.AwaitingInspection;
     }
 
     public string GetStateDisplayName()

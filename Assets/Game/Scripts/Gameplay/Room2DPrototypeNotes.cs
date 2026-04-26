@@ -57,6 +57,7 @@ public class Room2DPrototypeNotes : MonoBehaviour
     // Simulate Checkout moves Ready to Dirty and marks guestCheckedOut true.
     // Dirty, Cleaning, and AwaitingInspection represent the post-checkout cleaning path.
     // Explicit workflow actions are SimulateCheckout, StartCleaning, FinishCleaning, and ApproveInspection.
+    // Each explicit workflow action should only succeed from its valid current state.
 
     // Prefab target:
     // Once Room_A_2D contains entity, controller, visuals, and label view, drag it into Assets/Game/Prefabs.
