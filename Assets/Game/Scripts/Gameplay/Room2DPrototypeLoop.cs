@@ -1,13 +1,23 @@
 using UnityEngine;
 
+// 原型用客人循环。
+// 它只模拟“入住”和“退房”，不代表最终前台/客人系统。
 public class Room2DPrototypeLoop : MonoBehaviour
 {
+    // 自动寻找场景引用，方便初学阶段快速测试。
     public bool autoFindReferences = true;
+
+    // 执行动作后是否自动选中发生变化的房间。
     public bool selectChangedRoom = true;
+
+    // 默认关闭。打开后会按间隔自动模拟入住/退房。
     public bool autoSimulateGuestFlowDuringPlay;
     public float autoGuestFlowIntervalSeconds = 12f;
+
     public Room2DOverview roomOverview;
     public Room2DSelectionManager selectionManager;
+
+    // 原型调试计数。
     public int simulatedCheckInCount;
     public int simulatedCheckoutCount;
 
@@ -40,6 +50,7 @@ public class Room2DPrototypeLoop : MonoBehaviour
     {
         FindReferencesIfNeeded();
 
+        // 如果有客人在住，优先模拟退房；否则找一个 Ready 房间模拟入住。
         if (FindFirstOccupiedRoom() != null)
         {
             SimulateNextCheckout();
@@ -55,6 +66,7 @@ public class Room2DPrototypeLoop : MonoBehaviour
     {
         FindReferencesIfNeeded();
 
+        // 退房只能发生在 Occupied 房间。
         Room2DController room = FindFirstOccupiedRoom();
         if (room == null || room.roomEntity == null)
         {
@@ -85,6 +97,7 @@ public class Room2DPrototypeLoop : MonoBehaviour
     {
         FindReferencesIfNeeded();
 
+        // 入住只能发生在 Ready 房间。
         Room2DController room = FindFirstReadyRoom();
         if (room == null || room.roomEntity == null)
         {
@@ -149,6 +162,7 @@ public class Room2DPrototypeLoop : MonoBehaviour
         Room2DController[] rooms = GetRoomControllers();
         Room2DController firstReadyRoom = null;
 
+        // 原型阶段用房号最小的 Ready 房间，不做复杂分配策略。
         for (int i = 0; i < rooms.Length; i++)
         {
             if (rooms[i] == null || rooms[i].roomEntity == null)
@@ -175,6 +189,7 @@ public class Room2DPrototypeLoop : MonoBehaviour
         Room2DController[] rooms = GetRoomControllers();
         Room2DController firstOccupiedRoom = null;
 
+        // 原型阶段用房号最小的 Occupied 房间。
         for (int i = 0; i < rooms.Length; i++)
         {
             if (rooms[i] == null || rooms[i].roomEntity == null)
@@ -198,6 +213,7 @@ public class Room2DPrototypeLoop : MonoBehaviour
 
     private Room2DController[] GetRoomControllers()
     {
+        // 优先复用 Room2DOverview 已经找到的房间列表。
         if (roomOverview != null && roomOverview.roomControllers != null && roomOverview.roomControllers.Length > 0)
         {
             return roomOverview.roomControllers;

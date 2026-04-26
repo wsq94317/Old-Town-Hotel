@@ -1,14 +1,23 @@
 using TMPro;
 using UnityEngine;
 
+// 场景级房间总览。
+// 负责统计所有房间的状态数量，并刷新总览 UI。
 public class Room2DOverview : MonoBehaviour
 {
+    // 打开后，每次刷新都会重新在场景里找房间，适合原型阶段频繁复制房间。
     public bool autoFindRoomsOnRefresh = true;
+
+    // Play 模式下定时刷新总览，让等待时间、Blocked 数量等能更新。
     public bool refreshSummaryDuringPlay = true;
     public float summaryRefreshInterval = 1f;
+
+    // 原型房号生成设置。
     public int prototypeStartFloor = 1;
     public int prototypeStartRoomNumber = 101;
     public bool numberRoomsByScenePosition = true;
+
+    // 房间数据和控制器列表。可以手动拖，也可以自动查找。
     public Room2DEntity[] rooms;
     public Room2DController[] roomControllers;
 
@@ -48,6 +57,7 @@ public class Room2DOverview : MonoBehaviour
         RefreshSummary();
     }
 
+    // 手动刷新所有房间视觉，适合 Inspector 改完数据后测试。
     [ContextMenu("Refresh All Room Visuals")]
     public void RefreshAllRoomVisuals()
     {
@@ -64,18 +74,21 @@ public class Room2DOverview : MonoBehaviour
         RefreshSummary();
     }
 
+    // 原型工具：把所有房间重置成 Dirty。
     [ContextMenu("Set All Rooms Dirty")]
     public void SetAllRoomsDirty()
     {
         SetAllRoomsState(Room2DState.Dirty);
     }
 
+    // 原型工具：把所有房间重置成 Ready。
     [ContextMenu("Set All Rooms Ready")]
     public void SetAllRoomsReady()
     {
         SetAllRoomsState(Room2DState.Ready);
     }
 
+    // 根据场景位置给房间分配房号，方便复制多个房间后快速整理。
     [ContextMenu("Assign Prototype Room Numbers")]
     public void AssignPrototypeRoomNumbers()
     {
@@ -93,6 +106,7 @@ public class Room2DOverview : MonoBehaviour
         RefreshAllRoomVisuals();
     }
 
+    // 统计各类房态，并把文本写到 summaryLabelTextMeshPro。
     public void RefreshSummary()
     {
         FindRoomsIfNeeded();
@@ -142,6 +156,7 @@ public class Room2DOverview : MonoBehaviour
             }
         }
 
+        // 这里先用一行文本，后面正式 UI 可以拆成多个 Text 或图标。
         string summaryText = "Rooms  Dirty: " + dirtyCount
             + "  Cleaning: " + cleaningCount
             + "  Inspect: " + awaitingInspectionCount
@@ -157,6 +172,7 @@ public class Room2DOverview : MonoBehaviour
         }
     }
 
+    // 自动找房间，减少手动绑定成本。
     private void FindRoomsIfNeeded()
     {
         if (autoFindRoomsOnRefresh || rooms == null || rooms.Length == 0)
@@ -170,6 +186,7 @@ public class Room2DOverview : MonoBehaviour
         }
     }
 
+    // 批量设置房态的共用方法。
     private void SetAllRoomsState(Room2DState newState)
     {
         FindRoomsIfNeeded();
@@ -186,6 +203,7 @@ public class Room2DOverview : MonoBehaviour
         RefreshAllRoomVisuals();
     }
 
+    // 原型阶段简单排序：上面的房间先编号，同一行左边先编号。
     private void SortRoomsForPrototypeNumbering()
     {
         if (!numberRoomsByScenePosition || rooms == null)
@@ -207,6 +225,7 @@ public class Room2DOverview : MonoBehaviour
         }
     }
 
+    // 判断 candidateRoom 是否应该排在 currentRoom 前面。
     private bool ShouldRoomComeBefore(Room2DEntity candidateRoom, Room2DEntity currentRoom)
     {
         if (candidateRoom == null)
@@ -230,6 +249,7 @@ public class Room2DOverview : MonoBehaviour
         return candidatePosition.x < currentPosition.x;
     }
 
+    // 把秒数格式化成 10s 或 2m 5s。
     private string FormatSeconds(float seconds)
     {
         int wholeSeconds = Mathf.FloorToInt(seconds);

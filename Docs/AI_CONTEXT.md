@@ -58,5 +58,6 @@ Hotel_Rooms_2D_Proto
 ## Coding Rules
 - Keep systems small and simple
 - Prefer readable C# over clever architecture
+- Add concise Chinese comments for new gameplay code so the beginner Unity workflow is easier to read
 - Do not over-engineer
 - Only change files requested

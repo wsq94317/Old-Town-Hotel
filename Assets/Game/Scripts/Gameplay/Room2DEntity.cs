@@ -1,22 +1,35 @@
 using UnityEngine;
 
+// 房间的核心数据实体。
+// 它不负责画面怎么显示，只保存房间的业务状态、房号、Block 信息和房间属性。
 public class Room2DEntity : MonoBehaviour
 {
+    // 房间身份信息。后面存档和 UI 都应该从这里读房间编号。
     public string roomId = "101";
     public string roomName = "Room 101";
     public int floorNumber = 1;
     public int roomNumber = 101;
+
+    // 当前房态，是房间流程的核心。
     public Room2DState currentState = Room2DState.Dirty;
+
+    // Dirty/Cleaning/AwaitingInspection 代表客人已经离开后产生的清洁链条。
     public bool guestCheckedOut = true;
+
+    // 临时原型计数，用来确认按钮/流程是否真的被触发。
     public int actionCount;
+
+    // 当前状态停留时间，用于以后做等待压力、优先级、评价等系统。
     public bool trackStateTime = true;
     public float stateElapsedSeconds;
 
     [Header("Block")]
+    // Blocked 状态的原因和剩余游戏小时数。
     public Room2DBlockReason blockReason = Room2DBlockReason.None;
     public float blockRemainingHours;
 
     [Header("Room Attributes")]
+    // 房间内部属性数据。不要用 Hierarchy 当作玩法数据源，UI/存档以后读取这个数组。
     public Room2DAttribute[] roomAttributes;
 
     private void OnValidate()
@@ -42,11 +55,13 @@ public class Room2DEntity : MonoBehaviour
         roomName = "Room " + newRoomNumber;
     }
 
+    // 强制设置房态。原型工具和批量重置会用到它。
     public void SetState(Room2DState newState)
     {
         EnterState(newState, ShouldStateBeCheckedOut(newState));
     }
 
+    // 当前主按钮的默认行为：按房态推进下一步。
     public void PerformNextAction()
     {
         switch (currentState)
@@ -71,6 +86,7 @@ public class Room2DEntity : MonoBehaviour
         }
     }
 
+    // 原型用：模拟客人入住。正式前台系统以后会替代这个入口。
     public bool SimulateCheckIn()
     {
         if (!CanSimulateCheckIn())
@@ -83,6 +99,7 @@ public class Room2DEntity : MonoBehaviour
         return true;
     }
 
+    // 原型用：模拟客人退房。退房后房间进入 Dirty。
     public bool SimulateCheckout()
     {
         if (!CanSimulateCheckout())
@@ -95,6 +112,7 @@ public class Room2DEntity : MonoBehaviour
         return true;
     }
 
+    // 开始清洁。只有 Dirty 且客人已退房的房间可以开始清洁。
     public bool StartCleaning()
     {
         if (!CanStartCleaning())
@@ -107,6 +125,7 @@ public class Room2DEntity : MonoBehaviour
         return true;
     }
 
+    // 清洁完成后进入等待检查。
     public bool FinishCleaning()
     {
         if (!CanFinishCleaning())
@@ -119,6 +138,7 @@ public class Room2DEntity : MonoBehaviour
         return true;
     }
 
+    // 检查通过后，房间重新变成 Ready。
     public bool ApproveInspection()
     {
         if (!CanApproveInspection())
@@ -131,6 +151,7 @@ public class Room2DEntity : MonoBehaviour
         return true;
     }
 
+    // 将房间锁定为不可用，例如维修或装修。
     public bool StartBlock(Room2DBlockReason reason, float durationHours)
     {
         if (!CanStartBlock() || reason == Room2DBlockReason.None || durationHours <= 0f)
@@ -145,6 +166,7 @@ public class Room2DEntity : MonoBehaviour
         return true;
     }
 
+    // 由原型时钟调用：推进 Block 剩余时间。
     public bool AdvanceBlockTime(float gameHours)
     {
         if (currentState != Room2DState.Blocked || gameHours <= 0f)
@@ -162,6 +184,7 @@ public class Room2DEntity : MonoBehaviour
         return true;
     }
 
+    // Block 到期后进入 Dirty，因为维修/装修结束后仍然需要清洁整理。
     public void CompleteBlock()
     {
         blockReason = Room2DBlockReason.None;
@@ -169,6 +192,7 @@ public class Room2DEntity : MonoBehaviour
         EnterState(Room2DState.Dirty, true);
     }
 
+    // 以下 Can... 方法负责保护状态流转，避免 UI 或别的脚本乱跳状态。
     public bool CanSimulateCheckout()
     {
         return currentState == Room2DState.Occupied;
@@ -201,6 +225,7 @@ public class Room2DEntity : MonoBehaviour
             && currentState != Room2DState.Blocked;
     }
 
+    // 给 UI 显示用的房态文本。
     public string GetStateDisplayName()
     {
         switch (currentState)
@@ -220,6 +245,7 @@ public class Room2DEntity : MonoBehaviour
         }
     }
 
+    // 给主按钮显示下一步行动用。
     public string GetNextActionDisplayName()
     {
         switch (currentState)
@@ -264,6 +290,8 @@ public class Room2DEntity : MonoBehaviour
         return blockReason + " " + FormatHours(blockRemainingHours);
     }
 
+    // 原型工具：为当前房间随机生成几个内部属性。
+    // 以后新建存档时，应该由存档/生成系统统一调用类似逻辑。
     [ContextMenu("Generate Prototype Room Attributes")]
     public void GeneratePrototypeRoomAttributes()
     {
@@ -295,6 +323,7 @@ public class Room2DEntity : MonoBehaviour
         }
     }
 
+    // 进入新房态时统一处理：状态、退房标记、Block 清理、计时器重置。
     private void EnterState(Room2DState newState, bool newGuestCheckedOut)
     {
         currentState = newState;
@@ -309,16 +338,19 @@ public class Room2DEntity : MonoBehaviour
         ResetStateTimer();
     }
 
+    // 状态改变时，状态停留时间从 0 重新计算。
     private void ResetStateTimer()
     {
         stateElapsedSeconds = 0f;
     }
 
+    // Inspector 里手动改 currentState 时，同步 guestCheckedOut，减少初学阶段的手动错误。
     private void SyncCheckoutFlagForState()
     {
         guestCheckedOut = ShouldStateBeCheckedOut(currentState);
     }
 
+    // Ready / Occupied / Blocked 都不是“已退房等待清洁”。
     private bool ShouldStateBeCheckedOut(Room2DState state)
     {
         return state != Room2DState.Ready
@@ -326,6 +358,7 @@ public class Room2DEntity : MonoBehaviour
             && state != Room2DState.Blocked;
     }
 
+    // 把游戏小时转成易读文本，例如 8h 或 2d 4h。
     private string FormatHours(float hours)
     {
         if (hours >= 24f)
@@ -338,6 +371,7 @@ public class Room2DEntity : MonoBehaviour
         return Mathf.CeilToInt(hours) + "h";
     }
 
+    // 原型阶段的属性备注。正式版本可以改成更细的本地化文案。
     private string GetPrototypeAttributeNote(Room2DAttributeType attributeType, int condition)
     {
         if (condition >= 75)

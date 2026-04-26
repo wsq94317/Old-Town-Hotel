@@ -36,6 +36,7 @@ Build first playable fake-3D 2D room entity prototype.
 - Room2DEntity now stores block reason and block remaining hours
 - Room2DEntity now stores generated room attributes for future UI and reviews
 - Room2DPrototypeClock created to advance block duration and expire blocked rooms into Dirty
+- Gameplay scripts now include concise Chinese comments for easier code reading
 
 ## Next
 - Attach Room2DEntity to Room_A_2D in Unity

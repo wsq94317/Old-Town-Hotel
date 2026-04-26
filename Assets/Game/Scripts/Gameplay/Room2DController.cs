@@ -1,16 +1,26 @@
 using UnityEngine;
 using UnityEngine.UI;
 
+// 房间视觉和交互控制器。
+// 它读取 Room2DEntity 的数据，然后更新颜色、状态物体、标签和总览。
 public class Room2DController : MonoBehaviour
 {
+    // 房间数据源。正常情况下和这个组件挂在同一个 Room_A_2D / Room_B_2D 物体上。
     public Room2DEntity roomEntity;
+
+    // 可选：房间自己的文字显示。
     public Room2DLabelView labelView;
+
+    // 可选：场景里的总览统计。
     public Room2DOverview roomOverview;
+
+    // 没有绑定 Room2DEntity 时的备用原型数据。
     public string roomName = "Room 101";
     public Room2DState currentState = Room2DState.Dirty;
     public int actionCount;
 
     [Header("Optional State Visuals")]
+    // 这些是可选的状态标记物体。绑定后会根据房态自动显示/隐藏。
     public GameObject dirtyVisual;
     public GameObject cleaningVisual;
     public GameObject awaitingInspectionVisual;
@@ -20,15 +30,19 @@ public class Room2DController : MonoBehaviour
     public GameObject selectedVisual;
 
     [Header("Optional Tint Target")]
+    // 房间主色目标。SpriteRenderer 用于场景 2D 精灵，Image 用于 UI 图片。
     public SpriteRenderer roomSpriteRenderer;
     public Image roomImage;
 
+    // 原型阶段用颜色区分房态。之后可以换成真实美术资源。
     public Color dirtyColor = new Color(0.65f, 0.45f, 0.35f);
     public Color cleaningColor = new Color(0.35f, 0.65f, 0.9f);
     public Color awaitingInspectionColor = new Color(0.95f, 0.8f, 0.35f);
     public Color readyColor = new Color(0.45f, 0.8f, 0.45f);
     public Color occupiedColor = new Color(0.75f, 0.6f, 0.9f);
     public Color blockedColor = new Color(0.35f, 0.35f, 0.35f);
+
+    // 原型阶段的默认 Block 时长，单位是游戏小时。
     public float prototypeMaintenanceBlockHours = 8f;
     public float prototypeRenovationBlockHours = 72f;
 
@@ -67,6 +81,7 @@ public class Room2DController : MonoBehaviour
         RefreshOverview();
     }
 
+    // 以下方法方便 Unity Button 或右键菜单直接绑定。
     public void SetDirty()
     {
         SetState(Room2DState.Dirty);
@@ -102,6 +117,7 @@ public class Room2DController : MonoBehaviour
         PerformNextAction();
     }
 
+    // 主按钮使用的入口：让房间按当前状态执行下一步。
     public void PerformNextAction()
     {
         if (roomEntity != null)
@@ -134,28 +150,33 @@ public class Room2DController : MonoBehaviour
         }
     }
 
+    // 原型用：模拟客人入住。
     public void SimulateCheckIn()
     {
         PerformRoomAction(entity => entity.SimulateCheckIn(), Room2DState.Occupied);
     }
 
+    // 原型用：模拟客人退房。
     public void SimulateCheckout()
     {
         PerformRoomAction(entity => entity.SimulateCheckout(), Room2DState.Dirty);
     }
 
+    // 原型用：开始维修 Block。
     [ContextMenu("Start Maintenance Block")]
     public void StartMaintenanceBlock()
     {
         PerformRoomAction(entity => entity.StartBlock(Room2DBlockReason.Maintenance, prototypeMaintenanceBlockHours), Room2DState.Blocked);
     }
 
+    // 原型用：开始装修 Block。
     [ContextMenu("Start Renovation Block")]
     public void StartRenovationBlock()
     {
         PerformRoomAction(entity => entity.StartBlock(Room2DBlockReason.Renovation, prototypeRenovationBlockHours), Room2DState.Blocked);
     }
 
+    // 以下是清洁链条的显式动作。
     public void StartCleaning()
     {
         PerformRoomAction(entity => entity.StartCleaning(), Room2DState.Cleaning);
@@ -171,6 +192,7 @@ public class Room2DController : MonoBehaviour
         PerformRoomAction(entity => entity.ApproveInspection(), Room2DState.Ready);
     }
 
+    // 根据当前房态刷新颜色、状态标记和文字。
     public void ApplyStateVisual()
     {
         Room2DState visualState = GetCurrentState();
@@ -197,6 +219,7 @@ public class Room2DController : MonoBehaviour
         RefreshLabelView();
     }
 
+    // 当前选中房间的视觉反馈。
     public void SetSelected(bool isSelected)
     {
         SetVisualActive(selectedVisual, isSelected);
@@ -210,6 +233,7 @@ public class Room2DController : MonoBehaviour
         }
     }
 
+    // 执行 Room2DEntity 上的动作，并在成功后刷新显示。
     private void PerformRoomAction(System.Func<Room2DEntity, bool> entityAction, Room2DState fallbackState)
     {
         if (roomEntity != null)
@@ -229,6 +253,7 @@ public class Room2DController : MonoBehaviour
         RefreshOverview();
     }
 
+    // 把房态映射成原型颜色。
     private Color GetStateColor()
     {
         switch (GetCurrentState())
@@ -248,6 +273,7 @@ public class Room2DController : MonoBehaviour
         }
     }
 
+    // 优先读取 Room2DEntity；没有数据实体时才用本组件备用字段。
     private Room2DState GetCurrentState()
     {
         if (roomEntity != null)
@@ -258,6 +284,7 @@ public class Room2DController : MonoBehaviour
         return currentState;
     }
 
+    // 以下 Find... 方法让复制房间时少拖几个引用，降低 Unity 初学阶段的绑定成本。
     private void FindRoomEntityIfNeeded()
     {
         if (roomEntity == null)
