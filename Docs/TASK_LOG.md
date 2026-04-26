@@ -18,6 +18,7 @@ Build first playable fake-3D 2D room entity prototype.
 - Room2DController now auto-finds Room2DOverview for easier room duplication
 - Room2DLabelView created for per-room TMP labels under each room entity
 - Room2DSelectionManager created for controlling the currently selected room
+- Room2DOverview now has prototype tools for refreshing and resetting all rooms
 
 ## Next
 - Attach Room2DEntity to Room_A_2D in Unity
@@ -28,4 +29,5 @@ Build first playable fake-3D 2D room entity prototype.
 - Rename duplicated rooms and update each Room2DEntity room number
 - Add temporary UI buttons for selecting Room_A_2D and Room_B_2D
 - Rebind Button_NextState to Room2DSelectionManager.PerformNextActionOnSelectedRoom
+- Use Room2DOverview context menu tools to test multi-room states quickly
 - Convert the finished Room_A_2D object into a reusable Unity Prefab

@@ -43,6 +43,7 @@ public class Room2DPrototypeNotes : MonoBehaviour
     // Room overview target:
     // Count how many rooms are Dirty, Cleaning, AwaitingInspection, and Ready.
     // This becomes useful once the first room is duplicated into multiple room entities.
+    // Use Room2DOverview context menu tools to find rooms, refresh visuals, or reset all rooms.
 
     // Room selection target:
     // Use temporary UI buttons to select Room_A_2D or Room_B_2D.

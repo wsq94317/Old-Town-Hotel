@@ -5,6 +5,7 @@ public class Room2DOverview : MonoBehaviour
 {
     public bool autoFindRoomsOnRefresh = true;
     public Room2DEntity[] rooms;
+    public Room2DController[] roomControllers;
 
     [Header("Optional UI")]
     public TMP_Text summaryLabelTextMeshPro;
@@ -19,7 +20,36 @@ public class Room2DOverview : MonoBehaviour
     public void FindRoomsInScene()
     {
         rooms = FindObjectsByType<Room2DEntity>(FindObjectsSortMode.None);
+        roomControllers = FindObjectsByType<Room2DController>(FindObjectsSortMode.None);
         RefreshSummary();
+    }
+
+    [ContextMenu("Refresh All Room Visuals")]
+    public void RefreshAllRoomVisuals()
+    {
+        FindRoomsIfNeeded();
+
+        for (int i = 0; i < roomControllers.Length; i++)
+        {
+            if (roomControllers[i] != null)
+            {
+                roomControllers[i].ApplyStateVisual();
+            }
+        }
+
+        RefreshSummary();
+    }
+
+    [ContextMenu("Set All Rooms Dirty")]
+    public void SetAllRoomsDirty()
+    {
+        SetAllRoomsState(Room2DState.Dirty);
+    }
+
+    [ContextMenu("Set All Rooms Ready")]
+    public void SetAllRoomsReady()
+    {
+        SetAllRoomsState(Room2DState.Ready);
     }
 
     public void RefreshSummary()
@@ -72,5 +102,26 @@ public class Room2DOverview : MonoBehaviour
         {
             rooms = FindObjectsByType<Room2DEntity>(FindObjectsSortMode.None);
         }
+
+        if (autoFindRoomsOnRefresh || roomControllers == null || roomControllers.Length == 0)
+        {
+            roomControllers = FindObjectsByType<Room2DController>(FindObjectsSortMode.None);
+        }
+    }
+
+    private void SetAllRoomsState(Room2DState newState)
+    {
+        FindRoomsIfNeeded();
+
+        for (int i = 0; i < rooms.Length; i++)
+        {
+            if (rooms[i] != null)
+            {
+                rooms[i].SetState(newState);
+                rooms[i].actionCount = 0;
+            }
+        }
+
+        RefreshAllRoomVisuals();
     }
 }
