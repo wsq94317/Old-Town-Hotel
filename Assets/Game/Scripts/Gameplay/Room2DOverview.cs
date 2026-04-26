@@ -4,6 +4,8 @@ using UnityEngine;
 public class Room2DOverview : MonoBehaviour
 {
     public bool autoFindRoomsOnRefresh = true;
+    public int prototypeStartFloor = 1;
+    public int prototypeStartRoomNumber = 101;
     public Room2DEntity[] rooms;
     public Room2DController[] roomControllers;
 
@@ -50,6 +52,22 @@ public class Room2DOverview : MonoBehaviour
     public void SetAllRoomsReady()
     {
         SetAllRoomsState(Room2DState.Ready);
+    }
+
+    [ContextMenu("Assign Prototype Room Numbers")]
+    public void AssignPrototypeRoomNumbers()
+    {
+        FindRoomsIfNeeded();
+
+        for (int i = 0; i < rooms.Length; i++)
+        {
+            if (rooms[i] != null)
+            {
+                rooms[i].SetIdentity(prototypeStartFloor, prototypeStartRoomNumber + i);
+            }
+        }
+
+        RefreshAllRoomVisuals();
     }
 
     public void RefreshSummary()

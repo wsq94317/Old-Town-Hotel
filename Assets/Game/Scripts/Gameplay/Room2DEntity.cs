@@ -9,6 +9,14 @@ public class Room2DEntity : MonoBehaviour
     public Room2DState currentState = Room2DState.Dirty;
     public int actionCount;
 
+    public void SetIdentity(int newFloorNumber, int newRoomNumber)
+    {
+        floorNumber = newFloorNumber;
+        roomNumber = newRoomNumber;
+        roomId = newRoomNumber.ToString();
+        roomName = "Room " + newRoomNumber;
+    }
+
     public void SetState(Room2DState newState)
     {
         currentState = newState;
