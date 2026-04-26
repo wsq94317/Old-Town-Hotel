@@ -22,6 +22,7 @@ Build the fake-3D 2D Room View prototype first inside the current Unity project:
 - UI labels for room name, current state, next action, and action count
 - Explicit guest checkout flag for the room cleaning flow
 - Lightweight state timing so dirty rooms can become a cleaning priority later
+- Minimal prototype loop that creates room-cleaning demand through simulated checkout
 - Beginner-friendly scene setup in Unity
 - States: Dirty, Cleaning, AwaitingInspection, Ready
 
@@ -38,8 +39,9 @@ Hotel_Rooms_2D_Proto
 7. Room interaction: one main action button that advances the selected room workflow.
 8. Room workflow actions: SimulateCheckout, StartCleaning, FinishCleaning, ApproveInspection.
 9. Room timing: track how long each room has been in its current state.
-10. Room prefab: convert one working room entity into a reusable Unity Prefab.
-11. Room layout scale-up: duplicate one working prefab into multiple rooms and floors.
+10. Prototype loop: simulate checkouts from Ready rooms to create cleaning demand.
+11. Room prefab: convert one working room entity into a reusable Unity Prefab.
+12. Room layout scale-up: duplicate one working prefab into multiple rooms and floors.
 
 ## Coding Rules
 - Keep systems small and simple

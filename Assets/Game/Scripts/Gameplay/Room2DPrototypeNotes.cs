@@ -65,6 +65,12 @@ public class Room2DPrototypeNotes : MonoBehaviour
     // For now, Room2DOverview uses this only to show the oldest Dirty room wait time.
     // Later this can drive cleaning priority without adding front desk or worker systems yet.
 
+    // Prototype loop target:
+    // Add Room2DPrototypeLoop to a scene manager object when testing multiple rooms.
+    // Simulate Next Checkout finds the first Ready room and turns it Dirty.
+    // This creates room-cleaning demand without building the front desk system yet.
+    // Keep autoSimulateCheckoutDuringPlay off unless you intentionally want timed checkouts.
+
     // Prefab target:
     // Once Room_A_2D contains entity, controller, visuals, and label view, drag it into Assets/Game/Prefabs.
     // Unity Prefabs are the reusable room "class instances" for building many rooms.

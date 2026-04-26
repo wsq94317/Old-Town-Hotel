@@ -28,6 +28,7 @@ Build first playable fake-3D 2D room entity prototype.
 - Room workflow actions now guard against invalid state transitions
 - Room2DEntity now tracks how long the room has stayed in its current state
 - Room2DOverview now shows the oldest Dirty room wait time
+- Room2DPrototypeLoop created to simulate checkouts from Ready rooms
 
 ## Next
 - Attach Room2DEntity to Room_A_2D in Unity
@@ -43,4 +44,6 @@ Build first playable fake-3D 2D room entity prototype.
 - Prefer explicit room actions before expanding into guest/front-desk systems
 - Use CanStartCleaning/CanFinishCleaning/CanApproveInspection guards when adding workers or UI states
 - Use stateElapsedSeconds later for cleaning priority and waiting pressure
+- Attach Room2DPrototypeLoop to the scene and test Simulate Next Checkout
+- Use the prototype loop to create cleaning demand before building front desk UI
 - Convert the finished Room_A_2D object into a reusable Unity Prefab
