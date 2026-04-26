@@ -23,6 +23,14 @@ public class Room2DEntity : MonoBehaviour
     public bool trackStateTime = true;
     public float stateElapsedSeconds;
 
+    [Header("Cleaning Priority")]
+    // Dirty 房等待越久，清洁优先级越高。Blocked/Occupied/Ready 都不会参与优先级。
+    public float mediumPrioritySeconds = 30f;
+    public float highPrioritySeconds = 60f;
+    public float urgentPrioritySeconds = 120f;
+    public int cleaningPriorityLevel;
+    public string cleaningPriorityLabel = "None";
+
     [Header("Block")]
     // Blocked 状态的原因和剩余游戏小时数。
     public Room2DBlockReason blockReason = Room2DBlockReason.None;
@@ -45,6 +53,7 @@ public class Room2DEntity : MonoBehaviour
         }
 
         stateElapsedSeconds += Time.deltaTime;
+        RefreshCleaningPriority();
     }
 
     public void SetIdentity(int newFloorNumber, int newRoomNumber)
@@ -192,6 +201,11 @@ public class Room2DEntity : MonoBehaviour
         EnterState(Room2DState.Dirty, true);
     }
 
+    public bool IsWaitingForCleaning()
+    {
+        return currentState == Room2DState.Dirty && guestCheckedOut;
+    }
+
     // 以下 Can... 方法负责保护状态流转，避免 UI 或别的脚本乱跳状态。
     public bool CanSimulateCheckout()
     {
@@ -280,6 +294,11 @@ public class Room2DEntity : MonoBehaviour
         return "State Time: " + Mathf.FloorToInt(stateElapsedSeconds) + "s";
     }
 
+    public string GetCleaningPriorityDisplayName()
+    {
+        return "Priority: " + cleaningPriorityLabel;
+    }
+
     public string GetBlockDisplayName()
     {
         if (currentState != Room2DState.Blocked)
@@ -323,6 +342,39 @@ public class Room2DEntity : MonoBehaviour
         }
     }
 
+    // 根据 Dirty 等待时间计算原型清洁优先级。
+    // 0=None, 1=Low, 2=Medium, 3=High, 4=Urgent。
+    public void RefreshCleaningPriority()
+    {
+        if (!IsWaitingForCleaning())
+        {
+            cleaningPriorityLevel = 0;
+            cleaningPriorityLabel = "None";
+            return;
+        }
+
+        if (stateElapsedSeconds >= urgentPrioritySeconds)
+        {
+            cleaningPriorityLevel = 4;
+            cleaningPriorityLabel = "P4 Urgent";
+        }
+        else if (stateElapsedSeconds >= highPrioritySeconds)
+        {
+            cleaningPriorityLevel = 3;
+            cleaningPriorityLabel = "P3 High";
+        }
+        else if (stateElapsedSeconds >= mediumPrioritySeconds)
+        {
+            cleaningPriorityLevel = 2;
+            cleaningPriorityLabel = "P2 Medium";
+        }
+        else
+        {
+            cleaningPriorityLevel = 1;
+            cleaningPriorityLabel = "P1 Low";
+        }
+    }
+
     // 进入新房态时统一处理：状态、退房标记、Block 清理、计时器重置。
     private void EnterState(Room2DState newState, bool newGuestCheckedOut)
     {
@@ -336,6 +388,7 @@ public class Room2DEntity : MonoBehaviour
         }
 
         ResetStateTimer();
+        RefreshCleaningPriority();
     }
 
     // 状态改变时，状态停留时间从 0 重新计算。

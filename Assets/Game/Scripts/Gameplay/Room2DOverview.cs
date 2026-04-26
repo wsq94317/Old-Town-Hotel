@@ -21,6 +21,13 @@ public class Room2DOverview : MonoBehaviour
     public Room2DEntity[] rooms;
     public Room2DController[] roomControllers;
 
+    [Header("Cleaning Priority")]
+    // 当前最需要清洁的 Dirty 房。Blocked/Occupied/Ready 不会进入这个选择。
+    public Room2DEntity highestPriorityDirtyRoom;
+    public string highestPriorityDirtyRoomName = "None";
+    public int highestPriorityDirtyLevel;
+    public float highestPriorityDirtySeconds;
+
     [Header("Optional UI")]
     public TMP_Text summaryLabelTextMeshPro;
 
@@ -119,6 +126,10 @@ public class Room2DOverview : MonoBehaviour
         int blockedCount = 0;
         int checkedOutCount = 0;
         float oldestDirtySeconds = 0f;
+        highestPriorityDirtyRoom = null;
+        highestPriorityDirtyRoomName = "None";
+        highestPriorityDirtyLevel = 0;
+        highestPriorityDirtySeconds = 0f;
 
         for (int i = 0; i < rooms.Length; i++)
         {
@@ -146,7 +157,9 @@ public class Room2DOverview : MonoBehaviour
                     break;
                 default:
                     dirtyCount++;
+                    rooms[i].RefreshCleaningPriority();
                     oldestDirtySeconds = Mathf.Max(oldestDirtySeconds, rooms[i].stateElapsedSeconds);
+                    UpdateHighestPriorityDirtyRoom(rooms[i]);
                     break;
             }
 
@@ -164,12 +177,19 @@ public class Room2DOverview : MonoBehaviour
             + "  Occupied: " + occupiedCount
             + "  Blocked: " + blockedCount
             + "  Checked Out: " + checkedOutCount
-            + "  Oldest Dirty: " + FormatSeconds(oldestDirtySeconds);
+            + "  Oldest Dirty: " + FormatSeconds(oldestDirtySeconds)
+            + "  Urgent: " + highestPriorityDirtyRoomName + " " + FormatSeconds(highestPriorityDirtySeconds);
 
         if (summaryLabelTextMeshPro != null)
         {
             summaryLabelTextMeshPro.text = summaryText;
         }
+    }
+
+    public Room2DEntity GetHighestPriorityDirtyRoom()
+    {
+        RefreshSummary();
+        return highestPriorityDirtyRoom;
     }
 
     // 自动找房间，减少手动绑定成本。
@@ -247,6 +267,29 @@ public class Room2DOverview : MonoBehaviour
         }
 
         return candidatePosition.x < currentPosition.x;
+    }
+
+    // 用等待时间选择最紧急的 Dirty 房；同样时间时选房号更小的。
+    private void UpdateHighestPriorityDirtyRoom(Room2DEntity room)
+    {
+        if (room == null || !room.IsWaitingForCleaning())
+        {
+            return;
+        }
+
+        bool shouldReplace = highestPriorityDirtyRoom == null
+            || room.stateElapsedSeconds > highestPriorityDirtySeconds
+            || (Mathf.Approximately(room.stateElapsedSeconds, highestPriorityDirtySeconds) && room.roomNumber < highestPriorityDirtyRoom.roomNumber);
+
+        if (!shouldReplace)
+        {
+            return;
+        }
+
+        highestPriorityDirtyRoom = room;
+        highestPriorityDirtyRoomName = room.roomName;
+        highestPriorityDirtyLevel = room.cleaningPriorityLevel;
+        highestPriorityDirtySeconds = room.stateElapsedSeconds;
     }
 
     // 把秒数格式化成 10s 或 2m 5s。

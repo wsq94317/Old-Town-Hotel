@@ -23,6 +23,7 @@ Build the fake-3D 2D Room View prototype first inside the current Unity project:
 - UI labels for room name, current state, next action, and action count
 - Explicit guest checkout flag for the room cleaning flow
 - Lightweight state timing so dirty rooms can become a cleaning priority later
+- Simple cleaning priority for Dirty rooms based on checkout waiting time
 - Minimal prototype loop that creates room-cleaning demand through simulated check-in and checkout
 - Blocked rooms with reason and duration for maintenance or renovation
 - Per-room attributes for future guest preference and review calculations
@@ -47,6 +48,13 @@ Hotel_Rooms_2D_Proto
 12. Room attributes: store condition data such as bed, floor, wardrobe, bathroom, wallpaper, air conditioner, and window.
 13. Room prefab: convert one working room entity into a reusable Unity Prefab.
 14. Room layout scale-up: duplicate one working prefab into multiple rooms and floors.
+
+## Current Milestone
+Prove that multi-room turnover creates meaningful prioritization pressure:
+- 8 to 12 duplicated room prefabs should work independently.
+- Dirty rooms expose a simple cleaning priority based on waiting time.
+- Room2DOverview identifies the most urgent Dirty room.
+- Blocked, Occupied, and Ready rooms are excluded from cleaning priority.
 
 ## User Stories To Preserve
 - As a guest with very high cleanliness expectations, I want my assigned room to match my preference so that a clean but old-looking room can still affect my final review.

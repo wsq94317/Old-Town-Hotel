@@ -37,6 +37,8 @@ Build first playable fake-3D 2D room entity prototype.
 - Room2DEntity now stores generated room attributes for future UI and reviews
 - Room2DPrototypeClock created to advance block duration and expire blocked rooms into Dirty
 - Gameplay scripts now include concise Chinese comments for easier code reading
+- Dirty rooms now expose a simple cleaning priority based on checkout waiting time
+- Room2DOverview now identifies the highest-priority Dirty room
 
 ## Next
 - Attach Room2DEntity to Room_A_2D in Unity
@@ -59,3 +61,5 @@ Build first playable fake-3D 2D room entity prototype.
 - Use Room2DEntity Generate Prototype Room Attributes to create sample per-room condition data
 - Later move room generation into new-save setup instead of manual context menu tools
 - Convert the finished Room_A_2D object into a reusable Unity Prefab
+- Duplicate the Room_A_2D prefab into 8 to 12 rooms and assign room numbers by scene position
+- Test whether multiple Dirty rooms create visible prioritization pressure
