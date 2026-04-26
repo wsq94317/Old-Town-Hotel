@@ -6,6 +6,7 @@ public class Room2DOverview : MonoBehaviour
     public bool autoFindRoomsOnRefresh = true;
     public int prototypeStartFloor = 1;
     public int prototypeStartRoomNumber = 101;
+    public bool numberRoomsByScenePosition = true;
     public Room2DEntity[] rooms;
     public Room2DController[] roomControllers;
 
@@ -58,6 +59,7 @@ public class Room2DOverview : MonoBehaviour
     public void AssignPrototypeRoomNumbers()
     {
         FindRoomsIfNeeded();
+        SortRoomsForPrototypeNumbering();
 
         for (int i = 0; i < rooms.Length; i++)
         {
@@ -148,5 +150,49 @@ public class Room2DOverview : MonoBehaviour
         }
 
         RefreshAllRoomVisuals();
+    }
+
+    private void SortRoomsForPrototypeNumbering()
+    {
+        if (!numberRoomsByScenePosition || rooms == null)
+        {
+            return;
+        }
+
+        for (int i = 0; i < rooms.Length - 1; i++)
+        {
+            for (int j = i + 1; j < rooms.Length; j++)
+            {
+                if (ShouldRoomComeBefore(rooms[j], rooms[i]))
+                {
+                    Room2DEntity tempRoom = rooms[i];
+                    rooms[i] = rooms[j];
+                    rooms[j] = tempRoom;
+                }
+            }
+        }
+    }
+
+    private bool ShouldRoomComeBefore(Room2DEntity candidateRoom, Room2DEntity currentRoom)
+    {
+        if (candidateRoom == null)
+        {
+            return false;
+        }
+
+        if (currentRoom == null)
+        {
+            return true;
+        }
+
+        Vector3 candidatePosition = candidateRoom.transform.position;
+        Vector3 currentPosition = currentRoom.transform.position;
+
+        if (!Mathf.Approximately(candidatePosition.y, currentPosition.y))
+        {
+            return candidatePosition.y > currentPosition.y;
+        }
+
+        return candidatePosition.x < currentPosition.x;
     }
 }

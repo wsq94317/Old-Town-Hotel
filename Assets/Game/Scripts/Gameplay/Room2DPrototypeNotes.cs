@@ -44,7 +44,8 @@ public class Room2DPrototypeNotes : MonoBehaviour
     // Count how many rooms are Dirty, Cleaning, AwaitingInspection, and Ready.
     // This becomes useful once the first room is duplicated into multiple room entities.
     // Use Room2DOverview context menu tools to find rooms, refresh visuals, or reset all rooms.
-    // Use Assign Prototype Room Numbers after duplicating rooms to quickly set Room 101, Room 102, etc.
+    // Use Assign Prototype Room Numbers after positioning duplicated rooms to quickly set Room 101, Room 102, etc.
+    // Prototype numbering sorts rooms by scene position: higher Y first, then lower X first.
 
     // Room selection target:
     // Use temporary UI buttons to select the next or previous room.
