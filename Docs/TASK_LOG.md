@@ -32,6 +32,10 @@ Build first playable fake-3D 2D room entity prototype.
 - Room2DState now includes Occupied for guests staying in rooms
 - Room workflow now uses Ready -> Occupied -> Dirty before cleaning begins
 - Guest preference and room quality review user stories recorded in AI_CONTEXT
+- Room2DState now includes Blocked for unavailable rooms
+- Room2DEntity now stores block reason and block remaining hours
+- Room2DEntity now stores generated room attributes for future UI and reviews
+- Room2DPrototypeClock created to advance block duration and expire blocked rooms into Dirty
 
 ## Next
 - Attach Room2DEntity to Room_A_2D in Unity
@@ -50,4 +54,7 @@ Build first playable fake-3D 2D room entity prototype.
 - Attach Room2DPrototypeLoop to the scene and test Simulate Next Check In / Simulate Next Checkout
 - Use the prototype loop to create guest occupancy and cleaning demand before building front desk UI
 - Later add guest identity and room quality attributes: cleanliness expectation, room cleanliness, and room wear/oldness
+- Attach Room2DPrototypeClock to the scene and test block expiration
+- Use Room2DEntity Generate Prototype Room Attributes to create sample per-room condition data
+- Later move room generation into new-save setup instead of manual context menu tools
 - Convert the finished Room_A_2D object into a reusable Unity Prefab

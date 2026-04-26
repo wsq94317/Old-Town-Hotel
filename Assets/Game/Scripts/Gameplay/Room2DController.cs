@@ -16,6 +16,7 @@ public class Room2DController : MonoBehaviour
     public GameObject awaitingInspectionVisual;
     public GameObject readyVisual;
     public GameObject occupiedVisual;
+    public GameObject blockedVisual;
     public GameObject selectedVisual;
 
     [Header("Optional Tint Target")]
@@ -27,6 +28,9 @@ public class Room2DController : MonoBehaviour
     public Color awaitingInspectionColor = new Color(0.95f, 0.8f, 0.35f);
     public Color readyColor = new Color(0.45f, 0.8f, 0.45f);
     public Color occupiedColor = new Color(0.75f, 0.6f, 0.9f);
+    public Color blockedColor = new Color(0.35f, 0.35f, 0.35f);
+    public float prototypeMaintenanceBlockHours = 8f;
+    public float prototypeRenovationBlockHours = 72f;
 
     private void Awake()
     {
@@ -88,6 +92,11 @@ public class Room2DController : MonoBehaviour
         SetState(Room2DState.Occupied);
     }
 
+    public void SetBlocked()
+    {
+        SetState(Room2DState.Blocked);
+    }
+
     public void CycleToNextState()
     {
         PerformNextAction();
@@ -135,6 +144,18 @@ public class Room2DController : MonoBehaviour
         PerformRoomAction(entity => entity.SimulateCheckout(), Room2DState.Dirty);
     }
 
+    [ContextMenu("Start Maintenance Block")]
+    public void StartMaintenanceBlock()
+    {
+        PerformRoomAction(entity => entity.StartBlock(Room2DBlockReason.Maintenance, prototypeMaintenanceBlockHours), Room2DState.Blocked);
+    }
+
+    [ContextMenu("Start Renovation Block")]
+    public void StartRenovationBlock()
+    {
+        PerformRoomAction(entity => entity.StartBlock(Room2DBlockReason.Renovation, prototypeRenovationBlockHours), Room2DState.Blocked);
+    }
+
     public void StartCleaning()
     {
         PerformRoomAction(entity => entity.StartCleaning(), Room2DState.Cleaning);
@@ -159,6 +180,7 @@ public class Room2DController : MonoBehaviour
         SetVisualActive(awaitingInspectionVisual, visualState == Room2DState.AwaitingInspection);
         SetVisualActive(readyVisual, visualState == Room2DState.Ready);
         SetVisualActive(occupiedVisual, visualState == Room2DState.Occupied);
+        SetVisualActive(blockedVisual, visualState == Room2DState.Blocked);
 
         Color stateColor = GetStateColor();
 
@@ -219,6 +241,8 @@ public class Room2DController : MonoBehaviour
                 return readyColor;
             case Room2DState.Occupied:
                 return occupiedColor;
+            case Room2DState.Blocked:
+                return blockedColor;
             default:
                 return dirtyColor;
         }

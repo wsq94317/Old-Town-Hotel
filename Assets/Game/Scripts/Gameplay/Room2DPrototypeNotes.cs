@@ -81,6 +81,20 @@ public class Room2DPrototypeNotes : MonoBehaviour
     // Rooms can have separate quality attributes such as cleanliness and oldness/wear.
     // A room may be clean but still feel old, which can reduce the guest's review.
 
+    // Block target:
+    // Blocked means the room is temporarily unavailable.
+    // Current block reasons are Maintenance and Renovation.
+    // Room2DEntity stores blockReason and blockRemainingHours.
+    // Room2DPrototypeClock advances game hours and turns expired Blocked rooms into Dirty.
+    // A finished repair or renovation should still require cleaning before the room becomes Ready.
+
+    // Room attributes target:
+    // Room2DEntity stores roomAttributes as data, not as scene hierarchy.
+    // These attributes can describe Bed, Floor, Wardrobe, Bathroom, Wallpaper, AirConditioner, or Window condition.
+    // Future UI should read these values from Room2DEntity.
+    // Future new-save generation should create these values automatically per room.
+    // Scene children can show visuals, but gameplay and save data should come from Room2DEntity.
+
     // Prefab target:
     // Once Room_A_2D contains entity, controller, visuals, and label view, drag it into Assets/Game/Prefabs.
     // Unity Prefabs are the reusable room "class instances" for building many rooms.

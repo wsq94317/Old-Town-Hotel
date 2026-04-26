@@ -297,6 +297,7 @@ Cleaning
 AwaitingInspection
 Ready
 Occupied
+Blocked
 
 后续可扩展：
 
@@ -305,13 +306,14 @@ Blocked
 DeepCleanDue
 10.2 当前原型要求
 
-原型阶段现在包含以下五种：
+原型阶段现在包含以下六种：
 
 Dirty
 Cleaning
 AwaitingInspection
 Ready
 Occupied
+Blocked
 10.3 正常状态流转
 
 Ready
@@ -326,6 +328,7 @@ Ready
 Ready 表示空房、干净、可以入住。
 Occupied 表示客人正在房间中。
 Dirty 表示客人退房后产生了清洁需求。
+Blocked 表示房间因为维修或装修暂时不可用。
 
 10.4 后续扩展流转
 
@@ -371,6 +374,48 @@ AwaitingInspection
 一个房间可以是干净的，但因为陈旧或磨损让高要求客人不满意。
 
 后续评分系统应同时考虑客人偏好和房间属性。
+
+10.8 Blocked 房间
+
+Blocked 房间需要记录：
+
+Block 原因
+Block 剩余时长
+
+当前支持的原因：
+
+维修 Maintenance
+装修 Renovation
+
+Block 时长使用游戏小时记录。UI 可以显示为几小时或几天。
+
+Block 到期后，房间自动进入 Dirty。原因是维修或装修完成后仍然需要清洁/整理，不能直接变成 Ready。
+
+10.9 房间内部属性存储
+
+房间内部属性应该作为房间数据的一部分保存，而不是只靠场景层级里的子物体表示。
+
+当前原型使用 Room2DEntity 上的 Room2DAttribute 数组保存：
+
+属性类型
+状态数值 condition
+备注 note
+
+示例属性：
+
+床 Bed
+地板 Floor
+衣柜 Wardrobe
+浴室 Bathroom
+墙纸 Wallpaper
+空调 AirConditioner
+窗户 Window
+
+未来 UI 应该从 Room2DEntity 读取这些属性。
+
+未来新建存档时，系统应根据房间类型、楼层、价格、随机种子等自动生成这些属性。
+
+场景中的家具/墙面子物体负责视觉表现；Room2DEntity 的属性数据负责玩法逻辑、UI、存档、评价和投诉。
 
 旧版简化流转记录：
 

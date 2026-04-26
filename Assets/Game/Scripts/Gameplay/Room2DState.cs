@@ -4,5 +4,6 @@ public enum Room2DState
     Cleaning,
     AwaitingInspection,
     Ready,
-    Occupied
+    Occupied,
+    Blocked
 }

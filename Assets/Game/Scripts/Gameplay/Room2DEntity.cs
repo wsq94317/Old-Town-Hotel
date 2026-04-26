@@ -12,6 +12,13 @@ public class Room2DEntity : MonoBehaviour
     public bool trackStateTime = true;
     public float stateElapsedSeconds;
 
+    [Header("Block")]
+    public Room2DBlockReason blockReason = Room2DBlockReason.None;
+    public float blockRemainingHours;
+
+    [Header("Room Attributes")]
+    public Room2DAttribute[] roomAttributes;
+
     private void OnValidate()
     {
         SyncCheckoutFlagForState();
@@ -37,9 +44,7 @@ public class Room2DEntity : MonoBehaviour
 
     public void SetState(Room2DState newState)
     {
-        currentState = newState;
-        SyncCheckoutFlagForState();
-        ResetStateTimer();
+        EnterState(newState, ShouldStateBeCheckedOut(newState));
     }
 
     public void PerformNextAction()
@@ -57,6 +62,8 @@ public class Room2DEntity : MonoBehaviour
                 break;
             case Room2DState.Ready:
                 SimulateCheckIn();
+                break;
+            case Room2DState.Blocked:
                 break;
             default:
                 SimulateCheckout();
@@ -124,6 +131,44 @@ public class Room2DEntity : MonoBehaviour
         return true;
     }
 
+    public bool StartBlock(Room2DBlockReason reason, float durationHours)
+    {
+        if (!CanStartBlock() || reason == Room2DBlockReason.None || durationHours <= 0f)
+        {
+            return false;
+        }
+
+        actionCount++;
+        blockReason = reason;
+        blockRemainingHours = durationHours;
+        EnterState(Room2DState.Blocked, false);
+        return true;
+    }
+
+    public bool AdvanceBlockTime(float gameHours)
+    {
+        if (currentState != Room2DState.Blocked || gameHours <= 0f)
+        {
+            return false;
+        }
+
+        blockRemainingHours = Mathf.Max(0f, blockRemainingHours - gameHours);
+
+        if (blockRemainingHours <= 0f)
+        {
+            CompleteBlock();
+        }
+
+        return true;
+    }
+
+    public void CompleteBlock()
+    {
+        blockReason = Room2DBlockReason.None;
+        blockRemainingHours = 0f;
+        EnterState(Room2DState.Dirty, true);
+    }
+
     public bool CanSimulateCheckout()
     {
         return currentState == Room2DState.Occupied;
@@ -149,6 +194,13 @@ public class Room2DEntity : MonoBehaviour
         return currentState == Room2DState.AwaitingInspection;
     }
 
+    public bool CanStartBlock()
+    {
+        return currentState != Room2DState.Occupied
+            && currentState != Room2DState.Cleaning
+            && currentState != Room2DState.Blocked;
+    }
+
     public string GetStateDisplayName()
     {
         switch (currentState)
@@ -161,6 +213,8 @@ public class Room2DEntity : MonoBehaviour
                 return "Ready";
             case Room2DState.Occupied:
                 return "Occupied";
+            case Room2DState.Blocked:
+                return "Blocked";
             default:
                 return "Dirty";
         }
@@ -178,6 +232,8 @@ public class Room2DEntity : MonoBehaviour
                 return "Next: Simulate Check In";
             case Room2DState.Occupied:
                 return "Next: Simulate Checkout";
+            case Room2DState.Blocked:
+                return "Blocked: " + GetBlockDisplayName();
             default:
                 return guestCheckedOut ? "Next: Start Cleaning" : "Next: Wait for Checkout";
         }
@@ -198,10 +254,58 @@ public class Room2DEntity : MonoBehaviour
         return "State Time: " + Mathf.FloorToInt(stateElapsedSeconds) + "s";
     }
 
+    public string GetBlockDisplayName()
+    {
+        if (currentState != Room2DState.Blocked)
+        {
+            return "Not Blocked";
+        }
+
+        return blockReason + " " + FormatHours(blockRemainingHours);
+    }
+
+    [ContextMenu("Generate Prototype Room Attributes")]
+    public void GeneratePrototypeRoomAttributes()
+    {
+        Room2DAttributeType[] possibleTypes =
+        {
+            Room2DAttributeType.Bed,
+            Room2DAttributeType.Floor,
+            Room2DAttributeType.Wardrobe,
+            Room2DAttributeType.Bathroom,
+            Room2DAttributeType.Wallpaper,
+            Room2DAttributeType.AirConditioner,
+            Room2DAttributeType.Window
+        };
+
+        int attributeCount = Random.Range(3, 6);
+        roomAttributes = new Room2DAttribute[attributeCount];
+
+        for (int i = 0; i < roomAttributes.Length; i++)
+        {
+            Room2DAttributeType attributeType = possibleTypes[(roomNumber + i) % possibleTypes.Length];
+            int condition = Random.Range(35, 101);
+
+            roomAttributes[i] = new Room2DAttribute
+            {
+                type = attributeType,
+                condition = condition,
+                note = GetPrototypeAttributeNote(attributeType, condition)
+            };
+        }
+    }
+
     private void EnterState(Room2DState newState, bool newGuestCheckedOut)
     {
         currentState = newState;
         guestCheckedOut = newGuestCheckedOut;
+
+        if (newState != Room2DState.Blocked)
+        {
+            blockReason = Room2DBlockReason.None;
+            blockRemainingHours = 0f;
+        }
+
         ResetStateTimer();
     }
 
@@ -212,15 +316,40 @@ public class Room2DEntity : MonoBehaviour
 
     private void SyncCheckoutFlagForState()
     {
-        switch (currentState)
+        guestCheckedOut = ShouldStateBeCheckedOut(currentState);
+    }
+
+    private bool ShouldStateBeCheckedOut(Room2DState state)
+    {
+        return state != Room2DState.Ready
+            && state != Room2DState.Occupied
+            && state != Room2DState.Blocked;
+    }
+
+    private string FormatHours(float hours)
+    {
+        if (hours >= 24f)
         {
-            case Room2DState.Ready:
-            case Room2DState.Occupied:
-                guestCheckedOut = false;
-                break;
-            default:
-                guestCheckedOut = true;
-                break;
+            int days = Mathf.FloorToInt(hours / 24f);
+            int remainingHours = Mathf.CeilToInt(hours - days * 24f);
+            return days + "d " + remainingHours + "h";
         }
+
+        return Mathf.CeilToInt(hours) + "h";
+    }
+
+    private string GetPrototypeAttributeNote(Room2DAttributeType attributeType, int condition)
+    {
+        if (condition >= 75)
+        {
+            return "Good";
+        }
+
+        if (condition >= 50)
+        {
+            return "Worn";
+        }
+
+        return "Problem: " + attributeType;
     }
 }
