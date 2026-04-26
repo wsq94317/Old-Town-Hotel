@@ -78,6 +78,7 @@ public class Room2DOverview : MonoBehaviour
         int cleaningCount = 0;
         int awaitingInspectionCount = 0;
         int readyCount = 0;
+        int checkedOutCount = 0;
 
         for (int i = 0; i < rooms.Length; i++)
         {
@@ -101,12 +102,18 @@ public class Room2DOverview : MonoBehaviour
                     dirtyCount++;
                     break;
             }
+
+            if (rooms[i].guestCheckedOut)
+            {
+                checkedOutCount++;
+            }
         }
 
         string summaryText = "Rooms  Dirty: " + dirtyCount
             + "  Cleaning: " + cleaningCount
             + "  Inspect: " + awaitingInspectionCount
-            + "  Ready: " + readyCount;
+            + "  Ready: " + readyCount
+            + "  Checked Out: " + checkedOutCount;
 
         if (summaryLabelTextMeshPro != null)
         {

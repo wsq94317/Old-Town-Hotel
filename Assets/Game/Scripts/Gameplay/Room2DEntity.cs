@@ -7,7 +7,13 @@ public class Room2DEntity : MonoBehaviour
     public int floorNumber = 1;
     public int roomNumber = 101;
     public Room2DState currentState = Room2DState.Dirty;
+    public bool guestCheckedOut = true;
     public int actionCount;
+
+    private void OnValidate()
+    {
+        SyncCheckoutFlagForState();
+    }
 
     public void SetIdentity(int newFloorNumber, int newRoomNumber)
     {
@@ -20,6 +26,7 @@ public class Room2DEntity : MonoBehaviour
     public void SetState(Room2DState newState)
     {
         currentState = newState;
+        SyncCheckoutFlagForState();
     }
 
     public void PerformNextAction()
@@ -36,9 +43,11 @@ public class Room2DEntity : MonoBehaviour
                 break;
             case Room2DState.AwaitingInspection:
                 currentState = Room2DState.Ready;
+                guestCheckedOut = false;
                 break;
             default:
                 currentState = Room2DState.Dirty;
+                guestCheckedOut = true;
                 break;
         }
     }
@@ -69,12 +78,30 @@ public class Room2DEntity : MonoBehaviour
             case Room2DState.Ready:
                 return "Next: Simulate Checkout";
             default:
-                return "Next: Start Cleaning";
+                return guestCheckedOut ? "Next: Start Cleaning" : "Next: Wait for Checkout";
         }
     }
 
     public string GetActionCountDisplayName()
     {
         return "Actions: " + actionCount;
+    }
+
+    public string GetCheckoutDisplayName()
+    {
+        return guestCheckedOut ? "Checked Out" : "Not Checked Out";
+    }
+
+    private void SyncCheckoutFlagForState()
+    {
+        switch (currentState)
+        {
+            case Room2DState.Ready:
+                guestCheckedOut = false;
+                break;
+            default:
+                guestCheckedOut = true;
+                break;
+        }
     }
 }

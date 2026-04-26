@@ -20,6 +20,7 @@ Build the fake-3D 2D Room View prototype first inside the current Unity project:
 - One clear room entity first
 - Simple room state visualization
 - UI labels for room name, current state, next action, and action count
+- Explicit guest checkout flag for the room cleaning flow
 - Beginner-friendly scene setup in Unity
 - States: Dirty, Cleaning, AwaitingInspection, Ready
 
@@ -27,7 +28,7 @@ Build the fake-3D 2D Room View prototype first inside the current Unity project:
 Hotel_Rooms_2D_Proto
 
 ## Room Entity Development Flow
-1. Room data entity: identity, floor, room number, state, action count.
+1. Room data entity: identity, floor, room number, state, checkout flag, action count.
 2. Room visual controller: state color and state markers.
 3. Room fake-depth visual: shadow, floor, back wall, side walls, furniture sorting.
 4. Room label view: per-room TMP labels under each room entity.

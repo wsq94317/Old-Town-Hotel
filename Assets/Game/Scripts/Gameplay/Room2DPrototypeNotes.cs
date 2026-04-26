@@ -51,6 +51,11 @@ public class Room2DPrototypeNotes : MonoBehaviour
     // The main next-action button should call Room2DSelectionManager.PerformNextActionOnSelectedRoom.
     // Avoid room click/raycast logic until the room prefab structure is stable.
 
+    // Checkout target:
+    // Ready means the room is not checked out and does not need cleaning.
+    // Simulate Checkout moves Ready to Dirty and marks guestCheckedOut true.
+    // Dirty, Cleaning, and AwaitingInspection represent the post-checkout cleaning path.
+
     // Prefab target:
     // Once Room_A_2D contains entity, controller, visuals, and label view, drag it into Assets/Game/Prefabs.
     // Unity Prefabs are the reusable room "class instances" for building many rooms.

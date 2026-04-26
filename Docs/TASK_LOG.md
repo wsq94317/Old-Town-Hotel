@@ -22,6 +22,7 @@ Build first playable fake-3D 2D room entity prototype.
 - Room2DEntity now has SetIdentity for room number/name setup
 - Room2DOverview can assign prototype room numbers for duplicated rooms
 - Room2DSelectionManager can select next/previous room by room number
+- Room2DEntity now tracks whether the guest has checked out
 
 ## Next
 - Attach Room2DEntity to Room_A_2D in Unity
@@ -33,4 +34,5 @@ Build first playable fake-3D 2D room entity prototype.
 - Add temporary UI buttons for Select Next Room and Select Previous Room
 - Rebind Button_NextState to Room2DSelectionManager.PerformNextActionOnSelectedRoom
 - Use Room2DOverview context menu tools to test multi-room states quickly
+- Keep cleaning flow tied to checked-out rooms before adding guest/front-desk systems
 - Convert the finished Room_A_2D object into a reusable Unity Prefab
