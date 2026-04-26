@@ -24,6 +24,7 @@ public class Room2DPrototypeNotes : MonoBehaviour
     // 15. Put roomName, current state, next action, and action count TMP labels under that child.
     // 16. Assign those TMP labels to Room2DLabelView.
     // 17. Add Room2DOverview to a scene UI object for summary counts across rooms.
+    // 18. Add Room2DSelectionManager for choosing which room the main action button controls.
 
     // First visual target:
     // Dirty = messy room color or overlay.
@@ -42,6 +43,11 @@ public class Room2DPrototypeNotes : MonoBehaviour
     // Room overview target:
     // Count how many rooms are Dirty, Cleaning, AwaitingInspection, and Ready.
     // This becomes useful once the first room is duplicated into multiple room entities.
+
+    // Room selection target:
+    // Use temporary UI buttons to select Room_A_2D or Room_B_2D.
+    // The main next-action button should call Room2DSelectionManager.PerformNextActionOnSelectedRoom.
+    // Avoid room click/raycast logic until the room prefab structure is stable.
 
     // Prefab target:
     // Once Room_A_2D contains entity, controller, visuals, and label view, drag it into Assets/Game/Prefabs.

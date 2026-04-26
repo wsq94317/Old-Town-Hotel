@@ -15,6 +15,7 @@ public class Room2DController : MonoBehaviour
     public GameObject cleaningVisual;
     public GameObject awaitingInspectionVisual;
     public GameObject readyVisual;
+    public GameObject selectedVisual;
 
     [Header("Optional Tint Target")]
     public SpriteRenderer roomSpriteRenderer;
@@ -136,6 +137,11 @@ public class Room2DController : MonoBehaviour
         }
 
         RefreshLabelView();
+    }
+
+    public void SetSelected(bool isSelected)
+    {
+        SetVisualActive(selectedVisual, isSelected);
     }
 
     private void SetVisualActive(GameObject visual, bool isActive)

@@ -32,9 +32,10 @@ Hotel_Rooms_2D_Proto
 3. Room fake-depth visual: shadow, floor, back wall, side walls, furniture sorting.
 4. Room label view: per-room TMP labels under each room entity.
 5. Room overview: scene-level counts for Dirty, Cleaning, AwaitingInspection, Ready.
-6. Room interaction: one main action button that advances the room workflow.
-7. Room prefab: convert one working room entity into a reusable Unity Prefab.
-8. Room layout scale-up: duplicate one working prefab into multiple rooms and floors.
+6. Room selection: choose one current room for the main action button.
+7. Room interaction: one main action button that advances the selected room workflow.
+8. Room prefab: convert one working room entity into a reusable Unity Prefab.
+9. Room layout scale-up: duplicate one working prefab into multiple rooms and floors.
 
 ## Coding Rules
 - Keep systems small and simple
