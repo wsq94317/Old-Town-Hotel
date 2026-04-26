@@ -47,7 +47,7 @@ public class Room2DPrototypeNotes : MonoBehaviour
     // Use Assign Prototype Room Numbers after duplicating rooms to quickly set Room 101, Room 102, etc.
 
     // Room selection target:
-    // Use temporary UI buttons to select Room_A_2D or Room_B_2D.
+    // Use temporary UI buttons to select the next or previous room.
     // The main next-action button should call Room2DSelectionManager.PerformNextActionOnSelectedRoom.
     // Avoid room click/raycast logic until the room prefab structure is stable.
 
