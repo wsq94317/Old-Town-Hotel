@@ -31,25 +31,49 @@ public class Room2DEntity : MonoBehaviour
 
     public void PerformNextAction()
     {
-        actionCount++;
-
         switch (currentState)
         {
             case Room2DState.Dirty:
-                currentState = Room2DState.Cleaning;
+                StartCleaning();
                 break;
             case Room2DState.Cleaning:
-                currentState = Room2DState.AwaitingInspection;
+                FinishCleaning();
                 break;
             case Room2DState.AwaitingInspection:
-                currentState = Room2DState.Ready;
-                guestCheckedOut = false;
+                ApproveInspection();
                 break;
             default:
-                currentState = Room2DState.Dirty;
-                guestCheckedOut = true;
+                SimulateCheckout();
                 break;
         }
+    }
+
+    public void SimulateCheckout()
+    {
+        actionCount++;
+        currentState = Room2DState.Dirty;
+        guestCheckedOut = true;
+    }
+
+    public void StartCleaning()
+    {
+        actionCount++;
+        currentState = Room2DState.Cleaning;
+        guestCheckedOut = true;
+    }
+
+    public void FinishCleaning()
+    {
+        actionCount++;
+        currentState = Room2DState.AwaitingInspection;
+        guestCheckedOut = true;
+    }
+
+    public void ApproveInspection()
+    {
+        actionCount++;
+        currentState = Room2DState.Ready;
+        guestCheckedOut = false;
     }
 
     public string GetStateDisplayName()

@@ -35,8 +35,9 @@ Hotel_Rooms_2D_Proto
 5. Room overview: scene-level counts for Dirty, Cleaning, AwaitingInspection, Ready.
 6. Room selection: choose one current room for the main action button.
 7. Room interaction: one main action button that advances the selected room workflow.
-8. Room prefab: convert one working room entity into a reusable Unity Prefab.
-9. Room layout scale-up: duplicate one working prefab into multiple rooms and floors.
+8. Room workflow actions: SimulateCheckout, StartCleaning, FinishCleaning, ApproveInspection.
+9. Room prefab: convert one working room entity into a reusable Unity Prefab.
+10. Room layout scale-up: duplicate one working prefab into multiple rooms and floors.
 
 ## Coding Rules
 - Keep systems small and simple

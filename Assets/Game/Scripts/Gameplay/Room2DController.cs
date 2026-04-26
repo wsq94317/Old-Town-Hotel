@@ -115,6 +115,26 @@ public class Room2DController : MonoBehaviour
         }
     }
 
+    public void SimulateCheckout()
+    {
+        PerformRoomAction(entity => entity.SimulateCheckout(), Room2DState.Dirty);
+    }
+
+    public void StartCleaning()
+    {
+        PerformRoomAction(entity => entity.StartCleaning(), Room2DState.Cleaning);
+    }
+
+    public void FinishCleaning()
+    {
+        PerformRoomAction(entity => entity.FinishCleaning(), Room2DState.AwaitingInspection);
+    }
+
+    public void ApproveInspection()
+    {
+        PerformRoomAction(entity => entity.ApproveInspection(), Room2DState.Ready);
+    }
+
     public void ApplyStateVisual()
     {
         Room2DState visualState = GetCurrentState();
@@ -150,6 +170,22 @@ public class Room2DController : MonoBehaviour
         {
             visual.SetActive(isActive);
         }
+    }
+
+    private void PerformRoomAction(System.Action<Room2DEntity> entityAction, Room2DState fallbackState)
+    {
+        if (roomEntity != null)
+        {
+            entityAction(roomEntity);
+        }
+        else
+        {
+            currentState = fallbackState;
+            actionCount++;
+        }
+
+        ApplyStateVisual();
+        RefreshOverview();
     }
 
     private Color GetStateColor()
