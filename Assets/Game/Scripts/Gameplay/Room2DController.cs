@@ -14,6 +14,9 @@ public class Room2DController : MonoBehaviour
     // 可选：场景里的总览统计。
     public Room2DOverview roomOverview;
 
+    // 可选：场景里的单个 HSK，用来判断当前房间是否正在被保洁处理。
+    public Housekeeper2D housekeeper;
+
     // 没有绑定 Room2DEntity 时的备用原型数据。
     public string roomName = "Room 101";
     public Room2DState currentState = Room2DState.Dirty;
@@ -46,16 +49,31 @@ public class Room2DController : MonoBehaviour
     public float prototypeMaintenanceBlockHours = 8f;
     public float prototypeRenovationBlockHours = 72f;
 
+    [Header("Prototype Debug Room Label")]
+    // 原型调试标签：直接显示在 Game 窗口里，不依赖 Canvas，方便快速看每个房间是谁。
+    public bool showPrototypeDebugLabel = true;
+    public Vector2 debugLabelScreenOffset = new Vector2(-60f, -62f);
+    public Vector2 debugLabelSize = new Vector2(130f, 64f);
+    public int debugLabelFontSize = 16;
+    public Color normalDebugLabelColor = Color.white;
+    public Color selectedDebugLabelColor = Color.yellow;
+    public Color housekeeperDebugLabelColor = Color.cyan;
+
+    private bool isSelected;
+    private GUIStyle debugLabelStyle;
+
     private void Awake()
     {
         FindRoomEntityIfNeeded();
         FindLabelViewIfNeeded();
         FindRoomOverviewIfNeeded();
+        FindHousekeeperIfNeeded();
     }
 
     private void Start()
     {
         FindRoomOverviewIfNeeded();
+        FindHousekeeperIfNeeded();
         ApplyStateVisual();
     }
 
@@ -65,6 +83,11 @@ public class Room2DController : MonoBehaviour
         FindLabelViewIfNeeded();
         // 不在 OnValidate 里调用 ApplyStateVisual。
         // Unity 不允许在 OnValidate / Awake 校验阶段 SetActive，否则 Console 会出现 SendMessage 警告。
+    }
+
+    private void OnGUI()
+    {
+        DrawPrototypeDebugLabel();
     }
 
     public void SetState(Room2DState newState)
@@ -223,7 +246,9 @@ public class Room2DController : MonoBehaviour
     // 当前选中房间的视觉反馈。
     public void SetSelected(bool isSelected)
     {
+        this.isSelected = isSelected;
         SetVisualActive(selectedVisual, isSelected);
+        RefreshLabelView();
     }
 
     private void SetVisualActive(GameObject visual, bool isActive)
@@ -310,6 +335,14 @@ public class Room2DController : MonoBehaviour
         }
     }
 
+    private void FindHousekeeperIfNeeded()
+    {
+        if (housekeeper == null)
+        {
+            housekeeper = FindFirstObjectByType<Housekeeper2D>();
+        }
+    }
+
     private void RefreshOverview()
     {
         FindRoomOverviewIfNeeded();
@@ -323,10 +356,94 @@ public class Room2DController : MonoBehaviour
     private void RefreshLabelView()
     {
         FindLabelViewIfNeeded();
+        FindHousekeeperIfNeeded();
 
         if (labelView != null && roomEntity != null)
         {
-            labelView.Refresh(roomEntity);
+            labelView.Refresh(roomEntity, isSelected, IsAssignedToHousekeeper());
         }
+    }
+
+    private bool IsAssignedToHousekeeper()
+    {
+        return housekeeper != null
+            && housekeeper.assignedRoom == roomEntity
+            && housekeeper.currentState == Housekeeper2D.HousekeeperState.Busy;
+    }
+
+    private void DrawPrototypeDebugLabel()
+    {
+        if (!showPrototypeDebugLabel || roomEntity == null)
+        {
+            return;
+        }
+
+        Camera mainCamera = Camera.main;
+        if (mainCamera == null)
+        {
+            return;
+        }
+
+        Vector3 screenPosition = mainCamera.WorldToScreenPoint(transform.position);
+        if (screenPosition.z < 0f)
+        {
+            return;
+        }
+
+        Rect labelRect = new Rect(
+            screenPosition.x + debugLabelScreenOffset.x,
+            Screen.height - screenPosition.y + debugLabelScreenOffset.y,
+            debugLabelSize.x,
+            debugLabelSize.y);
+
+        bool isHousekeeperCleaning = IsAssignedToHousekeeper();
+        GUIStyle labelStyle = GetDebugLabelStyle(GetDebugLabelColor(isHousekeeperCleaning));
+        GUI.Label(labelRect, BuildPrototypeDebugLabelText(isHousekeeperCleaning), labelStyle);
+    }
+
+    private GUIStyle GetDebugLabelStyle(Color textColor)
+    {
+        if (debugLabelStyle == null)
+        {
+            debugLabelStyle = new GUIStyle(GUI.skin.label);
+            debugLabelStyle.alignment = TextAnchor.MiddleCenter;
+            debugLabelStyle.wordWrap = false;
+        }
+
+        debugLabelStyle.fontSize = debugLabelFontSize;
+        debugLabelStyle.normal.textColor = textColor;
+        return debugLabelStyle;
+    }
+
+    private Color GetDebugLabelColor(bool isHousekeeperCleaning)
+    {
+        if (isSelected)
+        {
+            return selectedDebugLabelColor;
+        }
+
+        if (isHousekeeperCleaning)
+        {
+            return housekeeperDebugLabelColor;
+        }
+
+        return normalDebugLabelColor;
+    }
+
+    private string BuildPrototypeDebugLabelText(bool isHousekeeperCleaning)
+    {
+        string labelText = roomEntity.roomName + "\n" + roomEntity.GetStateDisplayName();
+
+        if (isSelected)
+        {
+            labelText += "\nSELECTED";
+        }
+
+        if (isHousekeeperCleaning)
+        {
+            labelText += "\nHSK Cleaning";
+        }
+
+        return labelText;
     }
 }

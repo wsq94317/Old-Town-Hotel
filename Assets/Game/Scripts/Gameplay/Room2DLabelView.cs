@@ -13,6 +13,11 @@ public class Room2DLabelView : MonoBehaviour
 
     public void Refresh(Room2DEntity roomEntity)
     {
+        Refresh(roomEntity, false, false);
+    }
+
+    public void Refresh(Room2DEntity roomEntity, bool isSelected, bool isAssignedToHousekeeper)
+    {
         if (roomEntity == null)
         {
             return;
@@ -20,12 +25,14 @@ public class Room2DLabelView : MonoBehaviour
 
         if (roomNameLabel != null)
         {
-            roomNameLabel.text = roomEntity.roomName;
+            // 选中的房间直接在房号前加标记，方便在 Game 窗口里定位当前操作对象。
+            string selectedMarker = isSelected ? "> " : "";
+            roomNameLabel.text = selectedMarker + roomEntity.roomName;
         }
 
         if (stateLabel != null)
         {
-            stateLabel.text = roomEntity.GetStateDisplayName();
+            stateLabel.text = BuildStateText(roomEntity, isSelected, isAssignedToHousekeeper);
         }
 
         if (nextActionLabel != null)
@@ -42,5 +49,23 @@ public class Room2DLabelView : MonoBehaviour
         {
             cleaningPriorityLabel.text = roomEntity.GetCleaningPriorityDisplayName();
         }
+    }
+
+    private string BuildStateText(Room2DEntity roomEntity, bool isSelected, bool isAssignedToHousekeeper)
+    {
+        string stateText = roomEntity.GetStateDisplayName();
+
+        if (isAssignedToHousekeeper)
+        {
+            // HSK = Housekeeping，原型阶段先用短文字避免房间标签太挤。
+            stateText += "\nHSK Cleaning";
+        }
+
+        if (isSelected)
+        {
+            stateText += "\nSELECTED";
+        }
+
+        return stateText;
     }
 }
