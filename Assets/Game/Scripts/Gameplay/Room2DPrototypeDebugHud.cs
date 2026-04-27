@@ -327,13 +327,13 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
             return "Demand\nNone";
         }
 
-        return "Last Demand\n"
+        return demandLoop.GetUpcomingDemandPreviewText() + "\n\n"
+            + "Last Demand\n"
             + "Type: " + demandLoop.lastDemandType + "\n"
             + "Match: " + demandLoop.lastMatchQualityLabel + "\n"
             + "Clean/Wear: " + demandLoop.lastCleanlinessSuitability + " / " + demandLoop.lastWearSuitability + "\n"
             + "Outcome: " + demandLoop.lastOutcomeLabel + "\n"
             + "Result: " + demandLoop.lastOutcomeSummary + "\n"
-            + "Next demand: " + FormatSeconds(Mathf.Max(0f, demandLoop.demandIntervalSeconds - demandLoop.demandTimerSeconds)) + "\n"
             + BuildOccupiedRoomsText() + "\n\n"
             + demandLoop.GetPrototypeDaySummaryText();
     }

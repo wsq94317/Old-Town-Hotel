@@ -42,6 +42,15 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
     public int successfulDemandCount;
     public int unmetDemandCount;
 
+    [Header("Upcoming Demand Preview")]
+    // 最小 ETA 原型：只预告下一个入住需求，不做完整客人列表或预分配。
+    public bool useUpcomingDemandPreview = true;
+    public Room2DDemandType upcomingDemandType = Room2DDemandType.Normal;
+    public float upcomingDemandEtaSeconds;
+    public string upcomingDemandPreviewText = "None";
+    public string lastActivatedUpcomingDemandText = "None";
+    public int activatedUpcomingDemandCount;
+
     [Header("Occupancy")]
     // Occupied 房间住满多少现实秒后自动退房，重新变成 Dirty。
     public float occupiedDurationSeconds = 20f;
@@ -80,6 +89,7 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
     private void Start()
     {
         FindRoomsIfNeeded();
+        ScheduleUpcomingDemandPreview();
         RefreshPrototypeDaySummary();
     }
 
@@ -90,11 +100,18 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
             return;
         }
 
-        demandTimerSeconds += Time.deltaTime;
-        if (demandTimerSeconds >= demandIntervalSeconds)
+        if (useUpcomingDemandPreview)
         {
-            demandTimerSeconds = 0f;
-            GenerateOneDemand();
+            TickUpcomingDemandPreview();
+        }
+        else
+        {
+            demandTimerSeconds += Time.deltaTime;
+            if (demandTimerSeconds >= demandIntervalSeconds)
+            {
+                demandTimerSeconds = 0f;
+                GenerateOneDemand();
+            }
         }
 
         ProcessOccupiedCheckouts();
@@ -125,6 +142,25 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
                 ? Room2DDemandType.HighExpectation
                 : Room2DDemandType.Normal;
         }
+
+        if (useUpcomingDemandPreview)
+        {
+            ScheduleUpcomingDemandPreview();
+        }
+    }
+
+    [ContextMenu("Schedule Upcoming Demand Preview")]
+    public void ScheduleUpcomingDemandPreview()
+    {
+        upcomingDemandType = nextDemandType;
+        upcomingDemandEtaSeconds = Mathf.Max(0f, demandIntervalSeconds);
+        upcomingDemandPreviewText = BuildUpcomingDemandPreviewText("Incoming");
+    }
+
+    [ContextMenu("Activate Upcoming Demand Now")]
+    public void ActivateUpcomingDemandNow()
+    {
+        ActivateUpcomingDemand();
     }
 
     [ContextMenu("Generate Normal Demand")]
@@ -186,6 +222,58 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
         RefreshRoomVisual(readyRoom);
         RefreshOverview();
         RefreshPrototypeDaySummary();
+    }
+
+    private void TickUpcomingDemandPreview()
+    {
+        upcomingDemandEtaSeconds = Mathf.Max(0f, upcomingDemandEtaSeconds - Time.deltaTime);
+        upcomingDemandPreviewText = BuildUpcomingDemandPreviewText("Incoming");
+
+        if (upcomingDemandEtaSeconds > 0f)
+        {
+            return;
+        }
+
+        ActivateUpcomingDemand();
+    }
+
+    private void ActivateUpcomingDemand()
+    {
+        Room2DDemandType demandType = upcomingDemandType;
+
+        activatedUpcomingDemandCount++;
+        lastActivatedUpcomingDemandText = demandType + " activated";
+        GenerateDemand(demandType);
+        AdvanceNextDemandTypeAfterUpcomingDemand(demandType);
+        ScheduleUpcomingDemandPreview();
+    }
+
+    private void AdvanceNextDemandTypeAfterUpcomingDemand(Room2DDemandType activatedDemandType)
+    {
+        if (!alternateDemandTypes)
+        {
+            nextDemandType = activatedDemandType;
+            return;
+        }
+
+        nextDemandType = activatedDemandType == Room2DDemandType.Normal
+            ? Room2DDemandType.HighExpectation
+            : Room2DDemandType.Normal;
+    }
+
+    public string GetUpcomingDemandPreviewText()
+    {
+        if (!useUpcomingDemandPreview)
+        {
+            return "Upcoming\nPreview: Off\nNext in: " + FormatSeconds(Mathf.Max(0f, demandIntervalSeconds - demandTimerSeconds));
+        }
+
+        return "Upcoming\n"
+            + "Type: " + upcomingDemandType + "\n"
+            + "ETA: " + FormatSeconds(upcomingDemandEtaSeconds) + "\n"
+            + "Status: " + upcomingDemandPreviewText + "\n"
+            + "Activated: " + activatedUpcomingDemandCount + "\n"
+            + "Last active: " + lastActivatedUpcomingDemandText;
     }
 
     [ContextMenu("Process Occupied Checkouts")]
@@ -565,6 +653,11 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
         }
 
         return "Cycle is stable";
+    }
+
+    private string BuildUpcomingDemandPreviewText(string status)
+    {
+        return status + " " + upcomingDemandType + " in " + FormatSeconds(upcomingDemandEtaSeconds);
     }
 
     private string FormatSeconds(float seconds)
