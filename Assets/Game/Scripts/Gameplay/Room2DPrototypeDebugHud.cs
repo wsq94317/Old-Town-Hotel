@@ -42,6 +42,8 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
     public bool moveButtonsToActionPanel = true;
     public bool hideUnboundDebugTexts = true;
     public bool hideUnboundDebugPanels = true;
+    public bool assignDefaultFontWhenMissing = true;
+    public TMP_FontAsset fallbackFontAsset;
 
     [Header("Refresh")]
     public bool refreshDuringPlay = true;
@@ -94,6 +96,11 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
         if (moveButtonsToActionPanel)
         {
             MoveHudButtonsToActionPanel();
+        }
+
+        if (assignDefaultFontWhenMissing)
+        {
+            AssignFallbackFontsToHudTexts();
         }
 
         // 四块区域都用固定像素尺寸，手机竖屏下更容易读，也不会把房间区域整片盖住。
@@ -489,6 +496,8 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
             return;
         }
 
+        AssignFallbackFontIfNeeded(text);
+
         text.color = Color.white;
         text.alignment = alignment;
         text.textWrappingMode = TextWrappingModes.Normal;
@@ -502,6 +511,48 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
         layoutElement.minHeight = 36f;
         layoutElement.preferredHeight = text == demandStatusText ? 130f : 180f;
         layoutElement.flexibleWidth = 1f;
+    }
+
+    private void AssignFallbackFontsToHudTexts()
+    {
+        Transform root = GetHudSearchRoot();
+        TMP_Text[] texts = root.GetComponentsInChildren<TMP_Text>(true);
+        for (int i = 0; i < texts.Length; i++)
+        {
+            AssignFallbackFontIfNeeded(texts[i]);
+        }
+    }
+
+    private void AssignFallbackFontIfNeeded(TMP_Text text)
+    {
+        if (text == null || text.font != null)
+        {
+            return;
+        }
+
+        TMP_FontAsset fontAsset = GetFallbackFontAsset();
+        if (fontAsset == null)
+        {
+            return;
+        }
+
+        // 新建 TMP 文字有时没有 Font Asset；这里给 HUD 文字补一个默认字体，避免 Generate Mesh warning。
+        text.font = fontAsset;
+    }
+
+    private TMP_FontAsset GetFallbackFontAsset()
+    {
+        if (fallbackFontAsset != null)
+        {
+            return fallbackFontAsset;
+        }
+
+        if (TMP_Settings.defaultFontAsset != null)
+        {
+            return TMP_Settings.defaultFontAsset;
+        }
+
+        return Resources.Load<TMP_FontAsset>("Fonts & Materials/LiberationSans SDF");
     }
 
     private void MoveBoundTextsToCorrectPanels()
