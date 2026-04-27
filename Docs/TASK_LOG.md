@@ -41,6 +41,7 @@ Build first playable fake-3D 2D room entity prototype.
 - Room2DOverview now identifies the highest-priority Dirty room
 - Housekeeper2D created as a single-housekeeper cleaning resource prototype
 - Inspector2D created as a single-inspector room approval resource prototype
+- Room2DPrototypeDemandLoop created to consume Ready rooms and generate Dirty rooms again
 
 ## Next
 - Attach Room2DEntity to Room_A_2D in Unity
@@ -67,3 +68,4 @@ Build first playable fake-3D 2D room entity prototype.
 - Test whether multiple Dirty rooms create visible prioritization pressure
 - Attach Housekeeper2D to the scene and test one-room-at-a-time cleaning decisions
 - Attach Inspector2D to the scene and test one-room-at-a-time inspection decisions
+- Attach Room2DPrototypeDemandLoop to the scene and test unmet demand when no Ready rooms are available
