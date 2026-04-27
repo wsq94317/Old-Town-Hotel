@@ -43,6 +43,7 @@ Build first playable fake-3D 2D room entity prototype.
 - Inspector2D created as a single-inspector room approval resource prototype
 - Room2DPrototypeDemandLoop created to consume Ready rooms and generate Dirty rooms again
 - Room2DPrototypeDebugHud created to organize prototype testing information into readable panels
+- Room2DPrototypeDemandLoop now supports Normal / HighExpectation demand and simple room match quality
 
 ## Next
 - Attach Room2DEntity to Room_A_2D in Unity
@@ -71,3 +72,4 @@ Build first playable fake-3D 2D room entity prototype.
 - Attach Inspector2D to the scene and test one-room-at-a-time inspection decisions
 - Attach Room2DPrototypeDemandLoop to the scene and test unmet demand when no Ready rooms are available
 - Reorganize the Hotel_Rooms_2D_Proto Canvas into selected room, overview, worker, and action debug panels
+- Generate or edit prototype room attributes to test Good / Normal / Poor room match results
