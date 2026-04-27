@@ -330,6 +330,7 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
         }
 
         return demandLoop.GetUpcomingDemandPreviewText() + "\n\n"
+            + demandLoop.GetManualAssignmentText() + "\n\n"
             + "Last Demand\n"
             + "Type: " + demandLoop.lastDemandType + "\n"
             + "Match: " + demandLoop.lastMatchQualityLabel + "\n"
@@ -654,6 +655,10 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
             if (buttons[i].name == "Button_NextState")
             {
                 SetButtonText(buttons[i], "DEBUG State");
+            }
+            else if (buttons[i].name == "Button_AssignDemand" || buttons[i].name == "Button_AssignSelectedDemand")
+            {
+                SetButtonText(buttons[i], "Assign Demand");
             }
         }
     }

@@ -54,6 +54,8 @@ Build first playable fake-3D 2D room entity prototype.
 - Room2DEntity is now the single source of truth for room identity in the current prototype
 - The force-next-state button path is now clearly marked as a debug action
 - Legacy Room2DPrototypeLoop is guarded so it cannot accidentally mutate the current demand-loop test
+- Room2DPrototypeDemandLoop now supports one active demand that can be manually assigned to a selected Ready room
+- Room2DPrototypeDebugHud now shows active demand candidates and predicted match quality
 
 ## Next
 - Attach Room2DEntity to Room_A_2D in Unity
@@ -89,3 +91,4 @@ Build first playable fake-3D 2D room entity prototype.
 - Test whether upcoming demand ETA helps prepare Ready rooms before demand activates
 - Test whether reserving a Ready room before ETA activation improves assignment control
 - Keep normal room-turnover tests on Room2DPrototypeDemandLoop instead of the legacy prototype loop
+- Test manual room assignment versus fallback assignment for the current active demand

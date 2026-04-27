@@ -58,6 +58,19 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
     public string reservedRoomName = "None";
     public string lastReservationResult = "None";
 
+    [Header("Manual Active Demand Assignment")]
+    // 最小手动分房原型：ETA 到 0 后先变成一个 active demand，等待玩家选 Ready 房。
+    public bool useManualActiveDemand = true;
+    public bool activeDemandWaitingForManualAssignment;
+    public Room2DDemandType activeDemandType = Room2DDemandType.Normal;
+    public float activeDemandWaitSeconds;
+    public float manualAssignmentFallbackDelaySeconds = 8f;
+    public Room2DEntity activeReservedRoomForFallback;
+    public string activeReservedRoomName = "None";
+    public string activeDemandStatus = "None";
+    public string lastManualAssignmentResult = "None";
+    public string lastAssignmentMode = "None";
+
     [Header("Occupancy")]
     // Occupied 房间住满多少现实秒后自动退房，重新变成 Dirty。
     public float occupiedDurationSeconds = 20f;
@@ -121,6 +134,7 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
             }
         }
 
+        TickActiveDemand();
         ProcessOccupiedCheckouts();
         RefreshPrototypeDaySummary();
     }
@@ -205,6 +219,46 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
         lastReservationResult = "Reserved " + room.roomName + " for " + upcomingDemandType;
     }
 
+    [ContextMenu("Assign Selected Room To Active Demand")]
+    public void AssignSelectedRoomToActiveDemand()
+    {
+        FindReferencesIfNeeded();
+
+        if (selectionManager == null || selectionManager.selectedRoom == null)
+        {
+            lastManualAssignmentResult = "Manual failed: no selected room";
+            return;
+        }
+
+        AssignRoomToActiveDemand(selectionManager.selectedRoom.roomEntity);
+    }
+
+    public bool AssignRoomToActiveDemand(Room2DEntity room)
+    {
+        if (!activeDemandWaitingForManualAssignment)
+        {
+            lastManualAssignmentResult = "Manual failed: no active demand";
+            return false;
+        }
+
+        if (room == null)
+        {
+            lastManualAssignmentResult = "Manual failed: room is None";
+            return false;
+        }
+
+        if (!room.CanSimulateCheckIn())
+        {
+            lastManualAssignmentResult = "Manual failed: " + room.roomName + " is " + room.GetStateDisplayName();
+            return false;
+        }
+
+        lastManualAssignmentResult = "Manual assigned " + room.roomName;
+        GenerateDemand(activeDemandType, null, false, room, "Manual");
+        CompleteActiveDemand();
+        return true;
+    }
+
     [ContextMenu("Generate Normal Demand")]
     public void GenerateNormalDemandForTesting()
     {
@@ -219,20 +273,31 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
 
     private void GenerateDemand(Room2DDemandType demandType)
     {
-        GenerateDemand(demandType, null, false);
+        GenerateDemand(demandType, null, false, null, "Fallback");
     }
 
     private void GenerateDemand(Room2DDemandType demandType, Room2DEntity reservedRoom, bool useReservationFirst)
     {
+        GenerateDemand(demandType, reservedRoom, useReservationFirst, null, useReservationFirst ? "Reservation/Fallback" : "Fallback");
+    }
+
+    private void GenerateDemand(
+        Room2DDemandType demandType,
+        Room2DEntity reservedRoom,
+        bool useReservationFirst,
+        Room2DEntity forcedRoom,
+        string assignmentMode)
+    {
         FindRoomsIfNeeded();
         generatedDemandCount++;
         lastDemandType = demandType;
+        lastAssignmentMode = assignmentMode;
 
-        Room2DEntity readyRoom = FindRoomForDemand(demandType, reservedRoom, useReservationFirst);
+        Room2DEntity readyRoom = FindRoomForDemand(demandType, reservedRoom, useReservationFirst, forcedRoom);
         if (readyRoom == null)
         {
             unmetDemandCount++;
-            lastDemandResult = demandType + " unmet: no Ready room";
+            lastDemandResult = assignmentMode + ": " + demandType + " unmet: no Ready room";
             lastChangedRoomName = "None";
             lastMatchQuality = Room2DMatchQuality.PoorMatch;
             lastMatchQualityLabel = "No Match";
@@ -254,7 +319,7 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
         if (!readyRoom.SimulateCheckIn())
         {
             unmetDemandCount++;
-            lastDemandResult = demandType + " unmet: check-in guard blocked";
+            lastDemandResult = assignmentMode + ": " + demandType + " unmet: check-in guard blocked";
             lastChangedRoomName = readyRoom.roomName;
             lastMatchQualityLabel = "No Match";
             CompleteReservationResultAfterBlockedCheckIn(readyRoom, reservedRoom, useReservationFirst);
@@ -264,7 +329,7 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
         }
 
         successfulDemandCount++;
-        lastDemandResult = demandType + " -> " + readyRoom.roomName + " / " + lastMatchQualityLabel;
+        lastDemandResult = assignmentMode + ": " + demandType + " -> " + readyRoom.roomName + " / " + lastMatchQualityLabel;
         lastChangedRoomName = readyRoom.roomName;
         RecordSuccessfulAssignmentOutcome(demandType, readyRoom, matchQuality);
         CompleteReservationResultAfterSuccess(readyRoom, reservedRoom, useReservationFirst);
@@ -276,6 +341,13 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
 
     private void TickUpcomingDemandPreview()
     {
+        if (activeDemandWaitingForManualAssignment)
+        {
+            // 已经有一个 active demand 在等玩家手动分房时，暂停 ETA，避免重复生成新需求。
+            upcomingDemandPreviewText = "Paused: active demand waiting";
+            return;
+        }
+
         upcomingDemandEtaSeconds = Mathf.Max(0f, upcomingDemandEtaSeconds - Time.deltaTime);
         upcomingDemandPreviewText = BuildUpcomingDemandPreviewText("Incoming");
 
@@ -289,16 +361,27 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
 
     private void ActivateUpcomingDemand()
     {
+        if (activeDemandWaitingForManualAssignment)
+        {
+            // 已有 active demand 时不允许再激活新的需求，避免把玩家正在处理的需求覆盖掉。
+            lastActivatedUpcomingDemandText = "Blocked: active demand waiting";
+            return;
+        }
+
         Room2DDemandType demandType = upcomingDemandType;
         Room2DEntity reservedRoom = reservedRoomForUpcomingDemand;
 
         activatedUpcomingDemandCount++;
         lastActivatedUpcomingDemandText = demandType + " activated";
+
+        if (useManualActiveDemand)
+        {
+            StartActiveDemand(demandType, reservedRoom);
+            return;
+        }
+
         GenerateDemand(demandType, reservedRoom, true);
-        reservedRoomForUpcomingDemand = null;
-        reservedRoomName = "None";
-        AdvanceNextDemandTypeAfterUpcomingDemand(demandType);
-        ScheduleUpcomingDemandPreview();
+        FinishActivatedUpcomingDemand(demandType);
     }
 
     private void AdvanceNextDemandTypeAfterUpcomingDemand(Room2DDemandType activatedDemandType)
@@ -312,6 +395,69 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
         nextDemandType = activatedDemandType == Room2DDemandType.Normal
             ? Room2DDemandType.HighExpectation
             : Room2DDemandType.Normal;
+    }
+
+    private void StartActiveDemand(Room2DDemandType demandType, Room2DEntity reservedRoom)
+    {
+        activeDemandWaitingForManualAssignment = true;
+        activeDemandType = demandType;
+        activeDemandWaitSeconds = 0f;
+        activeReservedRoomForFallback = reservedRoom;
+        activeReservedRoomName = reservedRoom != null ? reservedRoom.roomName : "None";
+        activeDemandStatus = "Waiting for manual room assignment";
+        lastAssignmentMode = "Waiting";
+
+        reservedRoomForUpcomingDemand = null;
+        reservedRoomName = "None";
+        upcomingDemandPreviewText = "Paused: active demand waiting";
+        upcomingDemandEtaSeconds = 0f;
+    }
+
+    private void TickActiveDemand()
+    {
+        if (!activeDemandWaitingForManualAssignment)
+        {
+            return;
+        }
+
+        activeDemandWaitSeconds += Time.deltaTime;
+        activeDemandStatus = "Waiting for manual assignment";
+
+        if (manualAssignmentFallbackDelaySeconds <= 0f || activeDemandWaitSeconds < manualAssignmentFallbackDelaySeconds)
+        {
+            return;
+        }
+
+        ResolveActiveDemandWithFallback();
+    }
+
+    private void ResolveActiveDemandWithFallback()
+    {
+        Room2DEntity reservedRoom = activeReservedRoomForFallback;
+        lastManualAssignmentResult = "No manual assignment: fallback used";
+        GenerateDemand(activeDemandType, reservedRoom, reservedRoom != null, null, "Fallback");
+        CompleteActiveDemand();
+    }
+
+    private void CompleteActiveDemand()
+    {
+        Room2DDemandType completedDemandType = activeDemandType;
+
+        activeDemandWaitingForManualAssignment = false;
+        activeDemandWaitSeconds = 0f;
+        activeReservedRoomForFallback = null;
+        activeReservedRoomName = "None";
+        activeDemandStatus = "Resolved";
+
+        FinishActivatedUpcomingDemand(completedDemandType);
+    }
+
+    private void FinishActivatedUpcomingDemand(Room2DDemandType demandType)
+    {
+        reservedRoomForUpcomingDemand = null;
+        reservedRoomName = "None";
+        AdvanceNextDemandTypeAfterUpcomingDemand(demandType);
+        ScheduleUpcomingDemandPreview();
     }
 
     public string GetUpcomingDemandPreviewText()
@@ -329,6 +475,18 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
             + "Reserve result: " + lastReservationResult + "\n"
             + "Activated: " + activatedUpcomingDemandCount + "\n"
             + "Last active: " + lastActivatedUpcomingDemandText;
+    }
+
+    public string GetManualAssignmentText()
+    {
+        return "Active Demand\n"
+            + "Status: " + activeDemandStatus + "\n"
+            + "Type: " + (activeDemandWaitingForManualAssignment ? activeDemandType.ToString() : "None") + "\n"
+            + "Wait: " + FormatSeconds(activeDemandWaitSeconds) + " / " + FormatSeconds(manualAssignmentFallbackDelaySeconds) + "\n"
+            + "Fallback Reserved: " + activeReservedRoomName + "\n"
+            + "Last Assign: " + lastAssignmentMode + "\n"
+            + "Manual: " + lastManualAssignmentResult + "\n"
+            + GetCandidateReadyRoomsText();
     }
 
     [ContextMenu("Process Occupied Checkouts")]
@@ -441,8 +599,17 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
         FindRoomsIfNeeded();
     }
 
-    private Room2DEntity FindRoomForDemand(Room2DDemandType demandType, Room2DEntity reservedRoom, bool useReservationFirst)
+    private Room2DEntity FindRoomForDemand(
+        Room2DDemandType demandType,
+        Room2DEntity reservedRoom,
+        bool useReservationFirst,
+        Room2DEntity forcedRoom)
     {
+        if (forcedRoom != null)
+        {
+            return forcedRoom.CanSimulateCheckIn() ? forcedRoom : null;
+        }
+
         if (!useReservationFirst || reservedRoom == null)
         {
             return FindBestReadyRoomForDemand(demandType);
@@ -457,6 +624,50 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
 
         lastReservationResult = "Failed: " + reservedRoom.roomName + " was " + reservedRoom.GetStateDisplayName();
         return FindBestReadyRoomForDemand(demandType);
+    }
+
+    private string GetCandidateReadyRoomsText()
+    {
+        FindRoomsIfNeeded();
+
+        if (!activeDemandWaitingForManualAssignment)
+        {
+            return "Candidates: None";
+        }
+
+        string candidateText = "Candidates";
+        int shownCount = 0;
+
+        for (int i = 0; i < rooms.Length; i++)
+        {
+            Room2DEntity room = rooms[i];
+            if (room == null || !room.CanSimulateCheckIn())
+            {
+                continue;
+            }
+
+            if (shownCount < 5)
+            {
+                candidateText += "\n- " + room.roomName
+                    + ": " + GetMatchDisplayName(EvaluateMatchQuality(room, activeDemandType))
+                    + " C/W " + GetCleanlinessSuitability(room)
+                    + "/" + GetWearSuitability(room);
+            }
+
+            shownCount++;
+        }
+
+        if (shownCount == 0)
+        {
+            return "Candidates: no Ready rooms";
+        }
+
+        if (shownCount > 5)
+        {
+            candidateText += "\n- +" + (shownCount - 5) + " more";
+        }
+
+        return candidateText;
     }
 
     private Room2DEntity FindBestReadyRoomForDemand(Room2DDemandType demandType)
