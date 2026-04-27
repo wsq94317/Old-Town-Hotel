@@ -169,16 +169,17 @@ public class Room2DOverview : MonoBehaviour
             }
         }
 
-        // 这里先用一行文本，后面正式 UI 可以拆成多个 Text 或图标。
-        string summaryText = "Rooms  Dirty: " + dirtyCount
-            + "  Cleaning: " + cleaningCount
-            + "  Inspect: " + awaitingInspectionCount
-            + "  Ready: " + readyCount
-            + "  Occupied: " + occupiedCount
-            + "  Blocked: " + blockedCount
-            + "  Checked Out: " + checkedOutCount
-            + "  Oldest Dirty: " + FormatSeconds(oldestDirtySeconds)
-            + "  Urgent: " + highestPriorityDirtyRoomName + " " + FormatSeconds(highestPriorityDirtySeconds);
+        // 原型 HUD 需要多行文本，否则手机竖屏里会挤成一团。
+        string summaryText = "Overview\n"
+            + "Dirty: " + dirtyCount + "\n"
+            + "Cleaning: " + cleaningCount + "\n"
+            + "Inspect: " + awaitingInspectionCount + "\n"
+            + "Ready: " + readyCount + "\n"
+            + "Occupied: " + occupiedCount + "\n"
+            + "Blocked: " + blockedCount + "\n"
+            + "Checked Out: " + checkedOutCount + "\n"
+            + "Oldest Dirty: " + FormatSeconds(oldestDirtySeconds) + "\n"
+            + "Urgent: " + highestPriorityDirtyRoomName + " " + FormatSeconds(highestPriorityDirtySeconds);
 
         if (summaryLabelTextMeshPro != null)
         {

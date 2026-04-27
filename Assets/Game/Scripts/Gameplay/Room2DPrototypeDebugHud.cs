@@ -3,7 +3,7 @@ using UnityEngine;
 using UnityEngine.UI;
 
 // 临时原型调试 HUD。
-// 它不是最终玩家 UI，只负责把当前测试信息分区显示，方便调试房间周转循环。
+// 这不是最终 UI，只负责让当前房间周转循环更容易测试。
 public class Room2DPrototypeDebugHud : MonoBehaviour
 {
     [Header("References")]
@@ -16,20 +16,12 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
     public Room2DPrototypeDemandLoop demandLoop;
 
     [Header("Text Targets")]
-    // 顶部：当前选中房间信息。
     public TMP_Text selectedRoomInfoText;
-
-    // 左侧：房态总览和最高优先级 Dirty 房。
     public TMP_Text overviewInfoText;
-
-    // 右侧：保洁和查房主管状态。
     public TMP_Text workerStatusText;
-
-    // 可选：外部需求循环状态，可以放在左侧或右侧面板里。
     public TMP_Text demandStatusText;
 
     [Header("Panel Layout")]
-    // 这些 RectTransform 是 Canvas 下的四个分区面板。
     public RectTransform selectedRoomPanel;
     public RectTransform overviewPanel;
     public RectTransform workerPanel;
@@ -84,6 +76,7 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
     [ContextMenu("Apply Prototype HUD Layout")]
     public void ApplyPrototypeHudLayout()
     {
+        FindReferencesIfNeeded();
         FindHudObjectsIfNeeded();
         ApplyCanvasSettings();
         ApplyHudRootLayout();
@@ -103,21 +96,23 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
             AssignFallbackFontsToHudTexts();
         }
 
-        // 四块区域都用固定像素尺寸，手机竖屏下更容易读，也不会把房间区域整片盖住。
-        ApplyFixedPanel(overviewPanel, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(16f, -16f), new Vector2(330f, 370f));
-        ApplyFixedPanel(selectedRoomPanel, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-16f, -16f), new Vector2(360f, 230f));
-        ApplyFixedPanel(workerPanel, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-16f, -262f), new Vector2(360f, 190f));
-        ApplyFixedPanel(actionPanel, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 20f), new Vector2(720f, 150f));
+        RedirectLegacyOverviewText();
+
+        // 手机竖屏调试布局：信息放在上方，按钮放在下方，中间尽量留给房间。
+        ApplyFixedPanel(overviewPanel, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(16f, -16f), new Vector2(360f, 300f));
+        ApplyFixedPanel(selectedRoomPanel, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-16f, -16f), new Vector2(360f, 260f));
+        ApplyFixedPanel(workerPanel, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-16f, -292f), new Vector2(360f, 150f));
+        ApplyFixedPanel(actionPanel, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 20f), new Vector2(760f, 150f));
 
         ApplyTextPanelStyle(selectedRoomPanel);
         ApplyTextPanelStyle(overviewPanel);
         ApplyTextPanelStyle(workerPanel);
         ApplyActionPanelStyle(actionPanel);
 
-        ApplyTextStyle(selectedRoomInfoText, 24f, TextAlignmentOptions.TopLeft);
-        ApplyTextStyle(overviewInfoText, 23f, TextAlignmentOptions.TopLeft);
-        ApplyTextStyle(workerStatusText, 23f, TextAlignmentOptions.TopLeft);
-        ApplyTextStyle(demandStatusText, 21f, TextAlignmentOptions.TopLeft);
+        ApplyTextStyle(selectedRoomInfoText, 21f, 230f, TextAlignmentOptions.TopLeft);
+        ApplyTextStyle(overviewInfoText, 20f, 140f, TextAlignmentOptions.TopLeft);
+        ApplyTextStyle(workerStatusText, 20f, 120f, TextAlignmentOptions.TopLeft);
+        ApplyTextStyle(demandStatusText, 18f, 130f, TextAlignmentOptions.TopLeft);
 
         if (hideUnboundDebugTexts)
         {
@@ -136,6 +131,7 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
     public void RefreshHud()
     {
         FindReferencesIfNeeded();
+        RedirectLegacyOverviewText();
 
         if (selectedRoomInfoText != null)
         {
@@ -193,7 +189,6 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
 
     private void FindHudObjectsIfNeeded()
     {
-        // 兼容之前手动创建过的不同命名，减少重新搭 UI 的成本。
         if (!IsValidPanel(selectedRoomPanel))
         {
             selectedRoomPanel = FindRectTransformInHud("Panel_SelectedRoom");
@@ -240,15 +235,22 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
         Room2DEntity room = GetSelectedRoomEntity();
         if (room == null)
         {
-            return "Selected Room\nNone";
+            return "Selected\nRoom: None";
         }
 
-        return "Selected Room\n"
-            + room.roomName + "\n"
+        string occupiedText = "";
+        if (room.currentState == Room2DState.Occupied && demandLoop != null)
+        {
+            float remainingSeconds = Mathf.Max(0f, demandLoop.occupiedDurationSeconds - room.stateElapsedSeconds);
+            occupiedText = "\nCheckout in: " + FormatSeconds(remainingSeconds);
+        }
+
+        return "Selected\n"
+            + "Room: " + room.roomName + "\n"
             + "State: " + room.GetStateDisplayName() + "\n"
-            + room.GetNextActionDisplayName() + "\n"
-            + room.GetCleaningPriorityDisplayName() + "\n"
-            + room.GetStateTimeDisplayName();
+            + "Next: " + room.GetNextActionDisplayName() + "\n"
+            + "Wait: " + FormatSeconds(room.stateElapsedSeconds)
+            + occupiedText;
     }
 
     private string BuildOverviewText()
@@ -263,6 +265,11 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
 
         for (int i = 0; i < rooms.Length; i++)
         {
+            if (rooms[i] == null)
+            {
+                continue;
+            }
+
             switch (rooms[i].currentState)
             {
                 case Room2DState.Cleaning:
@@ -292,11 +299,11 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
             Room2DEntity urgentRoom = roomOverview.GetHighestPriorityDirtyRoom();
             if (urgentRoom != null)
             {
-                urgentRoomText = urgentRoom.roomName + " " + Mathf.FloorToInt(urgentRoom.stateElapsedSeconds) + "s";
+                urgentRoomText = urgentRoom.roomName + " " + FormatSeconds(urgentRoom.stateElapsedSeconds);
             }
         }
 
-        return "Room Overview\n"
+        return "Overview\n"
             + "Dirty: " + dirtyCount + "\n"
             + "Cleaning: " + cleaningCount + "\n"
             + "Inspect: " + awaitingInspectionCount + "\n"
@@ -309,8 +316,8 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
     private string BuildWorkerText()
     {
         return "Workers\n"
-            + "Housekeeper: " + GetHousekeeperText() + "\n"
-            + "Inspector: " + GetInspectorText();
+            + "HSK: " + GetHousekeeperText() + "\n"
+            + "Insp: " + GetInspectorText();
     }
 
     private string BuildDemandText()
@@ -325,7 +332,52 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
             + "Success: " + demandLoop.successfulDemandCount + "\n"
             + "Unmet: " + demandLoop.unmetDemandCount + "\n"
             + "Checkouts: " + demandLoop.simulatedCheckoutCount + "\n"
-            + demandLoop.lastDemandResult;
+            + "Last: " + demandLoop.lastDemandResult + "\n"
+            + "Room: " + demandLoop.lastChangedRoomName + "\n"
+            + "Next demand: " + FormatSeconds(Mathf.Max(0f, demandLoop.demandIntervalSeconds - demandLoop.demandTimerSeconds)) + "\n"
+            + BuildOccupiedRoomsText();
+    }
+
+    private string BuildOccupiedRoomsText()
+    {
+        if (demandLoop == null)
+        {
+            return "Occupied: None";
+        }
+
+        Room2DEntity[] rooms = FindObjectsByType<Room2DEntity>(FindObjectsSortMode.None);
+        string occupiedText = "Occupied: None";
+        int shownCount = 0;
+
+        for (int i = 0; i < rooms.Length; i++)
+        {
+            Room2DEntity room = rooms[i];
+            if (room == null || room.currentState != Room2DState.Occupied)
+            {
+                continue;
+            }
+
+            float remainingSeconds = Mathf.Max(0f, demandLoop.occupiedDurationSeconds - room.stateElapsedSeconds);
+            if (shownCount == 0)
+            {
+                occupiedText = "Occupied:";
+            }
+
+            // 原型 HUD 只显示前 3 间，避免文字把测试画面挤爆。
+            if (shownCount < 3)
+            {
+                occupiedText += "\n- " + room.roomName + " out in " + FormatSeconds(remainingSeconds);
+            }
+
+            shownCount++;
+        }
+
+        if (shownCount > 3)
+        {
+            occupiedText += "\n- +" + (shownCount - 3) + " more";
+        }
+
+        return occupiedText;
     }
 
     private string GetHousekeeperText()
@@ -337,7 +389,7 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
 
         return housekeeper.currentState
             + " / " + housekeeper.assignedRoomName
-            + " / " + Mathf.FloorToInt(housekeeper.cleaningTimerSeconds) + "s";
+            + " / " + FormatSeconds(housekeeper.cleaningTimerSeconds);
     }
 
     private string GetInspectorText()
@@ -349,7 +401,7 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
 
         return inspector.currentState
             + " / " + inspector.assignedRoomName
-            + " / " + Mathf.FloorToInt(inspector.inspectionTimerSeconds) + "s";
+            + " / " + FormatSeconds(inspector.inspectionTimerSeconds);
     }
 
     private Room2DEntity GetSelectedRoomEntity()
@@ -409,7 +461,6 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
         LayoutGroup[] rootLayoutGroups = GetComponents<LayoutGroup>();
         for (int i = 0; i < rootLayoutGroups.Length; i++)
         {
-            // 根物体不参与自动布局，只让四个 Panel 自己布局。
             rootLayoutGroups[i].enabled = false;
         }
     }
@@ -463,7 +514,7 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
 
         layout.padding = new RectOffset(16, 16, 14, 14);
         layout.spacing = new Vector2(12f, 10f);
-        layout.cellSize = new Vector2(210f, 48f);
+        layout.cellSize = new Vector2(220f, 48f);
         layout.startCorner = GridLayoutGroup.Corner.UpperLeft;
         layout.startAxis = GridLayoutGroup.Axis.Horizontal;
         layout.childAlignment = TextAnchor.UpperCenter;
@@ -484,12 +535,11 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
             return;
         }
 
-        // 深色半透明背景比默认白色 Panel 更适合调试，不会整片发灰。
-        image.color = new Color(0f, 0f, 0f, 0.55f);
+        image.color = new Color(0f, 0f, 0f, 0.62f);
         image.raycastTarget = false;
     }
 
-    private void ApplyTextStyle(TMP_Text text, float maxFontSize, TextAlignmentOptions alignment)
+    private void ApplyTextStyle(TMP_Text text, float maxFontSize, float preferredHeight, TextAlignmentOptions alignment)
     {
         if (text == null)
         {
@@ -503,13 +553,13 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
         text.textWrappingMode = TextWrappingModes.Normal;
         text.overflowMode = TextOverflowModes.Truncate;
         text.enableAutoSizing = true;
-        text.fontSizeMin = 14f;
+        text.fontSizeMin = 12f;
         text.fontSizeMax = maxFontSize;
         text.raycastTarget = false;
 
         LayoutElement layoutElement = GetOrAddComponent<LayoutElement>(text.gameObject);
         layoutElement.minHeight = 36f;
-        layoutElement.preferredHeight = text == demandStatusText ? 130f : 180f;
+        layoutElement.preferredHeight = preferredHeight;
         layoutElement.flexibleWidth = 1f;
     }
 
@@ -575,7 +625,7 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
 
     private void MoveHudButtonsToActionPanel()
     {
-        if (actionPanel == null)
+        if (!IsValidPanel(actionPanel))
         {
             return;
         }
@@ -613,7 +663,6 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
                 continue;
             }
 
-            // 旧版散落的调试 Text 会造成重叠，先隐藏，之后需要时再手动删除。
             text.gameObject.SetActive(false);
         }
     }
@@ -636,8 +685,17 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
                 continue;
             }
 
-            // 旧版没再使用的 Panel 会遮住画面，原型阶段先隐藏。
             rectTransform.gameObject.SetActive(false);
+        }
+    }
+
+    private void RedirectLegacyOverviewText()
+    {
+        if (roomOverview != null && overviewInfoText != null)
+        {
+            // 旧版 Room2DOverview 可能还绑定着一个单行 Text_RoomSummary。
+            // 这里让总览系统写到新的 HUD 文本，避免两个总览文本叠在一起。
+            roomOverview.summaryLabelTextMeshPro = overviewInfoText;
         }
     }
 
@@ -729,5 +787,19 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
         {
             layoutGroups[i].enabled = layoutGroups[i] == layoutToKeep;
         }
+    }
+
+    private string FormatSeconds(float seconds)
+    {
+        int wholeSeconds = Mathf.FloorToInt(seconds);
+        int minutes = wholeSeconds / 60;
+        int remainingSeconds = wholeSeconds % 60;
+
+        if (minutes > 0)
+        {
+            return minutes + "m " + remainingSeconds + "s";
+        }
+
+        return remainingSeconds + "s";
     }
 }
