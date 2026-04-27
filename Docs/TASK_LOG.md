@@ -44,6 +44,7 @@ Build first playable fake-3D 2D room entity prototype.
 - Room2DPrototypeDemandLoop created to consume Ready rooms and generate Dirty rooms again
 - Room2DPrototypeDebugHud created to organize prototype testing information into readable panels
 - Room2DPrototypeDemandLoop now supports Normal / HighExpectation demand and simple room match quality
+- Room2DPrototypeDemandLoop now tracks prototype outcomes and satisfaction trend from match quality
 
 ## Next
 - Attach Room2DEntity to Room_A_2D in Unity
@@ -73,3 +74,4 @@ Build first playable fake-3D 2D room entity prototype.
 - Attach Room2DPrototypeDemandLoop to the scene and test unmet demand when no Ready rooms are available
 - Reorganize the Hotel_Rooms_2D_Proto Canvas into selected room, overview, worker, and action debug panels
 - Generate or edit prototype room attributes to test Good / Normal / Poor room match results
+- Test that Good / Normal / Poor matches create Positive / Neutral / Negative prototype outcomes

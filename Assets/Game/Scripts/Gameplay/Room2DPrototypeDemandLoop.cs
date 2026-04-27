@@ -17,6 +17,13 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
         GoodMatch
     }
 
+    public enum Room2DOutcomeResult
+    {
+        Negative,
+        Neutral,
+        Positive
+    }
+
     // 打开后，Play 模式会自动定期产生需求并处理 Occupied 房间退房。
     public bool runDuringPlay = true;
 
@@ -48,6 +55,20 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
     public string lastMatchQualityLabel = "Normal Match";
     public int lastCleanlinessSuitability;
     public int lastWearSuitability;
+
+    [Header("Prototype Outcome")]
+    // 原型满意度不是最终评分系统，只用来确认“匹配好坏会产生后果”。
+    public int prototypeSatisfactionScore;
+    public string prototypeSatisfactionTrend = "Neutral";
+    public Room2DOutcomeResult lastOutcomeResult = Room2DOutcomeResult.Neutral;
+    public string lastOutcomeLabel = "Neutral";
+    public string lastOutcomeSummary = "None";
+    public int goodMatchCount;
+    public int normalMatchCount;
+    public int poorMatchCount;
+    public int positiveOutcomeCount;
+    public int neutralOutcomeCount;
+    public int negativeOutcomeCount;
 
     private void Start()
     {
@@ -125,6 +146,7 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
             lastMatchQualityLabel = "No Match";
             lastCleanlinessSuitability = 0;
             lastWearSuitability = 0;
+            RecordUnmetDemandOutcome(demandType, "No Ready room");
             return;
         }
 
@@ -141,12 +163,14 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
             lastDemandResult = demandType + " unmet: check-in guard blocked";
             lastChangedRoomName = readyRoom.roomName;
             lastMatchQualityLabel = "No Match";
+            RecordUnmetDemandOutcome(demandType, "Check-in blocked");
             return;
         }
 
         successfulDemandCount++;
         lastDemandResult = demandType + " -> " + readyRoom.roomName + " / " + lastMatchQualityLabel;
         lastChangedRoomName = readyRoom.roomName;
+        RecordSuccessfulAssignmentOutcome(demandType, readyRoom, matchQuality);
 
         RefreshRoomVisual(readyRoom);
         RefreshOverview();
@@ -333,6 +357,115 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
             default:
                 return "Normal Match";
         }
+    }
+
+    private void RecordSuccessfulAssignmentOutcome(Room2DDemandType demandType, Room2DEntity room, Room2DMatchQuality matchQuality)
+    {
+        Room2DOutcomeResult outcomeResult = GetOutcomeFromMatchQuality(matchQuality);
+
+        IncrementMatchCount(matchQuality);
+        RecordOutcome(outcomeResult, GetScoreDelta(outcomeResult));
+
+        string roomName = room != null ? room.roomName : "None";
+        lastOutcomeSummary = demandType + " / " + roomName + " / " + lastMatchQualityLabel + " -> " + lastOutcomeLabel;
+    }
+
+    private void RecordUnmetDemandOutcome(Room2DDemandType demandType, string reason)
+    {
+        // 没有 Ready 房时也算负面后果，因为玩家没有满足入住需求。
+        RecordOutcome(Room2DOutcomeResult.Negative, -3);
+        lastOutcomeSummary = demandType + " unmet / " + reason + " -> " + lastOutcomeLabel;
+    }
+
+    private Room2DOutcomeResult GetOutcomeFromMatchQuality(Room2DMatchQuality matchQuality)
+    {
+        switch (matchQuality)
+        {
+            case Room2DMatchQuality.GoodMatch:
+                return Room2DOutcomeResult.Positive;
+            case Room2DMatchQuality.PoorMatch:
+                return Room2DOutcomeResult.Negative;
+            default:
+                return Room2DOutcomeResult.Neutral;
+        }
+    }
+
+    private int GetScoreDelta(Room2DOutcomeResult outcomeResult)
+    {
+        switch (outcomeResult)
+        {
+            case Room2DOutcomeResult.Positive:
+                return 2;
+            case Room2DOutcomeResult.Negative:
+                return -2;
+            default:
+                return 0;
+        }
+    }
+
+    private void IncrementMatchCount(Room2DMatchQuality matchQuality)
+    {
+        switch (matchQuality)
+        {
+            case Room2DMatchQuality.GoodMatch:
+                goodMatchCount++;
+                break;
+            case Room2DMatchQuality.PoorMatch:
+                poorMatchCount++;
+                break;
+            default:
+                normalMatchCount++;
+                break;
+        }
+    }
+
+    private void RecordOutcome(Room2DOutcomeResult outcomeResult, int scoreDelta)
+    {
+        lastOutcomeResult = outcomeResult;
+        lastOutcomeLabel = GetOutcomeDisplayName(outcomeResult);
+        prototypeSatisfactionScore += scoreDelta;
+        prototypeSatisfactionTrend = GetSatisfactionTrendDisplayName();
+
+        switch (outcomeResult)
+        {
+            case Room2DOutcomeResult.Positive:
+                positiveOutcomeCount++;
+                break;
+            case Room2DOutcomeResult.Negative:
+                negativeOutcomeCount++;
+                break;
+            default:
+                neutralOutcomeCount++;
+                break;
+        }
+    }
+
+    private string GetOutcomeDisplayName(Room2DOutcomeResult outcomeResult)
+    {
+        switch (outcomeResult)
+        {
+            case Room2DOutcomeResult.Positive:
+                return "Positive";
+            case Room2DOutcomeResult.Negative:
+                return "Negative";
+            default:
+                return "Neutral";
+        }
+    }
+
+    private string GetSatisfactionTrendDisplayName()
+    {
+        if (prototypeSatisfactionScore > 0)
+        {
+            return "Positive";
+        }
+
+        if (prototypeSatisfactionScore < 0)
+        {
+            return "Negative";
+        }
+
+        return "Neutral";
     }
 
     private void SortRoomsByRoomNumber()
