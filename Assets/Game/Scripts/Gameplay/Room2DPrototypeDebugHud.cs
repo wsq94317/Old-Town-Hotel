@@ -100,21 +100,21 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
 
         RedirectLegacyOverviewText();
 
-        // 手机竖屏调试布局：信息放在上方，按钮放在下方，中间尽量留给房间。
-        ApplyFixedPanel(overviewPanel, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(16f, -16f), new Vector2(410f, 540f));
-        ApplyFixedPanel(selectedRoomPanel, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-16f, -16f), new Vector2(360f, 260f));
-        ApplyFixedPanel(workerPanel, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-16f, -292f), new Vector2(360f, 150f));
-        ApplyFixedPanel(actionPanel, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 20f), new Vector2(760f, 150f));
+        // 笔记本横屏调试布局：左右两侧放 Debug 面板，中间留给房间网格。
+        ApplyFixedPanel(selectedRoomPanel, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(24f, -24f), new Vector2(430f, 240f));
+        ApplyFixedPanel(workerPanel, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(24f, -284f), new Vector2(430f, 160f));
+        ApplyFixedPanel(actionPanel, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(24f, 24f), new Vector2(430f, 430f));
+        ApplyFixedPanel(overviewPanel, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-24f, 0f), new Vector2(720f, 1030f));
 
         ApplyTextPanelStyle(selectedRoomPanel);
         ApplyTextPanelStyle(overviewPanel);
         ApplyTextPanelStyle(workerPanel);
         ApplyActionPanelStyle(actionPanel);
 
-        ApplyTextStyle(selectedRoomInfoText, 21f, 230f, TextAlignmentOptions.TopLeft);
-        ApplyTextStyle(overviewInfoText, 20f, 130f, TextAlignmentOptions.TopLeft);
-        ApplyTextStyle(workerStatusText, 20f, 120f, TextAlignmentOptions.TopLeft);
-        ApplyTextStyle(demandStatusText, 17f, 390f, TextAlignmentOptions.TopLeft);
+        ApplyTextStyle(selectedRoomInfoText, 22f, 210f, TextAlignmentOptions.TopLeft);
+        ApplyTextStyle(overviewInfoText, 18f, 150f, TextAlignmentOptions.TopLeft);
+        ApplyTextStyle(workerStatusText, 20f, 130f, TextAlignmentOptions.TopLeft);
+        ApplyTextStyle(demandStatusText, 17f, 830f, TextAlignmentOptions.TopLeft);
 
         if (hideUnboundDebugTexts)
         {
@@ -330,7 +330,6 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
         }
 
         return demandLoop.GetPreparationText() + "\n\n"
-            + demandLoop.GetUpcomingDemandPreviewText() + "\n\n"
             + demandLoop.GetManualAssignmentText() + "\n\n"
             + "Last Demand\n"
             + "Type: " + demandLoop.lastDemandType + "\n"
@@ -338,7 +337,7 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
             + "Clean/Wear: " + demandLoop.lastCleanlinessSuitability + " / " + demandLoop.lastWearSuitability + "\n"
             + "Outcome: " + demandLoop.lastOutcomeLabel + "\n"
             + "Result: " + demandLoop.lastOutcomeSummary + "\n"
-            + BuildOccupiedRoomsText() + "\n\n"
+            + BuildOccupiedRoomsText() + "\n"
             + demandLoop.GetPrototypeDaySummaryText();
     }
 
@@ -432,15 +431,17 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
             return;
         }
 
-        // 统一用手机竖屏参考尺寸，避免不同 Game 窗口比例下文字忽大忽小。
+        // 当前阶段主要在笔记本横屏 Game 窗口调试，先用 16:9 参考尺寸让字更容易读。
         scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-        scaler.referenceResolution = new Vector2(1080f, 1920f);
+        scaler.referenceResolution = new Vector2(1920f, 1080f);
         scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
         scaler.matchWidthOrHeight = 0.5f;
     }
 
     private void ApplyHudRootLayout()
     {
+        StretchHudParentsToCanvas();
+
         RectTransform root = GetComponent<RectTransform>();
         if (root != null)
         {
@@ -466,6 +467,34 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
         for (int i = 0; i < rootLayoutGroups.Length; i++)
         {
             rootLayoutGroups[i].enabled = false;
+        }
+    }
+
+    private void StretchHudParentsToCanvas()
+    {
+        Canvas canvas = GetComponentInParent<Canvas>();
+        if (canvas == null)
+        {
+            return;
+        }
+
+        Transform current = transform.parent;
+        while (current != null && current != canvas.transform)
+        {
+            RectTransform rectTransform = current.GetComponent<RectTransform>();
+            if (rectTransform != null)
+            {
+                // 如果 HUD 外层还有 UI 容器，也把它铺满 Canvas，避免左右边栏被错误父物体挤到中间。
+                rectTransform.anchorMin = Vector2.zero;
+                rectTransform.anchorMax = Vector2.one;
+                rectTransform.pivot = new Vector2(0.5f, 0.5f);
+                rectTransform.offsetMin = Vector2.zero;
+                rectTransform.offsetMax = Vector2.zero;
+                rectTransform.anchoredPosition = Vector2.zero;
+                rectTransform.localScale = Vector3.one;
+            }
+
+            current = current.parent;
         }
     }
 
@@ -516,14 +545,14 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
         GridLayoutGroup layout = GetOrAddComponent<GridLayoutGroup>(panel.gameObject);
         DisableOtherLayoutGroups(panel, layout);
 
-        layout.padding = new RectOffset(16, 16, 14, 14);
-        layout.spacing = new Vector2(12f, 10f);
-        layout.cellSize = new Vector2(220f, 48f);
+        layout.padding = new RectOffset(16, 16, 16, 16);
+        layout.spacing = new Vector2(12f, 12f);
+        layout.cellSize = new Vector2(190f, 54f);
         layout.startCorner = GridLayoutGroup.Corner.UpperLeft;
         layout.startAxis = GridLayoutGroup.Axis.Horizontal;
         layout.childAlignment = TextAnchor.UpperCenter;
         layout.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
-        layout.constraintCount = 3;
+        layout.constraintCount = 2;
     }
 
     private void ApplyPanelBackground(RectTransform panel)

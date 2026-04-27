@@ -57,6 +57,8 @@ Build first playable fake-3D 2D room entity prototype.
 - Room2DPrototypeDemandLoop now supports one active demand that can be manually assigned to a selected Ready room
 - Room2DPrototypeDebugHud now shows active demand candidates and predicted match quality
 - Room2DPrototypeDemandLoop now exposes a lightweight preparation view with room summary, upcoming demand, warnings, reservation, and priority marks
+- Room2DPrototypeDebugHud now uses a larger laptop-friendly side-panel layout for easier testing
+- Room2DPrototypeDebugHud now stretches HUD parents to the Canvas and uses a wider right-side test information panel
 
 ## Next
 - Attach Room2DEntity to Room_A_2D in Unity
@@ -94,3 +96,5 @@ Build first playable fake-3D 2D room entity prototype.
 - Keep normal room-turnover tests on Room2DPrototypeDemandLoop instead of the legacy prototype loop
 - Test manual room assignment versus fallback assignment for the current active demand
 - Test whether preparation actions make upcoming demand handling easier than waiting reactively
+- Verify the laptop debug HUD does not cover important room labels during multi-room testing
+- Reapply the prototype HUD layout in Unity after HUD script layout changes
