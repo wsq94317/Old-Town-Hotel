@@ -187,22 +187,22 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
     private void FindHudObjectsIfNeeded()
     {
         // 兼容之前手动创建过的不同命名，减少重新搭 UI 的成本。
-        if (selectedRoomPanel == null)
+        if (!IsValidPanel(selectedRoomPanel))
         {
             selectedRoomPanel = FindRectTransformInHud("Panel_SelectedRoom");
         }
 
-        if (overviewPanel == null)
+        if (!IsValidPanel(overviewPanel))
         {
             overviewPanel = FindRectTransformInHud("Panel_RoomOverview", "Panel_Overview");
         }
 
-        if (workerPanel == null)
+        if (!IsValidPanel(workerPanel))
         {
             workerPanel = FindRectTransformInHud("Panel_Workers", "Panel_WorkerStatus");
         }
 
-        if (actionPanel == null)
+        if (!IsValidPanel(actionPanel))
         {
             actionPanel = FindRectTransformInHud("Panel_Actions", "Panel_ActionButtons");
         }
@@ -409,7 +409,7 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
 
     private void ApplyFixedPanel(RectTransform panel, Vector2 anchorMin, Vector2 anchorMax, Vector2 anchoredPosition, Vector2 size)
     {
-        if (panel == null)
+        if (!IsValidPanel(panel))
         {
             return;
         }
@@ -423,7 +423,7 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
 
     private void ApplyTextPanelStyle(RectTransform panel)
     {
-        if (panel == null)
+        if (!IsValidPanel(panel))
         {
             return;
         }
@@ -444,7 +444,7 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
 
     private void ApplyActionPanelStyle(RectTransform panel)
     {
-        if (panel == null)
+        if (!IsValidPanel(panel))
         {
             return;
         }
@@ -466,7 +466,17 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
 
     private void ApplyPanelBackground(RectTransform panel)
     {
+        if (!IsValidPanel(panel))
+        {
+            return;
+        }
+
         Image image = GetOrAddComponent<Image>(panel.gameObject);
+        if (image == null)
+        {
+            return;
+        }
+
         // 深色半透明背景比默认白色 Panel 更适合调试，不会整片发灰。
         image.color = new Color(0f, 0f, 0f, 0.55f);
         image.raycastTarget = false;
@@ -481,7 +491,7 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
 
         text.color = Color.white;
         text.alignment = alignment;
-        text.enableWordWrapping = true;
+        text.textWrappingMode = TextWrappingModes.Normal;
         text.overflowMode = TextOverflowModes.Truncate;
         text.enableAutoSizing = true;
         text.fontSizeMin = 14f;
@@ -504,7 +514,7 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
 
     private void MoveTextToPanel(TMP_Text text, RectTransform panel)
     {
-        if (text == null || panel == null || text.transform.parent == panel)
+        if (text == null || !IsValidPanel(panel) || text.transform.parent == panel)
         {
             return;
         }
@@ -580,6 +590,26 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
         }
     }
 
+    private bool IsValidPanel(RectTransform panel)
+    {
+        if (panel == null)
+        {
+            return false;
+        }
+
+        if (!panel.name.StartsWith("Panel_"))
+        {
+            return false;
+        }
+
+        // Text 和 Button 不能当 Panel 用，否则 Unity UI Graphic 组件会冲突。
+        if (panel.GetComponent<TMP_Text>() != null || panel.GetComponent<Button>() != null)
+        {
+            return false;
+        }
+
+        return true;
+    }
 
     private RectTransform FindRectTransformInHud(params string[] names)
     {
@@ -590,7 +620,7 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
         {
             for (int j = 0; j < names.Length; j++)
             {
-                if (rectTransforms[i].name == names[j])
+                if (rectTransforms[i].name == names[j] && IsValidPanel(rectTransforms[i]))
                 {
                     return rectTransforms[i];
                 }

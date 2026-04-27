@@ -63,7 +63,8 @@ public class Room2DController : MonoBehaviour
     {
         FindRoomEntityIfNeeded();
         FindLabelViewIfNeeded();
-        ApplyStateVisual();
+        // 不在 OnValidate 里调用 ApplyStateVisual。
+        // Unity 不允许在 OnValidate / Awake 校验阶段 SetActive，否则 Console 会出现 SendMessage 警告。
     }
 
     public void SetState(Room2DState newState)
