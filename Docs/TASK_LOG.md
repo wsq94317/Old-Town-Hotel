@@ -37,28 +37,9 @@ Build first playable fake-3D 2D room entity prototype.
 - Room2DEntity now stores generated room attributes for future UI and reviews
 - Room2DPrototypeClock created to advance block duration and expire blocked rooms into Dirty
 - Gameplay scripts now include concise Chinese comments for easier code reading
-- Dirty rooms now expose a simple cleaning priority based on checkout waiting time
-- Room2DOverview now identifies the highest-priority Dirty room
-- Housekeeper2D created as a single-housekeeper cleaning resource prototype
-- Inspector2D created as a single-inspector room approval resource prototype
-- Room2DPrototypeDemandLoop created to consume Ready rooms and generate Dirty rooms again
-- Room2DPrototypeDebugHud created to organize prototype testing information into readable panels
-- Room2DPrototypeDemandLoop now supports Normal / HighExpectation demand and simple room match quality
-- Room2DPrototypeDemandLoop now tracks prototype outcomes and satisfaction trend from match quality
-- Room2DPrototypeDemandLoop now exposes a prototype day summary with status hint for the debug HUD
-- Room2DLabelView now shows selected-room and HSK-cleaning markers on each room label
-- Room2DController now draws a lightweight prototype room label in the Game view for room number/state/selection/HSK status
-- Room2DPrototypeDemandLoop now previews one upcoming demand with ETA before it becomes active
-- Room2DPrototypeDebugHud now shows the upcoming demand type, ETA, and activation count
-- Room2DPrototypeDemandLoop now supports one reserved room for the current upcoming demand with fallback assignment
-- Room2DEntity is now the single source of truth for room identity in the current prototype
-- The force-next-state button path is now clearly marked as a debug action
-- Legacy Room2DPrototypeLoop is guarded so it cannot accidentally mutate the current demand-loop test
-- Room2DPrototypeDemandLoop now supports one active demand that can be manually assigned to a selected Ready room
-- Room2DPrototypeDebugHud now shows active demand candidates and predicted match quality
-- Room2DPrototypeDemandLoop now exposes a lightweight preparation view with room summary, upcoming demand, warnings, reservation, and priority marks
-- Room2DPrototypeDebugHud now uses a larger laptop-friendly side-panel layout for easier testing
-- Room2DPrototypeDebugHud now stretches HUD parents to the Canvas and uses a wider right-side test information panel
+- Room2DPrototypeDemandLoop exposes a lightweight preparation view with room summary, upcoming demand, warnings, reservation, and priority marks
+- Room2DEntity stores simple prototype preparation priority flags for cleaning and inspection
+- Room2DController shows preparation priority markers on room debug labels
 
 ## Next
 - Attach Room2DEntity to Room_A_2D in Unity
@@ -81,20 +62,39 @@ Build first playable fake-3D 2D room entity prototype.
 - Use Room2DEntity Generate Prototype Room Attributes to create sample per-room condition data
 - Later move room generation into new-save setup instead of manual context menu tools
 - Convert the finished Room_A_2D object into a reusable Unity Prefab
-- Duplicate the Room_A_2D prefab into 8 to 12 rooms and assign room numbers by scene position
-- Test whether multiple Dirty rooms create visible prioritization pressure
-- Attach Housekeeper2D to the scene and test one-room-at-a-time cleaning decisions
-- Attach Inspector2D to the scene and test one-room-at-a-time inspection decisions
-- Attach Room2DPrototypeDemandLoop to the scene and test unmet demand when no Ready rooms are available
-- Reorganize the Hotel_Rooms_2D_Proto Canvas into selected room, overview, worker, and action debug panels
-- Generate or edit prototype room attributes to test Good / Normal / Poor room match results
-- Test that Good / Normal / Poor matches create Positive / Neutral / Negative prototype outcomes
-- Use the prototype day summary to identify unmet demand, poor matching, or room backlog issues
-- Confirm every duplicated room has a readable room label in the Game window
-- Test whether upcoming demand ETA helps prepare Ready rooms before demand activates
-- Test whether reserving a Ready room before ETA activation improves assignment control
-- Keep normal room-turnover tests on Room2DPrototypeDemandLoop instead of the legacy prototype loop
-- Test manual room assignment versus fallback assignment for the current active demand
-- Test whether preparation actions make upcoming demand handling easier than waiting reactively
-- Verify the laptop debug HUD does not cover important room labels during multi-room testing
-- Reapply the prototype HUD layout in Unity after HUD script layout changes
+
+## Current Milestone
+Prove that multi-room turnover creates meaningful prioritization pressure.
+
+## Immediate Next
+- Finish one stable room prefab
+- Duplicate it into 8 to 12 working rooms
+- Add a simple cleaning priority rule for Dirty rooms
+- Surface highest-priority Dirty room in room labels or overview
+- Use prototype occupancy/check-in flow to create Ready-room demand
+
+## Explicitly Not Next
+- Full guest identity system
+- Full front desk system
+- Lounge expansion
+- Deep room attribute calculations
+- Extra tool-building
+
+## Current Milestone
+Prove that proactive preparation is better than reactive response.
+
+## Immediate Next
+- Add a lightweight prototype preparation panel
+- Show room-state summary
+- Show upcoming demand preview
+- Allow a small number of preparation actions
+- Test whether preparation improves outcomes
+- Test that Dirty / Inspection priority markers are visible on selected rooms and clear after state changes
+
+## Explicitly Not Next
+- Full morning briefing system
+- Full staffing system
+- Inventory planning
+- Lounge expansion
+- Events
+- Final UI polish

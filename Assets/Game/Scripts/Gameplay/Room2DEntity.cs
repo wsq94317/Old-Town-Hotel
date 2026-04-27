@@ -31,6 +31,12 @@ public class Room2DEntity : MonoBehaviour
     public int cleaningPriorityLevel;
     public string cleaningPriorityLabel = "None";
 
+    [Header("Prototype Preparation")]
+    // 原型准备标记：只表示玩家在测试面板里把这间房列为优先处理目标。
+    public bool markedCleaningPriority;
+    public bool markedInspectionPriority;
+    public string preparationPriorityLabel = "None";
+
     [Header("Block")]
     // Blocked 状态的原因和剩余游戏小时数。
     public Room2DBlockReason blockReason = Room2DBlockReason.None;
@@ -43,6 +49,7 @@ public class Room2DEntity : MonoBehaviour
     private void OnValidate()
     {
         SyncCheckoutFlagForState();
+        RefreshPreparationPriorityLabel();
     }
 
     private void Update()
@@ -306,6 +313,32 @@ public class Room2DEntity : MonoBehaviour
         return "Priority: " + cleaningPriorityLabel;
     }
 
+    public string GetPreparationPriorityDisplayName()
+    {
+        return "Prep: " + preparationPriorityLabel;
+    }
+
+    public void MarkCleaningPriorityForPreparation()
+    {
+        markedCleaningPriority = true;
+        markedInspectionPriority = false;
+        RefreshPreparationPriorityLabel();
+    }
+
+    public void MarkInspectionPriorityForPreparation()
+    {
+        markedInspectionPriority = true;
+        markedCleaningPriority = false;
+        RefreshPreparationPriorityLabel();
+    }
+
+    public void ClearPreparationPriority()
+    {
+        markedCleaningPriority = false;
+        markedInspectionPriority = false;
+        RefreshPreparationPriorityLabel();
+    }
+
     public string GetBlockDisplayName()
     {
         if (currentState != Room2DState.Blocked)
@@ -394,8 +427,11 @@ public class Room2DEntity : MonoBehaviour
             blockRemainingHours = 0f;
         }
 
+        ClearInvalidPreparationPriorityForState(newState);
+
         ResetStateTimer();
         RefreshCleaningPriority();
+        RefreshPreparationPriorityLabel();
     }
 
     // 状态改变时，状态停留时间从 0 重新计算。
@@ -408,6 +444,38 @@ public class Room2DEntity : MonoBehaviour
     private void SyncCheckoutFlagForState()
     {
         guestCheckedOut = ShouldStateBeCheckedOut(currentState);
+        ClearInvalidPreparationPriorityForState(currentState);
+    }
+
+    private void ClearInvalidPreparationPriorityForState(Room2DState state)
+    {
+        // 房间离开对应状态后，准备标记就不再有效，避免旧标记误导测试。
+        if (state != Room2DState.Dirty)
+        {
+            markedCleaningPriority = false;
+        }
+
+        if (state != Room2DState.AwaitingInspection)
+        {
+            markedInspectionPriority = false;
+        }
+    }
+
+    private void RefreshPreparationPriorityLabel()
+    {
+        if (markedCleaningPriority)
+        {
+            preparationPriorityLabel = "Cleaning Priority";
+            return;
+        }
+
+        if (markedInspectionPriority)
+        {
+            preparationPriorityLabel = "Inspection Priority";
+            return;
+        }
+
+        preparationPriorityLabel = "None";
     }
 
     // Ready / Occupied / Blocked 都不是“已退房等待清洁”。

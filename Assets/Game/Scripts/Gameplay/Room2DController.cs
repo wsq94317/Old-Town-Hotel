@@ -452,6 +452,15 @@ public class Room2DController : MonoBehaviour
             labelText += "\nHSK Cleaning";
         }
 
+        if (roomEntity.markedCleaningPriority)
+        {
+            labelText += "\nCLEAN PRIO";
+        }
+        else if (roomEntity.markedInspectionPriority)
+        {
+            labelText += "\nINSP PRIO";
+        }
+
         return labelText;
     }
 }

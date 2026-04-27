@@ -251,10 +251,18 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
             return;
         }
 
+        if (priorityDirtyRoom != null && priorityDirtyRoom != room)
+        {
+            priorityDirtyRoom.ClearPreparationPriority();
+            RefreshRoomVisual(priorityDirtyRoom);
+        }
+
         priorityDirtyRoom = room;
         priorityDirtyRoomName = room.roomName;
+        room.MarkCleaningPriorityForPreparation();
         lastPreparationAction = "Dirty priority: " + room.roomName;
         preparationActionCount++;
+        RefreshRoomVisual(room);
     }
 
     [ContextMenu("Mark Selected Inspection Room As Priority")]
@@ -275,10 +283,18 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
             return;
         }
 
+        if (priorityInspectionRoom != null && priorityInspectionRoom != room)
+        {
+            priorityInspectionRoom.ClearPreparationPriority();
+            RefreshRoomVisual(priorityInspectionRoom);
+        }
+
         priorityInspectionRoom = room;
         priorityInspectionRoomName = room.roomName;
+        room.MarkInspectionPriorityForPreparation();
         lastPreparationAction = "Inspect priority: " + room.roomName;
         preparationActionCount++;
+        RefreshRoomVisual(room);
     }
 
     [ContextMenu("Assign Selected Room To Active Demand")]
