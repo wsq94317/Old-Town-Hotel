@@ -39,6 +39,7 @@ Build first playable fake-3D 2D room entity prototype.
 - Gameplay scripts now include concise Chinese comments for easier code reading
 - Dirty rooms now expose a simple cleaning priority based on checkout waiting time
 - Room2DOverview now identifies the highest-priority Dirty room
+- Housekeeper2D created as a single-housekeeper cleaning resource prototype
 
 ## Next
 - Attach Room2DEntity to Room_A_2D in Unity
@@ -63,3 +64,4 @@ Build first playable fake-3D 2D room entity prototype.
 - Convert the finished Room_A_2D object into a reusable Unity Prefab
 - Duplicate the Room_A_2D prefab into 8 to 12 rooms and assign room numbers by scene position
 - Test whether multiple Dirty rooms create visible prioritization pressure
+- Attach Housekeeper2D to the scene and test one-room-at-a-time cleaning decisions
