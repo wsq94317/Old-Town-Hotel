@@ -31,6 +31,7 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
     public bool autoFindReferences = true;
     public Room2DEntity[] rooms;
     public Room2DOverview roomOverview;
+    public Room2DSelectionManager selectionManager;
 
     [Header("Demand")]
     // 每隔多少现实秒产生一个简单入住需求。
@@ -50,6 +51,12 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
     public string upcomingDemandPreviewText = "None";
     public string lastActivatedUpcomingDemandText = "None";
     public int activatedUpcomingDemandCount;
+
+    [Header("Upcoming Demand Reservation")]
+    // 当前 upcoming demand 只允许预留一间房；这不是完整预分配系统。
+    public Room2DEntity reservedRoomForUpcomingDemand;
+    public string reservedRoomName = "None";
+    public string lastReservationResult = "None";
 
     [Header("Occupancy")]
     // Occupied 房间住满多少现实秒后自动退房，重新变成 Dirty。
@@ -163,6 +170,41 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
         ActivateUpcomingDemand();
     }
 
+    [ContextMenu("Reserve Selected Room For Upcoming Demand")]
+    public void ReserveSelectedRoomForUpcomingDemand()
+    {
+        FindReferencesIfNeeded();
+
+        if (selectionManager == null || selectionManager.selectedRoom == null)
+        {
+            lastReservationResult = "Reserve failed: no selected room";
+            return;
+        }
+
+        ReserveRoomForUpcomingDemand(selectionManager.selectedRoom.roomEntity);
+    }
+
+    [ContextMenu("Clear Upcoming Demand Reservation")]
+    public void ClearUpcomingDemandReservation()
+    {
+        reservedRoomForUpcomingDemand = null;
+        reservedRoomName = "None";
+        lastReservationResult = "Reservation cleared";
+    }
+
+    public void ReserveRoomForUpcomingDemand(Room2DEntity room)
+    {
+        if (room == null)
+        {
+            lastReservationResult = "Reserve failed: room is None";
+            return;
+        }
+
+        reservedRoomForUpcomingDemand = room;
+        reservedRoomName = room.roomName;
+        lastReservationResult = "Reserved " + room.roomName + " for " + upcomingDemandType;
+    }
+
     [ContextMenu("Generate Normal Demand")]
     public void GenerateNormalDemandForTesting()
     {
@@ -177,11 +219,16 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
 
     private void GenerateDemand(Room2DDemandType demandType)
     {
+        GenerateDemand(demandType, null, false);
+    }
+
+    private void GenerateDemand(Room2DDemandType demandType, Room2DEntity reservedRoom, bool useReservationFirst)
+    {
         FindRoomsIfNeeded();
         generatedDemandCount++;
         lastDemandType = demandType;
 
-        Room2DEntity readyRoom = FindBestReadyRoomForDemand(demandType);
+        Room2DEntity readyRoom = FindRoomForDemand(demandType, reservedRoom, useReservationFirst);
         if (readyRoom == null)
         {
             unmetDemandCount++;
@@ -191,6 +238,7 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
             lastMatchQualityLabel = "No Match";
             lastCleanlinessSuitability = 0;
             lastWearSuitability = 0;
+            CompleteReservationResultAfterUnmet(reservedRoom, useReservationFirst);
             RecordUnmetDemandOutcome(demandType, "No Ready room");
             RefreshPrototypeDaySummary();
             return;
@@ -209,6 +257,7 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
             lastDemandResult = demandType + " unmet: check-in guard blocked";
             lastChangedRoomName = readyRoom.roomName;
             lastMatchQualityLabel = "No Match";
+            CompleteReservationResultAfterBlockedCheckIn(readyRoom, reservedRoom, useReservationFirst);
             RecordUnmetDemandOutcome(demandType, "Check-in blocked");
             RefreshPrototypeDaySummary();
             return;
@@ -218,6 +267,7 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
         lastDemandResult = demandType + " -> " + readyRoom.roomName + " / " + lastMatchQualityLabel;
         lastChangedRoomName = readyRoom.roomName;
         RecordSuccessfulAssignmentOutcome(demandType, readyRoom, matchQuality);
+        CompleteReservationResultAfterSuccess(readyRoom, reservedRoom, useReservationFirst);
 
         RefreshRoomVisual(readyRoom);
         RefreshOverview();
@@ -240,10 +290,13 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
     private void ActivateUpcomingDemand()
     {
         Room2DDemandType demandType = upcomingDemandType;
+        Room2DEntity reservedRoom = reservedRoomForUpcomingDemand;
 
         activatedUpcomingDemandCount++;
         lastActivatedUpcomingDemandText = demandType + " activated";
-        GenerateDemand(demandType);
+        GenerateDemand(demandType, reservedRoom, true);
+        reservedRoomForUpcomingDemand = null;
+        reservedRoomName = "None";
         AdvanceNextDemandTypeAfterUpcomingDemand(demandType);
         ScheduleUpcomingDemandPreview();
     }
@@ -272,6 +325,8 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
             + "Type: " + upcomingDemandType + "\n"
             + "ETA: " + FormatSeconds(upcomingDemandEtaSeconds) + "\n"
             + "Status: " + upcomingDemandPreviewText + "\n"
+            + "Reserved: " + reservedRoomName + "\n"
+            + "Reserve result: " + lastReservationResult + "\n"
             + "Activated: " + activatedUpcomingDemandCount + "\n"
             + "Last active: " + lastActivatedUpcomingDemandText;
     }
@@ -374,6 +429,34 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
         {
             roomOverview = FindFirstObjectByType<Room2DOverview>();
         }
+
+        if (selectionManager == null)
+        {
+            selectionManager = FindFirstObjectByType<Room2DSelectionManager>();
+        }
+    }
+
+    private void FindReferencesIfNeeded()
+    {
+        FindRoomsIfNeeded();
+    }
+
+    private Room2DEntity FindRoomForDemand(Room2DDemandType demandType, Room2DEntity reservedRoom, bool useReservationFirst)
+    {
+        if (!useReservationFirst || reservedRoom == null)
+        {
+            return FindBestReadyRoomForDemand(demandType);
+        }
+
+        // 预留房只有 Ready 时才会被使用；否则保留原来的自动分配作为 fallback。
+        if (reservedRoom.CanSimulateCheckIn())
+        {
+            lastReservationResult = "Succeeded: used " + reservedRoom.roomName;
+            return reservedRoom;
+        }
+
+        lastReservationResult = "Failed: " + reservedRoom.roomName + " was " + reservedRoom.GetStateDisplayName();
+        return FindBestReadyRoomForDemand(demandType);
     }
 
     private Room2DEntity FindBestReadyRoomForDemand(Room2DDemandType demandType)
@@ -440,6 +523,51 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
         }
 
         return Room2DMatchQuality.PoorMatch;
+    }
+
+    private void CompleteReservationResultAfterSuccess(Room2DEntity assignedRoom, Room2DEntity reservedRoom, bool usedReservationFlow)
+    {
+        if (!usedReservationFlow || reservedRoom == null)
+        {
+            return;
+        }
+
+        if (assignedRoom == reservedRoom)
+        {
+            lastReservationResult = "Succeeded: used " + reservedRoom.roomName;
+            return;
+        }
+
+        lastReservationResult += ", fallback used " + assignedRoom.roomName;
+    }
+
+    private void CompleteReservationResultAfterUnmet(Room2DEntity reservedRoom, bool usedReservationFlow)
+    {
+        if (!usedReservationFlow || reservedRoom == null)
+        {
+            return;
+        }
+
+        if (lastReservationResult.StartsWith("Failed:"))
+        {
+            lastReservationResult += ", no fallback Ready room";
+        }
+    }
+
+    private void CompleteReservationResultAfterBlockedCheckIn(Room2DEntity attemptedRoom, Room2DEntity reservedRoom, bool usedReservationFlow)
+    {
+        if (!usedReservationFlow || reservedRoom == null)
+        {
+            return;
+        }
+
+        if (attemptedRoom == reservedRoom)
+        {
+            lastReservationResult = "Failed: reserved check-in blocked";
+            return;
+        }
+
+        lastReservationResult += ", fallback check-in blocked";
     }
 
     private int GetCleanlinessSuitability(Room2DEntity room)
