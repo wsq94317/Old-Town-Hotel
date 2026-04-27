@@ -70,7 +70,14 @@ public class Room2DEntity : MonoBehaviour
         EnterState(newState, ShouldStateBeCheckedOut(newState));
     }
 
-    // 当前主按钮的默认行为：按房态推进下一步。
+    // Debug 强制推进房态。正常测试清洁/检查瓶颈时，不应该依赖这个入口。
+    [ContextMenu("DEBUG Force Next State")]
+    public void ForceDebugNextState()
+    {
+        PerformNextAction();
+    }
+
+    // 旧按钮兼容入口：现在只作为 Debug Force 使用，不代表正式玩法流程。
     public void PerformNextAction()
     {
         switch (currentState)

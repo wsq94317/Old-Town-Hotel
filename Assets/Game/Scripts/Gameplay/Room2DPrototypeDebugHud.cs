@@ -91,6 +91,8 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
             MoveHudButtonsToActionPanel();
         }
 
+        ApplyPrototypeButtonLabels();
+
         if (assignDefaultFontWhenMissing)
         {
             AssignFallbackFontsToHudTexts();
@@ -640,6 +642,33 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
             }
 
             buttons[i].transform.SetParent(actionPanel, false);
+        }
+    }
+
+    private void ApplyPrototypeButtonLabels()
+    {
+        Transform root = GetHudSearchRoot();
+        Button[] buttons = root.GetComponentsInChildren<Button>(true);
+        for (int i = 0; i < buttons.Length; i++)
+        {
+            if (buttons[i].name == "Button_NextState")
+            {
+                SetButtonText(buttons[i], "DEBUG State");
+            }
+        }
+    }
+
+    private void SetButtonText(Button button, string label)
+    {
+        if (button == null)
+        {
+            return;
+        }
+
+        TMP_Text text = button.GetComponentInChildren<TMP_Text>(true);
+        if (text != null)
+        {
+            text.text = label;
         }
     }
 

@@ -4,6 +4,11 @@ using UnityEngine;
 // 它只模拟“入住”和“退房”，不代表最终前台/客人系统。
 public class Room2DPrototypeLoop : MonoBehaviour
 {
+    [Header("Legacy Guard")]
+    // 当前测试应使用 Room2DPrototypeDemandLoop。这个旧循环默认锁住，避免误触发入住/退房污染测试。
+    public bool enableLegacyPrototypeLoop;
+    public string legacyLoopStatus = "Disabled: use Room2DPrototypeDemandLoop";
+
     // 自动寻找场景引用，方便初学阶段快速测试。
     public bool autoFindReferences = true;
 
@@ -30,6 +35,11 @@ public class Room2DPrototypeLoop : MonoBehaviour
 
     private void Update()
     {
+        if (!enableLegacyPrototypeLoop)
+        {
+            return;
+        }
+
         if (!autoSimulateGuestFlowDuringPlay)
         {
             return;
@@ -48,6 +58,11 @@ public class Room2DPrototypeLoop : MonoBehaviour
     [ContextMenu("Simulate Next Guest Step")]
     public void SimulateNextGuestStep()
     {
+        if (!CanUseLegacyLoop())
+        {
+            return;
+        }
+
         FindReferencesIfNeeded();
 
         // 如果有客人在住，优先模拟退房；否则找一个 Ready 房间模拟入住。
@@ -64,6 +79,11 @@ public class Room2DPrototypeLoop : MonoBehaviour
     [ContextMenu("Simulate Next Checkout")]
     public void SimulateNextCheckout()
     {
+        if (!CanUseLegacyLoop())
+        {
+            return;
+        }
+
         FindReferencesIfNeeded();
 
         // 退房只能发生在 Occupied 房间。
@@ -95,6 +115,11 @@ public class Room2DPrototypeLoop : MonoBehaviour
     [ContextMenu("Simulate Next Check In")]
     public void SimulateNextCheckIn()
     {
+        if (!CanUseLegacyLoop())
+        {
+            return;
+        }
+
         FindReferencesIfNeeded();
 
         // 入住只能发生在 Ready 房间。
@@ -125,6 +150,13 @@ public class Room2DPrototypeLoop : MonoBehaviour
 
     public void SetAutoGuestFlowEnabled(bool isEnabled)
     {
+        if (!enableLegacyPrototypeLoop)
+        {
+            autoSimulateGuestFlowDuringPlay = false;
+            legacyLoopStatus = "Blocked: enable legacy loop first";
+            return;
+        }
+
         autoSimulateGuestFlowDuringPlay = isEnabled;
         autoGuestFlowTimer = 0f;
     }
@@ -132,6 +164,18 @@ public class Room2DPrototypeLoop : MonoBehaviour
     public void ToggleAutoGuestFlow()
     {
         SetAutoGuestFlowEnabled(!autoSimulateGuestFlowDuringPlay);
+    }
+
+    private bool CanUseLegacyLoop()
+    {
+        if (enableLegacyPrototypeLoop)
+        {
+            legacyLoopStatus = "Enabled: legacy loop can mutate room states";
+            return true;
+        }
+
+        legacyLoopStatus = "Blocked: current testing uses Room2DPrototypeDemandLoop";
+        return false;
     }
 
     private void FindReferencesIfNeeded()

@@ -33,9 +33,15 @@ public class Room2DSelectionManager : MonoBehaviour
 
     public void PerformNextActionOnSelectedRoom()
     {
+        PerformDebugForceNextStateOnSelectedRoom();
+    }
+
+    // Debug 强制推进选中房间。正常测试清洁/检查瓶颈时，请使用 HSK / Inspector 按钮。
+    public void PerformDebugForceNextStateOnSelectedRoom()
+    {
         if (selectedRoom != null)
         {
-            selectedRoom.PerformNextAction();
+            selectedRoom.ForceDebugNextState();
             ApplySelection();
         }
     }

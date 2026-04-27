@@ -17,9 +17,8 @@ public class Room2DController : MonoBehaviour
     // 可选：场景里的单个 HSK，用来判断当前房间是否正在被保洁处理。
     public Housekeeper2D housekeeper;
 
-    // 没有绑定 Room2DEntity 时的备用原型数据。
-    // 如果绑定了 Room2DEntity，下面的 roomName 会自动同步给 Room2DEntity，避免复制房间后两个名字不同。
-    public bool syncEntityNameFromController = true;
+    // 没有绑定 Room2DEntity 时的备用原型数据。当前房间身份请改 Room2DEntity。
+    [HideInInspector]
     public string roomName = "Room 101";
     public Room2DState currentState = Room2DState.Dirty;
     public int actionCount;
@@ -70,14 +69,12 @@ public class Room2DController : MonoBehaviour
         FindLabelViewIfNeeded();
         FindRoomOverviewIfNeeded();
         FindHousekeeperIfNeeded();
-        SyncEntityNameFromControllerIfNeeded();
     }
 
     private void Start()
     {
         FindRoomOverviewIfNeeded();
         FindHousekeeperIfNeeded();
-        SyncEntityNameFromControllerIfNeeded();
         ApplyStateVisual();
     }
 
@@ -85,7 +82,6 @@ public class Room2DController : MonoBehaviour
     {
         FindRoomEntityIfNeeded();
         FindLabelViewIfNeeded();
-        SyncEntityNameFromControllerIfNeeded();
         // 不在 OnValidate 里调用 ApplyStateVisual。
         // Unity 不允许在 OnValidate / Awake 校验阶段 SetActive，否则 Console 会出现 SendMessage 警告。
     }
@@ -143,15 +139,22 @@ public class Room2DController : MonoBehaviour
 
     public void CycleToNextState()
     {
-        PerformNextAction();
+        ForceDebugNextState();
     }
 
-    // 主按钮使用的入口：让房间按当前状态执行下一步。
+    // 旧按钮兼容入口：现在只作为 Debug Force 使用，不代表正常 HSK / Inspector 瓶颈流程。
     public void PerformNextAction()
+    {
+        ForceDebugNextState();
+    }
+
+    // Debug 强制推进房态。正常测试请优先使用 Assign HSK / Assign Inspector / Demand Loop。
+    [ContextMenu("DEBUG Force Next State")]
+    public void ForceDebugNextState()
     {
         if (roomEntity != null)
         {
-            roomEntity.PerformNextAction();
+            roomEntity.ForceDebugNextState();
             ApplyStateVisual();
             RefreshOverview();
             return;
@@ -374,51 +377,6 @@ public class Room2DController : MonoBehaviour
         return housekeeper != null
             && housekeeper.assignedRoom == roomEntity
             && housekeeper.currentState == Housekeeper2D.HousekeeperState.Busy;
-    }
-
-    [ContextMenu("Sync Entity Name From Controller")]
-    private void SyncEntityNameFromControllerIfNeeded()
-    {
-        if (!syncEntityNameFromController || roomEntity == null || string.IsNullOrWhiteSpace(roomName))
-        {
-            return;
-        }
-
-        // 当前原型里用户更容易看到 Room2DController 的 Room Name。
-        // 这里把它同步到真正的数据源 Room2DEntity，避免 Game 窗口和 HUD 仍显示旧房号。
-        roomEntity.roomName = roomName;
-
-        if (TryReadRoomNumberFromName(roomName, out int parsedRoomNumber))
-        {
-            roomEntity.roomNumber = parsedRoomNumber;
-            roomEntity.roomId = parsedRoomNumber.ToString();
-
-            if (parsedRoomNumber >= 100)
-            {
-                roomEntity.floorNumber = parsedRoomNumber / 100;
-            }
-        }
-    }
-
-    private bool TryReadRoomNumberFromName(string sourceName, out int parsedRoomNumber)
-    {
-        parsedRoomNumber = 0;
-
-        if (string.IsNullOrWhiteSpace(sourceName))
-        {
-            return false;
-        }
-
-        string digits = "";
-        for (int i = 0; i < sourceName.Length; i++)
-        {
-            if (char.IsDigit(sourceName[i]))
-            {
-                digits += sourceName[i];
-            }
-        }
-
-        return int.TryParse(digits, out parsedRoomNumber);
     }
 
     private void DrawPrototypeDebugLabel()
