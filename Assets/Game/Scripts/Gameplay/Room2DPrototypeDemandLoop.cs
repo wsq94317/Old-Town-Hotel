@@ -70,9 +70,17 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
     public int neutralOutcomeCount;
     public int negativeOutcomeCount;
 
+    [Header("Prototype Day Summary")]
+    // 原型日结摘要：不是最终报表，只用来判断一轮测试主要卡在哪里。
+    public int summaryDirtyCount;
+    public int summaryAwaitingInspectionCount;
+    public float summaryOldestDirtySeconds;
+    public string summaryStatusHint = "No demands yet";
+
     private void Start()
     {
         FindRoomsIfNeeded();
+        RefreshPrototypeDaySummary();
     }
 
     private void Update()
@@ -90,6 +98,7 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
         }
 
         ProcessOccupiedCheckouts();
+        RefreshPrototypeDaySummary();
     }
 
     [ContextMenu("Find Rooms In Scene")]
@@ -147,6 +156,7 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
             lastCleanlinessSuitability = 0;
             lastWearSuitability = 0;
             RecordUnmetDemandOutcome(demandType, "No Ready room");
+            RefreshPrototypeDaySummary();
             return;
         }
 
@@ -164,6 +174,7 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
             lastChangedRoomName = readyRoom.roomName;
             lastMatchQualityLabel = "No Match";
             RecordUnmetDemandOutcome(demandType, "Check-in blocked");
+            RefreshPrototypeDaySummary();
             return;
         }
 
@@ -174,6 +185,7 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
 
         RefreshRoomVisual(readyRoom);
         RefreshOverview();
+        RefreshPrototypeDaySummary();
     }
 
     [ContextMenu("Process Occupied Checkouts")]
@@ -204,6 +216,58 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
         }
 
         RefreshOverview();
+        RefreshPrototypeDaySummary();
+    }
+
+    [ContextMenu("Refresh Prototype Day Summary")]
+    public void RefreshPrototypeDaySummary()
+    {
+        FindRoomsIfNeeded();
+
+        summaryDirtyCount = 0;
+        summaryAwaitingInspectionCount = 0;
+        summaryOldestDirtySeconds = 0f;
+
+        if (rooms != null)
+        {
+            for (int i = 0; i < rooms.Length; i++)
+            {
+                Room2DEntity room = rooms[i];
+                if (room == null)
+                {
+                    continue;
+                }
+
+                if (room.currentState == Room2DState.Dirty)
+                {
+                    summaryDirtyCount++;
+                    summaryOldestDirtySeconds = Mathf.Max(summaryOldestDirtySeconds, room.stateElapsedSeconds);
+                }
+                else if (room.currentState == Room2DState.AwaitingInspection)
+                {
+                    summaryAwaitingInspectionCount++;
+                }
+            }
+        }
+
+        summaryStatusHint = BuildSummaryStatusHint();
+    }
+
+    public string GetPrototypeDaySummaryText()
+    {
+        RefreshPrototypeDaySummary();
+
+        return "Day Summary\n"
+            + "Total: " + generatedDemandCount + "\n"
+            + "Success: " + successfulDemandCount + "\n"
+            + "Unmet: " + unmetDemandCount + "\n"
+            + "Match G/N/P: " + goodMatchCount + "/" + normalMatchCount + "/" + poorMatchCount + "\n"
+            + "Out P/N/Neg: " + positiveOutcomeCount + "/" + neutralOutcomeCount + "/" + negativeOutcomeCount + "\n"
+            + "Score: " + prototypeSatisfactionScore + " (" + prototypeSatisfactionTrend + ")\n"
+            + "Dirty: " + summaryDirtyCount + "\n"
+            + "Inspect Wait: " + summaryAwaitingInspectionCount + "\n"
+            + "Oldest Dirty: " + FormatSeconds(summaryOldestDirtySeconds) + "\n"
+            + "Hint: " + summaryStatusHint;
     }
 
     private void FindRoomsIfNeeded()
@@ -466,6 +530,55 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
         }
 
         return "Neutral";
+    }
+
+    private string BuildSummaryStatusHint()
+    {
+        if (generatedDemandCount == 0)
+        {
+            return "No demand tested yet";
+        }
+
+        if (unmetDemandCount > 0 && unmetDemandCount >= successfulDemandCount)
+        {
+            return "Main issue: unmet demand";
+        }
+
+        if (poorMatchCount > goodMatchCount && poorMatchCount > 0)
+        {
+            return "Main issue: poor room match";
+        }
+
+        if (summaryAwaitingInspectionCount >= 2)
+        {
+            return "Main issue: inspection backlog";
+        }
+
+        if (summaryDirtyCount >= 3 || summaryOldestDirtySeconds >= 60f)
+        {
+            return "Main issue: dirty backlog";
+        }
+
+        if (prototypeSatisfactionScore > 0)
+        {
+            return "Cycle looks healthy";
+        }
+
+        return "Cycle is stable";
+    }
+
+    private string FormatSeconds(float seconds)
+    {
+        int wholeSeconds = Mathf.FloorToInt(seconds);
+        int minutes = wholeSeconds / 60;
+        int remainingSeconds = wholeSeconds % 60;
+
+        if (minutes > 0)
+        {
+            return minutes + "m " + remainingSeconds + "s";
+        }
+
+        return remainingSeconds + "s";
     }
 
     private void SortRoomsByRoomNumber()

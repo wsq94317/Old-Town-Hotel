@@ -99,7 +99,7 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
         RedirectLegacyOverviewText();
 
         // 手机竖屏调试布局：信息放在上方，按钮放在下方，中间尽量留给房间。
-        ApplyFixedPanel(overviewPanel, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(16f, -16f), new Vector2(380f, 360f));
+        ApplyFixedPanel(overviewPanel, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(16f, -16f), new Vector2(410f, 540f));
         ApplyFixedPanel(selectedRoomPanel, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-16f, -16f), new Vector2(360f, 260f));
         ApplyFixedPanel(workerPanel, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-16f, -292f), new Vector2(360f, 150f));
         ApplyFixedPanel(actionPanel, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 20f), new Vector2(760f, 150f));
@@ -110,9 +110,9 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
         ApplyActionPanelStyle(actionPanel);
 
         ApplyTextStyle(selectedRoomInfoText, 21f, 230f, TextAlignmentOptions.TopLeft);
-        ApplyTextStyle(overviewInfoText, 20f, 135f, TextAlignmentOptions.TopLeft);
+        ApplyTextStyle(overviewInfoText, 20f, 130f, TextAlignmentOptions.TopLeft);
         ApplyTextStyle(workerStatusText, 20f, 120f, TextAlignmentOptions.TopLeft);
-        ApplyTextStyle(demandStatusText, 18f, 200f, TextAlignmentOptions.TopLeft);
+        ApplyTextStyle(demandStatusText, 17f, 390f, TextAlignmentOptions.TopLeft);
 
         if (hideUnboundDebugTexts)
         {
@@ -327,23 +327,15 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
             return "Demand\nNone";
         }
 
-        return "Demand\n"
-            + "Generated: " + demandLoop.generatedDemandCount + "\n"
-            + "Success: " + demandLoop.successfulDemandCount + "\n"
-            + "Unmet: " + demandLoop.unmetDemandCount + "\n"
-            + "Checkouts: " + demandLoop.simulatedCheckoutCount + "\n"
+        return "Last Demand\n"
             + "Type: " + demandLoop.lastDemandType + "\n"
             + "Match: " + demandLoop.lastMatchQualityLabel + "\n"
             + "Clean/Wear: " + demandLoop.lastCleanlinessSuitability + " / " + demandLoop.lastWearSuitability + "\n"
             + "Outcome: " + demandLoop.lastOutcomeLabel + "\n"
-            + "Score: " + demandLoop.prototypeSatisfactionScore + " (" + demandLoop.prototypeSatisfactionTrend + ")\n"
-            + "Match G/N/P: " + demandLoop.goodMatchCount + "/" + demandLoop.normalMatchCount + "/" + demandLoop.poorMatchCount + "\n"
-            + "Out P/N/Neg: " + demandLoop.positiveOutcomeCount + "/" + demandLoop.neutralOutcomeCount + "/" + demandLoop.negativeOutcomeCount + "\n"
-            + "Last: " + demandLoop.lastDemandResult + "\n"
             + "Result: " + demandLoop.lastOutcomeSummary + "\n"
-            + "Room: " + demandLoop.lastChangedRoomName + "\n"
             + "Next demand: " + FormatSeconds(Mathf.Max(0f, demandLoop.demandIntervalSeconds - demandLoop.demandTimerSeconds)) + "\n"
-            + BuildOccupiedRoomsText();
+            + BuildOccupiedRoomsText() + "\n\n"
+            + demandLoop.GetPrototypeDaySummaryText();
     }
 
     private string BuildOccupiedRoomsText()
