@@ -158,9 +158,60 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: 'Demand
+  m_text: 'Upcoming
 
-    None'
+    Type: Normal
+
+    ETA: 0s
+
+    Status: None
+
+    Activated:
+    5
+
+    Last active: None
+
+
+    Last Demand
+
+    Type: Normal
+
+    Match: Normal
+    Match
+
+    Clean/Wear: 0 / 0
+
+    Outcome: Neutral
+
+    Result: None
+
+    Occupied:
+    None
+
+
+    Day Summary
+
+    Total: 0
+
+    Success: 0
+
+    Unmet: 0
+
+    Match
+    G/N/P: 0/0/0
+
+    Out P/N/Neg: 0/0/0
+
+    Score: 0 (Neutral)
+
+    Dirty: 9
+
+    Inspect
+    Wait: 0
+
+    Oldest Dirty: 0s
+
+    Hint: No demand tested yet'
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -187,12 +238,12 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 18
+  m_fontSize: 12.7
   m_fontSizeBase: 36
   m_fontWeight: 400
   m_enableAutoSizing: 1
   m_fontSizeMin: 12
-  m_fontSizeMax: 18
+  m_fontSizeMax: 17
   m_fontStyle: 0
   m_HorizontalAlignment: 1
   m_VerticalAlignment: 256
@@ -275,7 +326,7 @@ MonoBehaviour:
   m_MinWidth: -1
   m_MinHeight: 36
   m_PreferredWidth: -1
-  m_PreferredHeight: 130
+  m_PreferredHeight: 390
   m_FlexibleWidth: 1
   m_FlexibleHeight: -1
   m_LayoutPriority: 1
@@ -612,6 +663,10 @@ PrefabInstance:
     - target: {fileID: 4271413077720424796, guid: 5d5e0ec990fcc437a848aa2f41ddcad9, type: 3}
       propertyPath: m_Name
       value: Room_A_2D (3)
+      objectReference: {fileID: 0}
+    - target: {fileID: 5828472676292665157, guid: 5d5e0ec990fcc437a848aa2f41ddcad9, type: 3}
+      propertyPath: roomName
+      value: Room 104
       objectReference: {fileID: 0}
     - target: {fileID: 7107964452960703241, guid: 5d5e0ec990fcc437a848aa2f41ddcad9, type: 3}
       propertyPath: m_text
@@ -1667,7 +1722,7 @@ MonoBehaviour:
   roomOverview: {fileID: 1255780567}
   housekeeper: {fileID: 1011916354}
   inspector: {fileID: 1951138755}
-  demandLoop: {fileID: 0}
+  demandLoop: {fileID: 1512229141}
   selectedRoomInfoText: {fileID: 584838238}
   overviewInfoText: {fileID: 1640815427}
   workerStatusText: {fileID: 826300422}
@@ -1847,7 +1902,7 @@ RectTransform:
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 0, y: 1}
   m_AnchoredPosition: {x: 16, y: -16}
-  m_SizeDelta: {x: 360, y: 300}
+  m_SizeDelta: {x: 410, y: 540}
   m_Pivot: {x: 0, y: 1}
 --- !u!114 &1135779390
 MonoBehaviour:
@@ -2292,26 +2347,26 @@ MonoBehaviour:
   prototypeStartRoomNumber: 101
   numberRoomsByScenePosition: 1
   rooms:
-  - {fileID: 364012664}
-  - {fileID: 1639403916}
-  - {fileID: 1258080070}
   - {fileID: 1509132723}
   - {fileID: 1743606497}
-  - {fileID: 1026532833}
-  - {fileID: 1458343392}
   - {fileID: 1935276555}
+  - {fileID: 1258080070}
+  - {fileID: 1458343392}
+  - {fileID: 364012664}
+  - {fileID: 1026532833}
   - {fileID: 533042248}
+  - {fileID: 1639403916}
   roomControllers:
-  - {fileID: 1026532834}
-  - {fileID: 1639403914}
-  - {fileID: 1258080071}
-  - {fileID: 1458343393}
-  - {fileID: 1743606498}
   - {fileID: 1935276556}
-  - {fileID: 1509132724}
+  - {fileID: 1743606498}
+  - {fileID: 1458343393}
   - {fileID: 533042249}
+  - {fileID: 1026532834}
   - {fileID: 364012665}
-  highestPriorityDirtyRoom: {fileID: 364012664}
+  - {fileID: 1639403914}
+  - {fileID: 1509132724}
+  - {fileID: 1258080071}
+  highestPriorityDirtyRoom: {fileID: 1509132723}
   highestPriorityDirtyRoomName: Room 101
   highestPriorityDirtyLevel: 1
   highestPriorityDirtySeconds: 0
@@ -2783,17 +2838,58 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Room2DPrototypeDemandLoop
   runDuringPlay: 1
   autoFindReferences: 1
-  rooms: []
-  roomOverview: {fileID: 0}
-  demandIntervalSeconds: 8
+  rooms:
+  - {fileID: 1509132723}
+  - {fileID: 1743606497}
+  - {fileID: 1935276555}
+  - {fileID: 1258080070}
+  - {fileID: 1458343392}
+  - {fileID: 364012664}
+  - {fileID: 1026532833}
+  - {fileID: 533042248}
+  - {fileID: 1639403916}
+  roomOverview: {fileID: 1255780567}
+  selectionManager: {fileID: 0}
+  demandIntervalSeconds: 5
   demandTimerSeconds: 0
+  alternateDemandTypes: 0
+  nextDemandType: 0
   generatedDemandCount: 0
   successfulDemandCount: 0
   unmetDemandCount: 0
-  occupiedDurationSeconds: 3
+  useUpcomingDemandPreview: 1
+  upcomingDemandType: 0
+  upcomingDemandEtaSeconds: 0
+  upcomingDemandPreviewText: None
+  lastActivatedUpcomingDemandText: None
+  activatedUpcomingDemandCount: 5
+  reservedRoomForUpcomingDemand: {fileID: 0}
+  reservedRoomName: None
+  lastReservationResult: None
+  occupiedDurationSeconds: 0
   simulatedCheckoutCount: 0
   lastDemandResult: None
   lastChangedRoomName: None
+  lastDemandType: 0
+  lastMatchQuality: 1
+  lastMatchQualityLabel: Normal Match
+  lastCleanlinessSuitability: 0
+  lastWearSuitability: 0
+  prototypeSatisfactionScore: 0
+  prototypeSatisfactionTrend: Neutral
+  lastOutcomeResult: 1
+  lastOutcomeLabel: Neutral
+  lastOutcomeSummary: None
+  goodMatchCount: 0
+  normalMatchCount: 0
+  poorMatchCount: 0
+  positiveOutcomeCount: 0
+  neutralOutcomeCount: 0
+  negativeOutcomeCount: 0
+  summaryDirtyCount: 9
+  summaryAwaitingInspectionCount: 0
+  summaryOldestDirtySeconds: 0
+  summaryStatusHint: No demand tested yet
 --- !u!4 &1512229142
 Transform:
   m_ObjectHideFlags: 0
@@ -2954,6 +3050,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Room_A_2D (4)
       objectReference: {fileID: 0}
+    - target: {fileID: 5828472676292665157, guid: 5d5e0ec990fcc437a848aa2f41ddcad9, type: 3}
+      propertyPath: roomName
+      value: Room 105
+      objectReference: {fileID: 0}
     - target: {fileID: 7107964452960703241, guid: 5d5e0ec990fcc437a848aa2f41ddcad9, type: 3}
       propertyPath: m_text
       value: Room 101
@@ -3026,6 +3126,10 @@ PrefabInstance:
     - target: {fileID: 4271413077720424796, guid: 5d5e0ec990fcc437a848aa2f41ddcad9, type: 3}
       propertyPath: m_Name
       value: Room_A_2D (7)
+      objectReference: {fileID: 0}
+    - target: {fileID: 5828472676292665157, guid: 5d5e0ec990fcc437a848aa2f41ddcad9, type: 3}
+      propertyPath: roomName
+      value: Room 108
       objectReference: {fileID: 0}
     - target: {fileID: 7107964452960703241, guid: 5d5e0ec990fcc437a848aa2f41ddcad9, type: 3}
       propertyPath: m_text
@@ -3196,7 +3300,7 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 15.15
+  m_fontSize: 13.9
   m_fontSizeBase: 36
   m_fontWeight: 400
   m_enableAutoSizing: 1
@@ -3284,7 +3388,7 @@ MonoBehaviour:
   m_MinWidth: -1
   m_MinHeight: 36
   m_PreferredWidth: -1
-  m_PreferredHeight: 140
+  m_PreferredHeight: 130
   m_FlexibleWidth: 1
   m_FlexibleHeight: -1
   m_LayoutPriority: 1
@@ -3299,6 +3403,10 @@ PrefabInstance:
     - target: {fileID: 4271413077720424796, guid: 5d5e0ec990fcc437a848aa2f41ddcad9, type: 3}
       propertyPath: m_Name
       value: Room_A_2D (6)
+      objectReference: {fileID: 0}
+    - target: {fileID: 5828472676292665157, guid: 5d5e0ec990fcc437a848aa2f41ddcad9, type: 3}
+      propertyPath: roomName
+      value: Room 107
       objectReference: {fileID: 0}
     - target: {fileID: 7107964452960703241, guid: 5d5e0ec990fcc437a848aa2f41ddcad9, type: 3}
       propertyPath: m_text
@@ -4019,6 +4127,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Room_A_2D (1)
       objectReference: {fileID: 0}
+    - target: {fileID: 5828472676292665157, guid: 5d5e0ec990fcc437a848aa2f41ddcad9, type: 3}
+      propertyPath: roomName
+      value: Room 102
+      objectReference: {fileID: 0}
     - target: {fileID: 7107964452960703241, guid: 5d5e0ec990fcc437a848aa2f41ddcad9, type: 3}
       propertyPath: m_text
       value: Room 101
@@ -4145,6 +4257,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Room_A_2D (2)
       objectReference: {fileID: 0}
+    - target: {fileID: 5828472676292665157, guid: 5d5e0ec990fcc437a848aa2f41ddcad9, type: 3}
+      propertyPath: roomName
+      value: Room 103
+      objectReference: {fileID: 0}
     - target: {fileID: 7107964452960703241, guid: 5d5e0ec990fcc437a848aa2f41ddcad9, type: 3}
       propertyPath: m_text
       value: Room 101
@@ -4258,6 +4374,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Room_A_2D (8)
       objectReference: {fileID: 0}
+    - target: {fileID: 5828472676292665157, guid: 5d5e0ec990fcc437a848aa2f41ddcad9, type: 3}
+      propertyPath: roomName
+      value: Room 109
+      objectReference: {fileID: 0}
     - target: {fileID: 7107964452960703241, guid: 5d5e0ec990fcc437a848aa2f41ddcad9, type: 3}
       propertyPath: m_text
       value: Room 101
@@ -4330,6 +4450,10 @@ PrefabInstance:
     - target: {fileID: 4271413077720424796, guid: 5d5e0ec990fcc437a848aa2f41ddcad9, type: 3}
       propertyPath: m_Name
       value: Room_A_2D (5)
+      objectReference: {fileID: 0}
+    - target: {fileID: 5828472676292665157, guid: 5d5e0ec990fcc437a848aa2f41ddcad9, type: 3}
+      propertyPath: roomName
+      value: Room 106
       objectReference: {fileID: 0}
     - target: {fileID: 7107964452960703241, guid: 5d5e0ec990fcc437a848aa2f41ddcad9, type: 3}
       propertyPath: m_text
@@ -4512,8 +4636,8 @@ SceneRoots:
   - {fileID: 315969598}
   - {fileID: 1814835618}
   - {fileID: 179694745}
+  - {fileID: 1512229142}
   - {fileID: 1376460782}
   - {fileID: 1011916355}
   - {fileID: 1988405937}
   - {fileID: 1951138756}
-  - {fileID: 1512229142}

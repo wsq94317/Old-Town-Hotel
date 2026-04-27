@@ -1082,6 +1082,7 @@ MonoBehaviour:
   roomEntity: {fileID: 8051486217628931062}
   labelView: {fileID: 493678738591452166}
   roomOverview: {fileID: 0}
+  housekeeper: {fileID: 0}
   roomName: Room 101
   currentState: 0
   actionCount: 0
@@ -1102,6 +1103,13 @@ MonoBehaviour:
   blockedColor: {r: 0.35, g: 0.35, b: 0.35, a: 1}
   prototypeMaintenanceBlockHours: 8
   prototypeRenovationBlockHours: 72
+  showPrototypeDebugLabel: 1
+  debugLabelScreenOffset: {x: -60, y: -62}
+  debugLabelSize: {x: 130, y: 64}
+  debugLabelFontSize: 16
+  normalDebugLabelColor: {r: 1, g: 1, b: 1, a: 1}
+  selectedDebugLabelColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
+  housekeeperDebugLabelColor: {r: 0, g: 1, b: 1, a: 1}
 --- !u!114 &8051486217628931062
 MonoBehaviour:
   m_ObjectHideFlags: 0
