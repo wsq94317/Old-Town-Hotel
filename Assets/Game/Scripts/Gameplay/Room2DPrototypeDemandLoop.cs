@@ -58,6 +58,15 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
     public string reservedRoomName = "None";
     public string lastReservationResult = "None";
 
+    [Header("Prototype Preparation")]
+    // 最小准备面板数据：只记录玩家当前准备优先处理哪几间房，不做正式排班系统。
+    public Room2DEntity priorityDirtyRoom;
+    public string priorityDirtyRoomName = "None";
+    public Room2DEntity priorityInspectionRoom;
+    public string priorityInspectionRoomName = "None";
+    public string lastPreparationAction = "None";
+    public int preparationActionCount;
+
     [Header("Manual Active Demand Assignment")]
     // 最小手动分房原型：ETA 到 0 后先变成一个 active demand，等待玩家选 Ready 房。
     public bool useManualActiveDemand = true;
@@ -192,6 +201,7 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
         if (selectionManager == null || selectionManager.selectedRoom == null)
         {
             lastReservationResult = "Reserve failed: no selected room";
+            lastPreparationAction = lastReservationResult;
             return;
         }
 
@@ -204,6 +214,7 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
         reservedRoomForUpcomingDemand = null;
         reservedRoomName = "None";
         lastReservationResult = "Reservation cleared";
+        lastPreparationAction = lastReservationResult;
     }
 
     public void ReserveRoomForUpcomingDemand(Room2DEntity room)
@@ -211,12 +222,63 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
         if (room == null)
         {
             lastReservationResult = "Reserve failed: room is None";
+            lastPreparationAction = lastReservationResult;
             return;
         }
 
         reservedRoomForUpcomingDemand = room;
         reservedRoomName = room.roomName;
         lastReservationResult = "Reserved " + room.roomName + " for " + upcomingDemandType;
+        lastPreparationAction = lastReservationResult;
+        preparationActionCount++;
+    }
+
+    [ContextMenu("Mark Selected Dirty Room As Priority")]
+    public void MarkSelectedDirtyRoomAsPriority()
+    {
+        FindReferencesIfNeeded();
+
+        Room2DEntity room = GetSelectedRoomEntity();
+        if (room == null)
+        {
+            lastPreparationAction = "Dirty priority failed: no selected room";
+            return;
+        }
+
+        if (!room.CanStartCleaning())
+        {
+            lastPreparationAction = "Dirty priority failed: " + room.roomName + " is " + room.GetStateDisplayName();
+            return;
+        }
+
+        priorityDirtyRoom = room;
+        priorityDirtyRoomName = room.roomName;
+        lastPreparationAction = "Dirty priority: " + room.roomName;
+        preparationActionCount++;
+    }
+
+    [ContextMenu("Mark Selected Inspection Room As Priority")]
+    public void MarkSelectedInspectionRoomAsPriority()
+    {
+        FindReferencesIfNeeded();
+
+        Room2DEntity room = GetSelectedRoomEntity();
+        if (room == null)
+        {
+            lastPreparationAction = "Inspect priority failed: no selected room";
+            return;
+        }
+
+        if (!room.CanApproveInspection())
+        {
+            lastPreparationAction = "Inspect priority failed: " + room.roomName + " is " + room.GetStateDisplayName();
+            return;
+        }
+
+        priorityInspectionRoom = room;
+        priorityInspectionRoomName = room.roomName;
+        lastPreparationAction = "Inspect priority: " + room.roomName;
+        preparationActionCount++;
     }
 
     [ContextMenu("Assign Selected Room To Active Demand")]
@@ -477,6 +539,30 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
             + "Last active: " + lastActivatedUpcomingDemandText;
     }
 
+    public string GetPreparationText()
+    {
+        FindRoomsIfNeeded();
+
+        int dirtyCount;
+        int cleaningCount;
+        int awaitingInspectionCount;
+        int readyCount;
+        int occupiedCount;
+        int blockedCount;
+        CountRoomStates(out dirtyCount, out cleaningCount, out awaitingInspectionCount, out readyCount, out occupiedCount, out blockedCount);
+
+        return "Preparation\n"
+            + "Rooms D/C/I/R/O/B: "
+            + dirtyCount + "/" + cleaningCount + "/" + awaitingInspectionCount + "/"
+            + readyCount + "/" + occupiedCount + "/" + blockedCount + "\n"
+            + "Upcoming 1/1: " + GetPreparationUpcomingLine() + "\n"
+            + "Reserved: " + reservedRoomName + "\n"
+            + "Dirty Priority: " + GetPriorityRoomLine(priorityDirtyRoom, Room2DState.Dirty, priorityDirtyRoomName) + "\n"
+            + "Inspect Priority: " + GetPriorityRoomLine(priorityInspectionRoom, Room2DState.AwaitingInspection, priorityInspectionRoomName) + "\n"
+            + "Warnings: " + GetPreparationWarningsText(dirtyCount, awaitingInspectionCount, readyCount) + "\n"
+            + "Last Prep: " + lastPreparationAction;
+    }
+
     public string GetManualAssignmentText()
     {
         return "Active Demand\n"
@@ -599,6 +685,16 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
         FindRoomsIfNeeded();
     }
 
+    private Room2DEntity GetSelectedRoomEntity()
+    {
+        if (selectionManager == null || selectionManager.selectedRoom == null)
+        {
+            return null;
+        }
+
+        return selectionManager.selectedRoom.roomEntity;
+    }
+
     private Room2DEntity FindRoomForDemand(
         Room2DDemandType demandType,
         Room2DEntity reservedRoom,
@@ -624,6 +720,113 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
 
         lastReservationResult = "Failed: " + reservedRoom.roomName + " was " + reservedRoom.GetStateDisplayName();
         return FindBestReadyRoomForDemand(demandType);
+    }
+
+    private void CountRoomStates(
+        out int dirtyCount,
+        out int cleaningCount,
+        out int awaitingInspectionCount,
+        out int readyCount,
+        out int occupiedCount,
+        out int blockedCount)
+    {
+        dirtyCount = 0;
+        cleaningCount = 0;
+        awaitingInspectionCount = 0;
+        readyCount = 0;
+        occupiedCount = 0;
+        blockedCount = 0;
+
+        if (rooms == null)
+        {
+            return;
+        }
+
+        for (int i = 0; i < rooms.Length; i++)
+        {
+            Room2DEntity room = rooms[i];
+            if (room == null)
+            {
+                continue;
+            }
+
+            switch (room.currentState)
+            {
+                case Room2DState.Cleaning:
+                    cleaningCount++;
+                    break;
+                case Room2DState.AwaitingInspection:
+                    awaitingInspectionCount++;
+                    break;
+                case Room2DState.Ready:
+                    readyCount++;
+                    break;
+                case Room2DState.Occupied:
+                    occupiedCount++;
+                    break;
+                case Room2DState.Blocked:
+                    blockedCount++;
+                    break;
+                default:
+                    dirtyCount++;
+                    break;
+            }
+        }
+    }
+
+    private string GetPreparationUpcomingLine()
+    {
+        if (!useUpcomingDemandPreview)
+        {
+            return nextDemandType + " in " + FormatSeconds(Mathf.Max(0f, demandIntervalSeconds - demandTimerSeconds));
+        }
+
+        if (activeDemandWaitingForManualAssignment)
+        {
+            return "Active " + activeDemandType + " waiting";
+        }
+
+        return upcomingDemandType + " in " + FormatSeconds(upcomingDemandEtaSeconds);
+    }
+
+    private string GetPriorityRoomLine(Room2DEntity room, Room2DState expectedState, string cachedName)
+    {
+        if (room == null)
+        {
+            return cachedName;
+        }
+
+        if (room.currentState != expectedState)
+        {
+            return room.roomName + " now " + room.GetStateDisplayName();
+        }
+
+        return room.roomName + " " + FormatSeconds(room.stateElapsedSeconds);
+    }
+
+    private string GetPreparationWarningsText(int dirtyCount, int awaitingInspectionCount, int readyCount)
+    {
+        if (activeDemandWaitingForManualAssignment)
+        {
+            return "Assign active demand now";
+        }
+
+        if (readyCount == 0)
+        {
+            return "No Ready room for next demand";
+        }
+
+        if (awaitingInspectionCount >= 2)
+        {
+            return "Inspection backlog";
+        }
+
+        if (dirtyCount >= 3)
+        {
+            return "Dirty backlog";
+        }
+
+        return "None";
     }
 
     private string GetCandidateReadyRoomsText()
