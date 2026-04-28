@@ -257,6 +257,7 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
         return "[Selected Room]\n"
             + "Name: " + room.roomName + "\n"
             + "Number: " + room.roomNumber + "\n"
+            + "Room Type: " + room.GetPrototypeRoomTypeDisplayName() + "\n"
             + "State: " + room.GetStateDisplayName() + "\n"
             + "Next: " + room.GetNextActionDisplayName() + "\n"
             + "Wait: " + FormatSeconds(room.stateElapsedSeconds)

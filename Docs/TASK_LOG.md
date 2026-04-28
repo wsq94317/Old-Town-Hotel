@@ -48,6 +48,7 @@ Build first playable fake-3D 2D room entity prototype.
 - Room2DPrototypeDebugHud now uses smaller action buttons so the debug panel blocks less of the room grid
 - Room2DPrototypeDebugHud now separates demand information into Upcoming, Active, and Latest Resolved prototype cards
 - Room2DPrototypeDebugHud now shows a selected-room detail card with reservation, priority, checkout, block, quality, and match hints
+- Room2DEntity now has a minimal Standard/Better prototype room type, and demand matching can prefer Better rooms
 
 ## Next
 - Attach Room2DEntity to Room_A_2D in Unity

@@ -1,5 +1,11 @@
 using UnityEngine;
 
+public enum Room2DPrototypeRoomType
+{
+    Standard,
+    Better
+}
+
 // 房间的核心数据实体。
 // 它不负责画面怎么显示，只保存房间的业务状态、房号、Block 信息和房间属性。
 public class Room2DEntity : MonoBehaviour
@@ -12,6 +18,10 @@ public class Room2DEntity : MonoBehaviour
 
     // 当前房态，是房间流程的核心。
     public Room2DState currentState = Room2DState.Dirty;
+
+    [Header("Prototype Room Type")]
+    // 最小房型原型：只区分普通房和更好一点的房，不做完整房型/库存系统。
+    public Room2DPrototypeRoomType prototypeRoomType = Room2DPrototypeRoomType.Standard;
 
     // Dirty/Cleaning/AwaitingInspection 代表客人已经离开后产生的清洁链条。
     public bool guestCheckedOut = true;
@@ -301,6 +311,11 @@ public class Room2DEntity : MonoBehaviour
     public string GetCheckoutDisplayName()
     {
         return guestCheckedOut ? "Checked Out" : "Not Checked Out";
+    }
+
+    public string GetPrototypeRoomTypeDisplayName()
+    {
+        return prototypeRoomType == Room2DPrototypeRoomType.Better ? "Better" : "Standard";
     }
 
     public string GetStateTimeDisplayName()
