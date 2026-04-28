@@ -16,6 +16,20 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
         BetterRoomPreferred
     }
 
+    public enum Room2DFloorPreference
+    {
+        NoPreference,
+        HighFloorPreferred,
+        LowFloorPreferred
+    }
+
+    public enum Room2DFacingPreference
+    {
+        NoPreference,
+        QuietPreferred,
+        ViewPreferred
+    }
+
     public enum Room2DMatchQuality
     {
         PoorMatch,
@@ -47,6 +61,8 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
     public Room2DDemandType nextDemandType = Room2DDemandType.Normal;
     public bool alternateDemandRoomPreferences = true;
     public Room2DRoomPreference nextDemandRoomPreference = Room2DRoomPreference.AnyRoom;
+    public Room2DFloorPreference nextDemandFloorPreference = Room2DFloorPreference.NoPreference;
+    public Room2DFacingPreference nextDemandFacingPreference = Room2DFacingPreference.NoPreference;
     public int generatedDemandCount;
     public int successfulDemandCount;
     public int unmetDemandCount;
@@ -56,6 +72,8 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
     public bool useUpcomingDemandPreview = true;
     public Room2DDemandType upcomingDemandType = Room2DDemandType.Normal;
     public Room2DRoomPreference upcomingDemandRoomPreference = Room2DRoomPreference.AnyRoom;
+    public Room2DFloorPreference upcomingDemandFloorPreference = Room2DFloorPreference.NoPreference;
+    public Room2DFacingPreference upcomingDemandFacingPreference = Room2DFacingPreference.NoPreference;
     public float upcomingDemandEtaSeconds;
     public string upcomingDemandPreviewText = "None";
     public string lastActivatedUpcomingDemandText = "None";
@@ -82,6 +100,8 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
     public bool activeDemandWaitingForManualAssignment;
     public Room2DDemandType activeDemandType = Room2DDemandType.Normal;
     public Room2DRoomPreference activeDemandRoomPreference = Room2DRoomPreference.AnyRoom;
+    public Room2DFloorPreference activeDemandFloorPreference = Room2DFloorPreference.NoPreference;
+    public Room2DFacingPreference activeDemandFacingPreference = Room2DFacingPreference.NoPreference;
     public float activeDemandWaitSeconds;
     public float manualAssignmentFallbackDelaySeconds = 8f;
     public Room2DEntity activeReservedRoomForFallback;
@@ -101,6 +121,8 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
     public string lastChangedRoomName = "None";
     public Room2DDemandType lastDemandType = Room2DDemandType.Normal;
     public Room2DRoomPreference lastDemandRoomPreference = Room2DRoomPreference.AnyRoom;
+    public Room2DFloorPreference lastDemandFloorPreference = Room2DFloorPreference.NoPreference;
+    public Room2DFacingPreference lastDemandFacingPreference = Room2DFacingPreference.NoPreference;
     public Room2DMatchQuality lastMatchQuality = Room2DMatchQuality.NormalMatch;
     public string lastMatchQualityLabel = "Normal Match";
     public int lastCleanlinessSuitability;
@@ -177,7 +199,9 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
     {
         Room2DDemandType demandType = nextDemandType;
         Room2DRoomPreference roomPreference = nextDemandRoomPreference;
-        GenerateDemand(demandType, roomPreference);
+        Room2DFloorPreference floorPreference = nextDemandFloorPreference;
+        Room2DFacingPreference facingPreference = nextDemandFacingPreference;
+        GenerateDemand(demandType, roomPreference, floorPreference, facingPreference);
 
         if (alternateDemandTypes)
         {
@@ -199,6 +223,8 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
     {
         upcomingDemandType = nextDemandType;
         upcomingDemandRoomPreference = nextDemandRoomPreference;
+        upcomingDemandFloorPreference = nextDemandFloorPreference;
+        upcomingDemandFacingPreference = nextDemandFacingPreference;
         upcomingDemandEtaSeconds = Mathf.Max(0f, demandIntervalSeconds);
         upcomingDemandPreviewText = BuildUpcomingDemandPreviewText("Incoming");
     }
@@ -242,10 +268,22 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
             return;
         }
 
+        if (!DoesRoomMeetHardRoomTypeConstraint(room, upcomingDemandRoomPreference))
+        {
+            lastReservationResult = "Reserve failed: "
+                + room.roomName + " is " + room.GetPrototypeRoomTypeDisplayName()
+                + ", needs Better";
+            lastPreparationAction = lastReservationResult;
+            return;
+        }
+
         reservedRoomForUpcomingDemand = room;
         reservedRoomName = room.roomName;
         lastReservationResult = "Reserved " + room.roomName + " for "
-            + upcomingDemandType + " / " + upcomingDemandRoomPreference;
+            + upcomingDemandType + " / " + BuildDemandPreferenceSummary(
+                upcomingDemandRoomPreference,
+                upcomingDemandFloorPreference,
+                upcomingDemandFacingPreference);
         lastPreparationAction = lastReservationResult;
         preparationActionCount++;
     }
@@ -348,8 +386,24 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
             return false;
         }
 
+        if (!DoesRoomMeetHardRoomTypeConstraint(room, activeDemandRoomPreference))
+        {
+            lastManualAssignmentResult = "Manual failed: "
+                + room.roomName + " is " + room.GetPrototypeRoomTypeDisplayName()
+                + ", needs Better";
+            return false;
+        }
+
         lastManualAssignmentResult = "Manual assigned " + room.roomName;
-        GenerateDemand(activeDemandType, activeDemandRoomPreference, null, false, room, "Manual");
+        GenerateDemand(
+            activeDemandType,
+            activeDemandRoomPreference,
+            activeDemandFloorPreference,
+            activeDemandFacingPreference,
+            null,
+            false,
+            room,
+            "Manual");
         CompleteActiveDemand();
         return true;
     }
@@ -357,45 +411,86 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
     [ContextMenu("Generate Normal Demand")]
     public void GenerateNormalDemandForTesting()
     {
-        GenerateDemand(Room2DDemandType.Normal, nextDemandRoomPreference);
+        GenerateDemand(Room2DDemandType.Normal, nextDemandRoomPreference, nextDemandFloorPreference, nextDemandFacingPreference);
     }
 
     [ContextMenu("Generate High Expectation Demand")]
     public void GenerateHighExpectationDemandForTesting()
     {
-        GenerateDemand(Room2DDemandType.HighExpectation, nextDemandRoomPreference);
+        GenerateDemand(Room2DDemandType.HighExpectation, nextDemandRoomPreference, nextDemandFloorPreference, nextDemandFacingPreference);
     }
 
     [ContextMenu("Generate Any Room Demand")]
     public void GenerateAnyRoomDemandForTesting()
     {
-        GenerateDemand(nextDemandType, Room2DRoomPreference.AnyRoom);
+        GenerateDemand(nextDemandType, Room2DRoomPreference.AnyRoom, nextDemandFloorPreference, nextDemandFacingPreference);
     }
 
     [ContextMenu("Generate Better Room Preferred Demand")]
     public void GenerateBetterRoomPreferredDemandForTesting()
     {
-        GenerateDemand(nextDemandType, Room2DRoomPreference.BetterRoomPreferred);
+        GenerateDemand(nextDemandType, Room2DRoomPreference.BetterRoomPreferred, nextDemandFloorPreference, nextDemandFacingPreference);
+    }
+
+    [ContextMenu("Generate High Floor Preferred Demand")]
+    public void GenerateHighFloorPreferredDemandForTesting()
+    {
+        GenerateDemand(nextDemandType, nextDemandRoomPreference, Room2DFloorPreference.HighFloorPreferred, nextDemandFacingPreference);
+    }
+
+    [ContextMenu("Generate Low Floor Preferred Demand")]
+    public void GenerateLowFloorPreferredDemandForTesting()
+    {
+        GenerateDemand(nextDemandType, nextDemandRoomPreference, Room2DFloorPreference.LowFloorPreferred, nextDemandFacingPreference);
+    }
+
+    [ContextMenu("Generate Quiet Preferred Demand")]
+    public void GenerateQuietPreferredDemandForTesting()
+    {
+        GenerateDemand(nextDemandType, nextDemandRoomPreference, nextDemandFloorPreference, Room2DFacingPreference.QuietPreferred);
+    }
+
+    [ContextMenu("Generate View Preferred Demand")]
+    public void GenerateViewPreferredDemandForTesting()
+    {
+        GenerateDemand(nextDemandType, nextDemandRoomPreference, nextDemandFloorPreference, Room2DFacingPreference.ViewPreferred);
     }
 
     private void GenerateDemand(Room2DDemandType demandType)
     {
-        GenerateDemand(demandType, nextDemandRoomPreference, null, false, null, "Fallback");
+        GenerateDemand(demandType, nextDemandRoomPreference, nextDemandFloorPreference, nextDemandFacingPreference, null, false, null, "Fallback");
     }
 
     private void GenerateDemand(Room2DDemandType demandType, Room2DRoomPreference roomPreference)
     {
-        GenerateDemand(demandType, roomPreference, null, false, null, "Fallback");
-    }
-
-    private void GenerateDemand(Room2DDemandType demandType, Room2DRoomPreference roomPreference, Room2DEntity reservedRoom, bool useReservationFirst)
-    {
-        GenerateDemand(demandType, roomPreference, reservedRoom, useReservationFirst, null, useReservationFirst ? "Reservation/Fallback" : "Fallback");
+        GenerateDemand(demandType, roomPreference, nextDemandFloorPreference, nextDemandFacingPreference, null, false, null, "Fallback");
     }
 
     private void GenerateDemand(
         Room2DDemandType demandType,
         Room2DRoomPreference roomPreference,
+        Room2DFloorPreference floorPreference,
+        Room2DFacingPreference facingPreference)
+    {
+        GenerateDemand(demandType, roomPreference, floorPreference, facingPreference, null, false, null, "Fallback");
+    }
+
+    private void GenerateDemand(
+        Room2DDemandType demandType,
+        Room2DRoomPreference roomPreference,
+        Room2DFloorPreference floorPreference,
+        Room2DFacingPreference facingPreference,
+        Room2DEntity reservedRoom,
+        bool useReservationFirst)
+    {
+        GenerateDemand(demandType, roomPreference, floorPreference, facingPreference, reservedRoom, useReservationFirst, null, useReservationFirst ? "Reservation/Fallback" : "Fallback");
+    }
+
+    private void GenerateDemand(
+        Room2DDemandType demandType,
+        Room2DRoomPreference roomPreference,
+        Room2DFloorPreference floorPreference,
+        Room2DFacingPreference facingPreference,
         Room2DEntity reservedRoom,
         bool useReservationFirst,
         Room2DEntity forcedRoom,
@@ -405,26 +500,30 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
         generatedDemandCount++;
         lastDemandType = demandType;
         lastDemandRoomPreference = roomPreference;
+        lastDemandFloorPreference = floorPreference;
+        lastDemandFacingPreference = facingPreference;
         lastAssignmentMode = assignmentMode;
         lastResolvedAssignmentMode = assignmentMode;
 
-        Room2DEntity readyRoom = FindRoomForDemand(demandType, roomPreference, reservedRoom, useReservationFirst, forcedRoom);
+        Room2DEntity readyRoom = FindRoomForDemand(demandType, roomPreference, floorPreference, facingPreference, reservedRoom, useReservationFirst, forcedRoom);
         if (readyRoom == null)
         {
             unmetDemandCount++;
-            lastDemandResult = assignmentMode + ": " + demandType + " / " + roomPreference + " unmet: no Ready room";
+            lastDemandResult = assignmentMode + ": " + demandType
+                + " / " + BuildDemandPreferenceSummary(roomPreference, floorPreference, facingPreference)
+                + " unmet: no matching Ready room";
             lastChangedRoomName = "None";
             lastMatchQuality = Room2DMatchQuality.PoorMatch;
             lastMatchQualityLabel = "No Match";
             lastCleanlinessSuitability = 0;
             lastWearSuitability = 0;
             CompleteReservationResultAfterUnmet(reservedRoom, useReservationFirst);
-            RecordUnmetDemandOutcome(demandType, roomPreference, "No Ready room");
+            RecordUnmetDemandOutcome(demandType, roomPreference, floorPreference, facingPreference, "No matching Ready room");
             RefreshPrototypeDaySummary();
             return;
         }
 
-        Room2DMatchQuality matchQuality = EvaluateMatchQuality(readyRoom, demandType, roomPreference);
+        Room2DMatchQuality matchQuality = EvaluateMatchQuality(readyRoom, demandType, roomPreference, floorPreference, facingPreference);
         lastMatchQuality = matchQuality;
         lastMatchQualityLabel = GetMatchDisplayName(matchQuality);
         lastCleanlinessSuitability = GetCleanlinessSuitability(readyRoom);
@@ -434,20 +533,23 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
         if (!readyRoom.SimulateCheckIn())
         {
             unmetDemandCount++;
-            lastDemandResult = assignmentMode + ": " + demandType + " / " + roomPreference + " unmet: check-in guard blocked";
+            lastDemandResult = assignmentMode + ": " + demandType
+                + " / " + BuildDemandPreferenceSummary(roomPreference, floorPreference, facingPreference)
+                + " unmet: check-in guard blocked";
             lastChangedRoomName = readyRoom.roomName;
             lastMatchQualityLabel = "No Match";
             CompleteReservationResultAfterBlockedCheckIn(readyRoom, reservedRoom, useReservationFirst);
-            RecordUnmetDemandOutcome(demandType, roomPreference, "Check-in blocked");
+            RecordUnmetDemandOutcome(demandType, roomPreference, floorPreference, facingPreference, "Check-in blocked");
             RefreshPrototypeDaySummary();
             return;
         }
 
         successfulDemandCount++;
-        lastDemandResult = assignmentMode + ": " + demandType + " / " + roomPreference
+        lastDemandResult = assignmentMode + ": " + demandType
+            + " / " + BuildDemandPreferenceSummary(roomPreference, floorPreference, facingPreference)
             + " -> " + readyRoom.roomName + " / " + lastMatchQualityLabel;
         lastChangedRoomName = readyRoom.roomName;
-        RecordSuccessfulAssignmentOutcome(demandType, roomPreference, readyRoom, matchQuality);
+        RecordSuccessfulAssignmentOutcome(demandType, roomPreference, floorPreference, facingPreference, readyRoom, matchQuality);
         CompleteReservationResultAfterSuccess(readyRoom, reservedRoom, useReservationFirst);
 
         RefreshRoomVisual(readyRoom);
@@ -486,19 +588,23 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
 
         Room2DDemandType demandType = upcomingDemandType;
         Room2DRoomPreference roomPreference = upcomingDemandRoomPreference;
+        Room2DFloorPreference floorPreference = upcomingDemandFloorPreference;
+        Room2DFacingPreference facingPreference = upcomingDemandFacingPreference;
         Room2DEntity reservedRoom = reservedRoomForUpcomingDemand;
 
         activatedUpcomingDemandCount++;
-        lastActivatedUpcomingDemandText = demandType + " / " + roomPreference + " activated";
+        lastActivatedUpcomingDemandText = demandType + " / "
+            + BuildDemandPreferenceSummary(roomPreference, floorPreference, facingPreference)
+            + " activated";
 
         if (useManualActiveDemand)
         {
-            StartActiveDemand(demandType, roomPreference, reservedRoom);
+            StartActiveDemand(demandType, roomPreference, floorPreference, facingPreference, reservedRoom);
             return;
         }
 
-        GenerateDemand(demandType, roomPreference, reservedRoom, true);
-        FinishActivatedUpcomingDemand(demandType, roomPreference);
+        GenerateDemand(demandType, roomPreference, floorPreference, facingPreference, reservedRoom, true);
+        FinishActivatedUpcomingDemand(demandType, roomPreference, floorPreference, facingPreference);
     }
 
     private void AdvanceNextDemandTypeAfterUpcomingDemand(Room2DDemandType activatedDemandType)
@@ -527,11 +633,18 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
             : Room2DRoomPreference.AnyRoom;
     }
 
-    private void StartActiveDemand(Room2DDemandType demandType, Room2DRoomPreference roomPreference, Room2DEntity reservedRoom)
+    private void StartActiveDemand(
+        Room2DDemandType demandType,
+        Room2DRoomPreference roomPreference,
+        Room2DFloorPreference floorPreference,
+        Room2DFacingPreference facingPreference,
+        Room2DEntity reservedRoom)
     {
         activeDemandWaitingForManualAssignment = true;
         activeDemandType = demandType;
         activeDemandRoomPreference = roomPreference;
+        activeDemandFloorPreference = floorPreference;
+        activeDemandFacingPreference = facingPreference;
         activeDemandWaitSeconds = 0f;
         activeReservedRoomForFallback = reservedRoom;
         activeReservedRoomName = reservedRoom != null ? reservedRoom.roomName : "None";
@@ -566,7 +679,15 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
     {
         Room2DEntity reservedRoom = activeReservedRoomForFallback;
         lastManualAssignmentResult = "No manual assignment: fallback used";
-        GenerateDemand(activeDemandType, activeDemandRoomPreference, reservedRoom, reservedRoom != null, null, "Fallback");
+        GenerateDemand(
+            activeDemandType,
+            activeDemandRoomPreference,
+            activeDemandFloorPreference,
+            activeDemandFacingPreference,
+            reservedRoom,
+            reservedRoom != null,
+            null,
+            "Fallback");
         CompleteActiveDemand();
     }
 
@@ -574,6 +695,8 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
     {
         Room2DDemandType completedDemandType = activeDemandType;
         Room2DRoomPreference completedRoomPreference = activeDemandRoomPreference;
+        Room2DFloorPreference completedFloorPreference = activeDemandFloorPreference;
+        Room2DFacingPreference completedFacingPreference = activeDemandFacingPreference;
 
         activeDemandWaitingForManualAssignment = false;
         activeDemandWaitSeconds = 0f;
@@ -581,10 +704,18 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
         activeReservedRoomName = "None";
         activeDemandStatus = "Resolved";
 
-        FinishActivatedUpcomingDemand(completedDemandType, completedRoomPreference);
+        FinishActivatedUpcomingDemand(
+            completedDemandType,
+            completedRoomPreference,
+            completedFloorPreference,
+            completedFacingPreference);
     }
 
-    private void FinishActivatedUpcomingDemand(Room2DDemandType demandType, Room2DRoomPreference roomPreference)
+    private void FinishActivatedUpcomingDemand(
+        Room2DDemandType demandType,
+        Room2DRoomPreference roomPreference,
+        Room2DFloorPreference floorPreference,
+        Room2DFacingPreference facingPreference)
     {
         reservedRoomForUpcomingDemand = null;
         reservedRoomName = "None";
@@ -600,13 +731,19 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
             return "Upcoming\n"
                 + "Preview: Off\n"
                 + "Type: " + nextDemandType + "\n"
-                + "Room Pref: " + nextDemandRoomPreference + "\n"
+                + "Prefs: " + BuildDemandPreferenceSummary(
+                    nextDemandRoomPreference,
+                    nextDemandFloorPreference,
+                    nextDemandFacingPreference) + "\n"
                 + "Next in: " + FormatSeconds(Mathf.Max(0f, demandIntervalSeconds - demandTimerSeconds));
         }
 
         return "Upcoming\n"
             + "Type: " + upcomingDemandType + "\n"
-            + "Room Pref: " + upcomingDemandRoomPreference + "\n"
+            + "Prefs: " + BuildDemandPreferenceSummary(
+                upcomingDemandRoomPreference,
+                upcomingDemandFloorPreference,
+                upcomingDemandFacingPreference) + "\n"
             + "ETA: " + FormatSeconds(upcomingDemandEtaSeconds) + "\n"
             + "Status: " + upcomingDemandPreviewText + "\n"
             + "Reserved: " + reservedRoomName + "\n"
@@ -644,6 +781,9 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
         return "Active Demand\n"
             + "Status: " + activeDemandStatus + "\n"
             + "Type: " + (activeDemandWaitingForManualAssignment ? activeDemandType.ToString() : "None") + "\n"
+            + "Prefs: " + (activeDemandWaitingForManualAssignment
+                ? BuildDemandPreferenceSummary(activeDemandRoomPreference, activeDemandFloorPreference, activeDemandFacingPreference)
+                : "None") + "\n"
             + "Wait: " + FormatSeconds(activeDemandWaitSeconds) + " / " + FormatSeconds(manualAssignmentFallbackDelaySeconds) + "\n"
             + "Fallback Reserved: " + activeReservedRoomName + "\n"
             + "Last Assign: " + lastAssignmentMode + "\n"
@@ -658,7 +798,10 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
         {
             return "[Upcoming Demand]\n"
                 + "Type: " + nextDemandType + "\n"
-                + "Room Pref: " + nextDemandRoomPreference + "\n"
+                + "Prefs: " + BuildDemandPreferenceSummary(
+                    nextDemandRoomPreference,
+                    nextDemandFloorPreference,
+                    nextDemandFacingPreference) + "\n"
                 + "ETA: " + FormatSeconds(Mathf.Max(0f, demandIntervalSeconds - demandTimerSeconds)) + "\n"
                 + "Reserved: None\n"
                 + "Status: Preview off";
@@ -666,7 +809,10 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
 
         return "[Upcoming Demand]\n"
             + "Type: " + upcomingDemandType + "\n"
-            + "Room Pref: " + upcomingDemandRoomPreference + "\n"
+            + "Prefs: " + BuildDemandPreferenceSummary(
+                upcomingDemandRoomPreference,
+                upcomingDemandFloorPreference,
+                upcomingDemandFacingPreference) + "\n"
             + "ETA: " + FormatSeconds(upcomingDemandEtaSeconds) + "\n"
             + "Reserved: " + reservedRoomName + "\n"
             + "Reserve Result: " + lastReservationResult + "\n"
@@ -677,7 +823,9 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
     {
         // Active demand 是当前等待玩家分房的需求；没有 active 时也显示空卡片，便于观察状态切换。
         string demandTypeText = activeDemandWaitingForManualAssignment ? activeDemandType.ToString() : "None";
-        string roomPreferenceText = activeDemandWaitingForManualAssignment ? activeDemandRoomPreference.ToString() : "None";
+        string preferenceText = activeDemandWaitingForManualAssignment
+            ? BuildDemandPreferenceSummary(activeDemandRoomPreference, activeDemandFloorPreference, activeDemandFacingPreference)
+            : "None";
         string waitText = activeDemandWaitingForManualAssignment
             ? FormatSeconds(activeDemandWaitSeconds) + " / " + FormatSeconds(manualAssignmentFallbackDelaySeconds)
             : "0s / " + FormatSeconds(manualAssignmentFallbackDelaySeconds);
@@ -685,7 +833,7 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
         return "[Active Demand]\n"
             + "Status: " + activeDemandStatus + "\n"
             + "Type: " + demandTypeText + "\n"
-            + "Room Pref: " + roomPreferenceText + "\n"
+            + "Prefs: " + preferenceText + "\n"
             + "Wait: " + waitText + "\n"
             + "Fallback Reserved: " + activeReservedRoomName + "\n"
             + "Assignment: " + lastAssignmentMode + "\n"
@@ -705,7 +853,10 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
         return "[Latest Resolved]\n"
             + "Mode: " + lastResolvedAssignmentMode + "\n"
             + "Type: " + lastDemandType + "\n"
-            + "Room Pref: " + lastDemandRoomPreference + "\n"
+            + "Prefs: " + BuildDemandPreferenceSummary(
+                lastDemandRoomPreference,
+                lastDemandFloorPreference,
+                lastDemandFacingPreference) + "\n"
             + "Room: " + lastChangedRoomName + "\n"
             + "Match: " + lastMatchQualityLabel + "\n"
             + "Clean/Wear: " + lastCleanlinessSuitability + " / " + lastWearSuitability + "\n"
@@ -734,12 +885,17 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
 
         Room2DDemandType demandType = GetCurrentVisibleDemandType();
         Room2DRoomPreference roomPreference = GetCurrentVisibleDemandRoomPreference();
+        Room2DFloorPreference floorPreference = GetCurrentVisibleDemandFloorPreference();
+        Room2DFacingPreference facingPreference = GetCurrentVisibleDemandFacingPreference();
         string demandStage = activeDemandWaitingForManualAssignment ? "Active" : "Upcoming";
         string readyNote = room.CanSimulateCheckIn() ? "" : " (not Ready)";
+        string roomTypeNote = DoesRoomMeetHardRoomTypeConstraint(room, roomPreference) ? "" : " (type blocked)";
 
-        return "Match Hint: " + demandStage + " " + demandType + " / " + roomPreference
-            + " -> " + GetMatchDisplayName(EvaluateMatchQuality(room, demandType, roomPreference))
-            + readyNote;
+        return "Match Hint: " + demandStage + " " + demandType + " / "
+            + BuildDemandPreferenceSummary(roomPreference, floorPreference, facingPreference)
+            + " -> " + GetMatchDisplayName(EvaluateMatchQuality(room, demandType, roomPreference, floorPreference, facingPreference))
+            + readyNote
+            + roomTypeNote;
     }
 
     public bool IsRoomReservedForPrototypeDemand(Room2DEntity room)
@@ -876,29 +1032,35 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
     private Room2DEntity FindRoomForDemand(
         Room2DDemandType demandType,
         Room2DRoomPreference roomPreference,
+        Room2DFloorPreference floorPreference,
+        Room2DFacingPreference facingPreference,
         Room2DEntity reservedRoom,
         bool useReservationFirst,
         Room2DEntity forcedRoom)
     {
         if (forcedRoom != null)
         {
-            return forcedRoom.CanSimulateCheckIn() ? forcedRoom : null;
+            return forcedRoom.CanSimulateCheckIn() && DoesRoomMeetHardRoomTypeConstraint(forcedRoom, roomPreference)
+                ? forcedRoom
+                : null;
         }
 
         if (!useReservationFirst || reservedRoom == null)
         {
-            return FindBestReadyRoomForDemand(demandType, roomPreference);
+            return FindBestReadyRoomForDemand(demandType, roomPreference, floorPreference, facingPreference);
         }
 
         // 预留房只有 Ready 时才会被使用；否则保留原来的自动分配作为 fallback。
-        if (reservedRoom.CanSimulateCheckIn())
+        if (reservedRoom.CanSimulateCheckIn() && DoesRoomMeetHardRoomTypeConstraint(reservedRoom, roomPreference))
         {
             lastReservationResult = "Succeeded: used " + reservedRoom.roomName;
             return reservedRoom;
         }
 
-        lastReservationResult = "Failed: " + reservedRoom.roomName + " was " + reservedRoom.GetStateDisplayName();
-        return FindBestReadyRoomForDemand(demandType, roomPreference);
+        lastReservationResult = "Failed: " + reservedRoom.roomName
+            + " was " + reservedRoom.GetStateDisplayName()
+            + " / " + reservedRoom.GetPrototypeRoomTypeDisplayName();
+        return FindBestReadyRoomForDemand(demandType, roomPreference, floorPreference, facingPreference);
     }
 
     private void CountRoomStates(
@@ -958,15 +1120,27 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
         if (!useUpcomingDemandPreview)
         {
             return nextDemandType + " / " + nextDemandRoomPreference
+                + " / " + nextDemandFloorPreference
+                + " / " + nextDemandFacingPreference
                 + " in " + FormatSeconds(Mathf.Max(0f, demandIntervalSeconds - demandTimerSeconds));
         }
 
         if (activeDemandWaitingForManualAssignment)
         {
-            return "Active " + activeDemandType + " / " + activeDemandRoomPreference + " waiting";
+            return "Active " + activeDemandType + " / "
+                + BuildDemandPreferenceSummary(
+                    activeDemandRoomPreference,
+                    activeDemandFloorPreference,
+                    activeDemandFacingPreference)
+                + " waiting";
         }
 
-        return upcomingDemandType + " / " + upcomingDemandRoomPreference + " in " + FormatSeconds(upcomingDemandEtaSeconds);
+        return upcomingDemandType + " / "
+            + BuildDemandPreferenceSummary(
+                upcomingDemandRoomPreference,
+                upcomingDemandFloorPreference,
+                upcomingDemandFacingPreference)
+            + " in " + FormatSeconds(upcomingDemandEtaSeconds);
     }
 
     private Room2DDemandType GetCurrentVisibleDemandType()
@@ -997,6 +1171,36 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
         }
 
         return nextDemandRoomPreference;
+    }
+
+    private Room2DFloorPreference GetCurrentVisibleDemandFloorPreference()
+    {
+        if (activeDemandWaitingForManualAssignment)
+        {
+            return activeDemandFloorPreference;
+        }
+
+        if (useUpcomingDemandPreview)
+        {
+            return upcomingDemandFloorPreference;
+        }
+
+        return nextDemandFloorPreference;
+    }
+
+    private Room2DFacingPreference GetCurrentVisibleDemandFacingPreference()
+    {
+        if (activeDemandWaitingForManualAssignment)
+        {
+            return activeDemandFacingPreference;
+        }
+
+        if (useUpcomingDemandPreview)
+        {
+            return upcomingDemandFacingPreference;
+        }
+
+        return nextDemandFacingPreference;
     }
 
     private string GetPriorityRoomLine(Room2DEntity room, Room2DState expectedState, string cachedName)
@@ -1050,6 +1254,7 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
 
         string candidateText = "Candidates";
         int shownCount = 0;
+        int blockedByTypeCount = 0;
 
         for (int i = 0; i < rooms.Length; i++)
         {
@@ -1059,13 +1264,28 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
                 continue;
             }
 
+            if (!DoesRoomMeetHardRoomTypeConstraint(room, activeDemandRoomPreference))
+            {
+                blockedByTypeCount++;
+                continue;
+            }
+
             if (shownCount < 5)
             {
                 candidateText += "\n- " + room.roomName
                     + " (" + room.GetPrototypeRoomTypeDisplayName() + ")"
-                    + ": " + GetMatchDisplayName(EvaluateMatchQuality(room, activeDemandType, activeDemandRoomPreference))
+                    + " " + room.GetPrototypeFloorDisplayName()
+                    + " / " + room.GetPrototypeFacingDisplayName()
+                    + ": " + GetMatchDisplayName(EvaluateMatchQuality(
+                        room,
+                        activeDemandType,
+                        activeDemandRoomPreference,
+                        activeDemandFloorPreference,
+                        activeDemandFacingPreference))
                     + " C/W " + GetCleanlinessSuitability(room)
-                    + "/" + GetWearSuitability(room);
+                    + "/" + GetWearSuitability(room)
+                    + " F/Fa " + GetFloorPreferenceScore(room, activeDemandFloorPreference)
+                    + "/" + GetFacingPreferenceScore(room, activeDemandFacingPreference);
             }
 
             shownCount++;
@@ -1073,7 +1293,9 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
 
         if (shownCount == 0)
         {
-            return "Candidates: no Ready rooms";
+            return blockedByTypeCount > 0
+                ? "Candidates: no matching room type"
+                : "Candidates: no Ready rooms";
         }
 
         if (shownCount > 5)
@@ -1081,10 +1303,19 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
             candidateText += "\n- +" + (shownCount - 5) + " more";
         }
 
+        if (blockedByTypeCount > 0)
+        {
+            candidateText += "\n- Type blocked: " + blockedByTypeCount;
+        }
+
         return candidateText;
     }
 
-    private Room2DEntity FindBestReadyRoomForDemand(Room2DDemandType demandType, Room2DRoomPreference roomPreference)
+    private Room2DEntity FindBestReadyRoomForDemand(
+        Room2DDemandType demandType,
+        Room2DRoomPreference roomPreference,
+        Room2DFloorPreference floorPreference,
+        Room2DFacingPreference facingPreference)
     {
         Room2DEntity bestRoom = null;
         Room2DMatchQuality bestMatchQuality = Room2DMatchQuality.PoorMatch;
@@ -1092,15 +1323,19 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
 
         for (int i = 0; i < rooms.Length; i++)
         {
-            if (rooms[i] == null || !rooms[i].CanSimulateCheckIn())
+            if (rooms[i] == null
+                || !rooms[i].CanSimulateCheckIn()
+                || !DoesRoomMeetHardRoomTypeConstraint(rooms[i], roomPreference))
             {
                 continue;
             }
 
-            Room2DMatchQuality matchQuality = EvaluateMatchQuality(rooms[i], demandType, roomPreference);
+            Room2DMatchQuality matchQuality = EvaluateMatchQuality(rooms[i], demandType, roomPreference, floorPreference, facingPreference);
             int suitabilityScore = GetCleanlinessSuitability(rooms[i])
                 + GetWearSuitability(rooms[i])
-                + GetRoomTypeSuitabilityBonus(rooms[i], roomPreference);
+                + GetRoomTypeSuitabilityBonus(rooms[i], roomPreference)
+                + GetFloorPreferenceScore(rooms[i], floorPreference)
+                + GetFacingPreferenceScore(rooms[i], facingPreference);
 
             bool shouldUseRoom = bestRoom == null
                 || matchQuality > bestMatchQuality
@@ -1118,11 +1353,23 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
         return bestRoom;
     }
 
-    private Room2DMatchQuality EvaluateMatchQuality(Room2DEntity room, Room2DDemandType demandType, Room2DRoomPreference roomPreference)
+    private Room2DMatchQuality EvaluateMatchQuality(
+        Room2DEntity room,
+        Room2DDemandType demandType,
+        Room2DRoomPreference roomPreference,
+        Room2DFloorPreference floorPreference,
+        Room2DFacingPreference facingPreference)
     {
+        if (!DoesRoomMeetHardRoomTypeConstraint(room, roomPreference))
+        {
+            return Room2DMatchQuality.PoorMatch;
+        }
+
         int cleanlinessSuitability = GetCleanlinessSuitability(room);
         int wearSuitability = GetWearSuitability(room);
-        int thresholdModifier = GetRoomTypeThresholdModifier(room, roomPreference);
+        int thresholdModifier = GetRoomTypeThresholdModifier(room, roomPreference)
+            + GetPreferenceThresholdModifier(GetFloorPreferenceScore(room, floorPreference))
+            + GetPreferenceThresholdModifier(GetFacingPreferenceScore(room, facingPreference));
 
         // HighExpectation 对清洁和老旧程度都更敏感；Normal 只要求不要太差。
         if (demandType == Room2DDemandType.HighExpectation)
@@ -1175,6 +1422,22 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
         return 0;
     }
 
+    private bool DoesRoomMeetHardRoomTypeConstraint(Room2DEntity room, Room2DRoomPreference roomPreference)
+    {
+        if (room == null)
+        {
+            return false;
+        }
+
+        // v1 里把 BetterRoomPreferred 当作硬约束：只允许 Better 房承接。
+        if (roomPreference == Room2DRoomPreference.BetterRoomPreferred)
+        {
+            return room.prototypeRoomType == Room2DPrototypeRoomType.Better;
+        }
+
+        return true;
+    }
+
     private int GetRoomTypeSuitabilityBonus(Room2DEntity room, Room2DRoomPreference roomPreference)
     {
         if (room == null)
@@ -1188,6 +1451,63 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
         }
 
         return roomPreference == Room2DRoomPreference.BetterRoomPreferred ? -8 : 0;
+    }
+
+    private int GetFloorPreferenceScore(Room2DEntity room, Room2DFloorPreference floorPreference)
+    {
+        if (room == null || floorPreference == Room2DFloorPreference.NoPreference)
+        {
+            return 0;
+        }
+
+        // 当前原型没有完整楼层配置，先用 floorNumber 直接判断高/低楼层倾向。
+        if (floorPreference == Room2DFloorPreference.HighFloorPreferred)
+        {
+            if (room.floorNumber >= 3)
+            {
+                return 12;
+            }
+
+            return room.floorNumber <= 1 ? -8 : 4;
+        }
+
+        if (room.floorNumber <= 1)
+        {
+            return 12;
+        }
+
+        return room.floorNumber >= 3 ? -8 : 4;
+    }
+
+    private int GetFacingPreferenceScore(Room2DEntity room, Room2DFacingPreference facingPreference)
+    {
+        if (room == null || facingPreference == Room2DFacingPreference.NoPreference)
+        {
+            return 0;
+        }
+
+        // BackFacing 代表更安静，StreetFacing 代表视野/临街感更强。
+        if (facingPreference == Room2DFacingPreference.QuietPreferred)
+        {
+            return room.prototypeFacing == Room2DPrototypeFacing.BackFacing ? 12 : -8;
+        }
+
+        return room.prototypeFacing == Room2DPrototypeFacing.StreetFacing ? 12 : -8;
+    }
+
+    private int GetPreferenceThresholdModifier(int preferenceScore)
+    {
+        if (preferenceScore >= 10)
+        {
+            return -5;
+        }
+
+        if (preferenceScore < 0)
+        {
+            return 5;
+        }
+
+        return 0;
     }
 
     private void CompleteReservationResultAfterSuccess(Room2DEntity assignedRoom, Room2DEntity reservedRoom, bool usedReservationFlow)
@@ -1307,6 +1627,8 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
     private void RecordSuccessfulAssignmentOutcome(
         Room2DDemandType demandType,
         Room2DRoomPreference roomPreference,
+        Room2DFloorPreference floorPreference,
+        Room2DFacingPreference facingPreference,
         Room2DEntity room,
         Room2DMatchQuality matchQuality)
     {
@@ -1317,15 +1639,27 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
 
         string roomName = room != null ? room.roomName : "None";
         string roomTypeName = room != null ? room.GetPrototypeRoomTypeDisplayName() : "None";
-        lastOutcomeSummary = demandType + " / " + roomPreference + " / " + roomName
+        string floorName = room != null ? room.GetPrototypeFloorDisplayName() : "None";
+        string facingName = room != null ? room.GetPrototypeFacingDisplayName() : "None";
+        lastOutcomeSummary = demandType
+            + " / " + BuildDemandPreferenceSummary(roomPreference, floorPreference, facingPreference)
+            + " / " + roomName
             + " (" + roomTypeName + ") / " + lastMatchQualityLabel + " -> " + lastOutcomeLabel;
+        lastOutcomeSummary += " / " + floorName + " / " + facingName;
     }
 
-    private void RecordUnmetDemandOutcome(Room2DDemandType demandType, Room2DRoomPreference roomPreference, string reason)
+    private void RecordUnmetDemandOutcome(
+        Room2DDemandType demandType,
+        Room2DRoomPreference roomPreference,
+        Room2DFloorPreference floorPreference,
+        Room2DFacingPreference facingPreference,
+        string reason)
     {
         // 没有 Ready 房时也算负面后果，因为玩家没有满足入住需求。
         RecordOutcome(Room2DOutcomeResult.Negative, -3);
-        lastOutcomeSummary = demandType + " / " + roomPreference + " unmet / " + reason + " -> " + lastOutcomeLabel;
+        lastOutcomeSummary = demandType
+            + " / " + BuildDemandPreferenceSummary(roomPreference, floorPreference, facingPreference)
+            + " unmet / " + reason + " -> " + lastOutcomeLabel;
     }
 
     private Room2DOutcomeResult GetOutcomeFromMatchQuality(Room2DMatchQuality matchQuality)
@@ -1457,7 +1791,17 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
     private string BuildUpcomingDemandPreviewText(string status)
     {
         return status + " " + upcomingDemandType + " / " + upcomingDemandRoomPreference
+            + " / " + upcomingDemandFloorPreference
+            + " / " + upcomingDemandFacingPreference
             + " in " + FormatSeconds(upcomingDemandEtaSeconds);
+    }
+
+    private string BuildDemandPreferenceSummary(
+        Room2DRoomPreference roomPreference,
+        Room2DFloorPreference floorPreference,
+        Room2DFacingPreference facingPreference)
+    {
+        return roomPreference + " / " + floorPreference + " / " + facingPreference;
     }
 
     private string FormatSeconds(float seconds)

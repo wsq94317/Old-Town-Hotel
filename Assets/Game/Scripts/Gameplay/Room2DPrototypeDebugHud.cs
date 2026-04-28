@@ -103,8 +103,8 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
         RedirectLegacyOverviewText();
 
         // 笔记本横屏调试布局：左右两侧放 Debug 面板，中间留给房间网格。
-        ApplyFixedPanel(selectedRoomPanel, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(24f, -24f), new Vector2(430f, 430f));
-        ApplyFixedPanel(workerPanel, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(24f, -484f), new Vector2(430f, 330f));
+        ApplyFixedPanel(selectedRoomPanel, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(24f, -24f), new Vector2(430f, 500f));
+        ApplyFixedPanel(workerPanel, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(24f, -554f), new Vector2(430f, 330f));
         ApplyFixedPanel(actionPanel, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(24f, 24f), new Vector2(300f, 300f));
         ApplyFixedPanel(overviewPanel, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-24f, 0f), new Vector2(720f, 1030f));
 
@@ -113,7 +113,7 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
         ApplyTextPanelStyle(workerPanel);
         ApplyActionPanelStyle(actionPanel);
 
-        ApplyTextStyle(selectedRoomInfoText, 18f, 410f, TextAlignmentOptions.TopLeft);
+        ApplyTextStyle(selectedRoomInfoText, 17f, 480f, TextAlignmentOptions.TopLeft);
         ApplyTextStyle(overviewInfoText, 18f, 150f, TextAlignmentOptions.TopLeft);
         ApplyTextStyle(workerStatusText, 18f, 300f, TextAlignmentOptions.TopLeft);
         ApplyTextStyle(demandStatusText, 17f, 830f, TextAlignmentOptions.TopLeft);
@@ -258,6 +258,8 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
             + "Name: " + room.roomName + "\n"
             + "Number: " + room.roomNumber + "\n"
             + "Room Type: " + room.GetPrototypeRoomTypeDisplayName() + "\n"
+            + "Floor: " + room.GetPrototypeFloorDisplayName() + "\n"
+            + "Facing: " + room.GetPrototypeFacingDisplayName() + "\n"
             + "State: " + room.GetStateDisplayName() + "\n"
             + "Next: " + room.GetNextActionDisplayName() + "\n"
             + "Wait: " + FormatSeconds(room.stateElapsedSeconds)

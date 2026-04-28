@@ -6,6 +6,12 @@ public enum Room2DPrototypeRoomType
     Better
 }
 
+public enum Room2DPrototypeFacing
+{
+    StreetFacing,
+    BackFacing
+}
+
 // 房间的核心数据实体。
 // 它不负责画面怎么显示，只保存房间的业务状态、房号、Block 信息和房间属性。
 public class Room2DEntity : MonoBehaviour
@@ -22,6 +28,10 @@ public class Room2DEntity : MonoBehaviour
     [Header("Prototype Room Type")]
     // 最小房型原型：只区分普通房和更好一点的房，不做完整房型/库存系统。
     public Room2DPrototypeRoomType prototypeRoomType = Room2DPrototypeRoomType.Standard;
+
+    [Header("Prototype Location")]
+    // 最小朝向原型：Street 偏视野，Back 偏安静，不做完整房间位置系统。
+    public Room2DPrototypeFacing prototypeFacing = Room2DPrototypeFacing.StreetFacing;
 
     // Dirty/Cleaning/AwaitingInspection 代表客人已经离开后产生的清洁链条。
     public bool guestCheckedOut = true;
@@ -316,6 +326,16 @@ public class Room2DEntity : MonoBehaviour
     public string GetPrototypeRoomTypeDisplayName()
     {
         return prototypeRoomType == Room2DPrototypeRoomType.Better ? "Better" : "Standard";
+    }
+
+    public string GetPrototypeFacingDisplayName()
+    {
+        return prototypeFacing == Room2DPrototypeFacing.BackFacing ? "Back Facing" : "Street Facing";
+    }
+
+    public string GetPrototypeFloorDisplayName()
+    {
+        return "Floor " + floorNumber;
     }
 
     public string GetStateTimeDisplayName()

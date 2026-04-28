@@ -49,6 +49,7 @@ Build first playable fake-3D 2D room entity prototype.
 - Room2DPrototypeDebugHud now separates demand information into Upcoming, Active, and Latest Resolved prototype cards
 - Room2DPrototypeDebugHud now shows a selected-room detail card with reservation, priority, checkout, block, quality, and match hints
 - Room2DEntity now has a minimal Standard/Better prototype room type, and demand matching can prefer Better rooms
+- Room assignment depth v1 now includes floor preference, quiet/view facing preference, and Street/Back facing in match hints
 
 ## Next
 - Attach Room2DEntity to Room_A_2D in Unity
@@ -110,3 +111,5 @@ Prove that proactive preparation is better than reactive response.
 - Lounge expansion
 - Events
 - Final UI polish
+
+- Recorded room-assignment, guest-preference, early check-in, and late-checkout design notes in a separate design doc
