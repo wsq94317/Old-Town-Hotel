@@ -14,6 +14,7 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
     public Housekeeper2D housekeeper;
     public Inspector2D inspector;
     public Room2DPrototypeDemandLoop demandLoop;
+    public Room2DWorkerSelectionPanel workerSelectionPanel;
 
     [Header("Text Targets")]
     public TMP_Text selectedRoomInfoText;
@@ -92,6 +93,7 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
         }
 
         ApplyPrototypeButtonLabels();
+        ApplyPrototypeButtonStyle();
 
         if (assignDefaultFontWhenMissing)
         {
@@ -103,7 +105,7 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
         // 笔记本横屏调试布局：左右两侧放 Debug 面板，中间留给房间网格。
         ApplyFixedPanel(selectedRoomPanel, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(24f, -24f), new Vector2(430f, 240f));
         ApplyFixedPanel(workerPanel, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(24f, -284f), new Vector2(430f, 330f));
-        ApplyFixedPanel(actionPanel, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(24f, 24f), new Vector2(430f, 430f));
+        ApplyFixedPanel(actionPanel, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(24f, 24f), new Vector2(300f, 300f));
         ApplyFixedPanel(overviewPanel, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-24f, 0f), new Vector2(720f, 1030f));
 
         ApplyTextPanelStyle(selectedRoomPanel);
@@ -186,6 +188,11 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
         if (demandLoop == null)
         {
             demandLoop = FindFirstObjectByType<Room2DPrototypeDemandLoop>();
+        }
+
+        if (workerSelectionPanel == null)
+        {
+            workerSelectionPanel = FindFirstObjectByType<Room2DWorkerSelectionPanel>();
         }
     }
 
@@ -317,6 +324,11 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
 
     private string BuildWorkerText()
     {
+        if (workerSelectionPanel != null)
+        {
+            return workerSelectionPanel.GetWorkerPanelText();
+        }
+
         return "Workers\n"
             + "HSK: " + GetHousekeeperText() + "\n"
             + GetHousekeeperBestTargetText() + "\n"
@@ -567,9 +579,9 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
         GridLayoutGroup layout = GetOrAddComponent<GridLayoutGroup>(panel.gameObject);
         DisableOtherLayoutGroups(panel, layout);
 
-        layout.padding = new RectOffset(16, 16, 16, 16);
-        layout.spacing = new Vector2(12f, 12f);
-        layout.cellSize = new Vector2(190f, 54f);
+        layout.padding = new RectOffset(10, 10, 10, 10);
+        layout.spacing = new Vector2(8f, 8f);
+        layout.cellSize = new Vector2(132f, 36f);
         layout.startCorner = GridLayoutGroup.Corner.UpperLeft;
         layout.startAxis = GridLayoutGroup.Axis.Horizontal;
         layout.childAlignment = TextAnchor.UpperCenter;
@@ -590,7 +602,7 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
             return;
         }
 
-        image.color = new Color(0f, 0f, 0f, 0.62f);
+        image.color = new Color(0f, 0f, 0f, 0.48f);
         image.raycastTarget = false;
     }
 
@@ -732,6 +744,44 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
             {
                 SetButtonText(buttons[i], "Best Insp");
             }
+            else if (buttons[i].name == "Button_SelectHousekeeper")
+            {
+                SetButtonText(buttons[i], "Select HSK");
+            }
+            else if (buttons[i].name == "Button_SelectNextHousekeeper")
+            {
+                SetButtonText(buttons[i], "Next HSK");
+            }
+            else if (buttons[i].name == "Button_SelectInspector")
+            {
+                SetButtonText(buttons[i], "Select Insp");
+            }
+            else if (buttons[i].name == "Button_AssignSelectedWorker")
+            {
+                SetButtonText(buttons[i], "Assign Worker");
+            }
+        }
+    }
+
+    private void ApplyPrototypeButtonStyle()
+    {
+        Transform root = GetHudSearchRoot();
+        Button[] buttons = root.GetComponentsInChildren<Button>(true);
+        for (int i = 0; i < buttons.Length; i++)
+        {
+            TMP_Text text = buttons[i].GetComponentInChildren<TMP_Text>(true);
+            if (text == null)
+            {
+                continue;
+            }
+
+            // 调试按钮要小一点，避免在笔记本 Game 窗口里盖住房间网格。
+            text.enableAutoSizing = true;
+            text.fontSizeMin = 9f;
+            text.fontSizeMax = 14f;
+            text.alignment = TextAlignmentOptions.Center;
+            text.textWrappingMode = TextWrappingModes.Normal;
+            text.overflowMode = TextOverflowModes.Ellipsis;
         }
     }
 

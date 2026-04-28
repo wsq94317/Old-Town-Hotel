@@ -1136,6 +1136,9 @@ MonoBehaviour:
   urgentPrioritySeconds: 120
   cleaningPriorityLevel: 0
   cleaningPriorityLabel: None
+  markedCleaningPriority: 0
+  markedInspectionPriority: 0
+  preparationPriorityLabel: None
   blockReason: 0
   blockRemainingHours: 0
   roomAttributes: []

@@ -43,6 +43,9 @@ Build first playable fake-3D 2D room entity prototype.
 - Housekeeper2D can assign the best Dirty room using CLEAN PRIO, cleaning priority level, and oldest Dirty time
 - Inspector2D can assign the best AwaitingInspection room using INSP PRIO and oldest inspection wait time
 - Room2DPrototypeDebugHud shows the current best housekeeping and inspection targets
+- Room2DWorkerSelectionPanel created for manual worker selection and selected-worker-to-selected-room assignment
+- Room2DPrototypeDebugHud can show selected worker, worker states, and manual worker assignment results
+- Room2DPrototypeDebugHud now uses smaller action buttons so the debug panel blocks less of the room grid
 
 ## Next
 - Attach Room2DEntity to Room_A_2D in Unity
@@ -94,6 +97,8 @@ Prove that proactive preparation is better than reactive response.
 - Test whether preparation improves outcomes
 - Test that Dirty / Inspection priority markers are visible on selected rooms and clear after state changes
 - Test that Best HSK / Best Insp chooses prepared priority rooms before normal backlog rooms
+- Test manual worker selection by selecting HSK / Inspector and assigning the selected worker to the selected room
+- Reapply the HUD layout and verify the smaller action buttons no longer cover the room grid
 
 ## Explicitly Not Next
 - Full morning briefing system
