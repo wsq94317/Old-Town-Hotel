@@ -46,6 +46,7 @@ Build first playable fake-3D 2D room entity prototype.
 - Room2DWorkerSelectionPanel created for manual worker selection and selected-worker-to-selected-room assignment
 - Room2DPrototypeDebugHud can show selected worker, worker states, and manual worker assignment results
 - Room2DPrototypeDebugHud now uses smaller action buttons so the debug panel blocks less of the room grid
+- Room2DPrototypeDebugHud now separates demand information into Upcoming, Active, and Latest Resolved prototype cards
 
 ## Next
 - Attach Room2DEntity to Room_A_2D in Unity

@@ -343,15 +343,12 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
             return "Demand\nNone";
         }
 
+        // Demand 信息拆成几个“卡片”，避免把 upcoming / active / result 混成一大段调试文字。
         return demandLoop.GetPreparationText() + "\n\n"
-            + demandLoop.GetManualAssignmentText() + "\n\n"
-            + "Last Demand\n"
-            + "Type: " + demandLoop.lastDemandType + "\n"
-            + "Match: " + demandLoop.lastMatchQualityLabel + "\n"
-            + "Clean/Wear: " + demandLoop.lastCleanlinessSuitability + " / " + demandLoop.lastWearSuitability + "\n"
-            + "Outcome: " + demandLoop.lastOutcomeLabel + "\n"
-            + "Result: " + demandLoop.lastOutcomeSummary + "\n"
-            + BuildOccupiedRoomsText() + "\n"
+            + demandLoop.GetUpcomingDemandCardText() + "\n\n"
+            + demandLoop.GetActiveDemandCardText() + "\n\n"
+            + demandLoop.GetResolvedDemandCardText() + "\n\n"
+            + BuildOccupiedRoomsText() + "\n\n"
             + demandLoop.GetPrototypeDaySummaryText();
     }
 

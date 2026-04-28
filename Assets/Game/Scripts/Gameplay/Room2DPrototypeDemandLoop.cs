@@ -79,6 +79,7 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
     public string activeDemandStatus = "None";
     public string lastManualAssignmentResult = "None";
     public string lastAssignmentMode = "None";
+    public string lastResolvedAssignmentMode = "None";
 
     [Header("Occupancy")]
     // Occupied 房间住满多少现实秒后自动退房，重新变成 Dirty。
@@ -370,6 +371,7 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
         generatedDemandCount++;
         lastDemandType = demandType;
         lastAssignmentMode = assignmentMode;
+        lastResolvedAssignmentMode = assignmentMode;
 
         Room2DEntity readyRoom = FindRoomForDemand(demandType, reservedRoom, useReservationFirst, forcedRoom);
         if (readyRoom == null)
@@ -589,6 +591,63 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
             + "Last Assign: " + lastAssignmentMode + "\n"
             + "Manual: " + lastManualAssignmentResult + "\n"
             + GetCandidateReadyRoomsText();
+    }
+
+    public string GetUpcomingDemandCardText()
+    {
+        // 只把已有 upcoming demand 数据整理成卡片文本，不创建真实客人或队列。
+        if (!useUpcomingDemandPreview)
+        {
+            return "[Upcoming Demand]\n"
+                + "Type: " + nextDemandType + "\n"
+                + "ETA: " + FormatSeconds(Mathf.Max(0f, demandIntervalSeconds - demandTimerSeconds)) + "\n"
+                + "Reserved: None\n"
+                + "Status: Preview off";
+        }
+
+        return "[Upcoming Demand]\n"
+            + "Type: " + upcomingDemandType + "\n"
+            + "ETA: " + FormatSeconds(upcomingDemandEtaSeconds) + "\n"
+            + "Reserved: " + reservedRoomName + "\n"
+            + "Reserve Result: " + lastReservationResult + "\n"
+            + "Status: " + upcomingDemandPreviewText;
+    }
+
+    public string GetActiveDemandCardText()
+    {
+        // Active demand 是当前等待玩家分房的需求；没有 active 时也显示空卡片，便于观察状态切换。
+        string demandTypeText = activeDemandWaitingForManualAssignment ? activeDemandType.ToString() : "None";
+        string waitText = activeDemandWaitingForManualAssignment
+            ? FormatSeconds(activeDemandWaitSeconds) + " / " + FormatSeconds(manualAssignmentFallbackDelaySeconds)
+            : "0s / " + FormatSeconds(manualAssignmentFallbackDelaySeconds);
+
+        return "[Active Demand]\n"
+            + "Status: " + activeDemandStatus + "\n"
+            + "Type: " + demandTypeText + "\n"
+            + "Wait: " + waitText + "\n"
+            + "Fallback Reserved: " + activeReservedRoomName + "\n"
+            + "Assignment: " + lastAssignmentMode + "\n"
+            + "Manual: " + lastManualAssignmentResult + "\n"
+            + GetCandidateReadyRoomsText();
+    }
+
+    public string GetResolvedDemandCardText()
+    {
+        // Latest resolved demand 用来快速判断上一单是手动分房、fallback，还是无人可住。
+        if (generatedDemandCount == 0)
+        {
+            return "[Latest Resolved]\n"
+                + "Status: None yet";
+        }
+
+        return "[Latest Resolved]\n"
+            + "Mode: " + lastResolvedAssignmentMode + "\n"
+            + "Type: " + lastDemandType + "\n"
+            + "Room: " + lastChangedRoomName + "\n"
+            + "Match: " + lastMatchQualityLabel + "\n"
+            + "Clean/Wear: " + lastCleanlinessSuitability + " / " + lastWearSuitability + "\n"
+            + "Outcome: " + lastOutcomeLabel + "\n"
+            + "Result: " + lastOutcomeSummary;
     }
 
     [ContextMenu("Process Occupied Checkouts")]
