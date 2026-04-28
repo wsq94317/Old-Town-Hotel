@@ -35,6 +35,14 @@ public class Housekeeper2D : MonoBehaviour
     // 可选：清洁开始/结束后刷新总览。
     public Room2DOverview roomOverview;
 
+    [Header("Prototype Best Target")]
+    // 原型用：显示当前“最应该派 HSK 去清洁”的房间，方便测试准备标记是否真的影响选择。
+    public Room2DEntity bestHousekeepingTarget;
+    public string bestHousekeepingTargetName = "None";
+    public string bestHousekeepingTargetReason = "None";
+    public bool preparationPriorityChangedTarget;
+    public string lastBestAssignmentResult = "None";
+
     private void Start()
     {
         FindReferencesIfNeeded();
@@ -73,6 +81,27 @@ public class Housekeeper2D : MonoBehaviour
         AssignRoom(targetRoomForTesting);
     }
 
+    [ContextMenu("Assign Best Housekeeping Target")]
+    public void AssignBestRoom()
+    {
+        FindReferencesIfNeeded();
+
+        Room2DEntity bestRoom = FindBestHousekeepingTarget(true);
+        if (bestRoom == null)
+        {
+            lastBestAssignmentResult = "Best HSK failed: no Dirty room";
+            RefreshBestTargetInfo();
+            return;
+        }
+
+        bool assigned = AssignRoom(bestRoom);
+        lastBestAssignmentResult = assigned
+            ? "Best HSK assigned " + bestRoom.roomName
+            : "Best HSK failed: " + bestRoom.roomName;
+
+        RefreshBestTargetInfo();
+    }
+
     public bool AssignRoom(Room2DEntity room)
     {
         if (currentState != HousekeeperState.Idle || room == null)
@@ -94,6 +123,16 @@ public class Housekeeper2D : MonoBehaviour
         RefreshRoomVisual(room);
         RefreshOverview();
         return true;
+    }
+
+    public string GetBestTargetText()
+    {
+        RefreshBestTargetInfo();
+
+        return "Best HSK: " + bestHousekeepingTargetName + "\n"
+            + "Reason: " + bestHousekeepingTargetReason + "\n"
+            + "Prep changed: " + (preparationPriorityChangedTarget ? "Yes" : "No") + "\n"
+            + "Last best: " + lastBestAssignmentResult;
     }
 
     public void FinishCurrentRoom()
@@ -135,6 +174,79 @@ public class Housekeeper2D : MonoBehaviour
         {
             roomOverview = FindFirstObjectByType<Room2DOverview>();
         }
+    }
+
+    private void RefreshBestTargetInfo()
+    {
+        Room2DEntity preparedBestRoom = FindBestHousekeepingTarget(true);
+        Room2DEntity normalBestRoom = FindBestHousekeepingTarget(false);
+
+        bestHousekeepingTarget = preparedBestRoom;
+        bestHousekeepingTargetName = preparedBestRoom != null ? preparedBestRoom.roomName : "None";
+        bestHousekeepingTargetReason = GetHousekeepingTargetReason(preparedBestRoom);
+        preparationPriorityChangedTarget = preparedBestRoom != null
+            && normalBestRoom != null
+            && preparedBestRoom != normalBestRoom;
+    }
+
+    private Room2DEntity FindBestHousekeepingTarget(bool usePreparationPriority)
+    {
+        Room2DEntity[] rooms = FindObjectsByType<Room2DEntity>(FindObjectsSortMode.None);
+        Room2DEntity bestRoom = null;
+
+        for (int i = 0; i < rooms.Length; i++)
+        {
+            Room2DEntity room = rooms[i];
+            if (room == null || !room.CanStartCleaning())
+            {
+                continue;
+            }
+
+            room.RefreshCleaningPriority();
+
+            if (bestRoom == null || IsBetterHousekeepingTarget(room, bestRoom, usePreparationPriority))
+            {
+                bestRoom = room;
+            }
+        }
+
+        return bestRoom;
+    }
+
+    private bool IsBetterHousekeepingTarget(Room2DEntity candidate, Room2DEntity currentBest, bool usePreparationPriority)
+    {
+        // 简单规则：准备标记 > 清洁优先级 > Dirty 等待时间 > 房号。
+        if (usePreparationPriority && candidate.markedCleaningPriority != currentBest.markedCleaningPriority)
+        {
+            return candidate.markedCleaningPriority;
+        }
+
+        if (candidate.cleaningPriorityLevel != currentBest.cleaningPriorityLevel)
+        {
+            return candidate.cleaningPriorityLevel > currentBest.cleaningPriorityLevel;
+        }
+
+        if (!Mathf.Approximately(candidate.stateElapsedSeconds, currentBest.stateElapsedSeconds))
+        {
+            return candidate.stateElapsedSeconds > currentBest.stateElapsedSeconds;
+        }
+
+        return candidate.roomNumber < currentBest.roomNumber;
+    }
+
+    private string GetHousekeepingTargetReason(Room2DEntity room)
+    {
+        if (room == null)
+        {
+            return "None";
+        }
+
+        if (room.markedCleaningPriority)
+        {
+            return "CLEAN PRIO";
+        }
+
+        return room.cleaningPriorityLabel + " / " + Mathf.FloorToInt(room.stateElapsedSeconds) + "s";
     }
 
     private void RefreshRoomVisual(Room2DEntity room)

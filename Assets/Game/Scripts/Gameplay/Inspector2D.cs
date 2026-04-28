@@ -35,6 +35,14 @@ public class Inspector2D : MonoBehaviour
     // 可选：检查开始/结束后刷新总览。
     public Room2DOverview roomOverview;
 
+    [Header("Prototype Best Target")]
+    // 原型用：显示当前“最应该派主管检查”的房间，方便测试准备标记是否真的影响选择。
+    public Room2DEntity bestInspectionTarget;
+    public string bestInspectionTargetName = "None";
+    public string bestInspectionTargetReason = "None";
+    public bool preparationPriorityChangedTarget;
+    public string lastBestAssignmentResult = "None";
+
     private void Start()
     {
         FindReferencesIfNeeded();
@@ -73,6 +81,27 @@ public class Inspector2D : MonoBehaviour
         AssignRoom(targetRoomForTesting);
     }
 
+    [ContextMenu("Assign Best Inspection Target")]
+    public void AssignBestRoom()
+    {
+        FindReferencesIfNeeded();
+
+        Room2DEntity bestRoom = FindBestInspectionTarget(true);
+        if (bestRoom == null)
+        {
+            lastBestAssignmentResult = "Best Insp failed: no AwaitingInspection room";
+            RefreshBestTargetInfo();
+            return;
+        }
+
+        bool assigned = AssignRoom(bestRoom);
+        lastBestAssignmentResult = assigned
+            ? "Best Insp assigned " + bestRoom.roomName
+            : "Best Insp failed: " + bestRoom.roomName;
+
+        RefreshBestTargetInfo();
+    }
+
     public bool AssignRoom(Room2DEntity room)
     {
         if (currentState != InspectorState.Idle || room == null)
@@ -94,6 +123,16 @@ public class Inspector2D : MonoBehaviour
         RefreshRoomVisual(room);
         RefreshOverview();
         return true;
+    }
+
+    public string GetBestTargetText()
+    {
+        RefreshBestTargetInfo();
+
+        return "Best Insp: " + bestInspectionTargetName + "\n"
+            + "Reason: " + bestInspectionTargetReason + "\n"
+            + "Prep changed: " + (preparationPriorityChangedTarget ? "Yes" : "No") + "\n"
+            + "Last best: " + lastBestAssignmentResult;
     }
 
     public void FinishCurrentRoom()
@@ -135,6 +174,72 @@ public class Inspector2D : MonoBehaviour
         {
             roomOverview = FindFirstObjectByType<Room2DOverview>();
         }
+    }
+
+    private void RefreshBestTargetInfo()
+    {
+        Room2DEntity preparedBestRoom = FindBestInspectionTarget(true);
+        Room2DEntity normalBestRoom = FindBestInspectionTarget(false);
+
+        bestInspectionTarget = preparedBestRoom;
+        bestInspectionTargetName = preparedBestRoom != null ? preparedBestRoom.roomName : "None";
+        bestInspectionTargetReason = GetInspectionTargetReason(preparedBestRoom);
+        preparationPriorityChangedTarget = preparedBestRoom != null
+            && normalBestRoom != null
+            && preparedBestRoom != normalBestRoom;
+    }
+
+    private Room2DEntity FindBestInspectionTarget(bool usePreparationPriority)
+    {
+        Room2DEntity[] rooms = FindObjectsByType<Room2DEntity>(FindObjectsSortMode.None);
+        Room2DEntity bestRoom = null;
+
+        for (int i = 0; i < rooms.Length; i++)
+        {
+            Room2DEntity room = rooms[i];
+            if (room == null || !room.CanApproveInspection())
+            {
+                continue;
+            }
+
+            if (bestRoom == null || IsBetterInspectionTarget(room, bestRoom, usePreparationPriority))
+            {
+                bestRoom = room;
+            }
+        }
+
+        return bestRoom;
+    }
+
+    private bool IsBetterInspectionTarget(Room2DEntity candidate, Room2DEntity currentBest, bool usePreparationPriority)
+    {
+        // 简单规则：准备标记 > 等待检查时间 > 房号。
+        if (usePreparationPriority && candidate.markedInspectionPriority != currentBest.markedInspectionPriority)
+        {
+            return candidate.markedInspectionPriority;
+        }
+
+        if (!Mathf.Approximately(candidate.stateElapsedSeconds, currentBest.stateElapsedSeconds))
+        {
+            return candidate.stateElapsedSeconds > currentBest.stateElapsedSeconds;
+        }
+
+        return candidate.roomNumber < currentBest.roomNumber;
+    }
+
+    private string GetInspectionTargetReason(Room2DEntity room)
+    {
+        if (room == null)
+        {
+            return "None";
+        }
+
+        if (room.markedInspectionPriority)
+        {
+            return "INSP PRIO";
+        }
+
+        return "Oldest Inspect / " + Mathf.FloorToInt(room.stateElapsedSeconds) + "s";
     }
 
     private void RefreshRoomVisual(Room2DEntity room)

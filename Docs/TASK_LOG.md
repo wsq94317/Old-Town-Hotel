@@ -40,6 +40,9 @@ Build first playable fake-3D 2D room entity prototype.
 - Room2DPrototypeDemandLoop exposes a lightweight preparation view with room summary, upcoming demand, warnings, reservation, and priority marks
 - Room2DEntity stores simple prototype preparation priority flags for cleaning and inspection
 - Room2DController shows preparation priority markers on room debug labels
+- Housekeeper2D can assign the best Dirty room using CLEAN PRIO, cleaning priority level, and oldest Dirty time
+- Inspector2D can assign the best AwaitingInspection room using INSP PRIO and oldest inspection wait time
+- Room2DPrototypeDebugHud shows the current best housekeeping and inspection targets
 
 ## Next
 - Attach Room2DEntity to Room_A_2D in Unity
@@ -90,6 +93,7 @@ Prove that proactive preparation is better than reactive response.
 - Allow a small number of preparation actions
 - Test whether preparation improves outcomes
 - Test that Dirty / Inspection priority markers are visible on selected rooms and clear after state changes
+- Test that Best HSK / Best Insp chooses prepared priority rooms before normal backlog rooms
 
 ## Explicitly Not Next
 - Full morning briefing system

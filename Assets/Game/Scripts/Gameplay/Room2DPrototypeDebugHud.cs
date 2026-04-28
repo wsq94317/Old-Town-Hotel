@@ -102,7 +102,7 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
 
         // 笔记本横屏调试布局：左右两侧放 Debug 面板，中间留给房间网格。
         ApplyFixedPanel(selectedRoomPanel, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(24f, -24f), new Vector2(430f, 240f));
-        ApplyFixedPanel(workerPanel, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(24f, -284f), new Vector2(430f, 160f));
+        ApplyFixedPanel(workerPanel, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(24f, -284f), new Vector2(430f, 330f));
         ApplyFixedPanel(actionPanel, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(24f, 24f), new Vector2(430f, 430f));
         ApplyFixedPanel(overviewPanel, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-24f, 0f), new Vector2(720f, 1030f));
 
@@ -113,7 +113,7 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
 
         ApplyTextStyle(selectedRoomInfoText, 22f, 210f, TextAlignmentOptions.TopLeft);
         ApplyTextStyle(overviewInfoText, 18f, 150f, TextAlignmentOptions.TopLeft);
-        ApplyTextStyle(workerStatusText, 20f, 130f, TextAlignmentOptions.TopLeft);
+        ApplyTextStyle(workerStatusText, 18f, 300f, TextAlignmentOptions.TopLeft);
         ApplyTextStyle(demandStatusText, 17f, 830f, TextAlignmentOptions.TopLeft);
 
         if (hideUnboundDebugTexts)
@@ -319,7 +319,9 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
     {
         return "Workers\n"
             + "HSK: " + GetHousekeeperText() + "\n"
-            + "Insp: " + GetInspectorText();
+            + GetHousekeeperBestTargetText() + "\n"
+            + "Insp: " + GetInspectorText() + "\n"
+            + GetInspectorBestTargetText();
     }
 
     private string BuildDemandText()
@@ -395,6 +397,16 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
             + " / " + FormatSeconds(housekeeper.cleaningTimerSeconds);
     }
 
+    private string GetHousekeeperBestTargetText()
+    {
+        if (housekeeper == null)
+        {
+            return "Best HSK: None";
+        }
+
+        return housekeeper.GetBestTargetText();
+    }
+
     private string GetInspectorText()
     {
         if (inspector == null)
@@ -405,6 +417,16 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
         return inspector.currentState
             + " / " + inspector.assignedRoomName
             + " / " + FormatSeconds(inspector.inspectionTimerSeconds);
+    }
+
+    private string GetInspectorBestTargetText()
+    {
+        if (inspector == null)
+        {
+            return "Best Insp: None";
+        }
+
+        return inspector.GetBestTargetText();
     }
 
     private Room2DEntity GetSelectedRoomEntity()
@@ -701,6 +723,14 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
             else if (buttons[i].name == "Button_MarkInspectionPriority")
             {
                 SetButtonText(buttons[i], "Inspect Prio");
+            }
+            else if (buttons[i].name == "Button_AssignBestHousekeeper")
+            {
+                SetButtonText(buttons[i], "Best HSK");
+            }
+            else if (buttons[i].name == "Button_AssignBestInspector")
+            {
+                SetButtonText(buttons[i], "Best Insp");
             }
         }
     }
