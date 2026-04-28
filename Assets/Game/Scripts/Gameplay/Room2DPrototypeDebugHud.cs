@@ -103,8 +103,8 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
         RedirectLegacyOverviewText();
 
         // 笔记本横屏调试布局：左右两侧放 Debug 面板，中间留给房间网格。
-        ApplyFixedPanel(selectedRoomPanel, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(24f, -24f), new Vector2(430f, 240f));
-        ApplyFixedPanel(workerPanel, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(24f, -284f), new Vector2(430f, 330f));
+        ApplyFixedPanel(selectedRoomPanel, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(24f, -24f), new Vector2(430f, 430f));
+        ApplyFixedPanel(workerPanel, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(24f, -484f), new Vector2(430f, 330f));
         ApplyFixedPanel(actionPanel, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(24f, 24f), new Vector2(300f, 300f));
         ApplyFixedPanel(overviewPanel, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-24f, 0f), new Vector2(720f, 1030f));
 
@@ -113,7 +113,7 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
         ApplyTextPanelStyle(workerPanel);
         ApplyActionPanelStyle(actionPanel);
 
-        ApplyTextStyle(selectedRoomInfoText, 22f, 210f, TextAlignmentOptions.TopLeft);
+        ApplyTextStyle(selectedRoomInfoText, 18f, 410f, TextAlignmentOptions.TopLeft);
         ApplyTextStyle(overviewInfoText, 18f, 150f, TextAlignmentOptions.TopLeft);
         ApplyTextStyle(workerStatusText, 18f, 300f, TextAlignmentOptions.TopLeft);
         ApplyTextStyle(demandStatusText, 17f, 830f, TextAlignmentOptions.TopLeft);
@@ -244,7 +244,7 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
         Room2DEntity room = GetSelectedRoomEntity();
         if (room == null)
         {
-            return "Selected\nRoom: None";
+            return "[Selected Room]\nRoom: None";
         }
 
         string occupiedText = "";
@@ -254,12 +254,69 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
             occupiedText = "\nCheckout in: " + FormatSeconds(remainingSeconds);
         }
 
-        return "Selected\n"
-            + "Room: " + room.roomName + "\n"
+        return "[Selected Room]\n"
+            + "Name: " + room.roomName + "\n"
+            + "Number: " + room.roomNumber + "\n"
             + "State: " + room.GetStateDisplayName() + "\n"
             + "Next: " + room.GetNextActionDisplayName() + "\n"
             + "Wait: " + FormatSeconds(room.stateElapsedSeconds)
-            + occupiedText;
+            + occupiedText + "\n\n"
+            + "[Decision Flags]\n"
+            + "Reserved: " + GetSelectedRoomReservedText(room) + "\n"
+            + "CLEAN PRIO: " + GetBoolText(room.markedCleaningPriority) + "\n"
+            + "INSP PRIO: " + GetBoolText(room.markedInspectionPriority) + "\n"
+            + "Guest: " + room.GetCheckoutDisplayName() + "\n"
+            + "Block: " + GetSelectedRoomBlockText(room) + "\n\n"
+            + "[Room Quality]\n"
+            + GetSelectedRoomQualityText(room) + "\n"
+            + GetSelectedRoomMatchHintText(room);
+    }
+
+    private string GetSelectedRoomReservedText(Room2DEntity room)
+    {
+        if (demandLoop == null)
+        {
+            return "No";
+        }
+
+        return GetBoolText(demandLoop.IsRoomReservedForPrototypeDemand(room));
+    }
+
+    private string GetSelectedRoomBlockText(Room2DEntity room)
+    {
+        if (room.currentState != Room2DState.Blocked)
+        {
+            return "None";
+        }
+
+        return room.GetBlockDisplayName();
+    }
+
+    private string GetSelectedRoomQualityText(Room2DEntity room)
+    {
+        if (demandLoop == null)
+        {
+            return "Clean: Unknown\nWear: Unknown";
+        }
+
+        // 这里显示的是原型适配度，不是最终评分系统。
+        return "Clean Suitability: " + demandLoop.GetPrototypeCleanlinessSuitability(room) + "\n"
+            + "Wear Suitability: " + demandLoop.GetPrototypeWearSuitability(room);
+    }
+
+    private string GetSelectedRoomMatchHintText(Room2DEntity room)
+    {
+        if (demandLoop == null)
+        {
+            return "Match Hint: None";
+        }
+
+        return demandLoop.GetPrototypeMatchHintForRoom(room);
+    }
+
+    private string GetBoolText(bool value)
+    {
+        return value ? "Yes" : "No";
     }
 
     private string BuildOverviewText()

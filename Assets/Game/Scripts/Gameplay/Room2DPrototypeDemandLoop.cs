@@ -650,6 +650,45 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
             + "Result: " + lastOutcomeSummary;
     }
 
+    public int GetPrototypeCleanlinessSuitability(Room2DEntity room)
+    {
+        // 给 HUD 读取用，避免 Selected Room 卡片自己复制一套房间质量算法。
+        return GetCleanlinessSuitability(room);
+    }
+
+    public int GetPrototypeWearSuitability(Room2DEntity room)
+    {
+        // 给 HUD 读取用，避免 Selected Room 卡片自己复制一套房间质量算法。
+        return GetWearSuitability(room);
+    }
+
+    public string GetPrototypeMatchHintForRoom(Room2DEntity room)
+    {
+        if (room == null)
+        {
+            return "Match Hint: None";
+        }
+
+        Room2DDemandType demandType = GetCurrentVisibleDemandType();
+        string demandStage = activeDemandWaitingForManualAssignment ? "Active" : "Upcoming";
+        string readyNote = room.CanSimulateCheckIn() ? "" : " (not Ready)";
+
+        return "Match Hint: " + demandStage + " " + demandType
+            + " -> " + GetMatchDisplayName(EvaluateMatchQuality(room, demandType))
+            + readyNote;
+    }
+
+    public bool IsRoomReservedForPrototypeDemand(Room2DEntity room)
+    {
+        if (room == null)
+        {
+            return false;
+        }
+
+        return room == reservedRoomForUpcomingDemand
+            || room == activeReservedRoomForFallback;
+    }
+
     [ContextMenu("Process Occupied Checkouts")]
     public void ProcessOccupiedCheckouts()
     {
@@ -862,6 +901,21 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
         }
 
         return upcomingDemandType + " in " + FormatSeconds(upcomingDemandEtaSeconds);
+    }
+
+    private Room2DDemandType GetCurrentVisibleDemandType()
+    {
+        if (activeDemandWaitingForManualAssignment)
+        {
+            return activeDemandType;
+        }
+
+        if (useUpcomingDemandPreview)
+        {
+            return upcomingDemandType;
+        }
+
+        return nextDemandType;
     }
 
     private string GetPriorityRoomLine(Room2DEntity room, Room2DState expectedState, string cachedName)
