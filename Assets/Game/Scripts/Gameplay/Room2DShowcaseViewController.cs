@@ -21,6 +21,8 @@ public class Room2DShowcaseViewController : MonoBehaviour
     [Header("Build")]
     // 开始运行时自动创建三个展示屏幕，减少手动搭 UI 的步骤。
     public bool autoBuildShellOnStart = true;
+    // Showcase 模式下先隐藏旧 Debug HUD，避免两套 UI 叠在一起导致完全无法阅读。
+    public bool hideLegacyDebugHudWhileShowcaseRuns = true;
     public Canvas targetCanvas;
     public RectTransform showcaseRoot;
     public RectTransform navigationPanel;
@@ -75,9 +77,11 @@ public class Room2DShowcaseViewController : MonoBehaviour
 
         showcaseRoot = FindOrCreateRectChild(targetCanvas.transform, RootName);
         ApplyStretch(showcaseRoot);
+        showcaseRoot.SetAsLastSibling();
+        HideLegacyDebugHudIfSafe();
 
         navigationPanel = FindOrCreatePanel(showcaseRoot, "Panel_ShowcaseBottomNav", new Color(0.03f, 0.04f, 0.06f, 0.88f));
-        ApplyBottomPanel(navigationPanel, 138f);
+        ApplyBottomPanel(navigationPanel, 88f);
         ApplyNavigationLayout(navigationPanel);
 
         frontDeskTabButton = FindOrCreateButton(navigationPanel, "Button_ShowFrontDeskView", "Front Desk");
@@ -85,9 +89,9 @@ public class Room2DShowcaseViewController : MonoBehaviour
         loungeTabButton = FindOrCreateButton(navigationPanel, "Button_ShowLoungeView", "Lounge");
         WireTabButtons();
 
-        frontDeskViewPanel = FindOrCreatePanel(showcaseRoot, "Panel_FrontDeskView", new Color(0.02f, 0.03f, 0.04f, 0.84f));
-        roomViewPanel = FindOrCreatePanel(showcaseRoot, "Panel_RoomView", new Color(0.02f, 0.03f, 0.04f, 0.08f));
-        loungeViewPanel = FindOrCreatePanel(showcaseRoot, "Panel_LoungeView", new Color(0.02f, 0.03f, 0.04f, 0.84f));
+        frontDeskViewPanel = FindOrCreatePanel(showcaseRoot, "Panel_FrontDeskView", new Color(0.02f, 0.03f, 0.04f, 0.96f));
+        roomViewPanel = FindOrCreatePanel(showcaseRoot, "Panel_RoomView", new Color(0.02f, 0.03f, 0.04f, 0.0f));
+        loungeViewPanel = FindOrCreatePanel(showcaseRoot, "Panel_LoungeView", new Color(0.02f, 0.03f, 0.04f, 0.96f));
 
         ApplyViewPanel(frontDeskViewPanel);
         ApplyViewPanel(roomViewPanel);
@@ -152,6 +156,15 @@ public class Room2DShowcaseViewController : MonoBehaviour
         RefreshShellText();
     }
 
+    [ContextMenu("Show Legacy Debug HUD Again")]
+    public void ShowLegacyDebugHudAgain()
+    {
+        if (debugHud != null)
+        {
+            debugHud.gameObject.SetActive(true);
+        }
+    }
+
     private void FindReferencesIfNeeded()
     {
         if (!autoFindReferences)
@@ -200,23 +213,23 @@ public class Room2DShowcaseViewController : MonoBehaviour
 
         if (frontDeskShellText != null)
         {
-            frontDeskShellText.text = "[Front Desk View]\n"
+            frontDeskShellText.text = "Front Desk\n"
                 + phaseText + "\n"
-                + "Phase 1 shell: queue, active demand, and front desk actions will be connected in Phase 2.";
+                + "Guests waiting, active request, and front desk actions will appear here in Phase 2.";
         }
 
         if (roomShellText != null)
         {
-            roomShellText.text = "[Room View]\n"
+            roomShellText.text = "Rooms\n"
                 + phaseText + "\n"
-                + "Phase 1 shell: room grid stays visible here.";
+                + "Room grid remains visible. Use this as the main operation view.";
         }
 
         if (loungeShellText != null)
         {
-            loungeShellText.text = "[Lounge View]\n"
+            loungeShellText.text = "Lounge\n"
                 + phaseText + "\n"
-                + "Phase 1 shell: cups, stock, washing, and restock actions will be connected in Phase 2.";
+                + "Cups, stock, washing, and restock actions will appear here in Phase 2.";
         }
     }
 
@@ -289,14 +302,14 @@ public class Room2DShowcaseViewController : MonoBehaviour
             layoutElement = buttonRect.gameObject.AddComponent<LayoutElement>();
         }
 
-        layoutElement.preferredWidth = 220f;
-        layoutElement.preferredHeight = 64f;
+        layoutElement.preferredWidth = 152f;
+        layoutElement.preferredHeight = 48f;
 
         TMP_Text labelText = FindOrCreateText(buttonRect, "Text (TMP)", label);
         labelText.text = label;
         ApplyDefaultFont(labelText);
         labelText.color = new Color(0.1f, 0.1f, 0.1f, 1f);
-        labelText.fontSize = 24f;
+        labelText.fontSize = 17f;
         labelText.alignment = TextAlignmentOptions.Center;
         ApplyStretch(labelText.rectTransform);
 
@@ -334,7 +347,7 @@ public class Room2DShowcaseViewController : MonoBehaviour
 
         layout.childAlignment = TextAnchor.MiddleCenter;
         layout.spacing = 18f;
-        layout.padding = new RectOffset(24, 24, 24, 24);
+        layout.padding = new RectOffset(16, 16, 16, 16);
         layout.childControlWidth = false;
         layout.childControlHeight = false;
         layout.childForceExpandWidth = false;
@@ -363,7 +376,7 @@ public class Room2DShowcaseViewController : MonoBehaviour
     {
         rect.anchorMin = new Vector2(0f, 0f);
         rect.anchorMax = new Vector2(1f, 1f);
-        rect.offsetMin = new Vector2(0f, 138f);
+        rect.offsetMin = new Vector2(0f, 88f);
         rect.offsetMax = Vector2.zero;
         rect.localScale = Vector3.one;
     }
@@ -374,12 +387,12 @@ public class Room2DShowcaseViewController : MonoBehaviour
         rect.anchorMin = new Vector2(0f, 1f);
         rect.anchorMax = new Vector2(1f, 1f);
         rect.pivot = new Vector2(0.5f, 1f);
-        rect.anchoredPosition = new Vector2(0f, -24f);
-        rect.sizeDelta = new Vector2(-48f, 160f);
+        rect.anchoredPosition = new Vector2(0f, -18f);
+        rect.sizeDelta = new Vector2(-48f, 110f);
 
         text.color = Color.white;
         ApplyDefaultFont(text);
-        text.fontSize = 24f;
+        text.fontSize = 18f;
         text.alignment = alignment;
         text.textWrappingMode = TextWrappingModes.Normal;
         text.raycastTarget = false;
@@ -391,12 +404,12 @@ public class Room2DShowcaseViewController : MonoBehaviour
         rect.anchorMin = new Vector2(0f, 1f);
         rect.anchorMax = new Vector2(0f, 1f);
         rect.pivot = new Vector2(0f, 1f);
-        rect.anchoredPosition = new Vector2(24f, 50f);
-        rect.sizeDelta = new Vector2(260f, 44f);
+        rect.anchoredPosition = new Vector2(16f, -16f);
+        rect.sizeDelta = new Vector2(220f, 34f);
 
         text.color = Color.white;
         ApplyDefaultFont(text);
-        text.fontSize = 20f;
+        text.fontSize = 16f;
         text.alignment = TextAlignmentOptions.Left;
         text.raycastTarget = false;
     }
@@ -408,6 +421,22 @@ public class Room2DShowcaseViewController : MonoBehaviour
         {
             image.raycastTarget = enabled;
         }
+    }
+
+    private void HideLegacyDebugHudIfSafe()
+    {
+        if (!hideLegacyDebugHudWhileShowcaseRuns || debugHud == null)
+        {
+            return;
+        }
+
+        // 如果这个脚本正好挂在旧 HUD 自己或它的子物体上，就不能隐藏旧 HUD，否则会把自己也关掉。
+        if (debugHud.gameObject == gameObject || transform.IsChildOf(debugHud.transform))
+        {
+            return;
+        }
+
+        debugHud.gameObject.SetActive(false);
     }
 
     private void ApplyDefaultFont(TMP_Text text)
