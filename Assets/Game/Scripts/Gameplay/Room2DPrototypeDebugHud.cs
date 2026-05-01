@@ -17,6 +17,7 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
     public Room2DWorkerSelectionPanel workerSelectionPanel;
     public FrontDesk2D frontDesk;
     public Lounge2D lounge;
+    public Room2DDemoDayController demoDayController;
 
     [Header("Text Targets")]
     public TMP_Text selectedRoomInfoText;
@@ -197,6 +198,42 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
         }
     }
 
+    [ContextMenu("Start Demo Operating Period")]
+    public void StartDemoOperatingPeriod()
+    {
+        FindReferencesIfNeeded();
+
+        if (demoDayController != null)
+        {
+            demoDayController.StartOperatingPeriod();
+            RefreshHud();
+        }
+    }
+
+    [ContextMenu("End Demo Day")]
+    public void EndDemoDay()
+    {
+        FindReferencesIfNeeded();
+
+        if (demoDayController != null)
+        {
+            demoDayController.EndDemoDay();
+            RefreshHud();
+        }
+    }
+
+    [ContextMenu("Restart Demo Day")]
+    public void RestartDemoDay()
+    {
+        FindReferencesIfNeeded();
+
+        if (demoDayController != null)
+        {
+            demoDayController.RestartDemoDay();
+            RefreshHud();
+        }
+    }
+
     private void FindReferencesIfNeeded()
     {
         if (!autoFindReferences)
@@ -242,6 +279,11 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
         if (lounge == null)
         {
             lounge = FindFirstObjectByType<Lounge2D>();
+        }
+
+        if (demoDayController == null)
+        {
+            demoDayController = FindFirstObjectByType<Room2DDemoDayController>();
         }
     }
 
@@ -421,7 +463,8 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
             }
         }
 
-        return "Overview\n"
+        return GetCompactDemoDayText() + "\n"
+            + "Overview\n"
             + "Dirty: " + dirtyCount + "\n"
             + "Cleaning: " + cleaningCount + "\n"
             + "Inspect: " + awaitingInspectionCount + "\n"
@@ -460,6 +503,7 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
             + demandLoop.GetActiveDemandCardText() + "\n\n"
             + demandLoop.GetComplaintReassignmentCardText() + "\n\n"
             + demandLoop.GetResolvedDemandCardText() + "\n\n"
+            + GetDemoDayText() + "\n\n"
             + GetFrontDeskText() + "\n\n"
             + GetLoungeText() + "\n\n"
             + demandLoop.GetPreparationText() + "\n\n"
@@ -476,6 +520,26 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
 
         return "Score: " + demandLoop.prototypeSatisfactionScore
             + " (" + demandLoop.prototypeSatisfactionTrend + ")";
+    }
+
+    private string GetCompactDemoDayText()
+    {
+        if (demoDayController == null)
+        {
+            return "Demo: No controller";
+        }
+
+        return demoDayController.GetCompactDemoDayText();
+    }
+
+    private string GetDemoDayText()
+    {
+        if (demoDayController == null)
+        {
+            return "[Demo Day]\nNo controller";
+        }
+
+        return demoDayController.GetDemoDaySummaryText();
     }
 
     private string GetCompactFrontDeskText()
@@ -936,6 +1000,18 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
             else if (buttons[i].name == "Button_RestockLounge")
             {
                 SetButtonText(buttons[i], "Restock");
+            }
+            else if (buttons[i].name == "Button_StartDemoDay")
+            {
+                SetButtonText(buttons[i], "Start Day");
+            }
+            else if (buttons[i].name == "Button_EndDemoDay")
+            {
+                SetButtonText(buttons[i], "End Day");
+            }
+            else if (buttons[i].name == "Button_RestartDemoDay")
+            {
+                SetButtonText(buttons[i], "Restart Day");
             }
         }
     }
