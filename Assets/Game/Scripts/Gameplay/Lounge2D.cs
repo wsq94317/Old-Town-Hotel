@@ -33,8 +33,16 @@ public class Lounge2D : MonoBehaviour
     public int lowStockThreshold = 2;
     public int loungeWarningCount;
     public int pressurePenaltyScore = -1;
+    public bool applyWarningPressure = true;
+    public int lowCleanCupPenaltyScore = -1;
+    public int lowStockPenaltyScore = -1;
+    public int lowCleanCupWarningPressureCount;
+    public int lowStockWarningPressureCount;
     public string loungeWarning = "None";
     public string lastLoungeResult = "None";
+
+    private bool lowCleanCupPressureRecorded;
+    private bool lowStockPressureRecorded;
 
     private void Start()
     {
@@ -110,6 +118,28 @@ public class Lounge2D : MonoBehaviour
         RefreshWarning();
     }
 
+    [ContextMenu("Reset Prototype Lounge")]
+    public void ResetPrototypeLounge()
+    {
+        cleanCups = 8;
+        dirtyCups = 0;
+        milkStock = 12;
+        teaCoffeeStock = 12;
+        serviceTimerSeconds = 0f;
+        servedDrinkCount = 0;
+        missedServiceCount = 0;
+        washing = false;
+        washTimerSeconds = 0f;
+        cupsInWashing = 0;
+        loungeWarningCount = 0;
+        lowCleanCupWarningPressureCount = 0;
+        lowStockWarningPressureCount = 0;
+        lowCleanCupPressureRecorded = false;
+        lowStockPressureRecorded = false;
+        loungeWarning = "None";
+        lastLoungeResult = "Reset prototype lounge";
+    }
+
     private void FindReferencesIfNeeded()
     {
         if (!autoFindReferences)
@@ -174,14 +204,20 @@ public class Lounge2D : MonoBehaviour
         if (cleanCups <= lowCleanCupThreshold)
         {
             loungeWarning = "Low clean cups";
+            RecordLowCleanCupPressureIfNeeded();
             return;
         }
+
+        lowCleanCupPressureRecorded = false;
 
         if (milkStock <= lowStockThreshold || teaCoffeeStock <= lowStockThreshold)
         {
             loungeWarning = "Low lounge stock";
+            RecordLowStockPressureIfNeeded();
             return;
         }
+
+        lowStockPressureRecorded = false;
 
         if (washing)
         {
@@ -190,6 +226,47 @@ public class Lounge2D : MonoBehaviour
         }
 
         loungeWarning = "None";
+    }
+
+    private void RecordLowCleanCupPressureIfNeeded()
+    {
+        if (!ShouldRecordWarningPressure() || lowCleanCupPressureRecorded)
+        {
+            return;
+        }
+
+        lowCleanCupPressureRecorded = true;
+        lowCleanCupWarningPressureCount++;
+        loungeWarningCount++;
+        lastLoungeResult = "Lounge warning: low clean cups";
+
+        if (demandLoop != null)
+        {
+            demandLoop.ApplyPrototypeServicePressure(lastLoungeResult, lowCleanCupPenaltyScore);
+        }
+    }
+
+    private void RecordLowStockPressureIfNeeded()
+    {
+        if (!ShouldRecordWarningPressure() || lowStockPressureRecorded)
+        {
+            return;
+        }
+
+        lowStockPressureRecorded = true;
+        lowStockWarningPressureCount++;
+        loungeWarningCount++;
+        lastLoungeResult = "Lounge warning: low stock";
+
+        if (demandLoop != null)
+        {
+            demandLoop.ApplyPrototypeServicePressure(lastLoungeResult, lowStockPenaltyScore);
+        }
+    }
+
+    private bool ShouldRecordWarningPressure()
+    {
+        return applyWarningPressure && runDuringPlay && demandLoop != null;
     }
 
     public string GetLoungeSummaryText()
@@ -201,6 +278,9 @@ public class Lounge2D : MonoBehaviour
             + "Tea/Coffee: " + teaCoffeeStock + "\n"
             + "Washing: " + GetWashingText() + "\n"
             + "Served/Missed: " + servedDrinkCount + " / " + missedServiceCount + "\n"
+            + "Warnings: " + loungeWarningCount
+            + " (Cup " + lowCleanCupWarningPressureCount
+            + " / Stock " + lowStockWarningPressureCount + ")\n"
             + "Warning: " + loungeWarning + "\n"
             + "Last: " + lastLoungeResult;
     }

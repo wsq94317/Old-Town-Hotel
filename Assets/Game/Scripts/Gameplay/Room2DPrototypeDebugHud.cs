@@ -498,17 +498,32 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
             return "Demand\nNone";
         }
 
-        // 最重要的需求卡片放在最前面，避免长文本被截断后看不到 upcoming / active 状态。
-        return demandLoop.GetUpcomingDemandCardText() + "\n\n"
+        if (demoDayController != null && demoDayController.currentPhase == Room2DDemoDayController.DemoDayPhase.Ended)
+        {
+            return demoDayController.GetEndOfDayRecordingSummaryText() + "\n\n"
+                + demandLoop.GetResolvedDemandCardText() + "\n\n"
+                + GetFrontDeskText() + "\n\n"
+                + GetLoungeText();
+        }
+
+        if (demoDayController != null && demoDayController.currentPhase == Room2DDemoDayController.DemoDayPhase.Preparation)
+        {
+            return demoDayController.GetRecordingStatusText() + "\n\n"
+                + demandLoop.GetPreparationText() + "\n\n"
+                + demandLoop.GetUpcomingDemandCardText() + "\n\n"
+                + GetFrontDeskText() + "\n\n"
+                + GetLoungeText();
+        }
+
+        // 营业中优先显示当前操作压力，避免录屏时被长调试文本淹没。
+        return GetDemoDayText() + "\n\n"
+            + demandLoop.GetUpcomingDemandCardText() + "\n\n"
             + demandLoop.GetActiveDemandCardText() + "\n\n"
             + demandLoop.GetComplaintReassignmentCardText() + "\n\n"
             + demandLoop.GetResolvedDemandCardText() + "\n\n"
-            + GetDemoDayText() + "\n\n"
             + GetFrontDeskText() + "\n\n"
             + GetLoungeText() + "\n\n"
-            + demandLoop.GetPreparationText() + "\n\n"
-            + BuildOccupiedRoomsText() + "\n\n"
-            + demandLoop.GetPrototypeDaySummaryText();
+            + BuildOccupiedRoomsText();
     }
 
     private string GetCompactSatisfactionText()

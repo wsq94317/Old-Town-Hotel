@@ -56,6 +56,8 @@ Build first playable fake-3D 2D room entity prototype.
 - Room2DPrototypeDebugHud now surfaces front desk and lounge pressure in the portrait prototype HUD
 - Room assignment now allows preference/type-risk rooms, then turns bad assignments into complaint reassignment pressure
 - Room2DDemoDayController created to organize the prototype into Preparation, Operating, and Ended demo phases
+- Front desk and lounge pressure now pause outside Operating phase and surface clearer demo-day pressure summaries
+- Demo HUD now switches between preparation, operating, and end-of-day recording summaries
 
 ## Next
 - Attach Room2DEntity to Room_A_2D in Unity

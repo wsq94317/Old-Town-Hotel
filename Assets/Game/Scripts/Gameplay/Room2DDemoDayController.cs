@@ -14,6 +14,7 @@ public class Room2DDemoDayController : MonoBehaviour
     [Header("References")]
     public bool autoFindReferences = true;
     public Room2DPrototypeDemandLoop demandLoop;
+    public FrontDesk2D frontDesk;
     public Lounge2D lounge;
     public Room2DOverview roomOverview;
 
@@ -64,6 +65,7 @@ public class Room2DDemoDayController : MonoBehaviour
 
         // 准备阶段允许玩家看房、预留、标记优先级，但不自动推进入住需求。
         SetDemandRunning(false);
+        SetFrontDeskRunning(false);
         SetLoungeRunning(false);
         RefreshOverview();
     }
@@ -76,6 +78,7 @@ public class Room2DDemoDayController : MonoBehaviour
         lastDemoAction = "Operating period started";
 
         SetDemandRunning(true);
+        SetFrontDeskRunning(true);
         SetLoungeRunning(true);
 
         if (demandLoop != null && demandLoop.useUpcomingDemandPreview)
@@ -94,6 +97,7 @@ public class Room2DDemoDayController : MonoBehaviour
 
         // 结束阶段冻结新需求和 Lounge 自动消耗，方便看 summary 和录屏结尾。
         SetDemandRunning(false);
+        SetFrontDeskRunning(false);
         SetLoungeRunning(false);
 
         if (demandLoop != null)
@@ -108,6 +112,7 @@ public class Room2DDemoDayController : MonoBehaviour
     public void RestartDemoDay()
     {
         demoDayIndex++;
+        ResetPressureSystemsForNewDemoDay();
         EnterPreparationPhase();
         lastDemoAction = "Demo day restarted";
     }
@@ -119,6 +124,8 @@ public class Room2DDemoDayController : MonoBehaviour
             + "Phase: " + currentPhase + "\n"
             + "Time: " + FormatSeconds(operatingTimerSeconds)
             + " / " + FormatSeconds(operatingDurationSeconds) + "\n"
+            + GetFrontDeskLine() + "\n"
+            + GetLoungeLine() + "\n"
             + "Status: " + GetPhaseHint() + "\n"
             + "Last: " + lastDemoAction;
     }
@@ -128,6 +135,32 @@ public class Room2DDemoDayController : MonoBehaviour
         return "Demo: " + currentPhase
             + " " + FormatSeconds(operatingTimerSeconds)
             + "/" + FormatSeconds(operatingDurationSeconds);
+    }
+
+    public string GetRecordingStatusText()
+    {
+        return "[Demo Flow]\n"
+            + "Phase: " + currentPhase + "\n"
+            + "Time: " + FormatSeconds(operatingTimerSeconds)
+            + " / " + FormatSeconds(operatingDurationSeconds) + "\n"
+            + "Focus: " + GetRecordingFocusText() + "\n"
+            + GetFrontDeskLine() + "\n"
+            + GetLoungeLine();
+    }
+
+    public string GetEndOfDayRecordingSummaryText()
+    {
+        RefreshFinalSummarySources();
+
+        return "[End Of Day Summary]\n"
+            + "Result: " + GetFinalResultLine() + "\n"
+            + "Demand: " + GetDemandSummaryLine() + "\n"
+            + "Match: " + GetMatchSummaryLine() + "\n"
+            + "Front Desk: " + GetFrontDeskSummaryLine() + "\n"
+            + "Lounge: " + GetLoungeSummaryLine() + "\n"
+            + "Rooms: " + GetRoomBacklogSummaryLine() + "\n"
+            + "Main Hint: " + GetFinalHintLine() + "\n"
+            + "Next Run: " + GetNextRunAdviceLine();
     }
 
     private void FindReferencesIfNeeded()
@@ -147,6 +180,11 @@ public class Room2DDemoDayController : MonoBehaviour
             lounge = FindFirstObjectByType<Lounge2D>();
         }
 
+        if (frontDesk == null)
+        {
+            frontDesk = FindFirstObjectByType<FrontDesk2D>();
+        }
+
         if (roomOverview == null)
         {
             roomOverview = FindFirstObjectByType<Room2DOverview>();
@@ -158,6 +196,14 @@ public class Room2DDemoDayController : MonoBehaviour
         if (demandLoop != null)
         {
             demandLoop.runDuringPlay = shouldRun;
+        }
+    }
+
+    private void SetFrontDeskRunning(bool shouldRun)
+    {
+        if (frontDesk != null)
+        {
+            frontDesk.runDuringPlay = shouldRun;
         }
     }
 
@@ -177,6 +223,42 @@ public class Room2DDemoDayController : MonoBehaviour
         }
     }
 
+    private void ResetPressureSystemsForNewDemoDay()
+    {
+        if (frontDesk != null)
+        {
+            frontDesk.ResetPrototypeFrontDesk();
+        }
+
+        if (lounge != null)
+        {
+            lounge.ResetPrototypeLounge();
+        }
+    }
+
+    private string GetFrontDeskLine()
+    {
+        if (frontDesk == null)
+        {
+            return "Front Desk: None";
+        }
+
+        return "Front Desk: Q" + frontDesk.currentQueueCount
+            + " / Delay " + frontDesk.totalDelayedCheckIns;
+    }
+
+    private string GetLoungeLine()
+    {
+        if (lounge == null)
+        {
+            return "Lounge: None";
+        }
+
+        return "Lounge: Cups " + lounge.cleanCups
+            + " / Warn " + lounge.loungeWarningCount
+            + " / " + lounge.loungeWarning;
+    }
+
     private string GetPhaseHint()
     {
         switch (currentPhase)
@@ -188,6 +270,186 @@ public class Room2DDemoDayController : MonoBehaviour
             default:
                 return "Prepare rooms, reserve demand, and mark priorities.";
         }
+    }
+
+    private void RefreshFinalSummarySources()
+    {
+        if (demandLoop != null)
+        {
+            demandLoop.RefreshPrototypeDaySummary();
+        }
+
+        RefreshOverview();
+    }
+
+    private string GetRecordingFocusText()
+    {
+        switch (currentPhase)
+        {
+            case DemoDayPhase.Operating:
+                return GetOperatingFocusText();
+            case DemoDayPhase.Ended:
+                return "Read the end summary.";
+            default:
+                return "Prepare: reserve, mark CLEAN PRIO, mark INSP PRIO.";
+        }
+    }
+
+    private string GetOperatingFocusText()
+    {
+        if (demandLoop == null)
+        {
+            return "Run hotel operations.";
+        }
+
+        if (demandLoop.complaintWaitingForReassignment)
+        {
+            return "Resolve complaint reassignment.";
+        }
+
+        if (demandLoop.activeDemandWaitingForManualAssignment)
+        {
+            return "Assign the active demand.";
+        }
+
+        if (frontDesk != null && frontDesk.currentQueueCount > 0)
+        {
+            return "Reduce front desk waiting.";
+        }
+
+        if (lounge != null && lounge.loungeWarning != "None")
+        {
+            return "Fix lounge warning.";
+        }
+
+        return "Keep rooms turning over before demand arrives.";
+    }
+
+    private string GetFinalResultLine()
+    {
+        if (demandLoop == null)
+        {
+            return "No demand data";
+        }
+
+        return "Score " + demandLoop.prototypeSatisfactionScore
+            + " / " + demandLoop.prototypeSatisfactionTrend;
+    }
+
+    private string GetDemandSummaryLine()
+    {
+        if (demandLoop == null)
+        {
+            return "None";
+        }
+
+        return "Total " + demandLoop.generatedDemandCount
+            + ", Success " + demandLoop.successfulDemandCount
+            + ", Unmet " + demandLoop.unmetDemandCount;
+    }
+
+    private string GetMatchSummaryLine()
+    {
+        if (demandLoop == null)
+        {
+            return "None";
+        }
+
+        return "G/N/P "
+            + demandLoop.goodMatchCount + "/"
+            + demandLoop.normalMatchCount + "/"
+            + demandLoop.poorMatchCount;
+    }
+
+    private string GetFrontDeskSummaryLine()
+    {
+        if (frontDesk == null || demandLoop == null)
+        {
+            return "None";
+        }
+
+        return "Delay " + frontDesk.totalDelayedCheckIns
+            + ", Complaints " + demandLoop.roomComplaintCount
+            + ", Compensation " + demandLoop.compensationRequestCount;
+    }
+
+    private string GetLoungeSummaryLine()
+    {
+        if (lounge == null)
+        {
+            return "None";
+        }
+
+        return "Served " + lounge.servedDrinkCount
+            + ", Missed " + lounge.missedServiceCount
+            + ", Warnings " + lounge.loungeWarningCount;
+    }
+
+    private string GetRoomBacklogSummaryLine()
+    {
+        if (demandLoop == null)
+        {
+            return "None";
+        }
+
+        return "Dirty " + demandLoop.summaryDirtyCount
+            + ", Inspect Wait " + demandLoop.summaryAwaitingInspectionCount
+            + ", Oldest Dirty " + FormatSeconds(demandLoop.summaryOldestDirtySeconds);
+    }
+
+    private string GetFinalHintLine()
+    {
+        if (demandLoop == null)
+        {
+            return "No run data";
+        }
+
+        if (frontDesk != null && frontDesk.totalDelayedCheckIns > 0)
+        {
+            return "Front desk waited too long.";
+        }
+
+        if (demandLoop.roomComplaintCount > 0)
+        {
+            return "Room assignment caused complaints.";
+        }
+
+        if (lounge != null && (lounge.missedServiceCount > 0 || lounge.loungeWarningCount > 0))
+        {
+            return "Lounge support was neglected.";
+        }
+
+        return demandLoop.summaryStatusHint;
+    }
+
+    private string GetNextRunAdviceLine()
+    {
+        if (demandLoop == null)
+        {
+            return "Start operating and create demand.";
+        }
+
+        if (demandLoop.summaryDirtyCount >= 3)
+        {
+            return "Prioritize HSK earlier.";
+        }
+
+        if (demandLoop.summaryAwaitingInspectionCount >= 2)
+        {
+            return "Assign Inspector earlier.";
+        }
+
+        if (frontDesk != null && frontDesk.totalDelayedCheckIns > 0)
+        {
+            return "Prepare Ready rooms before ETA hits 0.";
+        }
+
+        if (lounge != null && lounge.loungeWarningCount > 0)
+        {
+            return "Wash cups before clean cups run out.";
+        }
+
+        return "Run looked stable.";
     }
 
     private string FormatSeconds(float seconds)

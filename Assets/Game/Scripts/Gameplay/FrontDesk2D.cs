@@ -9,6 +9,9 @@ public class FrontDesk2D : MonoBehaviour
     public Room2DPrototypeDemandLoop demandLoop;
 
     [Header("Waiting Pressure")]
+    // Demo Day 控制器会在准备/结束阶段关闭它，避免结算时继续扣分。
+    public bool runDuringPlay = true;
+
     // Active Demand 等待超过这个时间后，就算前台出现延迟入住压力。
     public float delayedCheckInThresholdSeconds = 6f;
     public int pressurePenaltyScore = -1;
@@ -31,7 +34,25 @@ public class FrontDesk2D : MonoBehaviour
     private void Update()
     {
         FindReferencesIfNeeded();
+
+        if (!runDuringPlay)
+        {
+            return;
+        }
+
         TickFrontDeskPressure();
+    }
+
+    [ContextMenu("Reset Prototype Front Desk")]
+    public void ResetPrototypeFrontDesk()
+    {
+        currentQueueCount = 0;
+        waitingTimePressureSeconds = 0f;
+        complaintWaitingPressureSeconds = 0f;
+        totalDelayedCheckIns = 0;
+        lastFrontDeskResult = "None";
+        observedActiveDemandId = -1;
+        delayRecordedForCurrentDemand = false;
     }
 
     private void FindReferencesIfNeeded()
