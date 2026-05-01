@@ -50,6 +50,10 @@ Build first playable fake-3D 2D room entity prototype.
 - Room2DPrototypeDebugHud now shows a selected-room detail card with reservation, priority, checkout, block, quality, and match hints
 - Room2DEntity now has a minimal Standard/Better prototype room type, and demand matching can prefer Better rooms
 - Room assignment depth v1 now includes floor preference, quiet/view facing preference, and Street/Back facing in match hints
+- Room2DPrototypeRoomConfigApplier created for scene-level batch room type, facing, and attribute configuration
+- FrontDesk2D created for lightweight active-demand waiting pressure and delayed check-in penalties
+- Lounge2D created for prototype clean cup, dirty cup, stock, washing, and lounge service pressure
+- Room2DPrototypeDebugHud now surfaces front desk and lounge pressure in the portrait prototype HUD
 
 ## Next
 - Attach Room2DEntity to Room_A_2D in Unity

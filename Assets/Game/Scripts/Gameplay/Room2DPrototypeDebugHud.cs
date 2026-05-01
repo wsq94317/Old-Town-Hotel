@@ -15,6 +15,8 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
     public Inspector2D inspector;
     public Room2DPrototypeDemandLoop demandLoop;
     public Room2DWorkerSelectionPanel workerSelectionPanel;
+    public FrontDesk2D frontDesk;
+    public Lounge2D lounge;
 
     [Header("Text Targets")]
     public TMP_Text selectedRoomInfoText;
@@ -102,21 +104,21 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
 
         RedirectLegacyOverviewText();
 
-        // 笔记本横屏调试布局：左右两侧放 Debug 面板，中间留给房间网格。
-        ApplyFixedPanel(selectedRoomPanel, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(24f, -24f), new Vector2(430f, 500f));
-        ApplyFixedPanel(workerPanel, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(24f, -554f), new Vector2(430f, 330f));
-        ApplyFixedPanel(actionPanel, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(24f, 24f), new Vector2(300f, 300f));
-        ApplyFixedPanel(overviewPanel, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-24f, 0f), new Vector2(720f, 1030f));
+        // 手机竖屏原型布局：上方是摘要，中间留给房间网格，下方是操作和详情。
+        ApplyFixedPanel(overviewPanel, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -24f), new Vector2(1032f, 520f));
+        ApplyFixedPanel(actionPanel, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 24f), new Vector2(1032f, 230f));
+        ApplyFixedPanel(selectedRoomPanel, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(24f, 278f), new Vector2(504f, 430f));
+        ApplyFixedPanel(workerPanel, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-24f, 278f), new Vector2(504f, 430f));
 
         ApplyTextPanelStyle(selectedRoomPanel);
         ApplyTextPanelStyle(overviewPanel);
         ApplyTextPanelStyle(workerPanel);
         ApplyActionPanelStyle(actionPanel);
 
-        ApplyTextStyle(selectedRoomInfoText, 17f, 480f, TextAlignmentOptions.TopLeft);
-        ApplyTextStyle(overviewInfoText, 18f, 150f, TextAlignmentOptions.TopLeft);
-        ApplyTextStyle(workerStatusText, 18f, 300f, TextAlignmentOptions.TopLeft);
-        ApplyTextStyle(demandStatusText, 17f, 830f, TextAlignmentOptions.TopLeft);
+        ApplyTextStyle(selectedRoomInfoText, 18f, 400f, TextAlignmentOptions.TopLeft);
+        ApplyTextStyle(overviewInfoText, 18f, 130f, TextAlignmentOptions.TopLeft);
+        ApplyTextStyle(workerStatusText, 18f, 400f, TextAlignmentOptions.TopLeft);
+        ApplyTextStyle(demandStatusText, 16f, 360f, TextAlignmentOptions.TopLeft);
 
         if (hideUnboundDebugTexts)
         {
@@ -158,6 +160,43 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
         }
     }
 
+    // 以下方法方便 Unity Button 直接绑定，不需要初学阶段去找 Lounge2D 组件。
+    [ContextMenu("Serve Lounge Now")]
+    public void ServeLoungeNow()
+    {
+        FindReferencesIfNeeded();
+
+        if (lounge != null)
+        {
+            lounge.ServeOneLoungeDemand();
+            RefreshHud();
+        }
+    }
+
+    [ContextMenu("Start Lounge Wash")]
+    public void StartLoungeWash()
+    {
+        FindReferencesIfNeeded();
+
+        if (lounge != null)
+        {
+            lounge.StartWashingCups();
+            RefreshHud();
+        }
+    }
+
+    [ContextMenu("Restock Lounge")]
+    public void RestockLounge()
+    {
+        FindReferencesIfNeeded();
+
+        if (lounge != null)
+        {
+            lounge.RestockPrototypeLounge();
+            RefreshHud();
+        }
+    }
+
     private void FindReferencesIfNeeded()
     {
         if (!autoFindReferences)
@@ -193,6 +232,16 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
         if (workerSelectionPanel == null)
         {
             workerSelectionPanel = FindFirstObjectByType<Room2DWorkerSelectionPanel>();
+        }
+
+        if (frontDesk == null)
+        {
+            frontDesk = FindFirstObjectByType<FrontDesk2D>();
+        }
+
+        if (lounge == null)
+        {
+            lounge = FindFirstObjectByType<Lounge2D>();
         }
     }
 
@@ -379,7 +428,10 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
             + "Ready: " + readyCount + "\n"
             + "Occupied: " + occupiedCount + "\n"
             + "Blocked: " + blockedCount + "\n"
-            + "Urgent: " + urgentRoomText;
+            + "Urgent: " + urgentRoomText + "\n"
+            + GetCompactSatisfactionText() + "\n"
+            + GetCompactFrontDeskText() + "\n"
+            + GetCompactLoungeText();
     }
 
     private string BuildWorkerText()
@@ -403,13 +455,68 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
             return "Demand\nNone";
         }
 
-        // Demand 信息拆成几个“卡片”，避免把 upcoming / active / result 混成一大段调试文字。
-        return demandLoop.GetPreparationText() + "\n\n"
-            + demandLoop.GetUpcomingDemandCardText() + "\n\n"
+        // 最重要的需求卡片放在最前面，避免长文本被截断后看不到 upcoming / active 状态。
+        return demandLoop.GetUpcomingDemandCardText() + "\n\n"
             + demandLoop.GetActiveDemandCardText() + "\n\n"
             + demandLoop.GetResolvedDemandCardText() + "\n\n"
+            + GetFrontDeskText() + "\n\n"
+            + GetLoungeText() + "\n\n"
+            + demandLoop.GetPreparationText() + "\n\n"
             + BuildOccupiedRoomsText() + "\n\n"
             + demandLoop.GetPrototypeDaySummaryText();
+    }
+
+    private string GetCompactSatisfactionText()
+    {
+        if (demandLoop == null)
+        {
+            return "Score: None";
+        }
+
+        return "Score: " + demandLoop.prototypeSatisfactionScore
+            + " (" + demandLoop.prototypeSatisfactionTrend + ")";
+    }
+
+    private string GetCompactFrontDeskText()
+    {
+        if (frontDesk == null)
+        {
+            return "Front Desk: None";
+        }
+
+        return "Front Desk: Q" + frontDesk.currentQueueCount
+            + " / Delay " + frontDesk.totalDelayedCheckIns;
+    }
+
+    private string GetCompactLoungeText()
+    {
+        if (lounge == null)
+        {
+            return "Lounge: None";
+        }
+
+        return "Lounge: Cups " + lounge.cleanCups
+            + " / Warning " + lounge.loungeWarning;
+    }
+
+    private string GetFrontDeskText()
+    {
+        if (frontDesk == null)
+        {
+            return "[Front Desk]\nNone";
+        }
+
+        return frontDesk.GetFrontDeskSummaryText();
+    }
+
+    private string GetLoungeText()
+    {
+        if (lounge == null)
+        {
+            return "[Lounge]\nNone";
+        }
+
+        return lounge.GetLoungeSummaryText();
     }
 
     private string BuildOccupiedRoomsText()
@@ -522,9 +629,9 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
             return;
         }
 
-        // 当前阶段主要在笔记本横屏 Game 窗口调试，先用 16:9 参考尺寸让字更容易读。
+        // 当前项目是手机竖屏原型，用 1080x1920 作为测试参考尺寸。
         scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-        scaler.referenceResolution = new Vector2(1920f, 1080f);
+        scaler.referenceResolution = new Vector2(1080f, 1920f);
         scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
         scaler.matchWidthOrHeight = 0.5f;
     }
@@ -638,12 +745,12 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
 
         layout.padding = new RectOffset(10, 10, 10, 10);
         layout.spacing = new Vector2(8f, 8f);
-        layout.cellSize = new Vector2(132f, 36f);
+        layout.cellSize = new Vector2(190f, 42f);
         layout.startCorner = GridLayoutGroup.Corner.UpperLeft;
         layout.startAxis = GridLayoutGroup.Axis.Horizontal;
         layout.childAlignment = TextAnchor.UpperCenter;
         layout.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
-        layout.constraintCount = 2;
+        layout.constraintCount = 5;
     }
 
     private void ApplyPanelBackground(RectTransform panel)
@@ -816,6 +923,18 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
             else if (buttons[i].name == "Button_AssignSelectedWorker")
             {
                 SetButtonText(buttons[i], "Assign Worker");
+            }
+            else if (buttons[i].name == "Button_WashCups")
+            {
+                SetButtonText(buttons[i], "Wash Cups");
+            }
+            else if (buttons[i].name == "Button_ServeLounge")
+            {
+                SetButtonText(buttons[i], "Serve Lounge");
+            }
+            else if (buttons[i].name == "Button_RestockLounge")
+            {
+                SetButtonText(buttons[i], "Restock");
             }
         }
     }

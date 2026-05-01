@@ -141,6 +141,8 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
     public int positiveOutcomeCount;
     public int neutralOutcomeCount;
     public int negativeOutcomeCount;
+    public int servicePressurePenaltyCount;
+    public string lastServicePressureResult = "None";
 
     [Header("Prototype Day Summary")]
     // 原型日结摘要：不是最终报表，只用来判断一轮测试主要卡在哪里。
@@ -984,11 +986,24 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
             + "Unmet: " + unmetDemandCount + "\n"
             + "Match G/N/P: " + goodMatchCount + "/" + normalMatchCount + "/" + poorMatchCount + "\n"
             + "Out P/N/Neg: " + positiveOutcomeCount + "/" + neutralOutcomeCount + "/" + negativeOutcomeCount + "\n"
+            + "Service Pressure: " + servicePressurePenaltyCount + "\n"
             + "Score: " + prototypeSatisfactionScore + " (" + prototypeSatisfactionTrend + ")\n"
             + "Dirty: " + summaryDirtyCount + "\n"
             + "Inspect Wait: " + summaryAwaitingInspectionCount + "\n"
             + "Oldest Dirty: " + FormatSeconds(summaryOldestDirtySeconds) + "\n"
+            + "Last Pressure: " + lastServicePressureResult + "\n"
             + "Hint: " + summaryStatusHint;
+    }
+
+    // 前台和 Lounge 这类轻量压力系统通过这个入口影响原型满意度。
+    // 它不是最终评分系统，只让垂直切片能看到“服务压力会造成结果变差”。
+    public void ApplyPrototypeServicePressure(string reason, int scoreDelta)
+    {
+        servicePressurePenaltyCount++;
+        lastServicePressureResult = reason;
+        RecordOutcome(Room2DOutcomeResult.Negative, scoreDelta);
+        lastOutcomeSummary = reason + " -> " + lastOutcomeLabel;
+        RefreshPrototypeDaySummary();
     }
 
     private void FindRoomsIfNeeded()
