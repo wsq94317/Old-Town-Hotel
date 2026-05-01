@@ -458,6 +458,7 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
         // 最重要的需求卡片放在最前面，避免长文本被截断后看不到 upcoming / active 状态。
         return demandLoop.GetUpcomingDemandCardText() + "\n\n"
             + demandLoop.GetActiveDemandCardText() + "\n\n"
+            + demandLoop.GetComplaintReassignmentCardText() + "\n\n"
             + demandLoop.GetResolvedDemandCardText() + "\n\n"
             + GetFrontDeskText() + "\n\n"
             + GetLoungeText() + "\n\n"

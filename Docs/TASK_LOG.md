@@ -54,6 +54,7 @@ Build first playable fake-3D 2D room entity prototype.
 - FrontDesk2D created for lightweight active-demand waiting pressure and delayed check-in penalties
 - Lounge2D created for prototype clean cup, dirty cup, stock, washing, and lounge service pressure
 - Room2DPrototypeDebugHud now surfaces front desk and lounge pressure in the portrait prototype HUD
+- Room assignment now allows preference/type-risk rooms, then turns bad assignments into complaint reassignment pressure
 
 ## Next
 - Attach Room2DEntity to Room_A_2D in Unity

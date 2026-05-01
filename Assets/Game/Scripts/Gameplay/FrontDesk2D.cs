@@ -16,6 +16,7 @@ public class FrontDesk2D : MonoBehaviour
     [Header("Runtime State")]
     public int currentQueueCount;
     public float waitingTimePressureSeconds;
+    public float complaintWaitingPressureSeconds;
     public int totalDelayedCheckIns;
     public string lastFrontDeskResult = "None";
 
@@ -52,18 +53,27 @@ public class FrontDesk2D : MonoBehaviour
         {
             currentQueueCount = 0;
             waitingTimePressureSeconds = 0f;
+            complaintWaitingPressureSeconds = 0f;
             return;
+        }
+
+        currentQueueCount = 0;
+        waitingTimePressureSeconds = 0f;
+        complaintWaitingPressureSeconds = 0f;
+
+        if (demandLoop.complaintWaitingForReassignment)
+        {
+            currentQueueCount++;
+            complaintWaitingPressureSeconds = demandLoop.complaintReassignmentWaitSeconds;
         }
 
         if (!demandLoop.activeDemandWaitingForManualAssignment)
         {
-            currentQueueCount = 0;
-            waitingTimePressureSeconds = 0f;
             delayRecordedForCurrentDemand = false;
             return;
         }
 
-        currentQueueCount = 1;
+        currentQueueCount++;
         waitingTimePressureSeconds = demandLoop.activeDemandWaitSeconds;
 
         int activeDemandId = demandLoop.activatedUpcomingDemandCount;
@@ -92,6 +102,7 @@ public class FrontDesk2D : MonoBehaviour
             + "Queue: " + currentQueueCount + "\n"
             + "Wait Pressure: " + FormatSeconds(waitingTimePressureSeconds)
             + " / " + FormatSeconds(delayedCheckInThresholdSeconds) + "\n"
+            + "Complaint Wait: " + FormatSeconds(complaintWaitingPressureSeconds) + "\n"
             + "Delayed Check-ins: " + totalDelayedCheckIns + "\n"
             + "Last: " + lastFrontDeskResult;
     }

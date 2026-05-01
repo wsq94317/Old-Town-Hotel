@@ -116,6 +116,31 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
     public float occupiedDurationSeconds = 20f;
     public int simulatedCheckoutCount;
 
+    [Header("Prototype Complaint Reassignment")]
+    // 原型投诉重分房：房型/偏好不合不会阻止入住，但可能在入住后触发前台投诉。
+    public bool enableComplaintReassignment = true;
+    public float complaintDelaySeconds = 60f;
+    public float complaintPatienceSeconds = 20f;
+    public float complaintPatienceLossMultiplier = 2f;
+    public int complaintCompensationPenaltyScore = -6;
+    public int complaintPatienceExpiredPenaltyScore = -4;
+    public Room2DEntity pendingComplaintRoom;
+    public string pendingComplaintRoomName = "None";
+    public float pendingComplaintTimerSeconds;
+    public bool complaintWaitingForReassignment;
+    public float complaintReassignmentWaitSeconds;
+    public float complaintPatienceRemainingSeconds;
+    public bool complaintPatiencePenaltyApplied;
+    public Room2DDemandType complaintDemandType = Room2DDemandType.Normal;
+    public Room2DRoomPreference complaintRoomPreference = Room2DRoomPreference.AnyRoom;
+    public Room2DFloorPreference complaintFloorPreference = Room2DFloorPreference.NoPreference;
+    public Room2DFacingPreference complaintFacingPreference = Room2DFacingPreference.NoPreference;
+    public int roomComplaintCount;
+    public int complaintReassignmentCount;
+    public int compensationRequestCount;
+    public string complaintStatus = "None";
+    public string lastComplaintResult = "None";
+
     [Header("Debug")]
     public string lastDemandResult = "None";
     public string lastChangedRoomName = "None";
@@ -180,6 +205,7 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
         }
 
         TickActiveDemand();
+        TickComplaintReassignment();
         ProcessOccupiedCheckouts();
         RefreshPrototypeDaySummary();
     }
@@ -270,22 +296,14 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
             return;
         }
 
-        if (!DoesRoomMeetHardRoomTypeConstraint(room, upcomingDemandRoomPreference))
-        {
-            lastReservationResult = "Reserve failed: "
-                + room.roomName + " is " + room.GetPrototypeRoomTypeDisplayName()
-                + ", needs Better";
-            lastPreparationAction = lastReservationResult;
-            return;
-        }
-
         reservedRoomForUpcomingDemand = room;
         reservedRoomName = room.roomName;
         lastReservationResult = "Reserved " + room.roomName + " for "
             + upcomingDemandType + " / " + BuildDemandPreferenceSummary(
                 upcomingDemandRoomPreference,
                 upcomingDemandFloorPreference,
-                upcomingDemandFacingPreference);
+                upcomingDemandFacingPreference)
+            + GetRoomTypeRiskSuffix(room, upcomingDemandRoomPreference);
         lastPreparationAction = lastReservationResult;
         preparationActionCount++;
     }
@@ -370,6 +388,11 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
 
     public bool AssignRoomToActiveDemand(Room2DEntity room)
     {
+        if (complaintWaitingForReassignment)
+        {
+            return AssignRoomToComplaintReassignment(room);
+        }
+
         if (!activeDemandWaitingForManualAssignment)
         {
             lastManualAssignmentResult = "Manual failed: no active demand";
@@ -388,15 +411,8 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
             return false;
         }
 
-        if (!DoesRoomMeetHardRoomTypeConstraint(room, activeDemandRoomPreference))
-        {
-            lastManualAssignmentResult = "Manual failed: "
-                + room.roomName + " is " + room.GetPrototypeRoomTypeDisplayName()
-                + ", needs Better";
-            return false;
-        }
-
-        lastManualAssignmentResult = "Manual assigned " + room.roomName;
+        lastManualAssignmentResult = "Manual assigned " + room.roomName
+            + GetRoomTypeRiskSuffix(room, activeDemandRoomPreference);
         GenerateDemand(
             activeDemandType,
             activeDemandRoomPreference,
@@ -513,14 +529,14 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
             unmetDemandCount++;
             lastDemandResult = assignmentMode + ": " + demandType
                 + " / " + BuildDemandPreferenceSummary(roomPreference, floorPreference, facingPreference)
-                + " unmet: no matching Ready room";
+                + " unmet: no Ready room";
             lastChangedRoomName = "None";
             lastMatchQuality = Room2DMatchQuality.PoorMatch;
             lastMatchQualityLabel = "No Match";
             lastCleanlinessSuitability = 0;
             lastWearSuitability = 0;
             CompleteReservationResultAfterUnmet(reservedRoom, useReservationFirst);
-            RecordUnmetDemandOutcome(demandType, roomPreference, floorPreference, facingPreference, "No matching Ready room");
+            RecordUnmetDemandOutcome(demandType, roomPreference, floorPreference, facingPreference, "No Ready room");
             RefreshPrototypeDaySummary();
             return;
         }
@@ -553,6 +569,7 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
         lastChangedRoomName = readyRoom.roomName;
         RecordSuccessfulAssignmentOutcome(demandType, roomPreference, floorPreference, facingPreference, readyRoom, matchQuality);
         CompleteReservationResultAfterSuccess(readyRoom, reservedRoom, useReservationFirst);
+        ScheduleComplaintIfNeeded(demandType, roomPreference, floorPreference, facingPreference, readyRoom, matchQuality);
 
         RefreshRoomVisual(readyRoom);
         RefreshOverview();
@@ -675,6 +692,200 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
         }
 
         ResolveActiveDemandWithFallback();
+    }
+
+    private void TickComplaintReassignment()
+    {
+        if (!enableComplaintReassignment)
+        {
+            return;
+        }
+
+        TickPendingComplaintTimer();
+        TickComplaintWaitingPressure();
+    }
+
+    private void TickPendingComplaintTimer()
+    {
+        if (pendingComplaintRoom == null || complaintWaitingForReassignment)
+        {
+            return;
+        }
+
+        if (pendingComplaintRoom.currentState != Room2DState.Occupied)
+        {
+            ClearPendingComplaint();
+            return;
+        }
+
+        pendingComplaintTimerSeconds += Time.deltaTime;
+        complaintStatus = "Complaint in " + FormatSeconds(Mathf.Max(0f, complaintDelaySeconds - pendingComplaintTimerSeconds));
+
+        if (pendingComplaintTimerSeconds < complaintDelaySeconds)
+        {
+            return;
+        }
+
+        StartComplaintReassignment();
+    }
+
+    private void TickComplaintWaitingPressure()
+    {
+        if (!complaintWaitingForReassignment)
+        {
+            return;
+        }
+
+        complaintReassignmentWaitSeconds += Time.deltaTime;
+        complaintPatienceRemainingSeconds = Mathf.Max(
+            0f,
+            complaintPatienceRemainingSeconds - Time.deltaTime * Mathf.Max(1f, complaintPatienceLossMultiplier));
+        complaintStatus = "Complaint waiting: patience " + FormatSeconds(complaintPatienceRemainingSeconds);
+
+        if (complaintPatiencePenaltyApplied || complaintPatienceRemainingSeconds > 0f)
+        {
+            return;
+        }
+
+        complaintPatiencePenaltyApplied = true;
+        lastComplaintResult = "Complaint patience expired, extra compensation requested";
+        ApplyPrototypeServicePressure(lastComplaintResult, complaintPatienceExpiredPenaltyScore);
+    }
+
+    private void ScheduleComplaintIfNeeded(
+        Room2DDemandType demandType,
+        Room2DRoomPreference roomPreference,
+        Room2DFloorPreference floorPreference,
+        Room2DFacingPreference facingPreference,
+        Room2DEntity assignedRoom,
+        Room2DMatchQuality matchQuality)
+    {
+        if (!enableComplaintReassignment || assignedRoom == null)
+        {
+            return;
+        }
+
+        bool roomTypeMismatch = !DoesRoomMatchRoomTypePreference(assignedRoom, roomPreference);
+        if (!roomTypeMismatch && matchQuality != Room2DMatchQuality.PoorMatch)
+        {
+            return;
+        }
+
+        pendingComplaintRoom = assignedRoom;
+        pendingComplaintRoomName = assignedRoom.roomName;
+        pendingComplaintTimerSeconds = 0f;
+        complaintDemandType = demandType;
+        complaintRoomPreference = roomPreference;
+        complaintFloorPreference = floorPreference;
+        complaintFacingPreference = facingPreference;
+        complaintStatus = "Scheduled: " + assignedRoom.roomName + " may complain";
+        lastComplaintResult = "Complaint scheduled after poor assignment";
+    }
+
+    private void StartComplaintReassignment()
+    {
+        if (pendingComplaintRoom == null)
+        {
+            return;
+        }
+
+        Room2DEntity originalRoom = pendingComplaintRoom;
+        roomComplaintCount++;
+        compensationRequestCount++;
+        complaintWaitingForReassignment = true;
+        complaintReassignmentWaitSeconds = 0f;
+        complaintPatienceRemainingSeconds = complaintPatienceSeconds;
+        complaintPatiencePenaltyApplied = false;
+        complaintStatus = "Waiting for reassignment";
+        lastComplaintResult = originalRoom.roomName + " complaint: ask compensation and reassign";
+
+        // 投诉客人离开原房间，原房间变 Dirty，需要重新走 HSK -> Inspector -> Ready。
+        if (originalRoom.currentState == Room2DState.Occupied)
+        {
+            originalRoom.SimulateCheckout();
+            RefreshRoomVisual(originalRoom);
+        }
+
+        pendingComplaintRoom = null;
+        pendingComplaintRoomName = "None";
+        pendingComplaintTimerSeconds = 0f;
+        ApplyPrototypeServicePressure(lastComplaintResult, complaintCompensationPenaltyScore);
+        RefreshOverview();
+    }
+
+    public bool AssignRoomToComplaintReassignment(Room2DEntity room)
+    {
+        if (!complaintWaitingForReassignment)
+        {
+            lastManualAssignmentResult = "Complaint reassign failed: no complaint";
+            return false;
+        }
+
+        if (room == null)
+        {
+            lastManualAssignmentResult = "Complaint reassign failed: no selected room";
+            return false;
+        }
+
+        if (!room.CanSimulateCheckIn())
+        {
+            lastManualAssignmentResult = "Complaint reassign failed: " + room.roomName + " is " + room.GetStateDisplayName();
+            return false;
+        }
+
+        Room2DMatchQuality matchQuality = EvaluateMatchQuality(
+            room,
+            complaintDemandType,
+            complaintRoomPreference,
+            complaintFloorPreference,
+            complaintFacingPreference);
+
+        if (!room.SimulateCheckIn())
+        {
+            lastManualAssignmentResult = "Complaint reassign failed: check-in blocked";
+            return false;
+        }
+
+        complaintReassignmentCount++;
+        lastManualAssignmentResult = "Complaint reassigned " + room.roomName
+            + " / " + GetMatchDisplayName(matchQuality)
+            + GetRoomTypeRiskSuffix(room, complaintRoomPreference);
+        lastComplaintResult = lastManualAssignmentResult;
+        lastChangedRoomName = room.roomName;
+        lastDemandType = complaintDemandType;
+        lastDemandRoomPreference = complaintRoomPreference;
+        lastDemandFloorPreference = complaintFloorPreference;
+        lastDemandFacingPreference = complaintFacingPreference;
+        lastMatchQuality = matchQuality;
+        lastMatchQualityLabel = GetMatchDisplayName(matchQuality);
+        lastCleanlinessSuitability = GetCleanlinessSuitability(room);
+        lastWearSuitability = GetWearSuitability(room);
+        lastResolvedAssignmentMode = "Complaint Reassign";
+        RecordSuccessfulAssignmentOutcome(
+            complaintDemandType,
+            complaintRoomPreference,
+            complaintFloorPreference,
+            complaintFacingPreference,
+            room,
+            matchQuality);
+
+        complaintWaitingForReassignment = false;
+        complaintReassignmentWaitSeconds = 0f;
+        complaintPatienceRemainingSeconds = 0f;
+        complaintStatus = "Resolved";
+
+        RefreshRoomVisual(room);
+        RefreshOverview();
+        RefreshPrototypeDaySummary();
+        return true;
+    }
+
+    private void ClearPendingComplaint()
+    {
+        pendingComplaintRoom = null;
+        pendingComplaintRoomName = "None";
+        pendingComplaintTimerSeconds = 0f;
+        complaintStatus = "None";
     }
 
     private void ResolveActiveDemandWithFallback()
@@ -866,6 +1077,30 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
             + "Result: " + lastOutcomeSummary;
     }
 
+    public string GetComplaintReassignmentCardText()
+    {
+        string complaintDemandText = complaintWaitingForReassignment || pendingComplaintRoom != null
+            ? complaintDemandType + " / " + BuildDemandPreferenceSummary(
+                complaintRoomPreference,
+                complaintFloorPreference,
+                complaintFacingPreference)
+            : "None";
+        string complaintInText = pendingComplaintRoom != null
+            ? FormatSeconds(Mathf.Max(0f, complaintDelaySeconds - pendingComplaintTimerSeconds))
+            : "None";
+
+        return "[Complaint Reassign]\n"
+            + "Status: " + complaintStatus + "\n"
+            + "Demand: " + complaintDemandText + "\n"
+            + "Pending Room: " + pendingComplaintRoomName + "\n"
+            + "Complaint In: " + complaintInText + "\n"
+            + "Waiting: " + FormatSeconds(complaintReassignmentWaitSeconds) + "\n"
+            + "Patience: " + FormatSeconds(complaintPatienceRemainingSeconds) + "\n"
+            + "Complaints/Reassigns: " + roomComplaintCount + " / " + complaintReassignmentCount + "\n"
+            + "Compensation: " + compensationRequestCount + "\n"
+            + "Last: " + lastComplaintResult;
+    }
+
     public int GetPrototypeCleanlinessSuitability(Room2DEntity room)
     {
         // 给 HUD 读取用，避免 Selected Room 卡片自己复制一套房间质量算法。
@@ -891,7 +1126,7 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
         Room2DFacingPreference facingPreference = GetCurrentVisibleDemandFacingPreference();
         string demandStage = activeDemandWaitingForManualAssignment ? "Active" : "Upcoming";
         string readyNote = room.CanSimulateCheckIn() ? "" : " (not Ready)";
-        string roomTypeNote = DoesRoomMeetHardRoomTypeConstraint(room, roomPreference) ? "" : " (type blocked)";
+        string roomTypeNote = DoesRoomMatchRoomTypePreference(room, roomPreference) ? "" : " (type risk)";
 
         return "Match Hint: " + demandStage + " " + demandType + " / "
             + BuildDemandPreferenceSummary(roomPreference, floorPreference, facingPreference)
@@ -987,6 +1222,8 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
             + "Match G/N/P: " + goodMatchCount + "/" + normalMatchCount + "/" + poorMatchCount + "\n"
             + "Out P/N/Neg: " + positiveOutcomeCount + "/" + neutralOutcomeCount + "/" + negativeOutcomeCount + "\n"
             + "Service Pressure: " + servicePressurePenaltyCount + "\n"
+            + "Complaints/Reassigns: " + roomComplaintCount + "/" + complaintReassignmentCount + "\n"
+            + "Compensation: " + compensationRequestCount + "\n"
             + "Score: " + prototypeSatisfactionScore + " (" + prototypeSatisfactionTrend + ")\n"
             + "Dirty: " + summaryDirtyCount + "\n"
             + "Inspect Wait: " + summaryAwaitingInspectionCount + "\n"
@@ -1055,7 +1292,7 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
     {
         if (forcedRoom != null)
         {
-            return forcedRoom.CanSimulateCheckIn() && DoesRoomMeetHardRoomTypeConstraint(forcedRoom, roomPreference)
+            return forcedRoom.CanSimulateCheckIn()
                 ? forcedRoom
                 : null;
         }
@@ -1065,10 +1302,11 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
             return FindBestReadyRoomForDemand(demandType, roomPreference, floorPreference, facingPreference);
         }
 
-        // 预留房只有 Ready 时才会被使用；否则保留原来的自动分配作为 fallback。
-        if (reservedRoom.CanSimulateCheckIn() && DoesRoomMeetHardRoomTypeConstraint(reservedRoom, roomPreference))
+        // 预留房只有 Ready 时才会被使用；房型不合也允许入住，但会被 Match/投诉逻辑惩罚。
+        if (reservedRoom.CanSimulateCheckIn())
         {
-            lastReservationResult = "Succeeded: used " + reservedRoom.roomName;
+            lastReservationResult = "Succeeded: used " + reservedRoom.roomName
+                + GetRoomTypeRiskSuffix(reservedRoom, roomPreference);
             return reservedRoom;
         }
 
@@ -1269,7 +1507,7 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
 
         string candidateText = "Candidates";
         int shownCount = 0;
-        int blockedByTypeCount = 0;
+        int typeRiskCount = 0;
 
         for (int i = 0; i < rooms.Length; i++)
         {
@@ -1279,10 +1517,10 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
                 continue;
             }
 
-            if (!DoesRoomMeetHardRoomTypeConstraint(room, activeDemandRoomPreference))
+            bool typeRisk = !DoesRoomMatchRoomTypePreference(room, activeDemandRoomPreference);
+            if (typeRisk)
             {
-                blockedByTypeCount++;
-                continue;
+                typeRiskCount++;
             }
 
             if (shownCount < 5)
@@ -1300,7 +1538,8 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
                     + " C/W " + GetCleanlinessSuitability(room)
                     + "/" + GetWearSuitability(room)
                     + " F/Fa " + GetFloorPreferenceScore(room, activeDemandFloorPreference)
-                    + "/" + GetFacingPreferenceScore(room, activeDemandFacingPreference);
+                    + "/" + GetFacingPreferenceScore(room, activeDemandFacingPreference)
+                    + (typeRisk ? " Type Risk" : "");
             }
 
             shownCount++;
@@ -1308,9 +1547,7 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
 
         if (shownCount == 0)
         {
-            return blockedByTypeCount > 0
-                ? "Candidates: no matching room type"
-                : "Candidates: no Ready rooms";
+            return "Candidates: no Ready rooms";
         }
 
         if (shownCount > 5)
@@ -1318,9 +1555,9 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
             candidateText += "\n- +" + (shownCount - 5) + " more";
         }
 
-        if (blockedByTypeCount > 0)
+        if (typeRiskCount > 0)
         {
-            candidateText += "\n- Type blocked: " + blockedByTypeCount;
+            candidateText += "\n- Type risk: " + typeRiskCount + " still assignable";
         }
 
         return candidateText;
@@ -1339,8 +1576,7 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
         for (int i = 0; i < rooms.Length; i++)
         {
             if (rooms[i] == null
-                || !rooms[i].CanSimulateCheckIn()
-                || !DoesRoomMeetHardRoomTypeConstraint(rooms[i], roomPreference))
+                || !rooms[i].CanSimulateCheckIn())
             {
                 continue;
             }
@@ -1375,7 +1611,7 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
         Room2DFloorPreference floorPreference,
         Room2DFacingPreference facingPreference)
     {
-        if (!DoesRoomMeetHardRoomTypeConstraint(room, roomPreference))
+        if (!DoesRoomMatchRoomTypePreference(room, roomPreference))
         {
             return Room2DMatchQuality.PoorMatch;
         }
@@ -1437,20 +1673,30 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
         return 0;
     }
 
-    private bool DoesRoomMeetHardRoomTypeConstraint(Room2DEntity room, Room2DRoomPreference roomPreference)
+    private bool DoesRoomMatchRoomTypePreference(Room2DEntity room, Room2DRoomPreference roomPreference)
     {
         if (room == null)
         {
             return false;
         }
 
-        // v1 里把 BetterRoomPreferred 当作硬约束：只允许 Better 房承接。
+        // 当前垂直切片里，房型不再阻止入住，只作为投诉和匹配质量风险。
         if (roomPreference == Room2DRoomPreference.BetterRoomPreferred)
         {
             return room.prototypeRoomType == Room2DPrototypeRoomType.Better;
         }
 
         return true;
+    }
+
+    private string GetRoomTypeRiskSuffix(Room2DEntity room, Room2DRoomPreference roomPreference)
+    {
+        if (DoesRoomMatchRoomTypePreference(room, roomPreference))
+        {
+            return "";
+        }
+
+        return " (type risk)";
     }
 
     private int GetRoomTypeSuitabilityBonus(Room2DEntity room, Room2DRoomPreference roomPreference)
@@ -1778,6 +2024,16 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
         if (unmetDemandCount > 0 && unmetDemandCount >= successfulDemandCount)
         {
             return "Main issue: unmet demand";
+        }
+
+        if (roomComplaintCount > 0 && complaintReassignmentCount < roomComplaintCount)
+        {
+            return "Main issue: room complaint waiting";
+        }
+
+        if (compensationRequestCount > 0)
+        {
+            return "Main issue: compensation pressure";
         }
 
         if (poorMatchCount > goodMatchCount && poorMatchCount > 0)
