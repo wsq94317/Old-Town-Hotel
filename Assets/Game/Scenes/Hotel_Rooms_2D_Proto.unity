@@ -160,57 +160,103 @@ MonoBehaviour:
       m_Calls: []
   m_text: 'Preparation
 
-    Rooms D/C/I/R/O/B: 9/0/0/0/0/0
+    Rooms D/C/I/R/O/B: 6/0/0/3/0/0
 
     Upcoming 1/1: Normal
-    in 0s
+    / AnyRoom / NoPreference / NoPreference in 0s
 
     Reserved: None
 
-    Dirty Priority: None
+    Dirty
+    Priority: None
 
     Inspect Priority: None
 
-    Warnings:
-    No Ready room for next demand
+    Warnings: Dirty backlog
 
-    Last Prep: None
+    Last
+    Prep: None
 
 
-    Active Demand
+    [Front Desk]
 
-    Status:
+    Queue: 0
+
+    Wait Pressure: 0s / 6s
+
+    Delayed
+    Check-ins: 0
+
+    Last: None
+
+
+    [Lounge]
+
+    Clean Cups: 8
+
+    Dirty Cups:
+    0
+
+    Milk: 12
+
+    Tea/Coffee: 12
+
+    Washing: No
+
+    Served/Missed: 0 /
+    0
+
+    Warning: None
+
+    Last: None
+
+
+    [Upcoming Demand]
+
+    Type: Normal
+
+    Prefs:
+    AnyRoom / NoPreference / NoPreference
+
+    ETA: 0s
+
+    Reserved: None
+
+    Reserve
+    Result: None
+
+    Status: None
+
+
+    [Active Demand]
+
+    Status: None
+
+    Type:
     None
 
-    Type: None
+    Prefs: None
 
-    Wait: 0s / 8s
+    Wait: 0s / 16m 39s
 
     Fallback Reserved: None
 
-    Last
-    Assign: None
+    Assignment:
+    None
 
     Manual: None
 
     Candidates: None
 
 
-    Last Demand
+    [Latest Resolved]
 
-    Type:
-    Normal
+    Status:
+    None yet
 
-    Match: Normal Match
-
-    Clean/Wear: 0 / 0
-
-    Outcome: Neutral
-
-    Result:
-    None
 
     Occupied: None
+
 
     Day Summary
 
@@ -225,14 +271,19 @@ MonoBehaviour:
 
     Out P/N/Neg: 0/0/0
 
-    Score: 0 (Neutral)
+    Service Pressure: 0
 
-    Dirty:
-    9
+    Score:
+    0 (Neutral)
+
+    Dirty: 6
 
     Inspect Wait: 0
 
     Oldest Dirty: 0s
+
+    Last
+    Pressure: None
 
     Hint: No demand tested yet'
   m_isRightToLeft: 0
@@ -261,12 +312,12 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 17
+  m_fontSize: 12
   m_fontSizeBase: 36
   m_fontWeight: 400
   m_enableAutoSizing: 1
   m_fontSizeMin: 12
-  m_fontSizeMax: 17
+  m_fontSizeMax: 16
   m_fontStyle: 0
   m_HorizontalAlignment: 1
   m_VerticalAlignment: 256
@@ -349,7 +400,7 @@ MonoBehaviour:
   m_MinWidth: -1
   m_MinHeight: 36
   m_PreferredWidth: -1
-  m_PreferredHeight: 830
+  m_PreferredHeight: 360
   m_FlexibleWidth: 1
   m_FlexibleHeight: -1
   m_LayoutPriority: 1
@@ -385,12 +436,12 @@ RectTransform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1899555138}
-  m_Father: {fileID: 221602344}
+  m_Father: {fileID: 801825461}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 1}
-  m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 533.10004, y: 253.44998}
-  m_SizeDelta: {x: 132, y: 36}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &155630037
 MonoBehaviour:
@@ -572,12 +623,12 @@ RectTransform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1835025308}
-  m_Father: {fileID: 709579318}
+  m_Father: {fileID: 801825461}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 1}
-  m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 65.99997, y: 69.999985}
-  m_SizeDelta: {x: 132, y: 36}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &198280327
 MonoBehaviour:
@@ -701,9 +752,7 @@ Transform:
   m_LocalPosition: {x: -313.10004, y: -25.45, z: -0.102}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
-  m_Children:
-  - {fileID: 155630036}
-  - {fileID: 709304422}
+  m_Children: []
   m_Father: {fileID: 801825461}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &224021132
@@ -785,6 +834,14 @@ PrefabInstance:
     - target: {fileID: 8051486217628931062, guid: 5d5e0ec990fcc437a848aa2f41ddcad9, type: 3}
       propertyPath: roomName
       value: Room 104
+      objectReference: {fileID: 0}
+    - target: {fileID: 8051486217628931062, guid: 5d5e0ec990fcc437a848aa2f41ddcad9, type: 3}
+      propertyPath: currentState
+      value: 3
+      objectReference: {fileID: 0}
+    - target: {fileID: 8051486217628931062, guid: 5d5e0ec990fcc437a848aa2f41ddcad9, type: 3}
+      propertyPath: guestCheckedOut
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -1066,12 +1123,12 @@ RectTransform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 586311937}
-  m_Father: {fileID: 709579318}
+  m_Father: {fileID: 801825461}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 1}
-  m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 205.99994, y: 25.999985}
-  m_SizeDelta: {x: 132, y: 36}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &368997697
 MonoBehaviour:
@@ -1389,16 +1446,50 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: 'Selected
+  m_text: '[Selected Room]
 
-    Room: Room 101
+    Name: Room 101
+
+    Number: 101
+
+    Room Type: Standard
+
+    Floor:
+    Floor 1
+
+    Facing: Street Facing
 
     State: Dirty
 
-    Next: Next: Start
-    Cleaning
+    Next: Next: Start Cleaning
 
-    Wait: 0s'
+    Wait:
+    0s
+
+
+    [Decision Flags]
+
+    Reserved: No
+
+    CLEAN PRIO: No
+
+    INSP PRIO:
+    No
+
+    Guest: Checked Out
+
+    Block: None
+
+
+    [Room Quality]
+
+    Clean Suitability:
+    70
+
+    Wear Suitability: 70
+
+    Match Hint: Upcoming Normal / AnyRoom / NoPreference
+    / NoPreference -> Good Match (not Ready)'
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -1425,12 +1516,12 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 22
+  m_fontSize: 15.8
   m_fontSizeBase: 36
   m_fontWeight: 400
   m_enableAutoSizing: 1
   m_fontSizeMin: 12
-  m_fontSizeMax: 22
+  m_fontSizeMax: 18
   m_fontStyle: 0
   m_HorizontalAlignment: 1
   m_VerticalAlignment: 256
@@ -1494,7 +1585,7 @@ MonoBehaviour:
   m_MinWidth: -1
   m_MinHeight: 36
   m_PreferredWidth: -1
-  m_PreferredHeight: 210
+  m_PreferredHeight: 400
   m_FlexibleWidth: 1
   m_FlexibleHeight: -1
   m_LayoutPriority: 1
@@ -1702,11 +1793,11 @@ RectTransform:
   - {fileID: 826300421}
   m_Father: {fileID: 854722003}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 1}
-  m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 337, y: -284}
-  m_SizeDelta: {x: 430, y: 330}
-  m_Pivot: {x: 0, y: 1}
+  m_AnchorMin: {x: 1, y: 0}
+  m_AnchorMax: {x: 1, y: 0}
+  m_AnchoredPosition: {x: -24, y: 278}
+  m_SizeDelta: {x: 504, y: 430}
+  m_Pivot: {x: 1, y: 0}
 --- !u!114 &706053337
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1803,12 +1894,12 @@ RectTransform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1472076099}
-  m_Father: {fileID: 221602344}
+  m_Father: {fileID: 801825461}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 1}
-  m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 533.10004, y: 253.44998}
-  m_SizeDelta: {x: 132, y: 36}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &709304423
 MonoBehaviour:
@@ -1931,11 +2022,7 @@ RectTransform:
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
-  m_Children:
-  - {fileID: 198280326}
-  - {fileID: 1664056461}
-  - {fileID: 1558940528}
-  - {fileID: 368997696}
+  m_Children: []
   m_Father: {fileID: 801825461}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
@@ -1978,13 +2065,28 @@ RectTransform:
   - {fileID: 221602344}
   - {fileID: 1438958653}
   - {fileID: 1136108186}
+  - {fileID: 198280326}
+  - {fileID: 1664056461}
+  - {fileID: 1558940528}
+  - {fileID: 368997696}
+  - {fileID: 155630036}
+  - {fileID: 709304422}
+  - {fileID: 1434718021}
+  - {fileID: 1362503853}
+  - {fileID: 1092732506}
+  - {fileID: 1936402366}
+  - {fileID: 1553705054}
+  - {fileID: 1528793309}
+  - {fileID: 1211878361}
+  - {fileID: 1399220428}
+  - {fileID: 1733245795}
   m_Father: {fileID: 854722003}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 313.1, y: 25.45}
-  m_SizeDelta: {x: 300, y: 300}
-  m_Pivot: {x: 0, y: 0}
+  m_AnchorMin: {x: 0.5, y: 0}
+  m_AnchorMax: {x: 0.5, y: 0}
+  m_AnchoredPosition: {x: 0, y: 24}
+  m_SizeDelta: {x: 1032, y: 230}
+  m_Pivot: {x: 0.5, y: 0}
 --- !u!114 &801825462
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2043,10 +2145,10 @@ MonoBehaviour:
   m_ChildAlignment: 1
   m_StartCorner: 0
   m_StartAxis: 0
-  m_CellSize: {x: 132, y: 36}
+  m_CellSize: {x: 190, y: 42}
   m_Spacing: {x: 8, y: 8}
   m_Constraint: 1
-  m_ConstraintCount: 2
+  m_ConstraintCount: 5
 --- !u!1 &826300420
 GameObject:
   m_ObjectHideFlags: 0
@@ -2217,7 +2319,7 @@ MonoBehaviour:
   m_MinWidth: -1
   m_MinHeight: 36
   m_PreferredWidth: -1
-  m_PreferredHeight: 300
+  m_PreferredHeight: 400
   m_FlexibleWidth: 1
   m_FlexibleHeight: -1
   m_LayoutPriority: 1
@@ -2276,6 +2378,9 @@ MonoBehaviour:
   inspector: {fileID: 1951138755}
   demandLoop: {fileID: 1512229141}
   workerSelectionPanel: {fileID: 1590462959}
+  frontDesk: {fileID: 1514359744}
+  lounge: {fileID: 1633726679}
+  demoDayController: {fileID: 0}
   selectedRoomInfoText: {fileID: 584838238}
   overviewInfoText: {fileID: 1640815427}
   workerStatusText: {fileID: 826300422}
@@ -2309,7 +2414,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &923204394
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2454,12 +2559,12 @@ RectTransform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1558357819}
-  m_Father: {fileID: 1438958653}
+  m_Father: {fileID: 801825461}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 1}
-  m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: -74.00003, y: -17.999962}
-  m_SizeDelta: {x: 132, y: 36}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1092732507
 MonoBehaviour:
@@ -2590,11 +2695,11 @@ RectTransform:
   - {fileID: 21101555}
   m_Father: {fileID: 854722003}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 1, y: 0.5}
-  m_AnchorMax: {x: 1, y: 0.5}
-  m_AnchoredPosition: {x: -24, y: -81.1}
-  m_SizeDelta: {x: 720, y: 1030}
-  m_Pivot: {x: 1, y: 0.5}
+  m_AnchorMin: {x: 0.5, y: 1}
+  m_AnchorMax: {x: 0.5, y: 1}
+  m_AnchoredPosition: {x: 0, y: -24}
+  m_SizeDelta: {x: 1032, y: 520}
+  m_Pivot: {x: 0.5, y: 1}
 --- !u!114 &1135779390
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2686,12 +2791,7 @@ RectTransform:
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
-  m_Children:
-  - {fileID: 1553705054}
-  - {fileID: 1528793309}
-  - {fileID: 1211878361}
-  - {fileID: 1399220428}
-  - {fileID: 1733245795}
+  m_Children: []
   m_Father: {fileID: 801825461}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 1}
@@ -2731,12 +2831,12 @@ RectTransform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1375287592}
-  m_Father: {fileID: 1136108186}
+  m_Father: {fileID: 801825461}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 1}
-  m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: -74.00003, y: 25.999977}
-  m_SizeDelta: {x: 132, y: 36}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1211878362
 MonoBehaviour:
@@ -3040,7 +3140,7 @@ MonoBehaviour:
   m_UiScaleMode: 1
   m_ReferencePixelsPerUnit: 100
   m_ScaleFactor: 1
-  m_ReferenceResolution: {x: 1920, y: 1080}
+  m_ReferenceResolution: {x: 1080, y: 1920}
   m_ScreenMatchMode: 0
   m_MatchWidthOrHeight: 0.5
   m_PhysicalUnit: 3
@@ -3242,11 +3342,11 @@ RectTransform:
   - {fileID: 584838237}
   m_Father: {fileID: 854722003}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 1}
-  m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 311.15, y: -24}
-  m_SizeDelta: {x: 430, y: 240}
-  m_Pivot: {x: 0, y: 1}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 24, y: 278}
+  m_SizeDelta: {x: 504, y: 430}
+  m_Pivot: {x: 0, y: 0}
 --- !u!114 &1247121776
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3347,27 +3447,27 @@ MonoBehaviour:
   prototypeStartRoomNumber: 101
   numberRoomsByScenePosition: 1
   rooms:
-  - {fileID: 533042248}
-  - {fileID: 1935276555}
-  - {fileID: 1258080070}
-  - {fileID: 1743606497}
-  - {fileID: 1509132723}
   - {fileID: 1026532833}
+  - {fileID: 1743606497}
+  - {fileID: 1258080070}
+  - {fileID: 1458343392}
   - {fileID: 1639403916}
   - {fileID: 364012664}
-  - {fileID: 1458343392}
+  - {fileID: 1509132723}
+  - {fileID: 533042248}
+  - {fileID: 1935276555}
   roomControllers:
-  - {fileID: 1258080071}
   - {fileID: 1458343393}
-  - {fileID: 1743606498}
-  - {fileID: 1935276556}
-  - {fileID: 1509132724}
   - {fileID: 1026532834}
-  - {fileID: 1639403914}
-  - {fileID: 364012665}
+  - {fileID: 1258080071}
+  - {fileID: 1743606498}
+  - {fileID: 1509132724}
+  - {fileID: 1935276556}
   - {fileID: 533042249}
-  highestPriorityDirtyRoom: {fileID: 533042248}
-  highestPriorityDirtyRoomName: Room 104
+  - {fileID: 364012665}
+  - {fileID: 1639403914}
+  highestPriorityDirtyRoom: {fileID: 1026532833}
+  highestPriorityDirtyRoomName: Room 108
   highestPriorityDirtyLevel: 1
   highestPriorityDirtySeconds: 0
   summaryLabelTextMeshPro: {fileID: 1640815427}
@@ -3445,12 +3545,12 @@ RectTransform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 2076880552}
-  m_Father: {fileID: 1438958653}
+  m_Father: {fileID: 801825461}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 1}
-  m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 66.00006, y: 26.000015}
-  m_SizeDelta: {x: 132, y: 36}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1362503854
 MonoBehaviour:
@@ -3786,12 +3886,12 @@ RectTransform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1949166704}
-  m_Father: {fileID: 1136108186}
+  m_Father: {fileID: 801825461}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 1}
-  m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 66.00006, y: 25.999977}
-  m_SizeDelta: {x: 132, y: 36}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1399220429
 MonoBehaviour:
@@ -3956,12 +4056,12 @@ RectTransform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 2099792976}
-  m_Father: {fileID: 1438958653}
+  m_Father: {fileID: 801825461}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 1}
-  m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: -74.00003, y: 26.000015}
-  m_SizeDelta: {x: 132, y: 36}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1434718022
 MonoBehaviour:
@@ -4084,11 +4184,7 @@ RectTransform:
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
-  m_Children:
-  - {fileID: 1434718021}
-  - {fileID: 1362503853}
-  - {fileID: 1092732506}
-  - {fileID: 1936402366}
+  m_Children: []
   m_Father: {fileID: 801825461}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
@@ -4335,12 +4431,19 @@ MonoBehaviour:
   demandIntervalSeconds: 5
   demandTimerSeconds: 0
   alternateDemandTypes: 0
-  nextDemandType: 0
+  nextDemandType: 1
+  alternateDemandRoomPreferences: 1
+  nextDemandRoomPreference: 1
+  nextDemandFloorPreference: 1
+  nextDemandFacingPreference: 2
   generatedDemandCount: 0
   successfulDemandCount: 0
   unmetDemandCount: 0
   useUpcomingDemandPreview: 1
   upcomingDemandType: 0
+  upcomingDemandRoomPreference: 0
+  upcomingDemandFloorPreference: 0
+  upcomingDemandFacingPreference: 0
   upcomingDemandEtaSeconds: 0
   upcomingDemandPreviewText: None
   lastActivatedUpcomingDemandText: None
@@ -4357,18 +4460,47 @@ MonoBehaviour:
   useManualActiveDemand: 1
   activeDemandWaitingForManualAssignment: 0
   activeDemandType: 0
+  activeDemandRoomPreference: 0
+  activeDemandFloorPreference: 0
+  activeDemandFacingPreference: 0
   activeDemandWaitSeconds: 0
-  manualAssignmentFallbackDelaySeconds: 8
+  manualAssignmentFallbackDelaySeconds: 999
   activeReservedRoomForFallback: {fileID: 0}
   activeReservedRoomName: None
   activeDemandStatus: None
   lastManualAssignmentResult: None
   lastAssignmentMode: None
-  occupiedDurationSeconds: 0
+  lastResolvedAssignmentMode: None
+  occupiedDurationSeconds: 90
   simulatedCheckoutCount: 0
+  enableComplaintReassignment: 1
+  complaintDelaySeconds: 60
+  complaintPatienceSeconds: 20
+  complaintPatienceLossMultiplier: 2
+  complaintCompensationPenaltyScore: -6
+  complaintPatienceExpiredPenaltyScore: -4
+  pendingComplaintRoom: {fileID: 0}
+  pendingComplaintRoomName: None
+  pendingComplaintTimerSeconds: 0
+  complaintWaitingForReassignment: 0
+  complaintReassignmentWaitSeconds: 0
+  complaintPatienceRemainingSeconds: 0
+  complaintPatiencePenaltyApplied: 0
+  complaintDemandType: 0
+  complaintRoomPreference: 0
+  complaintFloorPreference: 0
+  complaintFacingPreference: 0
+  roomComplaintCount: 0
+  complaintReassignmentCount: 0
+  compensationRequestCount: 0
+  complaintStatus: None
+  lastComplaintResult: None
   lastDemandResult: None
   lastChangedRoomName: None
   lastDemandType: 0
+  lastDemandRoomPreference: 0
+  lastDemandFloorPreference: 0
+  lastDemandFacingPreference: 0
   lastMatchQuality: 1
   lastMatchQualityLabel: Normal Match
   lastCleanlinessSuitability: 0
@@ -4384,7 +4516,9 @@ MonoBehaviour:
   positiveOutcomeCount: 0
   neutralOutcomeCount: 0
   negativeOutcomeCount: 0
-  summaryDirtyCount: 9
+  servicePressurePenaltyCount: 0
+  lastServicePressureResult: None
+  summaryDirtyCount: 6
   summaryAwaitingInspectionCount: 0
   summaryOldestDirtySeconds: 0
   summaryStatusHint: No demand tested yet
@@ -4402,6 +4536,60 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 1410768528}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1514359743
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1514359745}
+  - component: {fileID: 1514359744}
+  m_Layer: 0
+  m_Name: Frontdesk2D
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1514359744
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1514359743}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 81b6e91baf0d4f6cb7fbc8e7d780fa47, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FrontDesk2D
+  autoFindReferences: 1
+  demandLoop: {fileID: 0}
+  runDuringPlay: 1
+  delayedCheckInThresholdSeconds: 6
+  pressurePenaltyScore: -1
+  currentQueueCount: 0
+  waitingTimePressureSeconds: 0
+  complaintWaitingPressureSeconds: 0
+  totalDelayedCheckIns: 0
+  lastFrontDeskResult: None
+--- !u!4 &1514359745
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1514359743}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 1063.9629, y: 489, z: -0.102}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1528793308
 GameObject:
@@ -4435,12 +4623,12 @@ RectTransform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 2030319015}
-  m_Father: {fileID: 1136108186}
+  m_Father: {fileID: 801825461}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 1}
-  m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: -74.00003, y: 25.999977}
-  m_SizeDelta: {x: 132, y: 36}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1528793310
 MonoBehaviour:
@@ -4568,12 +4756,12 @@ RectTransform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1216925285}
-  m_Father: {fileID: 1136108186}
+  m_Father: {fileID: 801825461}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 1}
-  m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: -74.00003, y: 25.999977}
-  m_SizeDelta: {x: 132, y: 36}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1553705055
 MonoBehaviour:
@@ -4749,6 +4937,14 @@ PrefabInstance:
       propertyPath: roomName
       value: Room 105
       objectReference: {fileID: 0}
+    - target: {fileID: 8051486217628931062, guid: 5d5e0ec990fcc437a848aa2f41ddcad9, type: 3}
+      propertyPath: currentState
+      value: 3
+      objectReference: {fileID: 0}
+    - target: {fileID: 8051486217628931062, guid: 5d5e0ec990fcc437a848aa2f41ddcad9, type: 3}
+      propertyPath: guestCheckedOut
+      value: 0
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -4923,12 +5119,12 @@ RectTransform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 469639681}
-  m_Father: {fileID: 709579318}
+  m_Father: {fileID: 801825461}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 1}
-  m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 65.99997, y: 25.999985}
-  m_SizeDelta: {x: 132, y: 36}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1558940529
 MonoBehaviour:
@@ -5157,11 +5353,90 @@ PrefabInstance:
       propertyPath: roomName
       value: Room 108
       objectReference: {fileID: 0}
+    - target: {fileID: 8051486217628931062, guid: 5d5e0ec990fcc437a848aa2f41ddcad9, type: 3}
+      propertyPath: currentState
+      value: 3
+      objectReference: {fileID: 0}
+    - target: {fileID: 8051486217628931062, guid: 5d5e0ec990fcc437a848aa2f41ddcad9, type: 3}
+      propertyPath: guestCheckedOut
+      value: 0
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 5d5e0ec990fcc437a848aa2f41ddcad9, type: 3}
+--- !u!1 &1633726678
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1633726680}
+  - component: {fileID: 1633726679}
+  m_Layer: 0
+  m_Name: Lounge2D
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1633726679
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1633726678}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3a4e1b7f59c94c51ad4f53df5a5a7618, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Lounge2D
+  autoFindReferences: 1
+  demandLoop: {fileID: 0}
+  cleanCups: 8
+  dirtyCups: 0
+  milkStock: 12
+  teaCoffeeStock: 12
+  runDuringPlay: 1
+  serviceIntervalSeconds: 7
+  serviceTimerSeconds: 0
+  servedDrinkCount: 0
+  missedServiceCount: 0
+  washing: 0
+  washDurationSeconds: 5
+  washTimerSeconds: 0
+  cupsInWashing: 0
+  maxCupsPerWash: 4
+  lowCleanCupThreshold: 2
+  lowStockThreshold: 2
+  loungeWarningCount: 0
+  pressurePenaltyScore: -1
+  applyWarningPressure: 1
+  lowCleanCupPenaltyScore: -1
+  lowStockPenaltyScore: -1
+  lowCleanCupWarningPressureCount: 0
+  lowStockWarningPressureCount: 0
+  loungeWarning: None
+  lastLoungeResult: None
+--- !u!4 &1633726680
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1633726678}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 1063.9629, y: 489, z: -0.102}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &1639403914 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 5828472676292665157, guid: 5d5e0ec990fcc437a848aa2f41ddcad9, type: 3}
@@ -5230,20 +5505,27 @@ MonoBehaviour:
       m_Calls: []
   m_text: 'Overview
 
-    Dirty: 9
+    Dirty: 6
 
     Cleaning: 0
 
     Inspect: 0
 
-    Ready: 0
+    Ready: 3
 
     Occupied:
     0
 
     Blocked: 0
 
-    Urgent: Room 104 0s'
+    Urgent: Room 108 0s
+
+    Score: 0 (Neutral)
+
+    Front
+    Desk: Q0 / Delay 0
+
+    Lounge: Cups 8 / Warning None'
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -5270,7 +5552,7 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 16.35
+  m_fontSize: 12
   m_fontSizeBase: 36
   m_fontWeight: 400
   m_enableAutoSizing: 1
@@ -5358,7 +5640,7 @@ MonoBehaviour:
   m_MinWidth: -1
   m_MinHeight: 36
   m_PreferredWidth: -1
-  m_PreferredHeight: 150
+  m_PreferredHeight: 130
   m_FlexibleWidth: 1
   m_FlexibleHeight: -1
   m_LayoutPriority: 1
@@ -5394,12 +5676,12 @@ RectTransform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 2137973404}
-  m_Father: {fileID: 709579318}
+  m_Father: {fileID: 801825461}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 1}
-  m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 205.99994, y: 69.999985}
-  m_SizeDelta: {x: 132, y: 36}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1664056462
 MonoBehaviour:
@@ -5575,6 +5857,14 @@ PrefabInstance:
       propertyPath: roomName
       value: Room 107
       objectReference: {fileID: 0}
+    - target: {fileID: 8051486217628931062, guid: 5d5e0ec990fcc437a848aa2f41ddcad9, type: 3}
+      propertyPath: currentState
+      value: 3
+      objectReference: {fileID: 0}
+    - target: {fileID: 8051486217628931062, guid: 5d5e0ec990fcc437a848aa2f41ddcad9, type: 3}
+      propertyPath: guestCheckedOut
+      value: 0
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -5612,12 +5902,12 @@ RectTransform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1855080516}
-  m_Father: {fileID: 1136108186}
+  m_Father: {fileID: 801825461}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 1}
-  m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: -74.00003, y: -17.999996}
-  m_SizeDelta: {x: 132, y: 36}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1733245796
 MonoBehaviour:
@@ -6258,12 +6548,12 @@ RectTransform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1226729964}
-  m_Father: {fileID: 1438958653}
+  m_Father: {fileID: 801825461}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 1}
-  m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 205.99994, y: -17.999962}
-  m_SizeDelta: {x: 132, y: 36}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1936402367
 MonoBehaviour:
@@ -6576,6 +6866,14 @@ PrefabInstance:
       propertyPath: roomName
       value: Room 102
       objectReference: {fileID: 0}
+    - target: {fileID: 8051486217628931062, guid: 5d5e0ec990fcc437a848aa2f41ddcad9, type: 3}
+      propertyPath: currentState
+      value: 3
+      objectReference: {fileID: 0}
+    - target: {fileID: 8051486217628931062, guid: 5d5e0ec990fcc437a848aa2f41ddcad9, type: 3}
+      propertyPath: guestCheckedOut
+      value: 0
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -6718,6 +7016,14 @@ PrefabInstance:
     - target: {fileID: 8051486217628931062, guid: 5d5e0ec990fcc437a848aa2f41ddcad9, type: 3}
       propertyPath: roomName
       value: Room 103
+      objectReference: {fileID: 0}
+    - target: {fileID: 8051486217628931062, guid: 5d5e0ec990fcc437a848aa2f41ddcad9, type: 3}
+      propertyPath: currentState
+      value: 3
+      objectReference: {fileID: 0}
+    - target: {fileID: 8051486217628931062, guid: 5d5e0ec990fcc437a848aa2f41ddcad9, type: 3}
+      propertyPath: guestCheckedOut
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -6982,6 +7288,14 @@ PrefabInstance:
     - target: {fileID: 8051486217628931062, guid: 5d5e0ec990fcc437a848aa2f41ddcad9, type: 3}
       propertyPath: roomName
       value: Room 109
+      objectReference: {fileID: 0}
+    - target: {fileID: 8051486217628931062, guid: 5d5e0ec990fcc437a848aa2f41ddcad9, type: 3}
+      propertyPath: currentState
+      value: 3
+      objectReference: {fileID: 0}
+    - target: {fileID: 8051486217628931062, guid: 5d5e0ec990fcc437a848aa2f41ddcad9, type: 3}
+      propertyPath: guestCheckedOut
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -7342,6 +7656,14 @@ PrefabInstance:
       propertyPath: roomName
       value: Room 106
       objectReference: {fileID: 0}
+    - target: {fileID: 8051486217628931062, guid: 5d5e0ec990fcc437a848aa2f41ddcad9, type: 3}
+      propertyPath: currentState
+      value: 3
+      objectReference: {fileID: 0}
+    - target: {fileID: 8051486217628931062, guid: 5d5e0ec990fcc437a848aa2f41ddcad9, type: 3}
+      propertyPath: guestCheckedOut
+      value: 0
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -7584,6 +7906,14 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 8051486217628931062, guid: 5d5e0ec990fcc437a848aa2f41ddcad9, type: 3}
+      propertyPath: currentState
+      value: 3
+      objectReference: {fileID: 0}
+    - target: {fileID: 8051486217628931062, guid: 5d5e0ec990fcc437a848aa2f41ddcad9, type: 3}
+      propertyPath: guestCheckedOut
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 8056807058777628473, guid: 5d5e0ec990fcc437a848aa2f41ddcad9, type: 3}
       propertyPath: m_IsActive
       value: 1
@@ -7604,3 +7934,5 @@ SceneRoots:
   - {fileID: 1410768528}
   - {fileID: 1988405937}
   - {fileID: 1225932598}
+  - {fileID: 1514359745}
+  - {fileID: 1633726680}

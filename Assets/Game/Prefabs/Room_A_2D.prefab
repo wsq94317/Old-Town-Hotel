@@ -1187,6 +1187,8 @@ MonoBehaviour:
   floorNumber: 1
   roomNumber: 101
   currentState: 0
+  prototypeRoomType: 0
+  prototypeFacing: 0
   guestCheckedOut: 1
   actionCount: 0
   trackStateTime: 1
