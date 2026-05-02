@@ -66,6 +66,8 @@ Build first playable fake-3D 2D room entity prototype.
 - Rooms View Interaction Phase 2/3 now exposes state-based room action buttons and a small worker assignment popup for HSK/Inspector assignment
 - Room2DController fallback state now mirrors Room2DEntity state so Inspector display does not contradict the Game view
 - Showcase UI Foundation Phase 1 rebuilds Front Desk into header/queue, current request, demand summary, action bar, and placeholder visual slots
+- Showcase UI Foundation Phase 2 rebuilds Rooms View into room summary, selected-room detail, state actions, worker card, and placeholder visual slots
+- Showcase UI Foundation Phase 3 rebuilds Lounge View into header, stock, washing machine, warning/result, action bar, and placeholder visual slots
 
 ## Next
 - Attach Room2DEntity to Room_A_2D in Unity

@@ -64,9 +64,18 @@ public class Room2DShowcaseViewController : MonoBehaviour
     public RectTransform roomDemandPanel;
     public RectTransform roomWorkerPopupPanel;
     public RectTransform roomWorkerPopupButtonPanel;
+    public RectTransform roomTypeIconPlaceholder;
+    public RectTransform roomStateIconPlaceholder;
+    public RectTransform roomWorkerPortraitPlaceholder;
     public RectTransform loungeStatusPanel;
+    public RectTransform loungeStockPanel;
+    public RectTransform loungeMachinePanel;
     public RectTransform loungeActionsPanel;
     public RectTransform loungeResultPanel;
+    public RectTransform loungeStockIconPlaceholder;
+    public RectTransform loungeCupIconPlaceholder;
+    public RectTransform loungeMachineIconPlaceholder;
+    public RectTransform loungeWarningBadgePlaceholder;
 
     [Header("Texts")]
     public TMP_Text activeViewLabelText;
@@ -81,6 +90,8 @@ public class Room2DShowcaseViewController : MonoBehaviour
     public TMP_Text roomWorkerPopupText;
     public TMP_Text roomDemandText;
     public TMP_Text loungeStatusText;
+    public TMP_Text loungeStockText;
+    public TMP_Text loungeMachineText;
     public TMP_Text loungeResultText;
 
     [Header("Buttons")]
@@ -458,6 +469,16 @@ public class Room2DShowcaseViewController : MonoBehaviour
             loungeStatusText.text = BuildLoungeStatusText();
         }
 
+        if (loungeStockText != null)
+        {
+            loungeStockText.text = BuildLoungeStockText();
+        }
+
+        if (loungeMachineText != null)
+        {
+            loungeMachineText.text = BuildLoungeMachineText();
+        }
+
         if (frontDeskResultText != null)
         {
             frontDeskResultText.text = BuildFrontDeskResultText();
@@ -474,6 +495,8 @@ public class Room2DShowcaseViewController : MonoBehaviour
         {
             loungeResultText.text = BuildLoungeResultText();
         }
+
+        RefreshLoungePlaceholderLabels();
     }
 
     private void BuildFrontDeskViewContent()
@@ -550,35 +573,44 @@ public class Room2DShowcaseViewController : MonoBehaviour
         roomWorkerPopupPanel = FindOrCreatePanel(roomViewPanel, "Card_RoomWorkerPopup", new Color(0.02f, 0.03f, 0.05f, 0.96f));
         roomWorkerPopupButtonPanel = FindOrCreatePanel(roomWorkerPopupPanel, "Panel_RoomWorkerPopupButtons", new Color(0f, 0f, 0f, 0f));
 
-        // Rooms View MVP：底部是房间详情，上方是根据房态变化的动作按钮。
-        ApplyAnchoredPanel(roomSelectedPanel, new Vector2(0.06f, 0.08f), new Vector2(0.94f, 0.29f), Vector2.zero, Vector2.zero);
-        ApplyAnchoredPanel(roomDemandPanel, new Vector2(0.06f, 0.78f), new Vector2(0.94f, 0.91f), Vector2.zero, Vector2.zero);
-        ApplyAnchoredPanel(roomWorkersPanel, new Vector2(0.06f, 0.30f), new Vector2(0.94f, 0.39f), Vector2.zero, Vector2.zero);
-        ApplyAnchoredPanel(roomActionsPanel, new Vector2(0.06f, 0.40f), new Vector2(0.94f, 0.54f), Vector2.zero, Vector2.zero);
-        ApplyAnchoredPanel(roomWorkerPopupPanel, new Vector2(0.08f, 0.32f), new Vector2(0.92f, 0.60f), Vector2.zero, Vector2.zero);
+        // Rooms View Foundation：上方只放短摘要；下方作为房间详情和状态动作区。
+        ApplyAnchoredPanel(roomDemandPanel, new Vector2(0.06f, 0.79f), new Vector2(0.94f, 0.92f), Vector2.zero, Vector2.zero);
+        ApplyAnchoredPanel(roomActionsPanel, new Vector2(0.06f, 0.55f), new Vector2(0.94f, 0.70f), Vector2.zero, Vector2.zero);
+        ApplyAnchoredPanel(roomSelectedPanel, new Vector2(0.06f, 0.28f), new Vector2(0.94f, 0.53f), Vector2.zero, Vector2.zero);
+        ApplyAnchoredPanel(roomWorkersPanel, new Vector2(0.06f, 0.14f), new Vector2(0.94f, 0.26f), Vector2.zero, Vector2.zero);
+        ApplyAnchoredPanel(roomWorkerPopupPanel, new Vector2(0.08f, 0.34f), new Vector2(0.92f, 0.64f), Vector2.zero, Vector2.zero);
         ApplyAnchoredPanel(roomWorkerPopupButtonPanel, new Vector2(0.05f, 0.08f), new Vector2(0.95f, 0.46f), Vector2.zero, Vector2.zero);
 
         selectedRoomText = FindOrCreateText(roomSelectedPanel, "Text_SelectedRoomCard", "Selected Room");
         roomWorkersText = FindOrCreateText(roomWorkersPanel, "Text_WorkerCard", "Workers");
         roomDemandText = FindOrCreateText(roomDemandPanel, "Text_RoomDemandCard", "Demand");
         roomWorkerPopupText = FindOrCreateText(roomWorkerPopupPanel, "Text_RoomWorkerPopup", "Assign Worker");
-        ApplyCardText(selectedRoomText, 15f);
-        ApplyCardText(roomWorkersText, 13f);
-        ApplyCardText(roomDemandText, 13f);
+        ApplyCardText(selectedRoomText, 18f);
+        ApplyCardText(roomWorkersText, 17f);
+        ApplyCardText(roomDemandText, 17f);
         ApplyCardText(roomWorkerPopupText, 14f);
+        selectedRoomText.rectTransform.offsetMax = new Vector2(-168f, -16f);
+        roomWorkersText.rectTransform.offsetMax = new Vector2(-126f, -16f);
         roomWorkerPopupText.rectTransform.offsetMax = new Vector2(-18f, -100f);
+
+        roomTypeIconPlaceholder = FindOrCreatePlaceholder(roomSelectedPanel, "IconPlaceholder_RoomType", "TYPE");
+        ApplyAnchoredPanel(roomTypeIconPlaceholder, new Vector2(0.72f, 0.56f), new Vector2(0.94f, 0.88f), Vector2.zero, Vector2.zero);
+        roomStateIconPlaceholder = FindOrCreatePlaceholder(roomSelectedPanel, "IconPlaceholder_State", "STATE");
+        ApplyAnchoredPanel(roomStateIconPlaceholder, new Vector2(0.72f, 0.14f), new Vector2(0.94f, 0.46f), Vector2.zero, Vector2.zero);
+        roomWorkerPortraitPlaceholder = FindOrCreatePlaceholder(roomWorkersPanel, "WorkerPortraitPlaceholder", "WORKER");
+        ApplyAnchoredPanel(roomWorkerPortraitPlaceholder, new Vector2(0.76f, 0.16f), new Vector2(0.94f, 0.84f), Vector2.zero, Vector2.zero);
 
         roomWorkersPanel.gameObject.SetActive(true);
         roomActionsPanel.gameObject.SetActive(true);
         roomWorkerPopupPanel.gameObject.SetActive(false);
 
-        ApplyActionGrid(roomActionsPanel, 2, new Vector2(210f, 42f), 10f);
-        roomAssignHousekeeperButton = FindOrCreateActionButton(roomActionsPanel, "Button_RoomAssignHSK", "Assign HSK", OpenHousekeeperPopup);
-        roomMarkCleanPriorityButton = FindOrCreateActionButton(roomActionsPanel, "Button_RoomMarkCleanPriority", "Clean Prio", MarkDirtyPriority);
-        roomAssignInspectorButton = FindOrCreateActionButton(roomActionsPanel, "Button_RoomAssignInspector", "Assign Insp", OpenInspectorPopup);
-        roomMarkInspectionPriorityButton = FindOrCreateActionButton(roomActionsPanel, "Button_RoomMarkInspectionPriority", "Insp Prio", MarkInspectionPriority);
-        roomReserveButton = FindOrCreateActionButton(roomActionsPanel, "Button_RoomReserve", "Reserve", ReserveSelectedRoom);
-        roomAssignDemandButton = FindOrCreateActionButton(roomActionsPanel, "Button_RoomAssignDemand", "Assign Guest", AssignSelectedRoomToDemand);
+        ApplyActionGrid(roomActionsPanel, 2, new Vector2(218f, 46f), 12f);
+        roomAssignHousekeeperButton = FindOrCreateActionButtonWithIconPlaceholder(roomActionsPanel, "Button_RoomAssignHSK", "Assign HSK", OpenHousekeeperPopup);
+        roomMarkCleanPriorityButton = FindOrCreateActionButtonWithIconPlaceholder(roomActionsPanel, "Button_RoomMarkCleanPriority", "Clean Prio", MarkDirtyPriority);
+        roomAssignInspectorButton = FindOrCreateActionButtonWithIconPlaceholder(roomActionsPanel, "Button_RoomAssignInspector", "Assign Insp", OpenInspectorPopup);
+        roomMarkInspectionPriorityButton = FindOrCreateActionButtonWithIconPlaceholder(roomActionsPanel, "Button_RoomMarkInspectionPriority", "Insp Prio", MarkInspectionPriority);
+        roomReserveButton = FindOrCreateActionButtonWithIconPlaceholder(roomActionsPanel, "Button_RoomReserve", "Reserve", ReserveSelectedRoom);
+        roomAssignDemandButton = FindOrCreateActionButtonWithIconPlaceholder(roomActionsPanel, "Button_RoomAssignDemand", "Assign Guest", AssignSelectedRoomToDemand);
         HideLegacyRoomActionButtons();
 
         ApplyActionGrid(roomWorkerPopupButtonPanel, 2, new Vector2(190f, 38f), 8f);
@@ -622,24 +654,70 @@ public class Room2DShowcaseViewController : MonoBehaviour
 
     private void BuildLoungeViewContent()
     {
-        loungeStatusPanel = FindOrCreatePanel(loungeViewPanel, "Card_LoungeStatus", new Color(0.05f, 0.07f, 0.09f, 0.96f));
+        loungeStatusPanel = FindOrCreatePanel(loungeViewPanel, "Card_LoungeHeader", new Color(0.05f, 0.07f, 0.09f, 0.96f));
+        loungeStockPanel = FindOrCreatePanel(loungeViewPanel, "Card_LoungeStock", new Color(0.06f, 0.08f, 0.10f, 0.96f));
+        loungeMachinePanel = FindOrCreatePanel(loungeViewPanel, "Card_LoungeMachine", new Color(0.05f, 0.06f, 0.08f, 0.96f));
+        loungeResultPanel = FindOrCreatePanel(loungeViewPanel, "Card_LoungeWarningResult", new Color(0.08f, 0.06f, 0.08f, 0.96f));
         loungeActionsPanel = FindOrCreatePanel(loungeViewPanel, "Card_LoungeActions", new Color(0.05f, 0.05f, 0.07f, 0.96f));
-        loungeResultPanel = FindOrCreatePanel(loungeViewPanel, "Card_LoungeResult", new Color(0.05f, 0.06f, 0.08f, 0.96f));
 
-        ApplyAnchoredPanel(loungeStatusPanel, new Vector2(0.08f, 0.48f), new Vector2(0.92f, 0.84f), Vector2.zero, Vector2.zero);
-        ApplyAnchoredPanel(loungeResultPanel, new Vector2(0.08f, 0.32f), new Vector2(0.92f, 0.44f), Vector2.zero, Vector2.zero);
-        ApplyAnchoredPanel(loungeActionsPanel, new Vector2(0.08f, 0.13f), new Vector2(0.92f, 0.28f), Vector2.zero, Vector2.zero);
+        ApplyAnchoredPanel(loungeStatusPanel, new Vector2(0.07f, 0.75f), new Vector2(0.93f, 0.91f), Vector2.zero, Vector2.zero);
+        ApplyAnchoredPanel(loungeStockPanel, new Vector2(0.07f, 0.50f), new Vector2(0.93f, 0.72f), Vector2.zero, Vector2.zero);
+        ApplyAnchoredPanel(loungeMachinePanel, new Vector2(0.07f, 0.31f), new Vector2(0.93f, 0.47f), Vector2.zero, Vector2.zero);
+        ApplyAnchoredPanel(loungeResultPanel, new Vector2(0.07f, 0.18f), new Vector2(0.93f, 0.28f), Vector2.zero, Vector2.zero);
+        ApplyAnchoredPanel(loungeActionsPanel, new Vector2(0.07f, 0.06f), new Vector2(0.93f, 0.15f), Vector2.zero, Vector2.zero);
 
         loungeStatusText = FindOrCreateText(loungeStatusPanel, "Text_LoungeStatus", "Lounge");
+        loungeStockText = FindOrCreateText(loungeStockPanel, "Text_LoungeStock", "Stock");
+        loungeMachineText = FindOrCreateText(loungeMachinePanel, "Text_LoungeMachine", "Washing");
         loungeResultText = FindOrCreateText(loungeResultPanel, "Text_LoungeResult", "Lounge Result");
-        ApplyCardText(loungeStatusText, 18f);
-        ApplyCardText(loungeResultText, 15f);
+        ApplyCardText(loungeStatusText, 20f);
+        ApplyCardText(loungeStockText, 19f);
+        ApplyCardText(loungeMachineText, 18f);
+        ApplyCardText(loungeResultText, 17f);
+        loungeStatusText.rectTransform.offsetMax = new Vector2(-120f, -16f);
+        loungeStockText.rectTransform.offsetMax = new Vector2(-150f, -16f);
+        loungeMachineText.rectTransform.offsetMax = new Vector2(-140f, -16f);
+        loungeResultText.rectTransform.offsetMax = new Vector2(-110f, -16f);
 
-        ApplyActionGrid(loungeActionsPanel, 2, new Vector2(190f, 42f), 12f);
-        FindOrCreateActionButton(loungeActionsPanel, "Button_ServeLoungeShowcase", "Serve", ServeLoungeNow);
-        FindOrCreateActionButton(loungeActionsPanel, "Button_WashCupsShowcase", "Wash", StartLoungeWash);
-        FindOrCreateActionButton(loungeActionsPanel, "Button_RestockLoungeShowcase", "Restock", RestockLounge);
-        FindOrCreateActionButton(loungeActionsPanel, "Button_StartDayLoungeShowcase", "Start", StartDemoOperatingPeriod);
+        loungeStockIconPlaceholder = FindOrCreatePlaceholder(loungeStockPanel, "IconPlaceholder_LoungeStock", "STOCK");
+        ApplyAnchoredPanel(loungeStockIconPlaceholder, new Vector2(0.72f, 0.54f), new Vector2(0.94f, 0.86f), Vector2.zero, Vector2.zero);
+        loungeCupIconPlaceholder = FindOrCreatePlaceholder(loungeStockPanel, "IconPlaceholder_Cups", "CUPS");
+        ApplyAnchoredPanel(loungeCupIconPlaceholder, new Vector2(0.72f, 0.14f), new Vector2(0.94f, 0.46f), Vector2.zero, Vector2.zero);
+        loungeMachineIconPlaceholder = FindOrCreatePlaceholder(loungeMachinePanel, "IconPlaceholder_LoungeMachine", "WASH");
+        ApplyAnchoredPanel(loungeMachineIconPlaceholder, new Vector2(0.74f, 0.18f), new Vector2(0.94f, 0.82f), Vector2.zero, Vector2.zero);
+        loungeWarningBadgePlaceholder = FindOrCreatePlaceholder(loungeResultPanel, "BadgePlaceholder_LoungeWarning", "WARN");
+        ApplyAnchoredPanel(loungeWarningBadgePlaceholder, new Vector2(0.78f, 0.18f), new Vector2(0.94f, 0.82f), Vector2.zero, Vector2.zero);
+
+        ApplyActionGrid(loungeActionsPanel, 2, new Vector2(220f, 44f), 10f);
+        FindOrCreateActionButtonWithIconPlaceholder(loungeActionsPanel, "Button_ServeLoungeShowcase", "Serve", ServeLoungeNow);
+        FindOrCreateActionButtonWithIconPlaceholder(loungeActionsPanel, "Button_WashCupsShowcase", "Wash", StartLoungeWash);
+        FindOrCreateActionButtonWithIconPlaceholder(loungeActionsPanel, "Button_RestockLoungeShowcase", "Restock", RestockLounge);
+        FindOrCreateActionButtonWithIconPlaceholder(loungeActionsPanel, "Button_StartDayLoungeShowcase", "Start", StartDemoOperatingPeriod);
+        HideLegacyLoungeCards();
+    }
+
+    private void HideLegacyLoungeCards()
+    {
+        if (loungeViewPanel == null)
+        {
+            return;
+        }
+
+        // 旧 Lounge 卡片如果还在场景里，隐藏掉，避免新旧 UI 叠在一起。
+        string[] legacyCardNames =
+        {
+            "Card_LoungeStatus",
+            "Card_LoungeResult"
+        };
+
+        for (int i = 0; i < legacyCardNames.Length; i++)
+        {
+            Transform legacyCard = loungeViewPanel.Find(legacyCardNames[i]);
+            if (legacyCard != null)
+            {
+                legacyCard.gameObject.SetActive(false);
+            }
+        }
     }
 
     private string BuildFrontDeskStatusText()
@@ -704,7 +782,7 @@ public class Room2DShowcaseViewController : MonoBehaviour
         Room2DEntity room = GetSelectedRoomEntity();
         if (room == null)
         {
-            return "Selected Room\nTap a room to inspect it.";
+            return "<b>Selected Room</b>\nTap a room to inspect it.";
         }
 
         string reservedText = demandLoop != null && demandLoop.IsRoomReservedForPrototypeDemand(room) ? "Yes" : "No";
@@ -712,41 +790,44 @@ public class Room2DShowcaseViewController : MonoBehaviour
         string cleanSuitability = demandLoop != null ? demandLoop.GetPrototypeCleanlinessSuitability(room).ToString() : "N/A";
         string wearSuitability = demandLoop != null ? demandLoop.GetPrototypeWearSuitability(room).ToString() : "N/A";
 
-        return "Selected Room\n"
-            + room.roomName + "  |  State: " + room.GetStateDisplayName() + "\n"
-            + "Type: " + room.prototypeRoomType
-            + "  |  Floor: " + room.floorNumber
-            + "  |  Facing: " + room.prototypeFacing + "\n"
-            + "Checked Out: " + GetYesNo(room.guestCheckedOut)
-            + "  |  Reserved: " + reservedText + "\n"
-            + "Clean Priority: " + GetYesNo(room.markedCleaningPriority)
-            + "  |  Insp Priority: " + GetYesNo(room.markedInspectionPriority) + "\n"
-            + "Clean Suitability: " + cleanSuitability
-            + "  |  Wear Suitability: " + wearSuitability
-            + "  |  Wait: " + FormatSeconds(room.stateElapsedSeconds) + "\n"
+        return "<b>Selected Room</b>\n"
+            + "<b>" + room.roomName + "</b>     " + room.GetStateDisplayName() + "\n"
+            + "Type " + room.prototypeRoomType
+            + "  |  Floor " + room.floorNumber
+            + "  |  " + room.prototypeFacing + "\n"
+            + "Checked Out " + GetYesNo(room.guestCheckedOut)
+            + "  |  Reserved " + reservedText + "\n"
+            + "Clean Prio " + GetYesNo(room.markedCleaningPriority)
+            + "  |  Insp Prio " + GetYesNo(room.markedInspectionPriority) + "\n"
+            + "Clean " + cleanSuitability
+            + "  |  Wear " + wearSuitability
+            + "  |  Wait " + FormatSeconds(room.stateElapsedSeconds) + "\n"
             + ShortenMatchHint(matchHint);
     }
 
     private string BuildRoomWorkerText()
     {
-        return "Room Actions\n"
-            + roomActionHint + "\n"
-            + BuildCompactWorkerText();
+        return "<b>Workers</b>\n"
+            + "Selected: " + GetSelectedWorkerLine() + "\n"
+            + "Target: " + GetSelectedRoomDisplayNameForHint() + "\n"
+            + BuildWorkerRuntimeLine() + "\n"
+            + "Last: " + roomActionHint;
     }
 
     private string BuildRoomDemandText()
     {
         if (demandLoop == null)
         {
-            return "Demand\nNone";
+            return "<b>Rooms</b>\n" + BuildCompactRoomStateLine() + "\nDemand: None";
         }
 
-        return "Demand\n"
-            + "Upcoming: " + demandLoop.upcomingDemandType
-            + " in " + FormatSeconds(demandLoop.upcomingDemandEtaSeconds) + "\n"
-            + "Active: " + GetActiveDemandShortLine() + "\n"
-            + "Reserved: " + demandLoop.reservedRoomName + "\n"
-            + "Last: " + demandLoop.lastChangedRoomName
+        return "<b>Rooms</b>\n"
+            + BuildCompactRoomStateLine() + "\n"
+            + "<b>Demand</b>  Upcoming: " + demandLoop.upcomingDemandType
+            + " in " + FormatSeconds(demandLoop.upcomingDemandEtaSeconds)
+            + "  |  Active: " + GetActiveDemandShortLine() + "\n"
+            + "Reserved: " + demandLoop.reservedRoomName
+            + "  |  Last: " + demandLoop.lastChangedRoomName
             + " / " + demandLoop.lastOutcomeLabel;
     }
 
@@ -779,6 +860,10 @@ public class Room2DShowcaseViewController : MonoBehaviour
         {
             roomWorkerPopupText.text = BuildWorkerPopupText();
         }
+
+        UpdatePlaceholderLabel(roomTypeIconPlaceholder, hasRoom ? room.prototypeRoomType.ToString() : "TYPE");
+        UpdatePlaceholderLabel(roomStateIconPlaceholder, hasRoom ? room.GetStateDisplayName() : "STATE");
+        UpdatePlaceholderLabel(roomWorkerPortraitPlaceholder, workerSelectionPanel != null ? workerSelectionPanel.selectedWorkerName : "WORKER");
 
         RefreshWorkerPopupButtonState();
     }
@@ -822,25 +907,60 @@ public class Room2DShowcaseViewController : MonoBehaviour
 
     private string BuildLoungeStatusText()
     {
-        string demoText = demoDayController != null
-            ? demoDayController.GetCompactDemoDayText()
-            : "Demo: None";
+        string phase = demoDayController != null ? demoDayController.currentPhase.ToString() : "None";
+        string time = demoDayController != null ? FormatSeconds(demoDayController.operatingTimerSeconds) : "0s";
+        string duration = demoDayController != null ? FormatSeconds(demoDayController.operatingDurationSeconds) : "0s";
+        string warning = lounge != null ? lounge.loungeWarning : "None";
 
-        return "Lounge View\n"
-            + demoText + "\n\n"
-            + BuildCompactLoungeText();
+        return "<b>Lounge</b>\n"
+            + phase + "  |  " + time + " / " + duration + "\n"
+            + "Service: " + GetLoungeServiceStateText() + "\n"
+            + "Warning: " + warning;
+    }
+
+    private string BuildLoungeStockText()
+    {
+        if (lounge == null)
+        {
+            return "<b>Stock</b>\nNo lounge linked.";
+        }
+
+        return "<b>Stock</b>\n"
+            + "Clean Cups     " + lounge.cleanCups + "\n"
+            + "Dirty Cups     " + lounge.dirtyCups + "\n"
+            + "Milk           " + lounge.milkStock + "\n"
+            + "Tea / Coffee   " + lounge.teaCoffeeStock;
+    }
+
+    private string BuildLoungeMachineText()
+    {
+        if (lounge == null)
+        {
+            return "<b>Washing Machine</b>\nNo lounge linked.";
+        }
+
+        string washingState = lounge.washing ? "Running" : "Idle";
+        string progress = lounge.washing
+            ? FormatSeconds(lounge.washTimerSeconds) + " / " + FormatSeconds(lounge.washDurationSeconds)
+            : "Ready";
+
+        return "<b>Washing Machine</b>\n"
+            + "State: " + washingState + "\n"
+            + "Cups: " + lounge.cupsInWashing + "\n"
+            + "Progress: " + progress;
     }
 
     private string BuildLoungeResultText()
     {
         if (lounge == null)
         {
-            return "Lounge Result\nNone";
+            return "<b>Warnings</b>\nNone";
         }
 
-        return "Lounge Result\n"
-            + "Warning: " + lounge.loungeWarning + "\n"
-            + "Served/Missed: " + lounge.servedDrinkCount + " / " + lounge.missedServiceCount + "\n"
+        return "<b>Warnings</b>\n"
+            + lounge.loungeWarning
+            + "  |  Served " + lounge.servedDrinkCount
+            + " / Missed " + lounge.missedServiceCount + "\n"
             + "Last: " + lounge.lastLoungeResult;
     }
 
@@ -882,6 +1002,38 @@ public class Room2DShowcaseViewController : MonoBehaviour
             + " " + FormatSeconds(roomOverview.highestPriorityDirtySeconds);
     }
 
+    private string BuildCompactRoomStateLine()
+    {
+        int dirty = 0;
+        int cleaning = 0;
+        int inspection = 0;
+        int ready = 0;
+        int occupied = 0;
+        int blocked = 0;
+
+        Room2DEntity[] rooms = roomOverview != null && roomOverview.rooms != null && roomOverview.rooms.Length > 0
+            ? roomOverview.rooms
+            : FindObjectsByType<Room2DEntity>(FindObjectsSortMode.None);
+
+        for (int i = 0; i < rooms.Length; i++)
+        {
+            Room2DEntity room = rooms[i];
+            if (room == null)
+            {
+                continue;
+            }
+
+            CountRoomState(room.currentState, ref dirty, ref cleaning, ref inspection, ref ready, ref occupied, ref blocked);
+        }
+
+        return "D " + dirty
+            + "  C " + cleaning
+            + "  I " + inspection
+            + "  R " + ready
+            + "  O " + occupied
+            + "  B " + blocked;
+    }
+
     private string BuildCompactWorkerText()
     {
         if (workerSelectionPanel == null)
@@ -892,6 +1044,66 @@ public class Room2DShowcaseViewController : MonoBehaviour
         return "Workers\n"
             + "Selected: " + workerSelectionPanel.selectedWorkerName + "\n"
             + "Last: " + workerSelectionPanel.lastManualAssignmentResult;
+    }
+
+    private string GetSelectedWorkerLine()
+    {
+        if (workerSelectionPanel == null)
+        {
+            return "None";
+        }
+
+        return workerSelectionPanel.selectedWorkerName
+            + " (" + workerSelectionPanel.selectedWorkerType + ")";
+    }
+
+    private string BuildWorkerRuntimeLine()
+    {
+        if (workerSelectionPanel == null)
+        {
+            return "State: None";
+        }
+
+        if (workerSelectionPanel.selectedWorkerType == Room2DWorkerSelectionPanel.PrototypeWorkerType.Housekeeper)
+        {
+            Housekeeper2D housekeeper = GetSelectedHousekeeperForDisplay();
+            if (housekeeper == null)
+            {
+                return "HSK: None";
+            }
+
+            return "HSK: " + housekeeper.currentState
+                + " / " + housekeeper.assignedRoomName
+                + " / " + FormatSeconds(housekeeper.cleaningTimerSeconds);
+        }
+
+        if (workerSelectionPanel.selectedWorkerType == Room2DWorkerSelectionPanel.PrototypeWorkerType.Inspector)
+        {
+            Inspector2D inspectorWorker = workerSelectionPanel.inspector;
+            if (inspectorWorker == null)
+            {
+                return "Inspector: None";
+            }
+
+            return "Inspector: " + inspectorWorker.currentState
+                + " / " + inspectorWorker.assignedRoomName
+                + " / " + FormatSeconds(inspectorWorker.inspectionTimerSeconds);
+        }
+
+        return "State: No worker selected";
+    }
+
+    private Housekeeper2D GetSelectedHousekeeperForDisplay()
+    {
+        if (workerSelectionPanel == null
+            || workerSelectionPanel.housekeepers == null
+            || workerSelectionPanel.housekeepers.Length == 0)
+        {
+            return null;
+        }
+
+        int index = Mathf.Clamp(workerSelectionPanel.selectedHousekeeperIndex, 0, workerSelectionPanel.housekeepers.Length - 1);
+        return workerSelectionPanel.housekeepers[index];
     }
 
     private string BuildCompactLoungeText()
@@ -911,6 +1123,48 @@ public class Room2DShowcaseViewController : MonoBehaviour
             + "Milk: " + lounge.milkStock + "\n"
             + "Tea/Coffee: " + lounge.teaCoffeeStock + "\n"
             + "Washing: " + washingText;
+    }
+
+    private string GetLoungeServiceStateText()
+    {
+        if (lounge == null)
+        {
+            return "None";
+        }
+
+        if (lounge.washing)
+        {
+            return "Washing cups";
+        }
+
+        if (lounge.cleanCups <= lounge.lowCleanCupThreshold)
+        {
+            return "Needs cups";
+        }
+
+        if (lounge.milkStock <= lounge.lowStockThreshold || lounge.teaCoffeeStock <= lounge.lowStockThreshold)
+        {
+            return "Needs stock";
+        }
+
+        return lounge.runDuringPlay ? "Serving" : "Paused";
+    }
+
+    private void RefreshLoungePlaceholderLabels()
+    {
+        if (lounge == null)
+        {
+            UpdatePlaceholderLabel(loungeStockIconPlaceholder, "STOCK");
+            UpdatePlaceholderLabel(loungeCupIconPlaceholder, "CUPS");
+            UpdatePlaceholderLabel(loungeMachineIconPlaceholder, "WASH");
+            UpdatePlaceholderLabel(loungeWarningBadgePlaceholder, "WARN");
+            return;
+        }
+
+        UpdatePlaceholderLabel(loungeStockIconPlaceholder, "MILK\n" + lounge.milkStock);
+        UpdatePlaceholderLabel(loungeCupIconPlaceholder, "CUPS\n" + lounge.cleanCups);
+        UpdatePlaceholderLabel(loungeMachineIconPlaceholder, lounge.washing ? "RUN" : "IDLE");
+        UpdatePlaceholderLabel(loungeWarningBadgePlaceholder, lounge.loungeWarning == "None" ? "OK" : "WARN");
     }
 
     private string GetActiveDemandShortLine()
@@ -1029,7 +1283,29 @@ public class Room2DShowcaseViewController : MonoBehaviour
             return matchHint;
         }
 
-        return lines[0];
+        string firstLine = lines[0];
+        int arrowIndex = firstLine.IndexOf("->");
+        if (arrowIndex >= 0 && arrowIndex + 2 < firstLine.Length)
+        {
+            return "Match: " + firstLine.Substring(arrowIndex + 2).Trim();
+        }
+
+        return firstLine.Replace("Match Hint: ", "Match: ");
+    }
+
+    private void UpdatePlaceholderLabel(RectTransform placeholder, string label)
+    {
+        if (placeholder == null)
+        {
+            return;
+        }
+
+        Transform labelTransform = placeholder.Find("Text_PlaceholderLabel");
+        TMP_Text labelText = labelTransform != null ? labelTransform.GetComponent<TMP_Text>() : null;
+        if (labelText != null)
+        {
+            labelText.text = label;
+        }
     }
 
     private string GetPhaseActionHint()
@@ -1746,6 +2022,7 @@ public class Room2DShowcaseViewController : MonoBehaviour
         ApplyDefaultFont(text);
         text.fontSize = fontSize;
         text.alignment = TextAlignmentOptions.TopLeft;
+        text.richText = true;
         text.textWrappingMode = TextWrappingModes.Normal;
         text.raycastTarget = false;
     }
