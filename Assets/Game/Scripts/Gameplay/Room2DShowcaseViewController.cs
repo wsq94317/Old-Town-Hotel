@@ -24,12 +24,15 @@ public class Room2DShowcaseViewController : MonoBehaviour
     public Room2DWorkerSelectionPanel workerSelectionPanel;
     public FrontDesk2D frontDesk;
     public Lounge2D lounge;
+    public Room2DController[] roomControllers;
 
     [Header("Build")]
     // 开始运行时自动创建三个展示屏幕，减少手动搭 UI 的步骤。
     public bool autoBuildShellOnStart = true;
     // Showcase 模式下先隐藏旧 Debug HUD，避免两套 UI 叠在一起导致完全无法阅读。
     public bool hideLegacyDebugHudWhileShowcaseRuns = true;
+    // Front Desk / Lounge 不是房间操作页，默认隐藏房间视觉，避免录屏时文字和房间叠在一起。
+    public bool hideRoomVisualsOutsideRoomView = true;
     public Canvas targetCanvas;
     public RectTransform showcaseRoot;
     public RectTransform navigationPanel;
@@ -66,6 +69,9 @@ public class Room2DShowcaseViewController : MonoBehaviour
     public string lastShellResult = "Not built";
 
     private const string RootName = "Room2DShowcaseViews";
+    private bool roomVisualCacheReady;
+    private Renderer[] cachedRoomRenderers;
+    private Canvas[] cachedRoomCanvases;
 
     private void Start()
     {
@@ -109,9 +115,9 @@ public class Room2DShowcaseViewController : MonoBehaviour
         loungeTabButton = FindOrCreateButton(navigationPanel, "Button_ShowLoungeView", "Lounge");
         WireTabButtons();
 
-        frontDeskViewPanel = FindOrCreatePanel(showcaseRoot, "Panel_FrontDeskView", new Color(0.02f, 0.03f, 0.04f, 0.96f));
+        frontDeskViewPanel = FindOrCreatePanel(showcaseRoot, "Panel_FrontDeskView", new Color(0.02f, 0.03f, 0.04f, 1f));
         roomViewPanel = FindOrCreatePanel(showcaseRoot, "Panel_RoomView", new Color(0.02f, 0.03f, 0.04f, 0.0f));
-        loungeViewPanel = FindOrCreatePanel(showcaseRoot, "Panel_LoungeView", new Color(0.02f, 0.03f, 0.04f, 0.96f));
+        loungeViewPanel = FindOrCreatePanel(showcaseRoot, "Panel_LoungeView", new Color(0.02f, 0.03f, 0.04f, 1f));
 
         ApplyViewPanel(frontDeskViewPanel);
         ApplyViewPanel(roomViewPanel);
@@ -127,6 +133,7 @@ public class Room2DShowcaseViewController : MonoBehaviour
         ApplyShellText(loungeShellText, TextAlignmentOptions.TopLeft);
         ApplyNavLabelText(activeViewLabelText);
         HideOldNavLabelIfItExists();
+        HideShellTextHeaders();
 
         BuildFrontDeskViewContent();
         BuildRoomViewContent();
@@ -183,6 +190,7 @@ public class Room2DShowcaseViewController : MonoBehaviour
             showcaseRoot.SetAsLastSibling();
         }
 
+        ApplyRoomVisualVisibilityForCurrentView();
         RefreshShellText();
     }
 
@@ -241,6 +249,11 @@ public class Room2DShowcaseViewController : MonoBehaviour
         {
             lounge = FindFirstObjectByType<Lounge2D>();
         }
+
+        if (roomControllers == null || roomControllers.Length == 0)
+        {
+            roomControllers = FindObjectsByType<Room2DController>(FindObjectsSortMode.None);
+        }
     }
 
     private bool FindCanvasIfNeeded()
@@ -270,7 +283,7 @@ public class Room2DShowcaseViewController : MonoBehaviour
 
         if (activeViewLabelText != null)
         {
-            activeViewLabelText.text = "View: " + currentView;
+            activeViewLabelText.text = GetViewTitleText();
         }
 
         if (frontDeskShellText != null)
@@ -326,16 +339,16 @@ public class Room2DShowcaseViewController : MonoBehaviour
         frontDeskDemandPanel = FindOrCreatePanel(frontDeskViewPanel, "Card_FrontDeskDemand", new Color(0.08f, 0.09f, 0.12f, 0.96f));
         frontDeskActionsPanel = FindOrCreatePanel(frontDeskViewPanel, "Card_FrontDeskActions", new Color(0.05f, 0.05f, 0.07f, 0.96f));
 
-        ApplyAnchoredPanel(frontDeskStatusPanel, new Vector2(0.06f, 0.68f), new Vector2(0.94f, 0.92f), Vector2.zero, Vector2.zero);
-        ApplyAnchoredPanel(frontDeskDemandPanel, new Vector2(0.06f, 0.30f), new Vector2(0.94f, 0.64f), Vector2.zero, Vector2.zero);
-        ApplyAnchoredPanel(frontDeskActionsPanel, new Vector2(0.06f, 0.07f), new Vector2(0.94f, 0.24f), Vector2.zero, Vector2.zero);
+        ApplyAnchoredPanel(frontDeskStatusPanel, new Vector2(0.07f, 0.66f), new Vector2(0.93f, 0.91f), Vector2.zero, Vector2.zero);
+        ApplyAnchoredPanel(frontDeskDemandPanel, new Vector2(0.07f, 0.31f), new Vector2(0.93f, 0.63f), Vector2.zero, Vector2.zero);
+        ApplyAnchoredPanel(frontDeskActionsPanel, new Vector2(0.07f, 0.12f), new Vector2(0.93f, 0.27f), Vector2.zero, Vector2.zero);
 
         frontDeskStatusText = FindOrCreateText(frontDeskStatusPanel, "Text_FrontDeskStatus", "Front Desk");
         frontDeskDemandText = FindOrCreateText(frontDeskDemandPanel, "Text_FrontDeskDemand", "Demand");
-        ApplyCardText(frontDeskStatusText, 20f);
-        ApplyCardText(frontDeskDemandText, 18f);
+        ApplyCardText(frontDeskStatusText, 15f);
+        ApplyCardText(frontDeskDemandText, 14f);
 
-        ApplyActionGrid(frontDeskActionsPanel, 2, new Vector2(230f, 52f), 16f);
+        ApplyActionGrid(frontDeskActionsPanel, 2, new Vector2(190f, 42f), 12f);
         FindOrCreateActionButton(frontDeskActionsPanel, "Button_StartOperating", "Start Day", StartDemoOperatingPeriod);
         FindOrCreateActionButton(frontDeskActionsPanel, "Button_ActivateDemand", "Call Guest", ActivateUpcomingDemandNow);
         FindOrCreateActionButton(frontDeskActionsPanel, "Button_AssignDemandShowcase", "Assign Room", AssignSelectedRoomToDemand);
@@ -348,16 +361,16 @@ public class Room2DShowcaseViewController : MonoBehaviour
         roomWorkersPanel = FindOrCreatePanel(roomViewPanel, "Card_RoomWorkers", new Color(0.03f, 0.04f, 0.06f, 0.88f));
         roomActionsPanel = FindOrCreatePanel(roomViewPanel, "Card_RoomActions", new Color(0.03f, 0.04f, 0.06f, 0.92f));
 
-        ApplyAnchoredPanel(roomSelectedPanel, new Vector2(0.04f, 0.10f), new Vector2(0.48f, 0.34f), Vector2.zero, Vector2.zero);
-        ApplyAnchoredPanel(roomWorkersPanel, new Vector2(0.52f, 0.10f), new Vector2(0.96f, 0.34f), Vector2.zero, Vector2.zero);
-        ApplyAnchoredPanel(roomActionsPanel, new Vector2(0.54f, 0.48f), new Vector2(0.96f, 0.86f), Vector2.zero, Vector2.zero);
+        ApplyAnchoredPanel(roomSelectedPanel, new Vector2(0.04f, 0.10f), new Vector2(0.48f, 0.30f), Vector2.zero, Vector2.zero);
+        ApplyAnchoredPanel(roomWorkersPanel, new Vector2(0.52f, 0.10f), new Vector2(0.96f, 0.30f), Vector2.zero, Vector2.zero);
+        ApplyAnchoredPanel(roomActionsPanel, new Vector2(0.55f, 0.56f), new Vector2(0.96f, 0.88f), Vector2.zero, Vector2.zero);
 
         selectedRoomText = FindOrCreateText(roomSelectedPanel, "Text_SelectedRoomCard", "Selected Room");
         roomWorkersText = FindOrCreateText(roomWorkersPanel, "Text_WorkerCard", "Workers");
-        ApplyCardText(selectedRoomText, 18f);
-        ApplyCardText(roomWorkersText, 17f);
+        ApplyCardText(selectedRoomText, 13f);
+        ApplyCardText(roomWorkersText, 13f);
 
-        ApplyActionGrid(roomActionsPanel, 2, new Vector2(190f, 46f), 10f);
+        ApplyActionGrid(roomActionsPanel, 2, new Vector2(150f, 36f), 8f);
         FindOrCreateActionButton(roomActionsPanel, "Button_PreviousRoomShowcase", "Prev Room", SelectPreviousRoom);
         FindOrCreateActionButton(roomActionsPanel, "Button_NextRoomShowcase", "Next Room", SelectNextRoom);
         FindOrCreateActionButton(roomActionsPanel, "Button_SelectHSKShowcase", "Select HSK", SelectHousekeeper);
@@ -374,13 +387,13 @@ public class Room2DShowcaseViewController : MonoBehaviour
         loungeStatusPanel = FindOrCreatePanel(loungeViewPanel, "Card_LoungeStatus", new Color(0.05f, 0.07f, 0.09f, 0.96f));
         loungeActionsPanel = FindOrCreatePanel(loungeViewPanel, "Card_LoungeActions", new Color(0.05f, 0.05f, 0.07f, 0.96f));
 
-        ApplyAnchoredPanel(loungeStatusPanel, new Vector2(0.06f, 0.36f), new Vector2(0.94f, 0.88f), Vector2.zero, Vector2.zero);
-        ApplyAnchoredPanel(loungeActionsPanel, new Vector2(0.06f, 0.10f), new Vector2(0.94f, 0.30f), Vector2.zero, Vector2.zero);
+        ApplyAnchoredPanel(loungeStatusPanel, new Vector2(0.08f, 0.36f), new Vector2(0.92f, 0.84f), Vector2.zero, Vector2.zero);
+        ApplyAnchoredPanel(loungeActionsPanel, new Vector2(0.08f, 0.13f), new Vector2(0.92f, 0.30f), Vector2.zero, Vector2.zero);
 
         loungeStatusText = FindOrCreateText(loungeStatusPanel, "Text_LoungeStatus", "Lounge");
-        ApplyCardText(loungeStatusText, 22f);
+        ApplyCardText(loungeStatusText, 18f);
 
-        ApplyActionGrid(loungeActionsPanel, 2, new Vector2(230f, 54f), 16f);
+        ApplyActionGrid(loungeActionsPanel, 2, new Vector2(190f, 44f), 12f);
         FindOrCreateActionButton(loungeActionsPanel, "Button_ServeLoungeShowcase", "Serve Drink", ServeLoungeNow);
         FindOrCreateActionButton(loungeActionsPanel, "Button_WashCupsShowcase", "Wash Cups", StartLoungeWash);
         FindOrCreateActionButton(loungeActionsPanel, "Button_RestockLoungeShowcase", "Restock", RestockLounge);
@@ -389,15 +402,22 @@ public class Room2DShowcaseViewController : MonoBehaviour
 
     private string BuildFrontDeskStatusText()
     {
-        string demoText = demoDayController != null
-            ? demoDayController.GetRecordingStatusText()
-            : "Demo Flow\nNone";
+        string phase = demoDayController != null ? demoDayController.currentPhase.ToString() : "None";
+        string time = demoDayController != null ? FormatSeconds(demoDayController.operatingTimerSeconds) : "0s";
+        string duration = demoDayController != null ? FormatSeconds(demoDayController.operatingDurationSeconds) : "0s";
+        string queue = frontDesk != null ? frontDesk.currentQueueCount.ToString() : "0";
+        string wait = frontDesk != null ? FormatSeconds(frontDesk.waitingTimePressureSeconds) : "0s";
+        string delayed = frontDesk != null ? frontDesk.totalDelayedCheckIns.ToString() : "0";
+        string score = demandLoop != null
+            ? demandLoop.prototypeSatisfactionScore + " (" + demandLoop.prototypeSatisfactionTrend + ")"
+            : "0";
 
-        string frontDeskText = frontDesk != null
-            ? frontDesk.GetFrontDeskSummaryText()
-            : "Front Desk\nNone";
-
-        return demoText + "\n\n" + frontDeskText;
+        return "Front Desk\n"
+            + "Phase: " + phase + "   Time: " + time + " / " + duration + "\n"
+            + "Queue: " + queue + "   Wait: " + wait + "\n"
+            + "Delayed Check-ins: " + delayed + "\n"
+            + "Satisfaction: " + score + "\n"
+            + "Last: " + GetFrontDeskLastResultText();
     }
 
     private string BuildFrontDeskDemandText()
@@ -407,10 +427,18 @@ public class Room2DShowcaseViewController : MonoBehaviour
             return "Demand\nNone";
         }
 
-        return demandLoop.GetUpcomingDemandCardText() + "\n\n"
-            + demandLoop.GetActiveDemandCardText() + "\n\n"
-            + demandLoop.GetComplaintReassignmentCardText() + "\n\n"
-            + demandLoop.GetResolvedDemandCardText();
+        return "Demand\n"
+            + "Upcoming: " + demandLoop.upcomingDemandType
+            + " / " + demandLoop.upcomingDemandRoomPreference + "\n"
+            + "ETA: " + FormatSeconds(demandLoop.upcomingDemandEtaSeconds)
+            + "   Reserved: " + demandLoop.reservedRoomName + "\n"
+            + "Active: " + GetActiveDemandShortLine() + "\n"
+            + "Complaint: " + GetComplaintShortLine() + "\n"
+            + "Latest: " + demandLoop.lastChangedRoomName
+            + " / " + demandLoop.lastMatchQualityLabel
+            + " / " + demandLoop.lastOutcomeLabel + "\n"
+            + "Totals: " + demandLoop.successfulDemandCount
+            + " ok, " + demandLoop.unmetDemandCount + " missed";
     }
 
     private string BuildSelectedRoomText()
@@ -424,28 +452,23 @@ public class Room2DShowcaseViewController : MonoBehaviour
         string reservedText = demandLoop != null && demandLoop.IsRoomReservedForPrototypeDemand(room) ? "Yes" : "No";
         string matchHint = demandLoop != null ? demandLoop.GetPrototypeMatchHintForRoom(room) : "Match Hint: None";
 
-        return "Selected Room\n"
-            + room.roomName + "\n"
-            + "State: " + room.GetStateDisplayName() + "\n"
-            + "Type: " + room.prototypeRoomType + "\n"
-            + "Floor: " + room.floorNumber + "\n"
+        return "Selected\n"
+            + room.roomName + "   " + room.GetStateDisplayName() + "\n"
+            + "Type: " + room.prototypeRoomType
+            + "   Floor: " + room.floorNumber + "\n"
             + "Facing: " + room.prototypeFacing + "\n"
-            + "Checked Out: " + GetYesNo(room.guestCheckedOut) + "\n"
-            + "Reserved: " + reservedText + "\n"
-            + "CLEAN PRIO: " + GetYesNo(room.markedCleaningPriority) + "\n"
-            + "INSP PRIO: " + GetYesNo(room.markedInspectionPriority) + "\n"
-            + "Wait: " + FormatSeconds(room.stateElapsedSeconds) + "\n\n"
-            + matchHint;
+            + "Reserved: " + reservedText
+            + "   Checked Out: " + GetYesNo(room.guestCheckedOut) + "\n"
+            + "CLEAN: " + GetYesNo(room.markedCleaningPriority)
+            + "   INSP: " + GetYesNo(room.markedInspectionPriority) + "\n"
+            + "Wait: " + FormatSeconds(room.stateElapsedSeconds) + "\n"
+            + ShortenMatchHint(matchHint);
     }
 
     private string BuildRoomWorkerText()
     {
-        string workerText = workerSelectionPanel != null
-            ? workerSelectionPanel.GetWorkerPanelText()
-            : "Workers\nNone";
-
         string summaryText = BuildRoomCountSummaryText();
-        return summaryText + "\n\n" + workerText;
+        return summaryText + "\n\n" + BuildCompactWorkerText();
     }
 
     private string BuildLoungeStatusText()
@@ -454,13 +477,9 @@ public class Room2DShowcaseViewController : MonoBehaviour
             ? demoDayController.GetCompactDemoDayText()
             : "Demo: None";
 
-        string loungeText = lounge != null
-            ? lounge.GetLoungeSummaryText()
-            : "Lounge\nNone";
-
         return "Lounge View\n"
             + demoText + "\n\n"
-            + loungeText;
+            + BuildCompactLoungeText();
     }
 
     private string BuildRoomCountSummaryText()
@@ -499,6 +518,94 @@ public class Room2DShowcaseViewController : MonoBehaviour
             + "Occupied: " + occupied + "  Blocked: " + blocked + "\n"
             + "Urgent Dirty: " + roomOverview.highestPriorityDirtyRoomName
             + " " + FormatSeconds(roomOverview.highestPriorityDirtySeconds);
+    }
+
+    private string BuildCompactWorkerText()
+    {
+        if (workerSelectionPanel == null)
+        {
+            return "Workers\nNone";
+        }
+
+        return "Workers\n"
+            + "Selected: " + workerSelectionPanel.selectedWorkerName + "\n"
+            + "Last: " + workerSelectionPanel.lastManualAssignmentResult;
+    }
+
+    private string BuildCompactLoungeText()
+    {
+        if (lounge == null)
+        {
+            return "Lounge\nNone";
+        }
+
+        string washingText = lounge.washing
+            ? "Yes " + FormatSeconds(lounge.washTimerSeconds) + " / " + FormatSeconds(lounge.washDurationSeconds)
+            : "No";
+
+        return "Stock\n"
+            + "Clean Cups: " + lounge.cleanCups + "\n"
+            + "Dirty Cups: " + lounge.dirtyCups + "\n"
+            + "Milk: " + lounge.milkStock + "\n"
+            + "Tea/Coffee: " + lounge.teaCoffeeStock + "\n"
+            + "Washing: " + washingText + "\n"
+            + "Warning: " + lounge.loungeWarning + "\n"
+            + "Served/Missed: " + lounge.servedDrinkCount + " / " + lounge.missedServiceCount + "\n"
+            + "Last: " + lounge.lastLoungeResult;
+    }
+
+    private string GetActiveDemandShortLine()
+    {
+        if (!demandLoop.activeDemandWaitingForManualAssignment)
+        {
+            return "None";
+        }
+
+        return demandLoop.activeDemandType
+            + " waiting " + FormatSeconds(demandLoop.activeDemandWaitSeconds)
+            + " / " + FormatSeconds(demandLoop.manualAssignmentFallbackDelaySeconds);
+    }
+
+    private string GetComplaintShortLine()
+    {
+        if (demandLoop.complaintWaitingForReassignment)
+        {
+            return "Waiting " + FormatSeconds(demandLoop.complaintReassignmentWaitSeconds)
+                + " / patience " + FormatSeconds(demandLoop.complaintPatienceRemainingSeconds);
+        }
+
+        if (demandLoop.pendingComplaintRoom != null)
+        {
+            return "Pending from " + demandLoop.pendingComplaintRoomName;
+        }
+
+        return "None";
+    }
+
+    private string GetFrontDeskLastResultText()
+    {
+        if (frontDesk == null || string.IsNullOrEmpty(frontDesk.lastFrontDeskResult))
+        {
+            return "None";
+        }
+
+        return frontDesk.lastFrontDeskResult;
+    }
+
+    private string ShortenMatchHint(string matchHint)
+    {
+        if (string.IsNullOrEmpty(matchHint))
+        {
+            return "Match: None";
+        }
+
+        string[] lines = matchHint.Split('\n');
+        if (lines.Length == 0)
+        {
+            return matchHint;
+        }
+
+        return lines[0];
     }
 
     private void CountRoomState(
@@ -693,6 +800,116 @@ public class Room2DShowcaseViewController : MonoBehaviour
         return remainingSeconds + "s";
     }
 
+    private string GetViewTitleText()
+    {
+        switch (currentView)
+        {
+            case ShowcaseView.FrontDesk:
+                return "Front Desk";
+            case ShowcaseView.Rooms:
+                return "Rooms";
+            case ShowcaseView.Lounge:
+                return "Lounge";
+            default:
+                return "Showcase";
+        }
+    }
+
+    private void ApplyRoomVisualVisibilityForCurrentView()
+    {
+        if (!hideRoomVisualsOutsideRoomView)
+        {
+            SetRoomVisualsVisible(true);
+            return;
+        }
+
+        SetRoomVisualsVisible(currentView == ShowcaseView.Rooms);
+    }
+
+    private void SetRoomVisualsVisible(bool visible)
+    {
+        CacheRoomVisualsIfNeeded();
+
+        if (cachedRoomRenderers != null)
+        {
+            for (int i = 0; i < cachedRoomRenderers.Length; i++)
+            {
+                if (cachedRoomRenderers[i] != null)
+                {
+                    cachedRoomRenderers[i].enabled = visible;
+                }
+            }
+        }
+
+        if (cachedRoomCanvases != null)
+        {
+            for (int i = 0; i < cachedRoomCanvases.Length; i++)
+            {
+                if (cachedRoomCanvases[i] != null)
+                {
+                    cachedRoomCanvases[i].enabled = visible;
+                }
+            }
+        }
+    }
+
+    private void CacheRoomVisualsIfNeeded()
+    {
+        if (roomVisualCacheReady)
+        {
+            return;
+        }
+
+        if (roomControllers == null || roomControllers.Length == 0)
+        {
+            roomControllers = FindObjectsByType<Room2DController>(FindObjectsSortMode.None);
+        }
+
+        int rendererCount = 0;
+        int canvasCount = 0;
+
+        for (int i = 0; i < roomControllers.Length; i++)
+        {
+            if (roomControllers[i] == null)
+            {
+                continue;
+            }
+
+            rendererCount += roomControllers[i].GetComponentsInChildren<Renderer>(true).Length;
+            canvasCount += roomControllers[i].GetComponentsInChildren<Canvas>(true).Length;
+        }
+
+        cachedRoomRenderers = new Renderer[rendererCount];
+        cachedRoomCanvases = new Canvas[canvasCount];
+
+        int rendererIndex = 0;
+        int canvasIndex = 0;
+
+        for (int i = 0; i < roomControllers.Length; i++)
+        {
+            if (roomControllers[i] == null)
+            {
+                continue;
+            }
+
+            Renderer[] renderers = roomControllers[i].GetComponentsInChildren<Renderer>(true);
+            for (int rendererChildIndex = 0; rendererChildIndex < renderers.Length; rendererChildIndex++)
+            {
+                cachedRoomRenderers[rendererIndex] = renderers[rendererChildIndex];
+                rendererIndex++;
+            }
+
+            Canvas[] canvases = roomControllers[i].GetComponentsInChildren<Canvas>(true);
+            for (int canvasChildIndex = 0; canvasChildIndex < canvases.Length; canvasChildIndex++)
+            {
+                cachedRoomCanvases[canvasIndex] = canvases[canvasChildIndex];
+                canvasIndex++;
+            }
+        }
+
+        roomVisualCacheReady = true;
+    }
+
     private RectTransform FindOrCreateRectChild(Transform parent, string childName)
     {
         Transform existing = parent.Find(childName);
@@ -866,6 +1083,24 @@ public class Room2DShowcaseViewController : MonoBehaviour
         }
     }
 
+    private void HideShellTextHeaders()
+    {
+        if (frontDeskShellText != null)
+        {
+            frontDeskShellText.gameObject.SetActive(false);
+        }
+
+        if (roomShellText != null)
+        {
+            roomShellText.gameObject.SetActive(false);
+        }
+
+        if (loungeShellText != null)
+        {
+            loungeShellText.gameObject.SetActive(false);
+        }
+    }
+
     private void ApplyNavigationLayout(RectTransform panel)
     {
         HorizontalLayoutGroup layout = panel.GetComponent<HorizontalLayoutGroup>();
@@ -933,12 +1168,12 @@ public class Room2DShowcaseViewController : MonoBehaviour
         rect.anchorMin = new Vector2(0f, 1f);
         rect.anchorMax = new Vector2(0f, 1f);
         rect.pivot = new Vector2(0f, 1f);
-        rect.anchoredPosition = new Vector2(16f, -16f);
-        rect.sizeDelta = new Vector2(220f, 34f);
+        rect.anchoredPosition = new Vector2(24f, -18f);
+        rect.sizeDelta = new Vector2(260f, 40f);
 
         text.color = Color.white;
         ApplyDefaultFont(text);
-        text.fontSize = 16f;
+        text.fontSize = 22f;
         text.alignment = TextAlignmentOptions.Left;
         text.raycastTarget = false;
     }
