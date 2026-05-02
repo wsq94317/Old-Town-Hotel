@@ -879,7 +879,9 @@ public class Room2DShowcaseViewController : MonoBehaviour
             + matchLine;
     }
 
-    private string BuildPreferenceLine(Room2DFloorPreference floorPreference, Room2DFacingPreference facingPreference)
+    private string BuildPreferenceLine(
+        Room2DPrototypeDemandLoop.Room2DFloorPreference floorPreference,
+        Room2DPrototypeDemandLoop.Room2DFacingPreference facingPreference)
     {
         return floorPreference + " / " + facingPreference;
     }
