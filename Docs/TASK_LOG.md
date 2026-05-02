@@ -68,6 +68,7 @@ Build first playable fake-3D 2D room entity prototype.
 - Showcase UI Foundation Phase 1 rebuilds Front Desk into header/queue, current request, demand summary, action bar, and placeholder visual slots
 - Showcase UI Foundation Phase 2 rebuilds Rooms View into room summary, selected-room detail, state actions, worker card, and placeholder visual slots
 - Showcase UI Foundation Phase 3 rebuilds Lounge View into header, stock, washing machine, warning/result, action bar, and placeholder visual slots
+- Showcase UI Rework v2 Phase 1 adds Front Desk waiting guest cards, guest detail popup, and Ready-room check-in popup using existing demand assignment logic
 
 ## Next
 - Attach Room2DEntity to Room_A_2D in Unity
