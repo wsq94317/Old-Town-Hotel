@@ -566,6 +566,10 @@ public class Room2DShowcaseViewController : MonoBehaviour
         frontDeskGuestActiveButton = FindOrCreateFrontDeskGuestCard(frontDeskWaitingGuestContent, "Card_Guest_Active", "Active Guest", SelectActiveDemandGuest);
         frontDeskGuestComplaintButton = FindOrCreateFrontDeskGuestCard(frontDeskWaitingGuestContent, "Card_Guest_Complaint", "Complaint", SelectComplaintGuest);
         frontDeskGuestUpcomingButton = FindOrCreateFrontDeskGuestCard(frontDeskWaitingGuestContent, "Card_Guest_Upcoming", "Next Guest", SelectUpcomingGuest);
+        if (frontDeskWaitingGuestContent.parent != null && frontDeskWaitingGuestContent.parent.parent != null)
+        {
+            frontDeskWaitingGuestContent.parent.parent.SetAsLastSibling();
+        }
 
         frontDeskAssignRoomButton = FindOrCreateActionButtonWithIconPlaceholder(frontDeskGuestDetailPopup, "Button_OpenReadyRoomList", "Assign Room", OpenReadyRoomListPopup);
         ApplyAnchoredPanel(frontDeskAssignRoomButton.transform as RectTransform, new Vector2(0.08f, 0.08f), new Vector2(0.52f, 0.22f), Vector2.zero, Vector2.zero);
@@ -604,23 +608,64 @@ public class Room2DShowcaseViewController : MonoBehaviour
             return;
         }
 
-        // 老版本的 raw debug 卡片如果还在场景里，保留但隐藏，避免和新 UI foundation 重叠。
-        string[] legacyCardNames =
-        {
-            "Card_FrontDeskStatus",
-            "Card_FrontDeskDemand",
-            "Card_FrontDeskActions",
-            "Card_FrontDeskResult"
-        };
+        // 老版本的 raw debug 卡片/按钮如果还在场景里，保留对象但隐藏，避免和新 Front Desk 页面重叠。
+        HideUnexpectedChildren(
+            frontDeskViewPanel,
+            "Text_FrontDeskViewShell",
+            "Card_FrontDeskHeader",
+            "Panel_WaitingGuests",
+            "Card_FrontDeskQuickActions",
+            "Popup_GuestDetail",
+            "Popup_ReadyRoomList");
 
-        for (int i = 0; i < legacyCardNames.Length; i++)
+        HideUnexpectedChildren(frontDeskStatusPanel, "Text_FrontDeskHeader", "IconPlaceholder_QueuePressure");
+        HideUnexpectedChildren(frontDeskWaitingGuestPanel, "Text_WaitingGuestHeader", "Scroll_WaitingGuestStrip");
+        HideUnexpectedChildren(frontDeskPageActionPanel, "Button_StartOperating", "Button_ActivateDemand", "Button_FrontDeskWait");
+        HideUnexpectedChildren(
+            frontDeskGuestDetailPopup,
+            "Text_GuestDetail",
+            "PortraitPlaceholder_CurrentGuest",
+            "BadgePlaceholder_Warning",
+            "Button_OpenReadyRoomList",
+            "Button_CloseGuestPopup");
+        HideUnexpectedChildren(frontDeskReadyRoomListPopup, "Text_ReadyRoomListTitle", "Scroll_ReadyRoomList", "Button_CloseReadyRoomList");
+    }
+
+    private void HideUnexpectedChildren(RectTransform parent, params string[] namesToKeep)
+    {
+        if (parent == null)
         {
-            Transform legacyCard = frontDeskViewPanel.Find(legacyCardNames[i]);
-            if (legacyCard != null)
+            return;
+        }
+
+        for (int i = 0; i < parent.childCount; i++)
+        {
+            Transform child = parent.GetChild(i);
+            if (child == null || ShouldKeepChild(child.name, namesToKeep))
             {
-                legacyCard.gameObject.SetActive(false);
+                continue;
+            }
+
+            child.gameObject.SetActive(false);
+        }
+    }
+
+    private bool ShouldKeepChild(string childName, string[] namesToKeep)
+    {
+        if (namesToKeep == null)
+        {
+            return false;
+        }
+
+        for (int i = 0; i < namesToKeep.Length; i++)
+        {
+            if (childName == namesToKeep[i])
+            {
+                return true;
             }
         }
+
+        return false;
     }
 
     private void RefreshFrontDeskGuestCards()
