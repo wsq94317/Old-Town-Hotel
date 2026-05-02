@@ -55,6 +55,9 @@ public class Room2DShowcaseViewController : MonoBehaviour
     public RectTransform frontDeskDemandPanel;
     public RectTransform frontDeskActionsPanel;
     public RectTransform frontDeskResultPanel;
+    public RectTransform frontDeskQueueIconPlaceholder;
+    public RectTransform frontDeskGuestPortraitPlaceholder;
+    public RectTransform frontDeskWarningBadgePlaceholder;
     public RectTransform roomSelectedPanel;
     public RectTransform roomWorkersPanel;
     public RectTransform roomActionsPanel;
@@ -475,30 +478,67 @@ public class Room2DShowcaseViewController : MonoBehaviour
 
     private void BuildFrontDeskViewContent()
     {
-        frontDeskStatusPanel = FindOrCreatePanel(frontDeskViewPanel, "Card_FrontDeskStatus", new Color(0.05f, 0.07f, 0.09f, 0.96f));
-        frontDeskDemandPanel = FindOrCreatePanel(frontDeskViewPanel, "Card_FrontDeskDemand", new Color(0.08f, 0.09f, 0.12f, 0.96f));
-        frontDeskActionsPanel = FindOrCreatePanel(frontDeskViewPanel, "Card_FrontDeskActions", new Color(0.05f, 0.05f, 0.07f, 0.96f));
-        frontDeskResultPanel = FindOrCreatePanel(frontDeskViewPanel, "Card_FrontDeskResult", new Color(0.05f, 0.06f, 0.08f, 0.96f));
+        frontDeskStatusPanel = FindOrCreatePanel(frontDeskViewPanel, "Card_FrontDeskHeaderAndQueue", new Color(0.05f, 0.07f, 0.09f, 0.96f));
+        frontDeskDemandPanel = FindOrCreatePanel(frontDeskViewPanel, "Card_CurrentGuestRequest", new Color(0.08f, 0.09f, 0.12f, 0.96f));
+        frontDeskActionsPanel = FindOrCreatePanel(frontDeskViewPanel, "Card_FrontDeskActionBar", new Color(0.05f, 0.05f, 0.07f, 0.96f));
+        frontDeskResultPanel = FindOrCreatePanel(frontDeskViewPanel, "Card_DemandSummary", new Color(0.05f, 0.06f, 0.08f, 0.96f));
 
-        ApplyAnchoredPanel(frontDeskStatusPanel, new Vector2(0.07f, 0.68f), new Vector2(0.93f, 0.90f), Vector2.zero, Vector2.zero);
-        ApplyAnchoredPanel(frontDeskDemandPanel, new Vector2(0.07f, 0.42f), new Vector2(0.93f, 0.65f), Vector2.zero, Vector2.zero);
-        ApplyAnchoredPanel(frontDeskResultPanel, new Vector2(0.07f, 0.25f), new Vector2(0.93f, 0.39f), Vector2.zero, Vector2.zero);
-        ApplyAnchoredPanel(frontDeskActionsPanel, new Vector2(0.07f, 0.09f), new Vector2(0.93f, 0.22f), Vector2.zero, Vector2.zero);
+        ApplyAnchoredPanel(frontDeskStatusPanel, new Vector2(0.07f, 0.70f), new Vector2(0.93f, 0.91f), Vector2.zero, Vector2.zero);
+        ApplyAnchoredPanel(frontDeskDemandPanel, new Vector2(0.07f, 0.48f), new Vector2(0.93f, 0.67f), Vector2.zero, Vector2.zero);
+        ApplyAnchoredPanel(frontDeskResultPanel, new Vector2(0.07f, 0.27f), new Vector2(0.93f, 0.45f), Vector2.zero, Vector2.zero);
+        ApplyAnchoredPanel(frontDeskActionsPanel, new Vector2(0.07f, 0.09f), new Vector2(0.93f, 0.24f), Vector2.zero, Vector2.zero);
 
-        frontDeskStatusText = FindOrCreateText(frontDeskStatusPanel, "Text_FrontDeskStatus", "Front Desk");
-        frontDeskDemandText = FindOrCreateText(frontDeskDemandPanel, "Text_FrontDeskDemand", "Demand");
-        frontDeskResultText = FindOrCreateText(frontDeskResultPanel, "Text_FrontDeskResult", "Result");
-        ApplyCardText(frontDeskStatusText, 15f);
-        ApplyCardText(frontDeskDemandText, 14f);
-        ApplyCardText(frontDeskResultText, 14f);
+        frontDeskStatusText = FindOrCreateText(frontDeskStatusPanel, "Text_HeaderAndQueue", "Front Desk");
+        frontDeskDemandText = FindOrCreateText(frontDeskDemandPanel, "Text_CurrentGuestRequest", "Current Guest");
+        frontDeskResultText = FindOrCreateText(frontDeskResultPanel, "Text_DemandSummary", "Demand Summary");
+        ApplyCardText(frontDeskStatusText, 20f);
+        ApplyCardText(frontDeskDemandText, 18f);
+        ApplyCardText(frontDeskResultText, 17f);
+        frontDeskStatusText.rectTransform.offsetMax = new Vector2(-120f, -16f);
+        frontDeskDemandText.rectTransform.offsetMax = new Vector2(-150f, -16f);
+        frontDeskResultText.rectTransform.offsetMax = new Vector2(-120f, -16f);
 
-        ApplyActionGrid(frontDeskActionsPanel, 3, new Vector2(160f, 40f), 10f);
-        FindOrCreateActionButton(frontDeskActionsPanel, "Button_StartOperating", "Start", StartDemoOperatingPeriod);
-        FindOrCreateActionButton(frontDeskActionsPanel, "Button_ActivateDemand", "Call", ActivateUpcomingDemandNow);
-        FindOrCreateActionButton(frontDeskActionsPanel, "Button_AssignDemandShowcase", "Assign", AssignSelectedRoomToDemand);
-        FindOrCreateActionButton(frontDeskActionsPanel, "Button_FrontDeskWait", "Wait", RecordWaitAction);
-        FindOrCreateActionButton(frontDeskActionsPanel, "Button_EndDemoDayShowcase", "End", EndDemoDay);
-        FindOrCreateActionButton(frontDeskActionsPanel, "Button_RestartDemoDayShowcase", "Reset", RestartDemoDay);
+        frontDeskQueueIconPlaceholder = FindOrCreatePlaceholder(frontDeskStatusPanel, "IconPlaceholder_QueuePressure", "QUEUE");
+        ApplyAnchoredPanel(frontDeskQueueIconPlaceholder, new Vector2(0.76f, 0.48f), new Vector2(0.96f, 0.86f), Vector2.zero, Vector2.zero);
+        frontDeskGuestPortraitPlaceholder = FindOrCreatePlaceholder(frontDeskDemandPanel, "PortraitPlaceholder_CurrentGuest", "GUEST");
+        ApplyAnchoredPanel(frontDeskGuestPortraitPlaceholder, new Vector2(0.74f, 0.18f), new Vector2(0.96f, 0.82f), Vector2.zero, Vector2.zero);
+        frontDeskWarningBadgePlaceholder = FindOrCreatePlaceholder(frontDeskResultPanel, "BadgePlaceholder_Warning", "RISK");
+        ApplyAnchoredPanel(frontDeskWarningBadgePlaceholder, new Vector2(0.78f, 0.22f), new Vector2(0.96f, 0.78f), Vector2.zero, Vector2.zero);
+
+        ApplyActionGrid(frontDeskActionsPanel, 3, new Vector2(168f, 44f), 12f);
+        FindOrCreateActionButtonWithIconPlaceholder(frontDeskActionsPanel, "Button_StartOperating", "Start", StartDemoOperatingPeriod);
+        FindOrCreateActionButtonWithIconPlaceholder(frontDeskActionsPanel, "Button_ActivateDemand", "Call", ActivateUpcomingDemandNow);
+        FindOrCreateActionButtonWithIconPlaceholder(frontDeskActionsPanel, "Button_AssignDemandShowcase", "Assign", AssignSelectedRoomToDemand);
+        FindOrCreateActionButtonWithIconPlaceholder(frontDeskActionsPanel, "Button_FrontDeskWait", "Wait", RecordWaitAction);
+        FindOrCreateActionButtonWithIconPlaceholder(frontDeskActionsPanel, "Button_EndDemoDayShowcase", "End", EndDemoDay);
+        FindOrCreateActionButtonWithIconPlaceholder(frontDeskActionsPanel, "Button_RestartDemoDayShowcase", "Reset", RestartDemoDay);
+        HideLegacyFrontDeskCards();
+    }
+
+    private void HideLegacyFrontDeskCards()
+    {
+        if (frontDeskViewPanel == null)
+        {
+            return;
+        }
+
+        // 老版本的 raw debug 卡片如果还在场景里，保留但隐藏，避免和新 UI foundation 重叠。
+        string[] legacyCardNames =
+        {
+            "Card_FrontDeskStatus",
+            "Card_FrontDeskDemand",
+            "Card_FrontDeskActions",
+            "Card_FrontDeskResult"
+        };
+
+        for (int i = 0; i < legacyCardNames.Length; i++)
+        {
+            Transform legacyCard = frontDeskViewPanel.Find(legacyCardNames[i]);
+            if (legacyCard != null)
+            {
+                legacyCard.gameObject.SetActive(false);
+            }
+        }
     }
 
     private void BuildRoomViewContent()
@@ -607,61 +647,56 @@ public class Room2DShowcaseViewController : MonoBehaviour
         string phase = demoDayController != null ? demoDayController.currentPhase.ToString() : "None";
         string time = demoDayController != null ? FormatSeconds(demoDayController.operatingTimerSeconds) : "0s";
         string duration = demoDayController != null ? FormatSeconds(demoDayController.operatingDurationSeconds) : "0s";
-        string queue = frontDesk != null ? frontDesk.currentQueueCount.ToString() : "0";
+        int queue = frontDesk != null ? frontDesk.currentQueueCount : 0;
         string wait = frontDesk != null ? FormatSeconds(frontDesk.waitingTimePressureSeconds) : "0s";
-        string delayed = frontDesk != null ? frontDesk.totalDelayedCheckIns.ToString() : "0";
+        int delayed = frontDesk != null ? frontDesk.totalDelayedCheckIns : 0;
         string score = demandLoop != null
             ? demandLoop.prototypeSatisfactionScore + " (" + demandLoop.prototypeSatisfactionTrend + ")"
             : "0";
+        string pressure = GetFrontDeskPressureLabel(queue, delayed);
 
-        return "Front Desk\n"
-            + "Phase: " + phase + "   Time: " + time + " / " + duration + "\n"
-            + "Queue: " + queue + "   Wait: " + wait + "\n"
-            + "Delayed Check-ins: " + delayed + "\n"
-            + "Satisfaction: " + score + "\n"
-            + "Last: " + GetFrontDeskLastResultText();
+        return "Old Town Hotel\n"
+            + phase + "  |  " + time + " / " + duration + "\n\n"
+            + "Queue Pressure\n"
+            + "Queue: " + queue + "    Wait: " + wait + "\n"
+            + "Delayed: " + delayed + "    Pressure: " + pressure + "\n"
+            + "Satisfaction: " + score;
     }
 
     private string BuildFrontDeskDemandText()
     {
         if (demandLoop == null)
         {
-            return "Demand\nNone";
+            return "Current Guest\nNo demand loop linked.";
         }
 
-        return "Demand\n"
-            + "Upcoming: " + demandLoop.upcomingDemandType
-            + " / " + demandLoop.upcomingDemandRoomPreference + "\n"
-            + "ETA: " + FormatSeconds(demandLoop.upcomingDemandEtaSeconds)
-            + "   Reserved: " + demandLoop.reservedRoomName + "\n"
-            + "Active: " + GetActiveDemandShortLine() + "\n"
-            + "Complaint: " + GetComplaintShortLine() + "\n"
-            + "Latest: " + demandLoop.lastChangedRoomName
-            + " / " + demandLoop.lastMatchQualityLabel
-            + " / " + demandLoop.lastOutcomeLabel + "\n"
-            + "Totals: " + demandLoop.successfulDemandCount
-            + " ok, " + demandLoop.unmetDemandCount + " missed";
+        string guestState = demandLoop.activeDemandWaitingForManualAssignment ? "Waiting" : "No active guest";
+        string roomReady = HasReadyRoomForFrontDesk() ? "Ready room available" : "No ready room";
+        string suggestion = GetFrontDeskSuggestionText();
+
+        return "Current Request\n"
+            + "Guest: " + GetCurrentFrontDeskGuestTypeText() + "\n"
+            + "State: " + guestState + "\n"
+            + "Wait: " + FormatSeconds(demandLoop.activeDemandWaitSeconds) + "\n"
+            + "Room: " + roomReady + "\n"
+            + "Suggestion: " + suggestion;
     }
 
     private string BuildFrontDeskResultText()
     {
         if (demandLoop == null)
         {
-            return "Result\nNo demand loop";
+            return "Demand Summary\nNo demand loop";
         }
 
-        string phaseHint = demoDayController != null ? GetPhaseActionHint() : "Use Start to begin.";
-
-        return "Result\n"
-            + "Score: " + demandLoop.prototypeSatisfactionScore
-            + "  Trend: " + demandLoop.prototypeSatisfactionTrend + "\n"
-            + "Match G/N/P: " + demandLoop.goodMatchCount
-            + "/" + demandLoop.normalMatchCount
-            + "/" + demandLoop.poorMatchCount + "\n"
-            + "Outcome +/0/-: " + demandLoop.positiveOutcomeCount
-            + "/" + demandLoop.neutralOutcomeCount
-            + "/" + demandLoop.negativeOutcomeCount + "\n"
-            + "Hint: " + phaseHint;
+        return "Demand Summary\n"
+            + "Upcoming: " + demandLoop.upcomingDemandType
+            + " in " + FormatSeconds(demandLoop.upcomingDemandEtaSeconds) + "\n"
+            + "Active: " + GetActiveDemandShortLine() + "\n"
+            + "Latest: " + demandLoop.lastChangedRoomName
+            + " / " + demandLoop.lastOutcomeLabel + "\n"
+            + "Result: " + demandLoop.successfulDemandCount
+            + " served, " + demandLoop.unmetDemandCount + " missed";
     }
 
     private string BuildSelectedRoomText()
@@ -914,6 +949,71 @@ public class Room2DShowcaseViewController : MonoBehaviour
         }
 
         return frontDesk.lastFrontDeskResult;
+    }
+
+    private string GetFrontDeskPressureLabel(int queue, int delayed)
+    {
+        if (delayed > 0 || queue >= 3)
+        {
+            return "High";
+        }
+
+        if (queue > 0)
+        {
+            return "Medium";
+        }
+
+        return "Low";
+    }
+
+    private string GetCurrentFrontDeskGuestTypeText()
+    {
+        if (demandLoop == null)
+        {
+            return "None";
+        }
+
+        if (demandLoop.activeDemandWaitingForManualAssignment)
+        {
+            return demandLoop.activeDemandType.ToString();
+        }
+
+        return demandLoop.upcomingDemandType + " incoming";
+    }
+
+    private string GetFrontDeskSuggestionText()
+    {
+        if (demandLoop == null)
+        {
+            return "Link demand loop.";
+        }
+
+        if (demandLoop.activeDemandWaitingForManualAssignment)
+        {
+            return HasReadyRoomForFrontDesk() ? "Assign a ready room." : "Wait or prepare a room.";
+        }
+
+        if (demandLoop.upcomingDemandEtaSeconds > 0f)
+        {
+            return "Prepare before arrival.";
+        }
+
+        return "Call next guest.";
+    }
+
+    private bool HasReadyRoomForFrontDesk()
+    {
+        Room2DEntity[] rooms = FindObjectsByType<Room2DEntity>(FindObjectsSortMode.None);
+        for (int i = 0; i < rooms.Length; i++)
+        {
+            Room2DEntity room = rooms[i];
+            if (room != null && room.currentState == Room2DState.Ready)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private string ShortenMatchHint(string matchHint)
@@ -1579,6 +1679,44 @@ public class Room2DShowcaseViewController : MonoBehaviour
         button.onClick.RemoveAllListeners();
         button.onClick.AddListener(action);
         return button;
+    }
+
+    private Button FindOrCreateActionButtonWithIconPlaceholder(RectTransform parent, string buttonName, string label, UnityAction action)
+    {
+        Button button = FindOrCreateActionButton(parent, buttonName, label);
+        RectTransform buttonRect = button.transform as RectTransform;
+
+        RectTransform iconPlaceholder = FindOrCreatePlaceholder(buttonRect, "ButtonIconPlaceholder_" + label, "");
+        ApplyAnchoredPanel(iconPlaceholder, new Vector2(0.06f, 0.24f), new Vector2(0.20f, 0.76f), Vector2.zero, Vector2.zero);
+
+        Transform labelTransform = buttonRect.Find("Text (TMP)");
+        TMP_Text labelText = labelTransform != null ? labelTransform.GetComponent<TMP_Text>() : null;
+        if (labelText != null)
+        {
+            labelText.rectTransform.offsetMin = new Vector2(34f, 0f);
+        }
+
+        return button;
+    }
+
+    private RectTransform FindOrCreatePlaceholder(RectTransform parent, string placeholderName, string label)
+    {
+        RectTransform placeholder = FindOrCreatePanel(parent, placeholderName, new Color(1f, 1f, 1f, 0.10f));
+        Image image = placeholder.GetComponent<Image>();
+        if (image != null)
+        {
+            image.raycastTarget = false;
+        }
+
+        TMP_Text labelText = FindOrCreateText(placeholder, "Text_PlaceholderLabel", label);
+        labelText.text = label;
+        labelText.color = new Color(1f, 1f, 1f, 0.72f);
+        labelText.fontSize = 12f;
+        labelText.alignment = TextAlignmentOptions.Center;
+        ApplyDefaultFont(labelText);
+        ApplyStretch(labelText.rectTransform);
+
+        return placeholder;
     }
 
     private void ApplyAnchoredPanel(
