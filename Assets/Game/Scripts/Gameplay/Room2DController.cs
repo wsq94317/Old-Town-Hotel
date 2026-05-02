@@ -5,6 +5,10 @@ using UnityEngine.UI;
 // 它读取 Room2DEntity 的数据，然后更新颜色、状态物体、标签和总览。
 public class Room2DController : MonoBehaviour
 {
+    // Showcase 页面切换时用的全局开关。
+    // 只隐藏 OnGUI 调试房间标签，不会关闭房间物体、Sprite 或正式 UI。
+    public static bool hidePrototypeDebugLabelsGlobally;
+
     // 房间数据源。正常情况下和这个组件挂在同一个 Room_A_2D / Room_B_2D 物体上。
     public Room2DEntity roomEntity;
 
@@ -381,7 +385,7 @@ public class Room2DController : MonoBehaviour
 
     private void DrawPrototypeDebugLabel()
     {
-        if (!showPrototypeDebugLabel || roomEntity == null)
+        if (hidePrototypeDebugLabelsGlobally || !showPrototypeDebugLabel || roomEntity == null)
         {
             return;
         }

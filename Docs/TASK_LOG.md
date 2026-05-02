@@ -60,6 +60,7 @@ Build first playable fake-3D 2D room entity prototype.
 - Demo HUD now switches between preparation, operating, and end-of-day recording summaries
 - Room2DShowcaseViewController created as the first Front Desk / Rooms / Lounge showcase navigation shell
 - Room2DShowcaseViewController Phase 2 now connects front desk, room, worker, demand, and lounge data/actions into the three showcase views
+- Room2DShowcaseViewController Phase 3 now separates showcase cards, shortens action labels, and adds Start/End/Reset controls for recording clarity
 
 ## Next
 - Attach Room2DEntity to Room_A_2D in Unity
