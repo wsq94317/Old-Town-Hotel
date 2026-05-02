@@ -63,6 +63,7 @@ Build first playable fake-3D 2D room entity prototype.
 - Room2DShowcaseViewController Phase 3 now separates showcase cards, shortens action labels, and adds Start/End/Reset controls for recording clarity
 - Rooms View Interaction Phase 1 now supports clicking rooms directly and reading a mobile-style selected-room detail card
 - Rooms View room selection now also supports screen-rect picking, so duplicated rooms can be selected even if their Collider setup is unreliable
+- Rooms View Interaction Phase 2/3 now exposes state-based room action buttons and a small worker assignment popup for HSK/Inspector assignment
 
 ## Next
 - Attach Room2DEntity to Room_A_2D in Unity
