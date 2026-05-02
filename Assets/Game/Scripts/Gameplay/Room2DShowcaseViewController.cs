@@ -1683,7 +1683,7 @@ public class Room2DShowcaseViewController : MonoBehaviour
 
     private Button FindOrCreateActionButtonWithIconPlaceholder(RectTransform parent, string buttonName, string label, UnityAction action)
     {
-        Button button = FindOrCreateActionButton(parent, buttonName, label);
+        Button button = FindOrCreateActionButton(parent, buttonName, label, action);
         RectTransform buttonRect = button.transform as RectTransform;
 
         RectTransform iconPlaceholder = FindOrCreatePlaceholder(buttonRect, "ButtonIconPlaceholder_" + label, "");
