@@ -24,15 +24,12 @@ public class Room2DShowcaseViewController : MonoBehaviour
     public Room2DWorkerSelectionPanel workerSelectionPanel;
     public FrontDesk2D frontDesk;
     public Lounge2D lounge;
-    public Room2DController[] roomControllers;
 
     [Header("Build")]
     // 开始运行时自动创建三个展示屏幕，减少手动搭 UI 的步骤。
     public bool autoBuildShellOnStart = true;
     // Showcase 模式下先隐藏旧 Debug HUD，避免两套 UI 叠在一起导致完全无法阅读。
     public bool hideLegacyDebugHudWhileShowcaseRuns = true;
-    // Front Desk / Lounge 不是房间操作页，默认隐藏房间视觉，避免录屏时文字和房间叠在一起。
-    public bool hideRoomVisualsOutsideRoomView = true;
     public Canvas targetCanvas;
     public RectTransform showcaseRoot;
     public RectTransform navigationPanel;
@@ -69,9 +66,6 @@ public class Room2DShowcaseViewController : MonoBehaviour
     public string lastShellResult = "Not built";
 
     private const string RootName = "Room2DShowcaseViews";
-    private bool roomVisualCacheReady;
-    private Renderer[] cachedRoomRenderers;
-    private Canvas[] cachedRoomCanvases;
 
     private void Start()
     {
@@ -190,7 +184,6 @@ public class Room2DShowcaseViewController : MonoBehaviour
             showcaseRoot.SetAsLastSibling();
         }
 
-        ApplyRoomVisualVisibilityForCurrentView();
         RefreshShellText();
     }
 
@@ -248,11 +241,6 @@ public class Room2DShowcaseViewController : MonoBehaviour
         if (lounge == null)
         {
             lounge = FindFirstObjectByType<Lounge2D>();
-        }
-
-        if (roomControllers == null || roomControllers.Length == 0)
-        {
-            roomControllers = FindObjectsByType<Room2DController>(FindObjectsSortMode.None);
         }
     }
 
@@ -813,101 +801,6 @@ public class Room2DShowcaseViewController : MonoBehaviour
             default:
                 return "Showcase";
         }
-    }
-
-    private void ApplyRoomVisualVisibilityForCurrentView()
-    {
-        if (!hideRoomVisualsOutsideRoomView)
-        {
-            SetRoomVisualsVisible(true);
-            return;
-        }
-
-        SetRoomVisualsVisible(currentView == ShowcaseView.Rooms);
-    }
-
-    private void SetRoomVisualsVisible(bool visible)
-    {
-        CacheRoomVisualsIfNeeded();
-
-        if (cachedRoomRenderers != null)
-        {
-            for (int i = 0; i < cachedRoomRenderers.Length; i++)
-            {
-                if (cachedRoomRenderers[i] != null)
-                {
-                    cachedRoomRenderers[i].enabled = visible;
-                }
-            }
-        }
-
-        if (cachedRoomCanvases != null)
-        {
-            for (int i = 0; i < cachedRoomCanvases.Length; i++)
-            {
-                if (cachedRoomCanvases[i] != null)
-                {
-                    cachedRoomCanvases[i].enabled = visible;
-                }
-            }
-        }
-    }
-
-    private void CacheRoomVisualsIfNeeded()
-    {
-        if (roomVisualCacheReady)
-        {
-            return;
-        }
-
-        if (roomControllers == null || roomControllers.Length == 0)
-        {
-            roomControllers = FindObjectsByType<Room2DController>(FindObjectsSortMode.None);
-        }
-
-        int rendererCount = 0;
-        int canvasCount = 0;
-
-        for (int i = 0; i < roomControllers.Length; i++)
-        {
-            if (roomControllers[i] == null)
-            {
-                continue;
-            }
-
-            rendererCount += roomControllers[i].GetComponentsInChildren<Renderer>(true).Length;
-            canvasCount += roomControllers[i].GetComponentsInChildren<Canvas>(true).Length;
-        }
-
-        cachedRoomRenderers = new Renderer[rendererCount];
-        cachedRoomCanvases = new Canvas[canvasCount];
-
-        int rendererIndex = 0;
-        int canvasIndex = 0;
-
-        for (int i = 0; i < roomControllers.Length; i++)
-        {
-            if (roomControllers[i] == null)
-            {
-                continue;
-            }
-
-            Renderer[] renderers = roomControllers[i].GetComponentsInChildren<Renderer>(true);
-            for (int rendererChildIndex = 0; rendererChildIndex < renderers.Length; rendererChildIndex++)
-            {
-                cachedRoomRenderers[rendererIndex] = renderers[rendererChildIndex];
-                rendererIndex++;
-            }
-
-            Canvas[] canvases = roomControllers[i].GetComponentsInChildren<Canvas>(true);
-            for (int canvasChildIndex = 0; canvasChildIndex < canvases.Length; canvasChildIndex++)
-            {
-                cachedRoomCanvases[canvasIndex] = canvases[canvasChildIndex];
-                canvasIndex++;
-            }
-        }
-
-        roomVisualCacheReady = true;
     }
 
     private RectTransform FindOrCreateRectChild(Transform parent, string childName)
