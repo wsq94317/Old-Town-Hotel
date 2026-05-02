@@ -30,6 +30,9 @@ public class Room2DShowcaseViewController : MonoBehaviour
     public bool autoBuildShellOnStart = true;
     // Showcase 模式下先隐藏旧 Debug HUD，避免两套 UI 叠在一起导致完全无法阅读。
     public bool hideLegacyDebugHudWhileShowcaseRuns = true;
+    // 使用专用 Overlay Canvas，避免误挂到房间自己的 World Space Canvas 上。
+    public bool useDedicatedOverlayCanvas = true;
+    public int showcaseCanvasSortingOrder = 5000;
     public Canvas targetCanvas;
     public RectTransform showcaseRoot;
     public RectTransform navigationPanel;
@@ -89,7 +92,7 @@ public class Room2DShowcaseViewController : MonoBehaviour
     {
         FindReferencesIfNeeded();
 
-        if (!FindCanvasIfNeeded())
+        if (!FindOrCreateCanvasIfNeeded())
         {
             lastShellResult = "No Canvas found. Create a Canvas first.";
             return;
@@ -98,6 +101,7 @@ public class Room2DShowcaseViewController : MonoBehaviour
         showcaseRoot = FindOrCreateRectChild(targetCanvas.transform, RootName);
         ApplyStretch(showcaseRoot);
         showcaseRoot.SetAsLastSibling();
+        HideDuplicateShowcaseRoots();
         HideLegacyDebugHudIfSafe();
 
         navigationPanel = FindOrCreatePanel(showcaseRoot, "Panel_ShowcaseBottomNav", new Color(0.03f, 0.04f, 0.06f, 0.88f));
@@ -244,10 +248,17 @@ public class Room2DShowcaseViewController : MonoBehaviour
         }
     }
 
-    private bool FindCanvasIfNeeded()
+    private bool FindOrCreateCanvasIfNeeded()
     {
+        if (useDedicatedOverlayCanvas)
+        {
+            targetCanvas = FindOrCreateDedicatedOverlayCanvas();
+            return targetCanvas != null;
+        }
+
         if (targetCanvas != null)
         {
+            ConfigureCanvasForShowcase(targetCanvas);
             return true;
         }
 
@@ -255,10 +266,92 @@ public class Room2DShowcaseViewController : MonoBehaviour
 
         if (targetCanvas == null)
         {
-            targetCanvas = FindFirstObjectByType<Canvas>();
+            targetCanvas = FindBestExistingScreenCanvas();
         }
 
+        ConfigureCanvasForShowcase(targetCanvas);
         return targetCanvas != null;
+    }
+
+    private Canvas FindOrCreateDedicatedOverlayCanvas()
+    {
+        GameObject existingCanvasObject = GameObject.Find("Canvas_ShowcaseUI");
+        Canvas canvas = existingCanvasObject != null ? existingCanvasObject.GetComponent<Canvas>() : null;
+
+        if (canvas == null)
+        {
+            GameObject canvasObject = new GameObject(
+                "Canvas_ShowcaseUI",
+                typeof(RectTransform),
+                typeof(Canvas),
+                typeof(CanvasScaler),
+                typeof(GraphicRaycaster));
+
+            canvas = canvasObject.GetComponent<Canvas>();
+        }
+
+        ConfigureCanvasForShowcase(canvas);
+        return canvas;
+    }
+
+    private Canvas FindBestExistingScreenCanvas()
+    {
+        Canvas[] canvases = FindObjectsByType<Canvas>(FindObjectsSortMode.None);
+        Canvas bestCanvas = null;
+
+        for (int i = 0; i < canvases.Length; i++)
+        {
+            Canvas canvas = canvases[i];
+            if (canvas == null)
+            {
+                continue;
+            }
+
+            if (canvas.renderMode == RenderMode.WorldSpace)
+            {
+                continue;
+            }
+
+            if (bestCanvas == null || canvas.sortingOrder > bestCanvas.sortingOrder)
+            {
+                bestCanvas = canvas;
+            }
+        }
+
+        if (bestCanvas != null)
+        {
+            return bestCanvas;
+        }
+
+        return FindFirstObjectByType<Canvas>();
+    }
+
+    private void ConfigureCanvasForShowcase(Canvas canvas)
+    {
+        if (canvas == null)
+        {
+            return;
+        }
+
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvas.overrideSorting = true;
+        canvas.sortingOrder = showcaseCanvasSortingOrder;
+
+        CanvasScaler scaler = canvas.GetComponent<CanvasScaler>();
+        if (scaler == null)
+        {
+            scaler = canvas.gameObject.AddComponent<CanvasScaler>();
+        }
+
+        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1080f, 1920f);
+        scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
+        scaler.matchWidthOrHeight = 0.5f;
+
+        if (canvas.GetComponent<GraphicRaycaster>() == null)
+        {
+            canvas.gameObject.AddComponent<GraphicRaycaster>();
+        }
     }
 
     private void RefreshShellText()
@@ -973,6 +1066,26 @@ public class Room2DShowcaseViewController : MonoBehaviour
         if (oldLabel != null)
         {
             oldLabel.gameObject.SetActive(false);
+        }
+    }
+
+    private void HideDuplicateShowcaseRoots()
+    {
+        RectTransform[] roots = Resources.FindObjectsOfTypeAll<RectTransform>();
+        for (int i = 0; i < roots.Length; i++)
+        {
+            RectTransform root = roots[i];
+            if (root == null || root == showcaseRoot || root.name != RootName)
+            {
+                continue;
+            }
+
+            if (root.gameObject.scene != gameObject.scene)
+            {
+                continue;
+            }
+
+            root.gameObject.SetActive(false);
         }
     }
 
