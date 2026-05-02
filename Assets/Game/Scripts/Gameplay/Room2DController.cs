@@ -28,10 +28,14 @@ public class Room2DController : MonoBehaviour
     public bool autoAddPrototypeClickCollider = true;
     public Room2DSelectionManager selectionManager;
 
-    // 没有绑定 Room2DEntity 时的备用原型数据。当前房间身份请改 Room2DEntity。
+    [Header("Fallback Only - Use Room2DEntity")]
+    // 没有绑定 Room2DEntity 时才使用这些备用数据。
+    // 如果绑定了 Room2DEntity，这些字段会自动同步实体数据，只用于 Inspector 易读。
     [HideInInspector]
     public string roomName = "Room 101";
+    [Tooltip("Only used when Room Entity is missing. If Room Entity exists, this field mirrors Room2DEntity.currentState.")]
     public Room2DState currentState = Room2DState.Dirty;
+    [Tooltip("Only used when Room Entity is missing. If Room Entity exists, this field mirrors Room2DEntity.actionCount.")]
     public int actionCount;
 
     [Header("Optional State Visuals")]
@@ -91,10 +95,16 @@ public class Room2DController : MonoBehaviour
         ApplyStateVisual();
     }
 
+    private void LateUpdate()
+    {
+        SyncFallbackFieldsFromEntity();
+    }
+
     private void OnValidate()
     {
         FindRoomEntityIfNeeded();
         FindLabelViewIfNeeded();
+        SyncFallbackFieldsFromEntity();
         // 不在 OnValidate 里调用 ApplyStateVisual。
         // Unity 不允许在 OnValidate / Awake 校验阶段 SetActive，否则 Console 会出现 SendMessage 警告。
     }
@@ -261,6 +271,7 @@ public class Room2DController : MonoBehaviour
     // 根据当前房态刷新颜色、状态标记和文字。
     public void ApplyStateVisual()
     {
+        SyncFallbackFieldsFromEntity();
         Room2DState visualState = GetCurrentState();
 
         SetVisualActive(dirtyVisual, visualState == Room2DState.Dirty);
@@ -350,6 +361,18 @@ public class Room2DController : MonoBehaviour
         }
 
         return currentState;
+    }
+
+    private void SyncFallbackFieldsFromEntity()
+    {
+        if (roomEntity == null)
+        {
+            return;
+        }
+
+        roomName = roomEntity.roomName;
+        currentState = roomEntity.currentState;
+        actionCount = roomEntity.actionCount;
     }
 
     // 以下 Find... 方法让复制房间时少拖几个引用，降低 Unity 初学阶段的绑定成本。
