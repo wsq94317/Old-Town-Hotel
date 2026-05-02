@@ -30,9 +30,18 @@ public class Room2DShowcaseViewController : MonoBehaviour
     public bool autoBuildShellOnStart = true;
     // Showcase 模式下先隐藏旧 Debug HUD，避免两套 UI 叠在一起导致完全无法阅读。
     public bool hideLegacyDebugHudWhileShowcaseRuns = true;
+    // Rooms View Phase 1：先隐藏旧调试按钮区，让主交互变成“点房间 -> 看详情卡”。
+    public bool showLegacyRoomDebugPanels = false;
     // 使用专用 Overlay Canvas，避免误挂到房间自己的 World Space Canvas 上。
     public bool useDedicatedOverlayCanvas = true;
     public int showcaseCanvasSortingOrder = 5000;
+
+    [Header("Rooms View Interaction")]
+    // Rooms View 的屏幕点击选择。它按房间可见 Sprite 的屏幕范围判断，不强依赖 Collider。
+    public bool enableRoomsViewClickSelection = true;
+    public float roomClickPaddingPixels = 28f;
+    public float maxRoomClickDistancePixels = 140f;
+
     public Canvas targetCanvas;
     public RectTransform showcaseRoot;
     public RectTransform navigationPanel;
@@ -90,6 +99,7 @@ public class Room2DShowcaseViewController : MonoBehaviour
 
     private void Update()
     {
+        HandleRoomsViewClickSelection();
         RefreshShellText();
     }
 
@@ -477,17 +487,21 @@ public class Room2DShowcaseViewController : MonoBehaviour
         roomActionsPanel = FindOrCreatePanel(roomViewPanel, "Card_RoomActions", new Color(0.03f, 0.04f, 0.06f, 0.92f));
         roomDemandPanel = FindOrCreatePanel(roomViewPanel, "Card_RoomDemand", new Color(0.03f, 0.04f, 0.06f, 0.88f));
 
-        ApplyAnchoredPanel(roomSelectedPanel, new Vector2(0.04f, 0.10f), new Vector2(0.48f, 0.30f), Vector2.zero, Vector2.zero);
-        ApplyAnchoredPanel(roomWorkersPanel, new Vector2(0.52f, 0.10f), new Vector2(0.96f, 0.30f), Vector2.zero, Vector2.zero);
-        ApplyAnchoredPanel(roomDemandPanel, new Vector2(0.04f, 0.32f), new Vector2(0.48f, 0.48f), Vector2.zero, Vector2.zero);
-        ApplyAnchoredPanel(roomActionsPanel, new Vector2(0.55f, 0.54f), new Vector2(0.96f, 0.88f), Vector2.zero, Vector2.zero);
+        // Phase 1 先把详情卡放到底部，避免旧调试按钮遮住房间网格。
+        ApplyAnchoredPanel(roomSelectedPanel, new Vector2(0.06f, 0.08f), new Vector2(0.94f, 0.30f), Vector2.zero, Vector2.zero);
+        ApplyAnchoredPanel(roomDemandPanel, new Vector2(0.06f, 0.78f), new Vector2(0.94f, 0.91f), Vector2.zero, Vector2.zero);
+        ApplyAnchoredPanel(roomWorkersPanel, new Vector2(0.06f, 0.31f), new Vector2(0.94f, 0.43f), Vector2.zero, Vector2.zero);
+        ApplyAnchoredPanel(roomActionsPanel, new Vector2(0.06f, 0.44f), new Vector2(0.94f, 0.64f), Vector2.zero, Vector2.zero);
 
         selectedRoomText = FindOrCreateText(roomSelectedPanel, "Text_SelectedRoomCard", "Selected Room");
         roomWorkersText = FindOrCreateText(roomWorkersPanel, "Text_WorkerCard", "Workers");
         roomDemandText = FindOrCreateText(roomDemandPanel, "Text_RoomDemandCard", "Demand");
-        ApplyCardText(selectedRoomText, 13f);
+        ApplyCardText(selectedRoomText, 15f);
         ApplyCardText(roomWorkersText, 13f);
         ApplyCardText(roomDemandText, 13f);
+
+        roomWorkersPanel.gameObject.SetActive(showLegacyRoomDebugPanels);
+        roomActionsPanel.gameObject.SetActive(showLegacyRoomDebugPanels);
 
         ApplyActionGrid(roomActionsPanel, 2, new Vector2(150f, 36f), 8f);
         FindOrCreateActionButton(roomActionsPanel, "Button_PreviousRoomShowcase", "Prev", SelectPreviousRoom);
@@ -590,22 +604,26 @@ public class Room2DShowcaseViewController : MonoBehaviour
         Room2DEntity room = GetSelectedRoomEntity();
         if (room == null)
         {
-            return "Selected Room\nNone";
+            return "Selected Room\nTap a room to inspect it.";
         }
 
         string reservedText = demandLoop != null && demandLoop.IsRoomReservedForPrototypeDemand(room) ? "Yes" : "No";
         string matchHint = demandLoop != null ? demandLoop.GetPrototypeMatchHintForRoom(room) : "Match Hint: None";
+        string cleanSuitability = demandLoop != null ? demandLoop.GetPrototypeCleanlinessSuitability(room).ToString() : "N/A";
+        string wearSuitability = demandLoop != null ? demandLoop.GetPrototypeWearSuitability(room).ToString() : "N/A";
 
-        return "Selected\n"
-            + room.roomName + "   " + room.GetStateDisplayName() + "\n"
+        return "Selected Room\n"
+            + room.roomName + "  |  State: " + room.GetStateDisplayName() + "\n"
             + "Type: " + room.prototypeRoomType
-            + "   Floor: " + room.floorNumber + "\n"
-            + "Facing: " + room.prototypeFacing + "\n"
-            + "Reserved: " + reservedText
-            + "   Checked Out: " + GetYesNo(room.guestCheckedOut) + "\n"
-            + "CLEAN: " + GetYesNo(room.markedCleaningPriority)
-            + "   INSP: " + GetYesNo(room.markedInspectionPriority) + "\n"
-            + "Wait: " + FormatSeconds(room.stateElapsedSeconds) + "\n"
+            + "  |  Floor: " + room.floorNumber
+            + "  |  Facing: " + room.prototypeFacing + "\n"
+            + "Checked Out: " + GetYesNo(room.guestCheckedOut)
+            + "  |  Reserved: " + reservedText + "\n"
+            + "Clean Priority: " + GetYesNo(room.markedCleaningPriority)
+            + "  |  Insp Priority: " + GetYesNo(room.markedInspectionPriority) + "\n"
+            + "Clean Suitability: " + cleanSuitability
+            + "  |  Wear Suitability: " + wearSuitability
+            + "  |  Wait: " + FormatSeconds(room.stateElapsedSeconds) + "\n"
             + ShortenMatchHint(matchHint);
     }
 
@@ -1032,6 +1050,212 @@ public class Room2DShowcaseViewController : MonoBehaviour
     {
         // OnGUI 房间标签会盖在 Canvas 之上；录屏时只在 Rooms 页面显示。
         Room2DController.hidePrototypeDebugLabelsGlobally = currentView != ShowcaseView.Rooms;
+    }
+
+    private void HandleRoomsViewClickSelection()
+    {
+        if (!enableRoomsViewClickSelection || currentView != ShowcaseView.Rooms)
+        {
+            return;
+        }
+
+        Vector2 screenPosition;
+        if (!TryGetPointerDownScreenPosition(out screenPosition))
+        {
+            return;
+        }
+
+        if (IsPointerInsideBottomNavigation(screenPosition))
+        {
+            return;
+        }
+
+        Room2DController clickedRoom = FindRoomAtScreenPosition(screenPosition);
+        if (clickedRoom == null)
+        {
+            return;
+        }
+
+        FindReferencesIfNeeded();
+        if (selectionManager != null)
+        {
+            selectionManager.SelectRoom(clickedRoom);
+        }
+    }
+
+    private bool TryGetPointerDownScreenPosition(out Vector2 screenPosition)
+    {
+        if (Input.touchCount > 0)
+        {
+            Touch touch = Input.GetTouch(0);
+            if (touch.phase == TouchPhase.Began)
+            {
+                screenPosition = touch.position;
+                return true;
+            }
+        }
+
+        if (Input.GetMouseButtonDown(0))
+        {
+            screenPosition = Input.mousePosition;
+            return true;
+        }
+
+        screenPosition = Vector2.zero;
+        return false;
+    }
+
+    private bool IsPointerInsideBottomNavigation(Vector2 screenPosition)
+    {
+        if (navigationPanel == null || !navigationPanel.gameObject.activeInHierarchy)
+        {
+            return false;
+        }
+
+        return RectTransformUtility.RectangleContainsScreenPoint(navigationPanel, screenPosition, null);
+    }
+
+    private Room2DController FindRoomAtScreenPosition(Vector2 screenPosition)
+    {
+        Camera mainCamera = Camera.main;
+        if (mainCamera == null)
+        {
+            return null;
+        }
+
+        Room2DController[] rooms = GetSelectableRooms();
+        Room2DController closestRoom = null;
+        float closestDistance = maxRoomClickDistancePixels;
+
+        for (int i = 0; i < rooms.Length; i++)
+        {
+            Room2DController room = rooms[i];
+            Rect roomRect;
+            Vector2 roomCenter;
+
+            if (room == null || !room.gameObject.activeInHierarchy)
+            {
+                continue;
+            }
+
+            if (!TryGetRoomScreenRect(room, mainCamera, out roomRect, out roomCenter))
+            {
+                continue;
+            }
+
+            if (roomRect.Contains(screenPosition))
+            {
+                return room;
+            }
+
+            float distance = Vector2.Distance(screenPosition, roomCenter);
+            if (distance < closestDistance)
+            {
+                closestDistance = distance;
+                closestRoom = room;
+            }
+        }
+
+        return closestRoom;
+    }
+
+    private Room2DController[] GetSelectableRooms()
+    {
+        FindReferencesIfNeeded();
+
+        if (selectionManager != null && selectionManager.rooms != null && selectionManager.rooms.Length > 0)
+        {
+            return selectionManager.rooms;
+        }
+
+        return FindObjectsByType<Room2DController>(FindObjectsSortMode.None);
+    }
+
+    private bool TryGetRoomScreenRect(
+        Room2DController room,
+        Camera mainCamera,
+        out Rect screenRect,
+        out Vector2 screenCenter)
+    {
+        Bounds bounds;
+        screenRect = new Rect();
+        screenCenter = Vector2.zero;
+
+        if (!TryGetVisibleSpriteBounds(room, out bounds))
+        {
+            return false;
+        }
+
+        Vector3 center = mainCamera.WorldToScreenPoint(bounds.center);
+        if (center.z < 0f)
+        {
+            return false;
+        }
+
+        Vector3 min = bounds.min;
+        Vector3 max = bounds.max;
+        Vector3[] corners =
+        {
+            new Vector3(min.x, min.y, min.z),
+            new Vector3(min.x, max.y, min.z),
+            new Vector3(max.x, min.y, min.z),
+            new Vector3(max.x, max.y, min.z),
+            new Vector3(min.x, min.y, max.z),
+            new Vector3(min.x, max.y, max.z),
+            new Vector3(max.x, min.y, max.z),
+            new Vector3(max.x, max.y, max.z)
+        };
+
+        float left = float.MaxValue;
+        float right = float.MinValue;
+        float bottom = float.MaxValue;
+        float top = float.MinValue;
+
+        for (int i = 0; i < corners.Length; i++)
+        {
+            Vector3 screenPoint = mainCamera.WorldToScreenPoint(corners[i]);
+            left = Mathf.Min(left, screenPoint.x);
+            right = Mathf.Max(right, screenPoint.x);
+            bottom = Mathf.Min(bottom, screenPoint.y);
+            top = Mathf.Max(top, screenPoint.y);
+        }
+
+        left -= roomClickPaddingPixels;
+        right += roomClickPaddingPixels;
+        bottom -= roomClickPaddingPixels;
+        top += roomClickPaddingPixels;
+
+        screenRect = Rect.MinMaxRect(left, bottom, right, top);
+        screenCenter = new Vector2(center.x, center.y);
+        return true;
+    }
+
+    private bool TryGetVisibleSpriteBounds(Room2DController room, out Bounds combinedBounds)
+    {
+        SpriteRenderer[] renderers = room.GetComponentsInChildren<SpriteRenderer>(true);
+        combinedBounds = new Bounds(room.transform.position, Vector3.zero);
+        bool foundRenderer = false;
+
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            SpriteRenderer renderer = renderers[i];
+            if (renderer == null || !renderer.enabled || !renderer.gameObject.activeInHierarchy)
+            {
+                continue;
+            }
+
+            if (!foundRenderer)
+            {
+                combinedBounds = renderer.bounds;
+                foundRenderer = true;
+            }
+            else
+            {
+                combinedBounds.Encapsulate(renderer.bounds);
+            }
+        }
+
+        return foundRenderer;
     }
 
     private RectTransform FindOrCreateRectChild(Transform parent, string childName)

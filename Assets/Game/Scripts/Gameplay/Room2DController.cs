@@ -21,6 +21,13 @@ public class Room2DController : MonoBehaviour
     // 可选：场景里的单个 HSK，用来判断当前房间是否正在被保洁处理。
     public Housekeeper2D housekeeper;
 
+    [Header("Prototype Click Selection")]
+    // 原型阶段用：允许玩家在 Rooms View 里直接点击房间来选中。
+    public bool enablePrototypeClickSelection = true;
+    // 原型阶段用：没有 Collider 时自动补一个 BoxCollider2D，避免每个复制房间都要手动加碰撞。
+    public bool autoAddPrototypeClickCollider = true;
+    public Room2DSelectionManager selectionManager;
+
     // 没有绑定 Room2DEntity 时的备用原型数据。当前房间身份请改 Room2DEntity。
     [HideInInspector]
     public string roomName = "Room 101";
@@ -79,6 +86,8 @@ public class Room2DController : MonoBehaviour
     {
         FindRoomOverviewIfNeeded();
         FindHousekeeperIfNeeded();
+        FindSelectionManagerIfNeeded();
+        EnsurePrototypeClickColliderIfNeeded();
         ApplyStateVisual();
     }
 
@@ -93,6 +102,27 @@ public class Room2DController : MonoBehaviour
     private void OnGUI()
     {
         DrawPrototypeDebugLabel();
+    }
+
+    private void OnMouseDown()
+    {
+        SelectThisRoomForPrototype();
+    }
+
+    // 给房间点击、按钮或临时测试脚本调用：把这个房间设为当前选中房间。
+    public void SelectThisRoomForPrototype()
+    {
+        if (!enablePrototypeClickSelection)
+        {
+            return;
+        }
+
+        FindSelectionManagerIfNeeded();
+
+        if (selectionManager != null)
+        {
+            selectionManager.SelectRoom(this);
+        }
     }
 
     public void SetState(Room2DState newState)
@@ -353,6 +383,74 @@ public class Room2DController : MonoBehaviour
         {
             housekeeper = FindFirstObjectByType<Housekeeper2D>();
         }
+    }
+
+    private void FindSelectionManagerIfNeeded()
+    {
+        if (selectionManager == null)
+        {
+            selectionManager = FindFirstObjectByType<Room2DSelectionManager>();
+        }
+    }
+
+    private void EnsurePrototypeClickColliderIfNeeded()
+    {
+        if (!enablePrototypeClickSelection || !autoAddPrototypeClickCollider)
+        {
+            return;
+        }
+
+        if (GetComponent<Collider2D>() != null || GetComponent<Collider>() != null)
+        {
+            return;
+        }
+
+        BoxCollider2D clickCollider = gameObject.AddComponent<BoxCollider2D>();
+        ApplyRendererBoundsToClickCollider(clickCollider);
+    }
+
+    private void ApplyRendererBoundsToClickCollider(BoxCollider2D clickCollider)
+    {
+        Bounds rendererBounds;
+        if (!TryGetRendererBounds(out rendererBounds))
+        {
+            clickCollider.size = new Vector2(3f, 2f);
+            return;
+        }
+
+        Vector3 localCenter = transform.InverseTransformPoint(rendererBounds.center);
+        Vector3 localSize = transform.InverseTransformVector(rendererBounds.size);
+
+        clickCollider.offset = new Vector2(localCenter.x, localCenter.y);
+        clickCollider.size = new Vector2(Mathf.Abs(localSize.x), Mathf.Abs(localSize.y));
+    }
+
+    private bool TryGetRendererBounds(out Bounds combinedBounds)
+    {
+        SpriteRenderer[] renderers = GetComponentsInChildren<SpriteRenderer>(true);
+        combinedBounds = new Bounds(transform.position, Vector3.zero);
+        bool foundRenderer = false;
+
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            SpriteRenderer renderer = renderers[i];
+            if (renderer == null)
+            {
+                continue;
+            }
+
+            if (!foundRenderer)
+            {
+                combinedBounds = renderer.bounds;
+                foundRenderer = true;
+            }
+            else
+            {
+                combinedBounds.Encapsulate(renderer.bounds);
+            }
+        }
+
+        return foundRenderer;
     }
 
     private void RefreshOverview()
