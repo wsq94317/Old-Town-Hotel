@@ -70,6 +70,16 @@ public class Room2DShowcaseViewController : MonoBehaviour
     public RectTransform roomDemandPanel;
     public RectTransform roomWorkerPopupPanel;
     public RectTransform roomWorkerPopupButtonPanel;
+    public RectTransform roomRightLauncherPanel;
+    public RectTransform roomWaitingGuestPeekPanel;
+    public RectTransform roomWaitingGuestCard;
+    public RectTransform roomWaitingGuestPortraitPlaceholder;
+    public RectTransform roomHousekeeperPanel;
+    public RectTransform roomInspectorPanel;
+    public RectTransform roomActionPopupPanel;
+    public RectTransform roomActionPopupButtonPanel;
+    public RectTransform roomInfoPopupPanel;
+    public RectTransform roomTileInfoButtonPanel;
     public RectTransform roomTypeIconPlaceholder;
     public RectTransform roomStateIconPlaceholder;
     public RectTransform roomWorkerPortraitPlaceholder;
@@ -97,6 +107,12 @@ public class Room2DShowcaseViewController : MonoBehaviour
     public TMP_Text roomWorkersText;
     public TMP_Text roomWorkerPopupText;
     public TMP_Text roomDemandText;
+    public TMP_Text roomWaitingGuestPeekText;
+    public TMP_Text roomWaitingGuestCardText;
+    public TMP_Text roomHousekeeperPanelText;
+    public TMP_Text roomInspectorPanelText;
+    public TMP_Text roomActionPopupText;
+    public TMP_Text roomInfoPopupText;
     public TMP_Text loungeStatusText;
     public TMP_Text loungeStockText;
     public TMP_Text loungeMachineText;
@@ -117,6 +133,19 @@ public class Room2DShowcaseViewController : MonoBehaviour
     public Button roomSelectInspectorButton;
     public Button roomConfirmWorkerButton;
     public Button roomCancelWorkerPopupButton;
+    public Button roomOpenWaitingGuestsButton;
+    public Button roomOpenHousekeeperPanelButton;
+    public Button roomOpenInspectorPanelButton;
+    public Button roomCloseWaitingGuestsButton;
+    public Button roomPopupAssignHousekeeperButton;
+    public Button roomPopupMarkCleanPriorityButton;
+    public Button roomPopupAssignInspectorButton;
+    public Button roomPopupMarkInspectionPriorityButton;
+    public Button roomPopupReserveButton;
+    public Button roomPopupInfoButton;
+    public Button roomPopupCloseButton;
+    public Button roomInfoPopupCloseButton;
+    public Button[] roomTileInfoButtons = new Button[24];
     public Button frontDeskAssignRoomButton;
     public Button frontDeskCloseGuestPopupButton;
     public Button frontDeskCloseReadyRoomPopupButton;
@@ -129,6 +158,11 @@ public class Room2DShowcaseViewController : MonoBehaviour
     public ShowcaseView currentView = ShowcaseView.Rooms;
     public string lastShellResult = "Not built";
     public bool roomWorkerPopupVisible;
+    public bool roomWaitingGuestPeekVisible;
+    public bool roomHousekeeperPanelVisible;
+    public bool roomInspectorPanelVisible;
+    public bool roomActionPopupVisible;
+    public bool roomInfoPopupVisible;
     public string roomActionHint = "Tap a room.";
     public bool frontDeskGuestPopupVisible;
     public bool frontDeskReadyRoomPopupVisible;
@@ -475,7 +509,7 @@ public class Room2DShowcaseViewController : MonoBehaviour
 
         if (selectedRoomText != null)
         {
-            selectedRoomText.text = BuildSelectedRoomText();
+            selectedRoomText.text = BuildCompactSelectedRoomText();
         }
 
         if (roomWorkersText != null)
@@ -1264,52 +1298,114 @@ public class Room2DShowcaseViewController : MonoBehaviour
 
     private void BuildRoomViewContent()
     {
-        roomSelectedPanel = FindOrCreatePanel(roomViewPanel, "Card_SelectedRoom", new Color(0.03f, 0.04f, 0.06f, 0.88f));
-        roomWorkersPanel = FindOrCreatePanel(roomViewPanel, "Card_RoomWorkers", new Color(0.03f, 0.04f, 0.06f, 0.88f));
-        roomActionsPanel = FindOrCreatePanel(roomViewPanel, "Card_RoomActions", new Color(0.03f, 0.04f, 0.06f, 0.92f));
-        roomDemandPanel = FindOrCreatePanel(roomViewPanel, "Card_RoomDemand", new Color(0.03f, 0.04f, 0.06f, 0.88f));
-        roomWorkerPopupPanel = FindOrCreatePanel(roomViewPanel, "Card_RoomWorkerPopup", new Color(0.02f, 0.03f, 0.05f, 0.96f));
+        roomDemandPanel = FindOrCreatePanel(roomViewPanel, "Card_RoomTopSummary", new Color(0.05f, 0.08f, 0.11f, 0.90f));
+        roomSelectedPanel = FindOrCreatePanel(roomViewPanel, "Card_SelectedRoom", new Color(0.06f, 0.06f, 0.10f, 0.92f));
+        roomWorkersPanel = FindOrCreatePanel(roomViewPanel, "Card_RoomWorkers", new Color(0.05f, 0.08f, 0.09f, 0.92f));
+        roomActionsPanel = FindOrCreatePanel(roomViewPanel, "Card_RoomActions", new Color(0.03f, 0.04f, 0.06f, 0.0f));
+        roomRightLauncherPanel = FindOrCreatePanel(roomViewPanel, "Panel_RoomRightLaunchers", new Color(0.04f, 0.05f, 0.07f, 0.82f));
+        roomWaitingGuestPeekPanel = FindOrCreatePanel(roomViewPanel, "Panel_RoomWaitingGuestsPeek", new Color(0.08f, 0.06f, 0.13f, 0.96f));
+        roomHousekeeperPanel = FindOrCreatePanel(roomViewPanel, "Panel_HousekeeperCards", new Color(0.06f, 0.09f, 0.08f, 0.96f));
+        roomInspectorPanel = FindOrCreatePanel(roomViewPanel, "Panel_InspectorCard", new Color(0.08f, 0.08f, 0.05f, 0.96f));
+        roomActionPopupPanel = FindOrCreatePanel(roomViewPanel, "Popup_RoomActions", new Color(0.05f, 0.06f, 0.10f, 0.98f));
+        roomActionPopupButtonPanel = FindOrCreatePanel(roomActionPopupPanel, "Panel_RoomActionPopupButtons", new Color(0f, 0f, 0f, 0f));
+        roomInfoPopupPanel = FindOrCreatePanel(roomViewPanel, "Popup_RoomInfo", new Color(0.04f, 0.05f, 0.08f, 0.98f));
+        roomTileInfoButtonPanel = FindOrCreatePanel(roomViewPanel, "Panel_RoomTileInfoButtons", new Color(0f, 0f, 0f, 0f));
+        roomWorkerPopupPanel = FindOrCreatePanel(roomViewPanel, "Card_RoomWorkerPopup", new Color(0.02f, 0.03f, 0.05f, 0.98f));
         roomWorkerPopupButtonPanel = FindOrCreatePanel(roomWorkerPopupPanel, "Panel_RoomWorkerPopupButtons", new Color(0f, 0f, 0f, 0f));
 
-        // Rooms View Foundation：上方只放短摘要；下方作为房间详情和状态动作区。
-        ApplyAnchoredPanel(roomDemandPanel, new Vector2(0.06f, 0.79f), new Vector2(0.94f, 0.92f), Vector2.zero, Vector2.zero);
-        ApplyAnchoredPanel(roomActionsPanel, new Vector2(0.06f, 0.55f), new Vector2(0.94f, 0.70f), Vector2.zero, Vector2.zero);
-        ApplyAnchoredPanel(roomSelectedPanel, new Vector2(0.06f, 0.28f), new Vector2(0.94f, 0.53f), Vector2.zero, Vector2.zero);
-        ApplyAnchoredPanel(roomWorkersPanel, new Vector2(0.06f, 0.14f), new Vector2(0.94f, 0.26f), Vector2.zero, Vector2.zero);
-        ApplyAnchoredPanel(roomWorkerPopupPanel, new Vector2(0.08f, 0.34f), new Vector2(0.92f, 0.64f), Vector2.zero, Vector2.zero);
-        ApplyAnchoredPanel(roomWorkerPopupButtonPanel, new Vector2(0.05f, 0.08f), new Vector2(0.95f, 0.46f), Vector2.zero, Vector2.zero);
+        // Rooms View：顶部只保留薄信息条，避免旧 Debug 卡片挡住房间点击。
+        ApplyAnchoredPanel(roomDemandPanel, new Vector2(0.04f, 0.92f), new Vector2(0.96f, 0.985f), Vector2.zero, Vector2.zero);
+        ApplyAnchoredPanel(roomRightLauncherPanel, new Vector2(0.60f, 0.80f), new Vector2(0.96f, 0.91f), Vector2.zero, Vector2.zero);
+        ApplyAnchoredPanel(roomSelectedPanel, new Vector2(0.04f, 0.80f), new Vector2(0.58f, 0.91f), Vector2.zero, Vector2.zero);
+        ApplyAnchoredPanel(roomWorkersPanel, new Vector2(0.60f, 0.80f), new Vector2(0.96f, 0.91f), Vector2.zero, Vector2.zero);
+        ApplyAnchoredPanel(roomWaitingGuestPeekPanel, new Vector2(0.10f, 0.38f), new Vector2(0.90f, 0.70f), Vector2.zero, Vector2.zero);
+        ApplyAnchoredPanel(roomHousekeeperPanel, new Vector2(0.10f, 0.40f), new Vector2(0.90f, 0.68f), Vector2.zero, Vector2.zero);
+        ApplyAnchoredPanel(roomInspectorPanel, new Vector2(0.10f, 0.42f), new Vector2(0.90f, 0.64f), Vector2.zero, Vector2.zero);
+        ApplyAnchoredPanel(roomActionPopupPanel, new Vector2(0.12f, 0.31f), new Vector2(0.88f, 0.58f), Vector2.zero, Vector2.zero);
+        ApplyAnchoredPanel(roomActionPopupButtonPanel, new Vector2(0.05f, 0.08f), new Vector2(0.95f, 0.45f), Vector2.zero, Vector2.zero);
+        ApplyAnchoredPanel(roomInfoPopupPanel, new Vector2(0.10f, 0.30f), new Vector2(0.90f, 0.70f), Vector2.zero, Vector2.zero);
+        ApplyStretch(roomTileInfoButtonPanel);
+        SetPanelRaycast(roomTileInfoButtonPanel, false);
+        ApplyAnchoredPanel(roomWorkerPopupPanel, new Vector2(0.12f, 0.31f), new Vector2(0.88f, 0.58f), Vector2.zero, Vector2.zero);
+        ApplyAnchoredPanel(roomWorkerPopupButtonPanel, new Vector2(0.05f, 0.08f), new Vector2(0.95f, 0.45f), Vector2.zero, Vector2.zero);
 
         selectedRoomText = FindOrCreateText(roomSelectedPanel, "Text_SelectedRoomCard", "Selected Room");
         roomWorkersText = FindOrCreateText(roomWorkersPanel, "Text_WorkerCard", "Workers");
         roomDemandText = FindOrCreateText(roomDemandPanel, "Text_RoomDemandCard", "Demand");
+        roomWaitingGuestPeekText = FindOrCreateText(roomWaitingGuestPeekPanel, "Text_RoomWaitingGuestsPeek", "Waiting Guests");
+        roomHousekeeperPanelText = FindOrCreateText(roomHousekeeperPanel, "Text_HousekeeperPanel", "Housekeepers");
+        roomInspectorPanelText = FindOrCreateText(roomInspectorPanel, "Text_InspectorPanel", "Inspector");
+        roomActionPopupText = FindOrCreateText(roomActionPopupPanel, "Text_RoomActionPopup", "Room Actions");
+        roomInfoPopupText = FindOrCreateText(roomInfoPopupPanel, "Text_RoomInfoPopup", "Room Info");
         roomWorkerPopupText = FindOrCreateText(roomWorkerPopupPanel, "Text_RoomWorkerPopup", "Assign Worker");
-        ApplyCardText(selectedRoomText, 18f);
-        ApplyCardText(roomWorkersText, 17f);
-        ApplyCardText(roomDemandText, 17f);
-        ApplyCardText(roomWorkerPopupText, 14f);
-        selectedRoomText.rectTransform.offsetMax = new Vector2(-168f, -16f);
-        roomWorkersText.rectTransform.offsetMax = new Vector2(-126f, -16f);
-        roomWorkerPopupText.rectTransform.offsetMax = new Vector2(-18f, -100f);
+
+        ApplyCardText(selectedRoomText, 16f);
+        ApplyCardText(roomWorkersText, 15f);
+        ApplyCardText(roomDemandText, 15f);
+        ApplyCardText(roomWaitingGuestPeekText, 15f);
+        ApplyCardText(roomHousekeeperPanelText, 15f);
+        ApplyCardText(roomInspectorPanelText, 15f);
+        ApplyCardText(roomActionPopupText, 16f);
+        ApplyCardText(roomInfoPopupText, 16f);
+        ApplyCardText(roomWorkerPopupText, 15f);
+        selectedRoomText.rectTransform.offsetMax = new Vector2(-14f, -10f);
+        roomWorkersText.rectTransform.offsetMax = new Vector2(-14f, -10f);
+        roomActionPopupText.rectTransform.offsetMax = new Vector2(-18f, -112f);
+        roomInfoPopupText.rectTransform.offsetMax = new Vector2(-18f, -82f);
+        roomWorkerPopupText.rectTransform.offsetMax = new Vector2(-18f, -112f);
 
         roomTypeIconPlaceholder = FindOrCreatePlaceholder(roomSelectedPanel, "IconPlaceholder_RoomType", "TYPE");
-        ApplyAnchoredPanel(roomTypeIconPlaceholder, new Vector2(0.72f, 0.56f), new Vector2(0.94f, 0.88f), Vector2.zero, Vector2.zero);
+        ApplyAnchoredPanel(roomTypeIconPlaceholder, new Vector2(0.75f, 0.54f), new Vector2(0.94f, 0.86f), Vector2.zero, Vector2.zero);
         roomStateIconPlaceholder = FindOrCreatePlaceholder(roomSelectedPanel, "IconPlaceholder_State", "STATE");
-        ApplyAnchoredPanel(roomStateIconPlaceholder, new Vector2(0.72f, 0.14f), new Vector2(0.94f, 0.46f), Vector2.zero, Vector2.zero);
+        ApplyAnchoredPanel(roomStateIconPlaceholder, new Vector2(0.75f, 0.14f), new Vector2(0.94f, 0.46f), Vector2.zero, Vector2.zero);
         roomWorkerPortraitPlaceholder = FindOrCreatePlaceholder(roomWorkersPanel, "WorkerPortraitPlaceholder", "WORKER");
-        ApplyAnchoredPanel(roomWorkerPortraitPlaceholder, new Vector2(0.76f, 0.16f), new Vector2(0.94f, 0.84f), Vector2.zero, Vector2.zero);
+        ApplyAnchoredPanel(roomWorkerPortraitPlaceholder, new Vector2(0.78f, 0.18f), new Vector2(0.94f, 0.82f), Vector2.zero, Vector2.zero);
+        roomTypeIconPlaceholder.gameObject.SetActive(false);
+        roomStateIconPlaceholder.gameObject.SetActive(false);
+        roomWorkerPortraitPlaceholder.gameObject.SetActive(false);
 
-        roomWorkersPanel.gameObject.SetActive(true);
-        roomActionsPanel.gameObject.SetActive(true);
+        // 这些信息卡只负责显示，不应该挡住底下的房间点击。
+        SetPanelRaycast(roomDemandPanel, false);
+        SetPanelRaycast(roomSelectedPanel, false);
+        SetPanelRaycast(roomWorkersPanel, false);
+
+        roomWaitingGuestCard = FindOrCreatePanel(roomWaitingGuestPeekPanel, "Card_RoomWaitingGuestPreview", new Color(0.12f, 0.16f, 0.23f, 0.96f));
+        ApplyAnchoredPanel(roomWaitingGuestCard, new Vector2(0.06f, 0.18f), new Vector2(0.94f, 0.62f), Vector2.zero, Vector2.zero);
+        roomWaitingGuestPortraitPlaceholder = FindOrCreatePlaceholder(roomWaitingGuestCard, "PortraitPlaceholder_RoomWaitingGuest", "G");
+        ApplyAnchoredPanel(roomWaitingGuestPortraitPlaceholder, new Vector2(0.04f, 0.18f), new Vector2(0.18f, 0.82f), Vector2.zero, Vector2.zero);
+        roomWaitingGuestCardText = FindOrCreateText(roomWaitingGuestCard, "Text_RoomWaitingGuestCard", "Guest");
+        ApplyCardText(roomWaitingGuestCardText, 15f);
+        roomWaitingGuestCardText.rectTransform.offsetMin = new Vector2(104f, 12f);
+        roomWaitingGuestCardText.rectTransform.offsetMax = new Vector2(-14f, -12f);
+
+        roomActionsPanel.gameObject.SetActive(false);
+        roomWorkersPanel.gameObject.SetActive(false);
+        roomWaitingGuestPeekPanel.gameObject.SetActive(false);
+        roomHousekeeperPanel.gameObject.SetActive(false);
+        roomInspectorPanel.gameObject.SetActive(false);
+        roomActionPopupPanel.gameObject.SetActive(false);
+        roomInfoPopupPanel.gameObject.SetActive(false);
         roomWorkerPopupPanel.gameObject.SetActive(false);
 
-        ApplyActionGrid(roomActionsPanel, 2, new Vector2(218f, 46f), 12f);
-        roomAssignHousekeeperButton = FindOrCreateActionButtonWithIconPlaceholder(roomActionsPanel, "Button_RoomAssignHSK", "Assign HSK", OpenHousekeeperPopup);
-        roomMarkCleanPriorityButton = FindOrCreateActionButtonWithIconPlaceholder(roomActionsPanel, "Button_RoomMarkCleanPriority", "Clean Prio", MarkDirtyPriority);
-        roomAssignInspectorButton = FindOrCreateActionButtonWithIconPlaceholder(roomActionsPanel, "Button_RoomAssignInspector", "Assign Insp", OpenInspectorPopup);
-        roomMarkInspectionPriorityButton = FindOrCreateActionButtonWithIconPlaceholder(roomActionsPanel, "Button_RoomMarkInspectionPriority", "Insp Prio", MarkInspectionPriority);
-        roomReserveButton = FindOrCreateActionButtonWithIconPlaceholder(roomActionsPanel, "Button_RoomReserve", "Reserve", ReserveSelectedRoom);
-        roomAssignDemandButton = FindOrCreateActionButtonWithIconPlaceholder(roomActionsPanel, "Button_RoomAssignDemand", "Assign Guest", AssignSelectedRoomToDemand);
-        HideLegacyRoomActionButtons();
+        ApplyActionGrid(roomRightLauncherPanel, 3, new Vector2(100f, 34f), 8f);
+        roomOpenWaitingGuestsButton = FindOrCreateActionButton(roomRightLauncherPanel, "Button_OpenRoomWaitingGuests", "Guests", ToggleRoomWaitingGuestPeek);
+        roomOpenHousekeeperPanelButton = FindOrCreateActionButton(roomRightLauncherPanel, "Button_OpenHousekeepers", "HSK", ToggleRoomHousekeeperPanel);
+        roomOpenInspectorPanelButton = FindOrCreateActionButton(roomRightLauncherPanel, "Button_OpenInspectors", "INSP", ToggleRoomInspectorPanel);
+
+        roomCloseWaitingGuestsButton = FindOrCreateActionButton(roomWaitingGuestPeekPanel, "Button_CloseRoomWaitingGuests", "Close", CloseRoomWaitingGuestPeek);
+        ApplyAnchoredPanel(roomCloseWaitingGuestsButton.transform as RectTransform, new Vector2(0.68f, 0.72f), new Vector2(0.94f, 0.90f), Vector2.zero, Vector2.zero);
+
+        ApplyActionGrid(roomActionPopupButtonPanel, 2, new Vector2(190f, 38f), 8f);
+        roomPopupAssignHousekeeperButton = FindOrCreateActionButton(roomActionPopupButtonPanel, "Button_RoomPopupAssignHSK", "Assign HSK", OpenHousekeeperPopup);
+        roomPopupMarkCleanPriorityButton = FindOrCreateActionButton(roomActionPopupButtonPanel, "Button_RoomPopupCleanPrio", "Clean Prio", MarkDirtyPriority);
+        roomPopupAssignInspectorButton = FindOrCreateActionButton(roomActionPopupButtonPanel, "Button_RoomPopupAssignINSP", "Assign INSP", OpenInspectorPopup);
+        roomPopupMarkInspectionPriorityButton = FindOrCreateActionButton(roomActionPopupButtonPanel, "Button_RoomPopupInspPrio", "Insp Prio", MarkInspectionPriority);
+        roomPopupReserveButton = FindOrCreateActionButton(roomActionPopupButtonPanel, "Button_RoomPopupReserve", "Reserve", ReserveSelectedRoom);
+        roomPopupInfoButton = FindOrCreateActionButton(roomActionPopupButtonPanel, "Button_RoomPopupInfo", "Info", OpenRoomInfoPopup);
+        roomPopupCloseButton = FindOrCreateActionButton(roomActionPopupButtonPanel, "Button_RoomPopupClose", "Close", CloseRoomActionPopup);
+
+        roomInfoPopupCloseButton = FindOrCreateActionButton(roomInfoPopupPanel, "Button_CloseRoomInfoPopup", "Close", CloseRoomInfoPopup);
+        ApplyAnchoredPanel(roomInfoPopupCloseButton.transform as RectTransform, new Vector2(0.58f, 0.05f), new Vector2(0.92f, 0.16f), Vector2.zero, Vector2.zero);
 
         ApplyActionGrid(roomWorkerPopupButtonPanel, 2, new Vector2(190f, 38f), 8f);
         roomSelectNextHousekeeperButton = FindOrCreateActionButton(roomWorkerPopupButtonPanel, "Button_RoomSelectNextHSK", "Next HSK", SelectNextHousekeeper);
@@ -1317,6 +1413,9 @@ public class Room2DShowcaseViewController : MonoBehaviour
         roomSelectInspectorButton = FindOrCreateActionButton(roomWorkerPopupButtonPanel, "Button_RoomSelectInsp", "Use Insp", SelectInspector);
         roomConfirmWorkerButton = FindOrCreateActionButton(roomWorkerPopupButtonPanel, "Button_RoomConfirmWorker", "Confirm", ConfirmSelectedWorkerFromPopup);
         roomCancelWorkerPopupButton = FindOrCreateActionButton(roomWorkerPopupButtonPanel, "Button_RoomCancelWorkerPopup", "Cancel", CloseWorkerPopup);
+
+        HideLegacyRoomActionButtons();
+        HideLegacyRoomCards();
     }
 
     private void HideLegacyRoomActionButtons()
@@ -1348,6 +1447,31 @@ public class Room2DShowcaseViewController : MonoBehaviour
                 legacyButton.gameObject.SetActive(false);
             }
         }
+    }
+
+    private void HideLegacyRoomCards()
+    {
+        if (roomViewPanel == null)
+        {
+            return;
+        }
+
+        // 旧 Rooms 调试卡片不再作为主 UI，避免和新的点房间弹窗交互叠在一起。
+        HideUnexpectedChildren(
+            roomViewPanel,
+            "Text_RoomViewShell",
+            "Card_RoomTopSummary",
+            "Panel_RoomRightLaunchers",
+            "Card_SelectedRoom",
+            "Card_RoomWorkers",
+            "Card_RoomActions",
+            "Panel_RoomWaitingGuestsPeek",
+            "Panel_HousekeeperCards",
+            "Panel_InspectorCard",
+            "Popup_RoomActions",
+            "Popup_RoomInfo",
+            "Panel_RoomTileInfoButtons",
+            "Card_RoomWorkerPopup");
     }
 
     private void BuildLoungeViewContent()
@@ -1400,6 +1524,15 @@ public class Room2DShowcaseViewController : MonoBehaviour
         {
             return;
         }
+
+        HideUnexpectedChildren(
+            loungeViewPanel,
+            "Text_LoungeViewShell",
+            "Card_LoungeHeader",
+            "Card_LoungeStock",
+            "Card_LoungeMachine",
+            "Card_LoungeWarningResult",
+            "Card_LoungeActions");
 
         // 旧 Lounge 卡片如果还在场景里，隐藏掉，避免新旧 UI 叠在一起。
         string[] legacyCardNames =
@@ -1503,6 +1636,27 @@ public class Room2DShowcaseViewController : MonoBehaviour
             + ShortenMatchHint(matchHint);
     }
 
+    private string BuildCompactSelectedRoomText()
+    {
+        Room2DEntity room = GetSelectedRoomEntity();
+        if (room == null)
+        {
+            return "<b>Selected Room</b>\nTap a room.";
+        }
+
+        string reservedText = demandLoop != null && demandLoop.IsRoomReservedForPrototypeDemand(room) ? "Yes" : "No";
+        string matchHint = demandLoop != null ? ShortenMatchHint(demandLoop.GetPrototypeMatchHintForRoom(room)) : "Match: None";
+
+        // 主 Rooms 页面只显示决策需要的摘要；完整信息放到房间弹窗里看。
+        return "<b>Selected Room</b>\n"
+            + room.roomName + "  |  " + room.GetStateDisplayName() + "\n"
+            + room.prototypeRoomType + "  F" + room.floorNumber + "  " + room.prototypeFacing + "\n"
+            + "Reserved " + reservedText
+            + "  |  CLEAN " + GetYesNo(room.markedCleaningPriority)
+            + "  |  INSP " + GetYesNo(room.markedInspectionPriority) + "\n"
+            + matchHint;
+    }
+
     private string BuildRoomWorkerText()
     {
         return "<b>Workers</b>\n"
@@ -1537,16 +1691,9 @@ public class Room2DShowcaseViewController : MonoBehaviour
         bool isAwaitingInspection = hasRoom && room.currentState == Room2DState.AwaitingInspection;
         bool isReady = hasRoom && room.currentState == Room2DState.Ready;
 
-        SetButtonVisible(roomAssignHousekeeperButton, isDirty);
-        SetButtonVisible(roomMarkCleanPriorityButton, isDirty);
-        SetButtonVisible(roomAssignInspectorButton, isAwaitingInspection);
-        SetButtonVisible(roomMarkInspectionPriorityButton, isAwaitingInspection);
-        SetButtonVisible(roomReserveButton, isReady);
-        SetButtonVisible(roomAssignDemandButton, isReady);
-
         if (roomActionsPanel != null)
         {
-            roomActionsPanel.gameObject.SetActive(isDirty || isAwaitingInspection || isReady);
+            roomActionsPanel.gameObject.SetActive(false);
         }
 
         if (roomWorkerPopupPanel != null)
@@ -1554,16 +1701,212 @@ public class Room2DShowcaseViewController : MonoBehaviour
             roomWorkerPopupPanel.gameObject.SetActive(roomWorkerPopupVisible && currentView == ShowcaseView.Rooms);
         }
 
+        if (roomWorkersPanel != null)
+        {
+            roomWorkersPanel.gameObject.SetActive(false);
+        }
+
         if (roomWorkerPopupText != null)
         {
             roomWorkerPopupText.text = BuildWorkerPopupText();
+        }
+
+        if (roomWaitingGuestPeekPanel != null)
+        {
+            roomWaitingGuestPeekPanel.gameObject.SetActive(roomWaitingGuestPeekVisible && currentView == ShowcaseView.Rooms);
+            if (roomWaitingGuestPeekPanel.gameObject.activeInHierarchy)
+            {
+                roomWaitingGuestPeekPanel.SetAsLastSibling();
+            }
+        }
+
+        if (roomHousekeeperPanel != null)
+        {
+            roomHousekeeperPanel.gameObject.SetActive(roomHousekeeperPanelVisible && currentView == ShowcaseView.Rooms);
+        }
+
+        if (roomInspectorPanel != null)
+        {
+            roomInspectorPanel.gameObject.SetActive(roomInspectorPanelVisible && currentView == ShowcaseView.Rooms);
+        }
+
+        if (roomActionPopupPanel != null)
+        {
+            roomActionPopupPanel.gameObject.SetActive(roomActionPopupVisible && currentView == ShowcaseView.Rooms && hasRoom);
+            if (roomActionPopupPanel.gameObject.activeInHierarchy)
+            {
+                roomActionPopupPanel.SetAsLastSibling();
+            }
+        }
+
+        if (roomInfoPopupPanel != null)
+        {
+            roomInfoPopupPanel.gameObject.SetActive(roomInfoPopupVisible && currentView == ShowcaseView.Rooms && hasRoom);
+            if (roomInfoPopupPanel.gameObject.activeInHierarchy)
+            {
+                roomInfoPopupPanel.SetAsLastSibling();
+            }
+        }
+
+        if (roomWaitingGuestPeekText != null)
+        {
+            roomWaitingGuestPeekText.text = BuildRoomWaitingGuestPeekText();
+        }
+
+        if (roomWaitingGuestCardText != null)
+        {
+            roomWaitingGuestCardText.text = BuildRoomWaitingGuestCardText();
+        }
+
+        UpdatePlaceholderLabel(roomWaitingGuestPortraitPlaceholder, GetFrontDeskWaitingGuestCount() > 0 ? "G" : "-");
+
+        if (roomHousekeeperPanelText != null)
+        {
+            roomHousekeeperPanelText.text = BuildHousekeeperPanelText();
+        }
+
+        if (roomInspectorPanelText != null)
+        {
+            roomInspectorPanelText.text = BuildInspectorPanelText();
+        }
+
+        if (roomActionPopupText != null)
+        {
+            roomActionPopupText.text = BuildRoomActionPopupText(room);
+        }
+
+        if (roomInfoPopupText != null)
+        {
+            roomInfoPopupText.text = BuildSelectedRoomText();
         }
 
         UpdatePlaceholderLabel(roomTypeIconPlaceholder, hasRoom ? room.prototypeRoomType.ToString() : "TYPE");
         UpdatePlaceholderLabel(roomStateIconPlaceholder, hasRoom ? room.GetStateDisplayName() : "STATE");
         UpdatePlaceholderLabel(roomWorkerPortraitPlaceholder, workerSelectionPanel != null ? workerSelectionPanel.selectedWorkerName : "WORKER");
 
+        RefreshRoomActionPopupButtonState(isDirty, isAwaitingInspection, isReady);
+        // 旧版漂浮 i 按钮和房间不是同一个整体，容易在层级上压到面板；现在先全部隐藏。
+        SetAllRoomTileInfoButtonsVisible(false);
         RefreshWorkerPopupButtonState();
+    }
+
+    private void RefreshRoomActionPopupButtonState(bool isDirty, bool isAwaitingInspection, bool isReady)
+    {
+        // 房间弹窗只显示当前状态真正能做的事，避免玩家把测试按钮当成正常流程。
+        SetButtonVisible(roomPopupAssignHousekeeperButton, isDirty);
+        SetButtonVisible(roomPopupMarkCleanPriorityButton, isDirty);
+        SetButtonVisible(roomPopupAssignInspectorButton, isAwaitingInspection);
+        SetButtonVisible(roomPopupMarkInspectionPriorityButton, isAwaitingInspection);
+        SetButtonVisible(roomPopupReserveButton, isReady);
+        SetButtonVisible(roomPopupInfoButton, isDirty || isAwaitingInspection || isReady);
+        SetButtonVisible(roomPopupCloseButton, true);
+    }
+
+    private void RefreshRoomTileInfoButtons()
+    {
+        if (roomTileInfoButtonPanel == null || currentView != ShowcaseView.Rooms)
+        {
+            SetAllRoomTileInfoButtonsVisible(false);
+            return;
+        }
+
+        if (roomTileInfoButtons == null || roomTileInfoButtons.Length == 0)
+        {
+            roomTileInfoButtons = new Button[24];
+        }
+
+        Camera mainCamera = Camera.main;
+        if (mainCamera == null)
+        {
+            SetAllRoomTileInfoButtonsVisible(false);
+            return;
+        }
+
+        Room2DController[] rooms = GetSelectableRooms();
+        int buttonCount = Mathf.Min(rooms.Length, roomTileInfoButtons.Length);
+
+        for (int i = 0; i < buttonCount; i++)
+        {
+            int roomIndex = i;
+            Button button = roomTileInfoButtons[i];
+            if (button == null)
+            {
+                button = FindOrCreateActionButton(roomTileInfoButtonPanel, "Button_RoomTileInfo_" + i, "i", () => OpenRoomInfoByVisibleIndex(roomIndex));
+                roomTileInfoButtons[i] = button;
+                RectTransform rect = button.transform as RectTransform;
+                if (rect != null)
+                {
+                    rect.sizeDelta = new Vector2(34f, 34f);
+                }
+            }
+
+            Room2DController room = rooms[i];
+            Rect screenRect = new Rect();
+            Vector2 screenCenter = Vector2.zero;
+            bool visible = room != null
+                && room.gameObject.activeInHierarchy
+                && TryGetRoomScreenRect(room, mainCamera, out screenRect, out screenCenter);
+
+            button.gameObject.SetActive(visible);
+            if (!visible)
+            {
+                continue;
+            }
+
+            RectTransform buttonRect = button.transform as RectTransform;
+            if (buttonRect == null)
+            {
+                continue;
+            }
+
+            Vector2 localPoint;
+            Vector2 screenPoint = new Vector2(screenRect.xMax - 18f, screenRect.yMax - 18f);
+            RectTransformUtility.ScreenPointToLocalPointInRectangle(roomTileInfoButtonPanel, screenPoint, null, out localPoint);
+            buttonRect.anchorMin = new Vector2(0.5f, 0.5f);
+            buttonRect.anchorMax = new Vector2(0.5f, 0.5f);
+            buttonRect.pivot = new Vector2(0.5f, 0.5f);
+            buttonRect.anchoredPosition = localPoint;
+            buttonRect.sizeDelta = new Vector2(34f, 34f);
+            SetButtonLabel(button, "i");
+        }
+
+        for (int i = buttonCount; i < roomTileInfoButtons.Length; i++)
+        {
+            SetButtonVisible(roomTileInfoButtons[i], false);
+        }
+    }
+
+    private void SetAllRoomTileInfoButtonsVisible(bool visible)
+    {
+        if (roomTileInfoButtons == null)
+        {
+            return;
+        }
+
+        for (int i = 0; i < roomTileInfoButtons.Length; i++)
+        {
+            SetButtonVisible(roomTileInfoButtons[i], visible);
+        }
+    }
+
+    private void OpenRoomInfoByVisibleIndex(int roomIndex)
+    {
+        Room2DController[] rooms = GetSelectableRooms();
+        if (roomIndex < 0 || roomIndex >= rooms.Length || rooms[roomIndex] == null)
+        {
+            return;
+        }
+
+        FindReferencesIfNeeded();
+        if (selectionManager != null)
+        {
+            selectionManager.SelectRoom(rooms[roomIndex]);
+        }
+
+        roomInfoPopupVisible = true;
+        roomActionPopupVisible = false;
+        roomWorkerPopupVisible = false;
+        roomActionHint = "Opened info for " + GetSelectedRoomDisplayNameForHint() + ".";
     }
 
     private void RefreshWorkerPopupButtonState()
@@ -1593,6 +1936,131 @@ public class Room2DShowcaseViewController : MonoBehaviour
             + "Selected Worker: " + workerName + "\n"
             + "Confirm to assign. Cancel to close.\n"
             + "Last: " + lastResult;
+    }
+
+    private string BuildRoomWaitingGuestPeekText()
+    {
+        if (demandLoop == null)
+        {
+            return "<b>Waiting Guests</b>\nNo demand loop.";
+        }
+
+        return "<b>Waiting Guests</b>\n"
+            + "Queue: " + GetFrontDeskWaitingGuestCount() + "\n"
+            + "This panel is for quick checking only.\n"
+            + "Close it before selecting rooms behind it.";
+    }
+
+    private string BuildRoomWaitingGuestCardText()
+    {
+        if (demandLoop == null)
+        {
+            return "No demand loop.";
+        }
+
+        if (demandLoop.complaintWaitingForReassignment)
+        {
+            return "<b>Complaint</b>\n"
+                + demandLoop.complaintDemandType + "\n"
+                + demandLoop.complaintRoomPreference + "\n"
+                + "Wait " + FormatSeconds(demandLoop.complaintReassignmentWaitSeconds);
+        }
+
+        if (demandLoop.activeDemandWaitingForManualAssignment)
+        {
+            return "<b>Waiting Guest</b>\n"
+                + demandLoop.activeDemandType + "\n"
+                + demandLoop.activeDemandRoomPreference + "\n"
+                + "Wait " + FormatSeconds(demandLoop.activeDemandWaitSeconds);
+        }
+
+        return "<b>No Waiting Guest</b>\n"
+            + "Next: " + demandLoop.upcomingDemandType + "\n"
+            + "ETA " + FormatSeconds(demandLoop.upcomingDemandEtaSeconds);
+    }
+
+    private string BuildHousekeeperPanelText()
+    {
+        if (workerSelectionPanel == null || workerSelectionPanel.housekeepers == null || workerSelectionPanel.housekeepers.Length == 0)
+        {
+            return "<b>Housekeepers</b>\nNo HSK linked.";
+        }
+
+        string text = "<b>Housekeepers</b>\n";
+        for (int i = 0; i < workerSelectionPanel.housekeepers.Length; i++)
+        {
+            Housekeeper2D housekeeper = workerSelectionPanel.housekeepers[i];
+            if (housekeeper == null)
+            {
+                continue;
+            }
+
+            string selected = i == workerSelectionPanel.selectedHousekeeperIndex
+                && workerSelectionPanel.selectedWorkerType == Room2DWorkerSelectionPanel.PrototypeWorkerType.Housekeeper
+                ? "> "
+                : "- ";
+            text += selected + housekeeper.name
+                + ": " + housekeeper.currentState
+                + " / " + housekeeper.assignedRoomName
+                + " / " + FormatSeconds(housekeeper.cleaningTimerSeconds) + "\n";
+        }
+
+        return text;
+    }
+
+    private string BuildInspectorPanelText()
+    {
+        if (workerSelectionPanel == null || workerSelectionPanel.inspector == null)
+        {
+            return "<b>Inspector</b>\nNo inspector linked.";
+        }
+
+        Inspector2D inspectorWorker = workerSelectionPanel.inspector;
+        string selected = workerSelectionPanel.selectedWorkerType == Room2DWorkerSelectionPanel.PrototypeWorkerType.Inspector
+            ? "> "
+            : "- ";
+
+        return "<b>Inspector</b>\n"
+            + selected + inspectorWorker.name
+            + ": " + inspectorWorker.currentState
+            + " / " + inspectorWorker.assignedRoomName
+            + " / " + FormatSeconds(inspectorWorker.inspectionTimerSeconds);
+    }
+
+    private string BuildRoomActionPopupText(Room2DEntity room)
+    {
+        if (room == null)
+        {
+            return "<b>Room Action</b>\nTap a room.";
+        }
+
+        string actionHint;
+        switch (room.currentState)
+        {
+            case Room2DState.Dirty:
+                actionHint = "Assign HSK or mark Clean Priority.";
+                break;
+            case Room2DState.AwaitingInspection:
+                actionHint = "Assign Inspector or mark Insp Priority.";
+                break;
+            case Room2DState.Ready:
+                actionHint = "Reserve for upcoming guest. Check-in is handled at Front Desk.";
+                break;
+            case Room2DState.Occupied:
+                actionHint = "Occupied room. No room operation now.";
+                break;
+            case Room2DState.Blocked:
+                actionHint = "Blocked: " + room.blockReason;
+                break;
+            default:
+                actionHint = "No manual action for this state.";
+                break;
+        }
+
+        return "<b>" + room.roomName + "</b>\n"
+            + "State: " + room.GetStateDisplayName() + "\n"
+            + actionHint + "\n"
+            + "Last: " + roomActionHint;
     }
 
     private void SetButtonVisible(Button button, bool visible)
@@ -1878,6 +2346,15 @@ public class Room2DShowcaseViewController : MonoBehaviour
         UpdatePlaceholderLabel(loungeCupIconPlaceholder, "CUPS\n" + lounge.cleanCups);
         UpdatePlaceholderLabel(loungeMachineIconPlaceholder, lounge.washing ? "RUN" : "IDLE");
         UpdatePlaceholderLabel(loungeWarningBadgePlaceholder, lounge.loungeWarning == "None" ? "OK" : "WARN");
+
+        SetPlaceholderColor(loungeStockIconPlaceholder, new Color(0.45f, 0.62f, 0.78f, 0.95f));
+        SetPlaceholderColor(loungeCupIconPlaceholder, new Color(0.62f, 0.76f, 0.82f, 0.95f));
+        SetPlaceholderColor(loungeMachineIconPlaceholder, lounge.washing
+            ? new Color(0.85f, 0.62f, 0.30f, 0.95f)
+            : new Color(0.30f, 0.48f, 0.42f, 0.95f));
+        SetPlaceholderColor(loungeWarningBadgePlaceholder, lounge.loungeWarning == "None"
+            ? new Color(0.25f, 0.44f, 0.30f, 0.95f)
+            : new Color(0.55f, 0.24f, 0.20f, 0.95f));
     }
 
     private string GetActiveDemandShortLine()
@@ -2226,10 +2703,56 @@ public class Room2DShowcaseViewController : MonoBehaviour
         }
     }
 
+    private void ToggleRoomWaitingGuestPeek()
+    {
+        roomWaitingGuestPeekVisible = !roomWaitingGuestPeekVisible;
+        roomHousekeeperPanelVisible = false;
+        roomInspectorPanelVisible = false;
+    }
+
+    private void CloseRoomWaitingGuestPeek()
+    {
+        roomWaitingGuestPeekVisible = false;
+    }
+
+    private void ToggleRoomHousekeeperPanel()
+    {
+        roomHousekeeperPanelVisible = !roomHousekeeperPanelVisible;
+        roomWaitingGuestPeekVisible = false;
+        roomInspectorPanelVisible = false;
+    }
+
+    private void ToggleRoomInspectorPanel()
+    {
+        roomInspectorPanelVisible = !roomInspectorPanelVisible;
+        roomWaitingGuestPeekVisible = false;
+        roomHousekeeperPanelVisible = false;
+    }
+
+    private void OpenRoomInfoPopup()
+    {
+        roomInfoPopupVisible = true;
+        roomActionPopupVisible = false;
+        roomWorkerPopupVisible = false;
+    }
+
+    private void CloseRoomInfoPopup()
+    {
+        roomInfoPopupVisible = false;
+    }
+
+    private void CloseRoomActionPopup()
+    {
+        roomActionPopupVisible = false;
+        roomActionHint = "Room popup closed.";
+    }
+
     private void OpenHousekeeperPopup()
     {
         SelectHousekeeper();
         roomWorkerPopupVisible = true;
+        roomActionPopupVisible = false;
+        roomInfoPopupVisible = false;
         roomActionHint = "Choose HSK, then Confirm.";
     }
 
@@ -2237,6 +2760,8 @@ public class Room2DShowcaseViewController : MonoBehaviour
     {
         SelectInspector();
         roomWorkerPopupVisible = true;
+        roomActionPopupVisible = false;
+        roomInfoPopupVisible = false;
         roomActionHint = "Choose Inspector, then Confirm.";
     }
 
@@ -2244,6 +2769,7 @@ public class Room2DShowcaseViewController : MonoBehaviour
     {
         AssignSelectedWorker();
         roomWorkerPopupVisible = false;
+        roomActionPopupVisible = true;
     }
 
     private void CloseWorkerPopup()
@@ -2343,8 +2869,8 @@ public class Room2DShowcaseViewController : MonoBehaviour
 
     private void ApplyPrototypeDebugLabelVisibility()
     {
-        // OnGUI 房间标签会盖在 Canvas 之上；录屏时只在 Rooms 页面显示。
-        Room2DController.hidePrototypeDebugLabelsGlobally = currentView != ShowcaseView.Rooms;
+        // Showcase UI 已经负责显示房间信息；旧 OnGUI 标签会压在 UI 上方，录屏阶段全部关闭。
+        Room2DController.hidePrototypeDebugLabelsGlobally = true;
     }
 
     private void HandleRoomsViewClickSelection()
@@ -2381,6 +2907,8 @@ public class Room2DShowcaseViewController : MonoBehaviour
         {
             selectionManager.SelectRoom(clickedRoom);
             roomWorkerPopupVisible = false;
+            roomInfoPopupVisible = false;
+            roomActionPopupVisible = true;
             roomActionHint = "Selected " + GetSelectedRoomDisplayNameForHint() + ".";
         }
     }
@@ -2440,10 +2968,13 @@ public class Room2DShowcaseViewController : MonoBehaviour
 
     private bool IsPointerInsideRoomsViewUi(Vector2 screenPosition)
     {
-        return IsPointerInsideActiveRect(roomSelectedPanel, screenPosition)
-            || IsPointerInsideActiveRect(roomDemandPanel, screenPosition)
-            || IsPointerInsideActiveRect(roomWorkersPanel, screenPosition)
-            || IsPointerInsideActiveRect(roomActionsPanel, screenPosition)
+        return IsPointerInsideActiveRect(roomActionsPanel, screenPosition)
+            || IsPointerInsideActiveRect(roomRightLauncherPanel, screenPosition)
+            || IsPointerInsideActiveRect(roomWaitingGuestPeekPanel, screenPosition)
+            || IsPointerInsideActiveRect(roomHousekeeperPanel, screenPosition)
+            || IsPointerInsideActiveRect(roomInspectorPanel, screenPosition)
+            || IsPointerInsideActiveRect(roomActionPopupPanel, screenPosition)
+            || IsPointerInsideActiveRect(roomInfoPopupPanel, screenPosition)
             || IsPointerInsideActiveRect(roomWorkerPopupPanel, screenPosition);
     }
 
