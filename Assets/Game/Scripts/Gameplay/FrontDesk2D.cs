@@ -128,6 +128,47 @@ public class FrontDesk2D : MonoBehaviour
             + "Last: " + lastFrontDeskResult;
     }
 
+    // Showcase UI 用：把前台压力整理成更像玩家能理解的短结论。
+    public string GetShowcasePressureLabel()
+    {
+        if (complaintWaitingPressureSeconds > 0f)
+        {
+            return "Complaint Waiting";
+        }
+
+        if (waitingTimePressureSeconds >= delayedCheckInThresholdSeconds)
+        {
+            return "Guest Delayed";
+        }
+
+        if (currentQueueCount > 0)
+        {
+            return "Guests Waiting";
+        }
+
+        return runDuringPlay ? "Stable" : "Standby";
+    }
+
+    public string GetShowcaseActionHint()
+    {
+        if (!runDuringPlay)
+        {
+            return "Start the day when rooms are ready.";
+        }
+
+        if (complaintWaitingPressureSeconds > 0f)
+        {
+            return "Reassign the complaint guest first.";
+        }
+
+        if (currentQueueCount > 0)
+        {
+            return "Open a guest card and assign a room.";
+        }
+
+        return "Call the next guest when you are ready.";
+    }
+
     private string FormatSeconds(float seconds)
     {
         int wholeSeconds = Mathf.FloorToInt(seconds);

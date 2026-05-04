@@ -1,134 +1,165 @@
 # Task Log
 
 ## Current Task
-Build first playable fake-3D 2D room entity prototype.
+Push the project toward a recordable, minimally presentable 3-view showcase build in `Hotel_Rooms_2D_Proto`.
 
-## Done
-- Unity URP project created
-- Base folder structure created
-- Scene Hotel_Rooms created
-- Basic 3-floor, 4-room block layout started
-- Scene Hotel_Rooms_2D_Proto created
-- Room2DState created
-- Room2DController created
-- Room2DEntity created
-- Room color, state marker, labels, button flow, and action count working
-- Room2DFakeDepthVisual created for simple sprite layer ordering
-- Room2DOverview created for scene-level room state counts
-- Room2DController now auto-finds Room2DOverview for easier room duplication
-- Room2DLabelView created for per-room TMP labels under each room entity
-- Room2DSelectionManager created for controlling the currently selected room
-- Room2DOverview now has prototype tools for refreshing and resetting all rooms
-- Room2DEntity now has SetIdentity for room number/name setup
-- Room2DOverview can assign prototype room numbers for duplicated rooms
-- Room2DSelectionManager can select next/previous room by room number
-- Room2DEntity now tracks whether the guest has checked out
-- Room2DOverview assigns prototype room numbers by scene position
-- Room2DEntity now exposes explicit room workflow actions
-- Room workflow actions now guard against invalid state transitions
-- Room2DEntity now tracks how long the room has stayed in its current state
-- Room2DOverview now shows the oldest Dirty room wait time
-- Room2DPrototypeLoop created to simulate guest check-in and checkout flow
-- Room2DState now includes Occupied for guests staying in rooms
-- Room workflow now uses Ready -> Occupied -> Dirty before cleaning begins
-- Guest preference and room quality review user stories recorded in AI_CONTEXT
-- Room2DState now includes Blocked for unavailable rooms
-- Room2DEntity now stores block reason and block remaining hours
-- Room2DEntity now stores generated room attributes for future UI and reviews
-- Room2DPrototypeClock created to advance block duration and expire blocked rooms into Dirty
-- Gameplay scripts now include concise Chinese comments for easier code reading
-- Room2DPrototypeDemandLoop exposes a lightweight preparation view with room summary, upcoming demand, warnings, reservation, and priority marks
-- Room2DEntity stores simple prototype preparation priority flags for cleaning and inspection
-- Room2DController shows preparation priority markers on room debug labels
-- Housekeeper2D can assign the best Dirty room using CLEAN PRIO, cleaning priority level, and oldest Dirty time
-- Inspector2D can assign the best AwaitingInspection room using INSP PRIO and oldest inspection wait time
-- Room2DPrototypeDebugHud shows the current best housekeeping and inspection targets
-- Room2DWorkerSelectionPanel created for manual worker selection and selected-worker-to-selected-room assignment
-- Room2DPrototypeDebugHud can show selected worker, worker states, and manual worker assignment results
-- Room2DPrototypeDebugHud now uses smaller action buttons so the debug panel blocks less of the room grid
-- Room2DPrototypeDebugHud now separates demand information into Upcoming, Active, and Latest Resolved prototype cards
-- Room2DPrototypeDebugHud now shows a selected-room detail card with reservation, priority, checkout, block, quality, and match hints
-- Room2DEntity now has a minimal Standard/Better prototype room type, and demand matching can prefer Better rooms
-- Room assignment depth v1 now includes floor preference, quiet/view facing preference, and Street/Back facing in match hints
-- Room2DPrototypeRoomConfigApplier created for scene-level batch room type, facing, and attribute configuration
-- FrontDesk2D created for lightweight active-demand waiting pressure and delayed check-in penalties
-- Lounge2D created for prototype clean cup, dirty cup, stock, washing, and lounge service pressure
-- Room2DPrototypeDebugHud now surfaces front desk and lounge pressure in the portrait prototype HUD
-- Room assignment now allows preference/type-risk rooms, then turns bad assignments into complaint reassignment pressure
-- Room2DDemoDayController created to organize the prototype into Preparation, Operating, and Ended demo phases
-- Front desk and lounge pressure now pause outside Operating phase and surface clearer demo-day pressure summaries
-- Demo HUD now switches between preparation, operating, and end-of-day recording summaries
-- Room2DShowcaseViewController created as the first Front Desk / Rooms / Lounge showcase navigation shell
-- Room2DShowcaseViewController Phase 2 now connects front desk, room, worker, demand, and lounge data/actions into the three showcase views
-- Room2DShowcaseViewController Phase 3 now separates showcase cards, shortens action labels, and adds Start/End/Reset controls for recording clarity
-- Rooms View Interaction Phase 1 now supports clicking rooms directly and reading a mobile-style selected-room detail card
-- Rooms View room selection now also supports screen-rect picking, so duplicated rooms can be selected even if their Collider setup is unreliable
-- Rooms View Interaction Phase 2/3 now exposes state-based room action buttons and a small worker assignment popup for HSK/Inspector assignment
-- Room2DController fallback state now mirrors Room2DEntity state so Inspector display does not contradict the Game view
-- Showcase UI Foundation Phase 1 rebuilds Front Desk into header/queue, current request, demand summary, action bar, and placeholder visual slots
-- Showcase UI Foundation Phase 2 rebuilds Rooms View into room summary, selected-room detail, state actions, worker card, and placeholder visual slots
-- Showcase UI Foundation Phase 3 rebuilds Lounge View into header, stock, washing machine, warning/result, action bar, and placeholder visual slots
-- Showcase UI Rework v2 Phase 1 adds Front Desk waiting guest cards, guest detail popup, and Ready-room check-in popup using existing demand assignment logic
+## Current Strategy
+- keep one-scene showcase flow
+- improve player-facing clarity before adding depth
+- reduce raw debug presentation
+- reuse existing systems
+- update docs during each meaningful iteration
 
-## Next
-- Attach Room2DEntity to Room_A_2D in Unity
-- Use Room2DEntity as the room data source
-- Attach Room2DFakeDepthVisual to Room_A_2D in Unity
-- Create Shadow, Floor, BackWall, LeftWall, RightWall sprite children
-- Duplicate one working room after the first room entity feels correct
-- Use Room2DOverview Assign Prototype Room Numbers after positioning duplicated rooms
-- Add temporary UI buttons for Select Next Room and Select Previous Room
-- Rebind Button_NextState to Room2DSelectionManager.PerformNextActionOnSelectedRoom
-- Use Room2DOverview context menu tools to test multi-room states quickly
-- Keep cleaning flow tied to Occupied checkout before adding full guest/front-desk systems
-- Prefer explicit room actions before expanding into guest/front-desk systems
-- Use CanStartCleaning/CanFinishCleaning/CanApproveInspection guards when adding workers or UI states
-- Use stateElapsedSeconds later for cleaning priority and waiting pressure
-- Attach Room2DPrototypeLoop to the scene and test Simulate Next Check In / Simulate Next Checkout
-- Use the prototype loop to create guest occupancy and cleaning demand before building front desk UI
-- Later add guest identity and room quality attributes: cleanliness expectation, room cleanliness, and room wear/oldness
-- Attach Room2DPrototypeClock to the scene and test block expiration
-- Use Room2DEntity Generate Prototype Room Attributes to create sample per-room condition data
-- Later move room generation into new-save setup instead of manual context menu tools
-- Convert the finished Room_A_2D object into a reusable Unity Prefab
+## Already In Place
+- `Room2DShowcaseViewController` builds the 3-view showcase shell
+- Front Desk has guest cards, detail popup, and ready-room popup
+- Rooms supports room clicking, room popup, and worker assignment popup
+- Lounge supports cups, stock, washing, warnings, and grouped actions
+- `Room2DDemoDayController` organizes Preparation / Operating / Ended
+- `Room2DPrototypeDemandLoop` already provides active demand, reservation, complaint reassignment, and outcome pressure
 
-## Current Milestone
-Prove that multi-room turnover creates meaningful prioritization pressure.
+## Showcase Session
 
-## Immediate Next
-- Finish one stable room prefab
-- Duplicate it into 8 to 12 working rooms
-- Add a simple cleaning priority rule for Dirty rooms
-- Surface highest-priority Dirty room in room labels or overview
-- Use prototype occupancy/check-in flow to create Ready-room demand
+### Iteration 1
+Goal:
+Make Front Desk and Rooms easier to understand in a recording without changing core gameplay architecture.
 
-## Explicitly Not Next
-- Full guest identity system
-- Full front desk system
-- Lounge expansion
-- Deep room attribute calculations
-- Extra tool-building
+Changed Files:
+- `Assets/Game/Scripts/Gameplay/Room2DEntity.cs`
+- `Assets/Game/Scripts/Gameplay/Room2DLabelView.cs`
+- `Assets/Game/Scripts/Gameplay/FrontDesk2D.cs`
+- `Assets/Game/Scripts/Gameplay/Room2DPrototypeDemandLoop.cs`
+- `Assets/Game/Scripts/Gameplay/Room2DDemoDayController.cs`
+- `Assets/Game/Scripts/Gameplay/Room2DShowcaseViewController.cs`
 
-## Current Milestone
-Prove that proactive preparation is better than reactive response.
+What Changed:
+- room tile labels now prefer showcase-facing state and action text
+- Front Desk now exposes clearer queue pressure and action-hint summaries
+- demand loop now exposes concise guest/request and room-fit strings for showcase UI
+- showcase controller rewrites major Front Desk / Rooms text blocks toward player-facing language
+- ready-room cards now show fit and recommendation instead of raw placeholder text
 
-## Immediate Next
-- Add a lightweight prototype preparation panel
-- Show room-state summary
-- Show upcoming demand preview
-- Allow a small number of preparation actions
-- Test whether preparation improves outcomes
-- Test that Dirty / Inspection priority markers are visible on selected rooms and clear after state changes
-- Test that Best HSK / Best Insp chooses prepared priority rooms before normal backlog rooms
-- Test manual worker selection by selecting HSK / Inspector and assigning the selected worker to the selected room
-- Reapply the HUD layout and verify the smaller action buttons no longer cover the room grid
+Unity Steps:
+- open `Hotel_Rooms_2D_Proto`
+- enter Play Mode and let `Room2DShowcaseViewController` rebuild the showcase UI
+- verify old debug HUD stays hidden while showcase UI is active
 
-## Explicitly Not Next
-- Full morning briefing system
-- Full staffing system
-- Inventory planning
-- Lounge expansion
-- Events
-- Final UI polish
+How To Test:
+- in Front Desk view, confirm waiting guests can be understood in a few seconds
+- open guest detail, then room list, and complete one assignment
+- switch to Rooms and confirm selected-room card explains the next useful action
+- click Dirty / AwaitingInspection / Ready rooms and verify popup actions match room state
 
-- Recorded room-assignment, guest-preference, early check-in, and late-checkout design notes in a separate design doc
+Self Review:
+- Easier to record: Yes, Front Desk and Rooms now explain action order more directly
+- Reduced debug feel: Yes, raw prototype text is reduced in the main visible cards
+- Improved player-facing interaction: Yes, selected room and ready-room decisions are easier to read
+- Closer to Front Desk / Rooms / Lounge target: Partly, Front Desk and Rooms improved first
+- Best next step: Lounge clarity and phase-wide recording flow
+
+### Iteration 2
+Goal:
+Make Lounge and overall demo-phase messaging feel like part of the same showcase flow.
+
+Changed Files:
+- `Assets/Game/Scripts/Gameplay/Lounge2D.cs`
+- `Assets/Game/Scripts/Gameplay/Room2DDemoDayController.cs`
+- `Assets/Game/Scripts/Gameplay/Room2DShowcaseViewController.cs`
+- `Docs/AI_CONTEXT.md`
+- `Docs/SHOWCASE_GOAL.md`
+- `Docs/TASK_LOG.md`
+
+What Changed:
+- Lounge now exposes clearer stock, washing, and action-hint summaries
+- Demo Day controller now exposes showcase phase labels and focus text
+- showcase controller now uses shared phase/focus wording across Front Desk, Rooms, and Lounge
+- source-of-truth docs now reflect the 3-view showcase goal instead of the older room-only milestone
+
+Unity Steps:
+- re-enter Play Mode after script reload
+- check Front Desk, Rooms, and Lounge headers during Preparation / Operating / Ended
+- confirm Lounge cards read like stock / washing / warning / action cards
+
+How To Test:
+- start in Preparation and verify action hints emphasize setup
+- start Operating and confirm all three views update phase/focus language
+- in Lounge view, trigger low cups or low stock and verify warnings become readable
+- end the day and confirm the build still transitions to summary state
+
+Self Review:
+- Easier to record: Yes, the scene now reads more like one guided demo
+- Reduced debug feel: Yes, phase/focus and lounge summaries are more product-facing
+- Improved player-facing interaction: Yes, Lounge now communicates recovery actions more clearly
+- Closer to Front Desk / Rooms / Lounge target: Yes, all three showcase views now have clearer roles
+- Best next step: Unity-side polish pass on layout balance, room overlay spacing, and any remaining noisy labels
+
+### Iteration 3
+Goal:
+Make Front Desk feel more like a guest-handling page instead of a prototype info strip.
+
+Changed Files:
+- `Assets/Game/Scripts/Gameplay/Room2DShowcaseViewController.cs`
+
+What Changed:
+- added a permanent Front Desk current-request card between the guest strip and bottom actions
+- guest cards now support stronger selected-state highlighting
+- Front Desk now keeps a visible current guest portrait/badge structure on both the page card and the detail popup
+- upcoming guest can now appear as a visible card when no active or complaint guest is waiting
+- queue pressure badge is always visible and changes tone based on waiting state
+
+Unity Steps:
+- open `Hotel_Rooms_2D_Proto`
+- enter Play Mode and switch to Front Desk
+- confirm the page now has header, waiting strip, current-request card, and bottom action row
+
+How To Test:
+- confirm the page no longer feels like only a scrolling strip plus popup
+- click between complaint / active / upcoming guest cards and verify the selected card stands out
+- open guest detail and verify portrait / warning badge placeholders are visible
+- assign a room from Front Desk and watch the current-request card update
+
+Self Review:
+- Is Front Desk more understandable now: Yes
+- Is Rooms more playable now: No change this iteration
+- Is Lounge more readable now: No change this iteration
+- Is the build less debug-like now: Yes
+- Is the result closer to a recordable game slice now: Yes
+- Should the next iteration focus on interaction, visual hierarchy, or placeholder assets: Visual hierarchy and placeholder assets for Rooms
+
+### Iteration 4
+Goal:
+Unify card, button, badge, and placeholder presentation across Front Desk, Rooms, and Lounge.
+
+Changed Files:
+- `Assets/Game/Scripts/Gameplay/Room2DShowcaseViewController.cs`
+
+What Changed:
+- card panels now get both border and shadow treatment for clearer mobile-card separation
+- showcase action buttons now use a darker in-game style instead of near-default light buttons
+- action buttons now carry consistent icon placeholders
+- Rooms selected card now shows room-type, room-state, and worker badge placeholders visibly instead of hiding them
+- waiting-guest portrait, ready-room icon, and lounge placeholders now use stronger visual blocks and colors
+
+Unity Steps:
+- re-enter Play Mode after script reload
+- inspect all three views for unified card and button styling
+- inspect Rooms selected card and Lounge cards for visible placeholder badges
+
+How To Test:
+- verify Front Desk, Rooms, and Lounge buttons now share the same base visual language
+- verify Rooms selected card always shows type/state/worker badges
+- verify Lounge stock / cups / wash / warning placeholders read as icons rather than empty debug blocks
+
+Self Review:
+- Is Front Desk more understandable now: Yes
+- Is Rooms more playable now: Yes, selected-room focus is clearer
+- Is Lounge more readable now: Yes, placeholder icon structure is stronger
+- Is the build less debug-like now: Yes
+- Is the result closer to a recordable game slice now: Yes
+- Should the next iteration focus on interaction, visual hierarchy, or placeholder assets: Interaction polish and Unity-side spacing validation
+
+## Next Best Objective
+- run a Unity playtest pass in `Hotel_Rooms_2D_Proto`
+- verify no panel overlaps remain in portrait aspect
+- tune popup sizes and bottom action spacing where the recording still feels crowded
+- if needed, add one more pass of placeholder icon differentiation for room states and worker roles

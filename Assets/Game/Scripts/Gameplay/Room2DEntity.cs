@@ -318,6 +318,51 @@ public class Room2DEntity : MonoBehaviour
         return "Actions: " + actionCount;
     }
 
+    // Showcase 房间小卡只保留当前最该做的动作，减少调试词汇。
+    public string GetShowcaseNextActionShortText()
+    {
+        switch (currentState)
+        {
+            case Room2DState.Dirty:
+                return guestCheckedOut ? "Assign HSK" : "Wait Checkout";
+            case Room2DState.Cleaning:
+                return "HSK Working";
+            case Room2DState.AwaitingInspection:
+                return "Assign Insp";
+            case Room2DState.Ready:
+                return "Ready Check-In";
+            case Room2DState.Occupied:
+                return "Guest Staying";
+            case Room2DState.Blocked:
+                return "Blocked";
+            default:
+                return "Check Room";
+        }
+    }
+
+    // Rooms 视图里房间卡只需要短标签，不需要暴露旧原型按钮文案。
+    public string GetShowcaseTileStateText()
+    {
+        string stateText = GetStateDisplayName();
+
+        if (markedCleaningPriority)
+        {
+            return stateText + "  |  Clean Prio";
+        }
+
+        if (markedInspectionPriority)
+        {
+            return stateText + "  |  Insp Prio";
+        }
+
+        return stateText;
+    }
+
+    public string GetShowcaseWaitText()
+    {
+        return "Wait " + Mathf.FloorToInt(Mathf.Max(0f, stateElapsedSeconds)) + "s";
+    }
+
     public string GetCheckoutDisplayName()
     {
         return guestCheckedOut ? "Checked Out" : "Not Checked Out";

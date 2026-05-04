@@ -137,6 +137,24 @@ public class Room2DDemoDayController : MonoBehaviour
             + "/" + FormatSeconds(operatingDurationSeconds);
     }
 
+    public string GetShowcasePhaseLabel()
+    {
+        switch (currentPhase)
+        {
+            case DemoDayPhase.Operating:
+                return "Operating";
+            case DemoDayPhase.Ended:
+                return "End Summary";
+            default:
+                return "Preparation";
+        }
+    }
+
+    public string GetShowcaseFocusText()
+    {
+        return GetRecordingFocusText();
+    }
+
     public string GetRecordingStatusText()
     {
         return "[Demo Flow]\n"

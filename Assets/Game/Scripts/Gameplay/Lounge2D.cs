@@ -140,6 +140,71 @@ public class Lounge2D : MonoBehaviour
         lastLoungeResult = "Reset prototype lounge";
     }
 
+    public bool HasStockRisk()
+    {
+        return milkStock <= lowStockThreshold || teaCoffeeStock <= lowStockThreshold;
+    }
+
+    public bool HasCupRisk()
+    {
+        return cleanCups <= lowCleanCupThreshold;
+    }
+
+    public string GetShowcaseStockSummary()
+    {
+        if (HasCupRisk())
+        {
+            return "Low clean cups";
+        }
+
+        if (HasStockRisk())
+        {
+            return "Low drink stock";
+        }
+
+        return "Stock ready";
+    }
+
+    public string GetShowcaseWashSummary()
+    {
+        if (washing)
+        {
+            return "Washing " + cupsInWashing + " cups";
+        }
+
+        if (dirtyCups > 0)
+        {
+            return "Dirty cups waiting";
+        }
+
+        return "Machine ready";
+    }
+
+    public string GetShowcaseActionHint()
+    {
+        if (!runDuringPlay)
+        {
+            return "Start the day to begin lounge service.";
+        }
+
+        if (HasCupRisk())
+        {
+            return washing ? "Wait for wash to finish." : "Start washing cups now.";
+        }
+
+        if (HasStockRisk())
+        {
+            return "Restock milk and tea / coffee.";
+        }
+
+        if (dirtyCups > 0 && !washing)
+        {
+            return "Wash cups before the next rush.";
+        }
+
+        return "Serve drinks while stock is stable.";
+    }
+
     private void FindReferencesIfNeeded()
     {
         if (!autoFindReferences)

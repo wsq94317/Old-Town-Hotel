@@ -1135,6 +1135,68 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
             + roomTypeNote;
     }
 
+    public string GetShowcaseCurrentGuestHeadline()
+    {
+        if (complaintWaitingForReassignment)
+        {
+            return "Complaint guest needs a new room";
+        }
+
+        if (activeDemandWaitingForManualAssignment)
+        {
+            return activeDemandType + " guest is waiting";
+        }
+
+        if (useUpcomingDemandPreview)
+        {
+            return upcomingDemandType + " guest arrives in " + FormatSeconds(upcomingDemandEtaSeconds);
+        }
+
+        return "No guest is waiting";
+    }
+
+    public string GetShowcaseCurrentGuestPreferenceLine()
+    {
+        if (complaintWaitingForReassignment)
+        {
+            return BuildDemandPreferenceSummary(
+                complaintRoomPreference,
+                complaintFloorPreference,
+                complaintFacingPreference);
+        }
+
+        if (activeDemandWaitingForManualAssignment)
+        {
+            return BuildDemandPreferenceSummary(
+                activeDemandRoomPreference,
+                activeDemandFloorPreference,
+                activeDemandFacingPreference);
+        }
+
+        return BuildDemandPreferenceSummary(
+            upcomingDemandRoomPreference,
+            upcomingDemandFloorPreference,
+            upcomingDemandFacingPreference);
+    }
+
+    public string GetShowcaseRoomFitText(Room2DEntity room)
+    {
+        if (room == null)
+        {
+            return "No room";
+        }
+
+        Room2DDemandType demandType = GetCurrentVisibleDemandType();
+        Room2DRoomPreference roomPreference = GetCurrentVisibleDemandRoomPreference();
+        Room2DFloorPreference floorPreference = GetCurrentVisibleDemandFloorPreference();
+        Room2DFacingPreference facingPreference = GetCurrentVisibleDemandFacingPreference();
+        Room2DMatchQuality matchQuality = EvaluateMatchQuality(room, demandType, roomPreference, floorPreference, facingPreference);
+
+        return GetMatchDisplayName(matchQuality)
+            + " / " + BuildDemandPreferenceSummary(roomPreference, floorPreference, facingPreference)
+            + GetRoomTypeRiskSuffix(room, roomPreference);
+    }
+
     public bool IsRoomReservedForPrototypeDemand(Room2DEntity room)
     {
         if (room == null)

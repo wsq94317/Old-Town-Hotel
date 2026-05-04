@@ -5,67 +5,82 @@ A mobile portrait hotel operations management game.
 Style: 2.5D, cute chibi, easy-to-develop cartoon visuals.
 Engine: Unity (URP).
 
-## Chapter 1
-Old downtown travel hotel.
+## Current Work Mode
+The current priority is no longer proving the room prototype in isolation.
+The current priority is building a recordable 3-view showcase inside `Hotel_Rooms_2D_Proto`.
 
-## Core Gameplay
-- Front desk queue pressure
-- Room cleaning and inspection flow
-- Guest-room occupancy and one-to-one guest assignment
-- Guest check-in timing
-- Lounge cup/inventory management
-- Random incidents like cockroach complaints
+Default showcase format:
+1. Preparation
+2. Start Operating
+3. Front Desk handles guest demand
+4. Rooms handles turnover and worker actions
+5. Lounge handles cups, stock, and washing
+6. End-of-day summary
 
-## Current Prototype Goal
-Build the fake-3D 2D Room View prototype first inside the current Unity project:
-- One clear room entity first
-- Simple room state visualization
-- UI labels for room name, current state, next action, and action count
-- Explicit guest checkout flag for the room cleaning flow
-- Lightweight state timing so dirty rooms can become a cleaning priority later
-- Simple cleaning priority for Dirty rooms based on checkout waiting time
-- Minimal prototype loop that creates room-cleaning demand through simulated check-in and checkout
-- Blocked rooms with reason and duration for maintenance or renovation
-- Per-room attributes for future guest preference and review calculations
-- Beginner-friendly scene setup in Unity
-- States: Dirty, Cleaning, AwaitingInspection, Ready, Occupied, Blocked
+## Showcase Goal
+Push the current project toward a minimally presentable build that is easier to record as a short gameplay demo.
+
+Priority order:
+1. Front Desk interaction clarity
+2. Rooms interaction clarity
+3. Lounge interaction clarity
+4. Reduce debug feel
+5. Keep the three views visually and behaviorally consistent
 
 ## Current Scene
-Hotel_Rooms_2D_Proto
+`Hotel_Rooms_2D_Proto`
 
-## Room Entity Development Flow
-1. Room data entity: identity, floor, room number, state, checkout flag, action count, block data, room attributes.
-2. Room visual controller: state color and state markers.
-3. Room fake-depth visual: shadow, floor, back wall, side walls, furniture sorting.
-4. Room label view: per-room TMP labels under each room entity.
-5. Room overview: scene-level counts for Dirty, Cleaning, AwaitingInspection, Ready, Occupied, Blocked.
-6. Room selection: choose one current room for the main action button.
-7. Room interaction: one main action button that advances the selected room workflow.
-8. Room workflow actions: SimulateCheckIn, SimulateCheckout, StartCleaning, FinishCleaning, ApproveInspection.
-9. Room timing: track how long each room has been in its current state.
-10. Prototype loop: simulate check-ins into Ready rooms, then checkouts from Occupied rooms to create cleaning demand.
-11. Block flow: start maintenance or renovation blocks, tick down block duration, then become Dirty.
-12. Room attributes: store condition data such as bed, floor, wardrobe, bathroom, wallpaper, air conditioner, and window.
-13. Room prefab: convert one working room entity into a reusable Unity Prefab.
-14. Room layout scale-up: duplicate one working prefab into multiple rooms and floors.
+## Main Showcase Views
+### Front Desk
+- waiting guest strip or list
+- current guest/request card
+- guest detail popup
+- assign-room flow
+- queue / wait pressure visibility
 
-## Current Milestone
-Prove that multi-room turnover creates meaningful prioritization pressure:
-- 8 to 12 duplicated room prefabs should work independently.
-- Dirty rooms expose a simple cleaning priority based on waiting time.
-- Room2DOverview identifies the most urgent Dirty room.
-- Blocked, Occupied, and Ready rooms are excluded from cleaning priority.
+### Rooms
+- clickable room tiles
+- readable room state on tile
+- room detail / info popup
+- assign HSK / assign INSP flow
+- reduced reliance on debug-heavy controls
 
-## User Stories To Preserve
-- As a guest with very high cleanliness expectations, I want my assigned room to match my preference so that a clean but old-looking room can still affect my final review.
-- As the hotel manager, I want each active guest to be assigned to exactly one Occupied room so that checkout, cleaning demand, and guest feedback can be traced back to a specific room.
-- As the hotel manager, I want room quality attributes such as cleanliness and oldness/wear to matter separately so that a room can be technically clean but still feel unsatisfying to certain guests.
-- As the hotel manager, I want to block a room for maintenance or renovation for a fixed number of game hours so that unavailable rooms return as Dirty when work finishes.
-- As the hotel manager, I want each room to have generated internal condition attributes so that later UI, guest matching, complaints, and reviews can read those values from the room entity.
+### Lounge
+- stock card
+- washing card
+- warning / result card
+- grouped actions
+
+## Preserved Prototype Systems
+These systems are already in the project and should be reused instead of replaced:
+- `Room2DShowcaseViewController`
+- `Room2DPrototypeDemandLoop`
+- `Room2DDemoDayController`
+- `FrontDesk2D`
+- `Lounge2D`
+- `Room2DWorkerSelectionPanel`
+- `Room2DEntity`, `Room2DController`, `Room2DOverview`
+
+## Preserve These Gameplay Ideas
+- Front desk queue pressure
+- Room cleaning and inspection flow
+- Guest-to-room assignment
+- Check-in timing pressure
+- Lounge cup and stock pressure
+- Complaint-driven reassignment pressure
+
+## Out Of Scope For This Run
+- deep backend systems
+- full guest identity
+- full review system
+- full economy system
+- large architecture rewrites
+- final polished art
 
 ## Coding Rules
 - Keep systems small and simple
 - Prefer readable C# over clever architecture
-- Add concise Chinese comments for new gameplay code so the beginner Unity workflow is easier to read
-- Do not over-engineer
-- Only change files requested
+- Add concise Chinese comments for new gameplay/UI code
+- Reuse existing systems whenever possible
+- Avoid over-engineering
+- Update docs when scope or current target changes

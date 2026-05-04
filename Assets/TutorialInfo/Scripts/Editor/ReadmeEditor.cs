@@ -13,6 +13,9 @@ public class ReadmeEditor : Editor
     static string s_ShowedReadmeSessionStateName = "ReadmeEditor.showedReadme";
     
     static string s_ReadmeSourceDirectory = "Assets/TutorialInfo";
+    // 这个项目不再依赖模板 Readme 自动改编辑器布局。
+    // 某些 Unity 版本里反射调用 WindowLayout 会触发编辑器内部空引用。
+    static bool s_EnableAutomaticLayoutLoad = false;
 
     const float k_Space = 16f;
 
@@ -58,7 +61,7 @@ public class ReadmeEditor : Editor
             var readme = SelectReadme();
             SessionState.SetBool(s_ShowedReadmeSessionStateName, true);
 
-            if (readme && !readme.loadedLayout)
+            if (readme && !readme.loadedLayout && s_EnableAutomaticLayoutLoad)
             {
                 LoadLayout();
                 readme.loadedLayout = true;
@@ -68,10 +71,33 @@ public class ReadmeEditor : Editor
 
     static void LoadLayout()
     {
-        var assembly = typeof(EditorApplication).Assembly;
-        var windowLayoutType = assembly.GetType("UnityEditor.WindowLayout", true);
-        var method = windowLayoutType.GetMethod("LoadWindowLayout", BindingFlags.Public | BindingFlags.Static);
-        method.Invoke(null, new object[] { Path.Combine(Application.dataPath, "TutorialInfo/Layout.wlt"), false });
+        string layoutPath = Path.Combine(Application.dataPath, "TutorialInfo/Layout.wlt");
+        if (!File.Exists(layoutPath))
+        {
+            return;
+        }
+
+        try
+        {
+            var assembly = typeof(EditorApplication).Assembly;
+            var windowLayoutType = assembly.GetType("UnityEditor.WindowLayout", false);
+            if (windowLayoutType == null)
+            {
+                return;
+            }
+
+            var method = windowLayoutType.GetMethod("LoadWindowLayout", BindingFlags.Public | BindingFlags.Static);
+            if (method == null)
+            {
+                return;
+            }
+
+            method.Invoke(null, new object[] { layoutPath, false });
+        }
+        catch (Exception exception)
+        {
+            Debug.LogWarning("Skip legacy tutorial layout auto-load: " + exception.Message);
+        }
     }
 
     static Readme SelectReadme()

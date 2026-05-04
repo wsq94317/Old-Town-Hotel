@@ -37,23 +37,25 @@ public class Room2DLabelView : MonoBehaviour
 
         if (nextActionLabel != null)
         {
-            nextActionLabel.text = roomEntity.GetNextActionDisplayName();
+            nextActionLabel.text = roomEntity.GetShowcaseNextActionShortText();
         }
 
         if (actionCountLabel != null)
         {
-            actionCountLabel.text = roomEntity.GetActionCountDisplayName();
+            actionCountLabel.text = roomEntity.GetShowcaseWaitText();
         }
 
         if (cleaningPriorityLabel != null)
         {
-            cleaningPriorityLabel.text = roomEntity.GetCleaningPriorityDisplayName();
+            cleaningPriorityLabel.text = roomEntity.markedCleaningPriority || roomEntity.markedInspectionPriority
+                ? roomEntity.preparationPriorityLabel
+                : roomEntity.GetCleaningPriorityDisplayName();
         }
     }
 
     private string BuildStateText(Room2DEntity roomEntity, bool isSelected, bool isAssignedToHousekeeper)
     {
-        string stateText = roomEntity.GetStateDisplayName();
+        string stateText = roomEntity.GetShowcaseTileStateText();
 
         if (isAssignedToHousekeeper)
         {
