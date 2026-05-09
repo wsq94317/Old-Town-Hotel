@@ -895,10 +895,15 @@ public class Room2DShowcaseViewController : MonoBehaviour
         RectTransform currentDeskGuestBadge = frontDeskResultPanel != null
             ? frontDeskResultPanel.Find("BadgePlaceholder_CurrentDeskStatus") as RectTransform
             : null;
-        UpdatePlaceholderLabel(currentDeskGuestPortrait, GetSelectedGuestPortraitLabel());
-        UpdatePlaceholderLabel(currentDeskGuestBadge, GetSelectedGuestWarningLabel());
-        SetPlaceholderColor(currentDeskGuestPortrait, GetSelectedGuestPortraitColor());
-        SetPlaceholderColor(currentDeskGuestBadge, GetSelectedGuestWarningColor());
+        int dirtyRooms = GetRoomCountByState(Room2DState.Dirty);
+        int awaitingInspectionRooms = GetRoomCountByState(Room2DState.AwaitingInspection);
+        bool hasRoomOpsBacklog = dirtyRooms > 0 || awaitingInspectionRooms > 0;
+        UpdatePlaceholderLabel(currentDeskGuestPortrait, "ROOM");
+        UpdatePlaceholderLabel(currentDeskGuestBadge, hasRoomOpsBacklog ? "FIX" : "OK");
+        SetPlaceholderColor(currentDeskGuestPortrait, new Color(0.24f, 0.30f, 0.40f, 0.96f));
+        SetPlaceholderColor(currentDeskGuestBadge, hasRoomOpsBacklog
+            ? new Color(0.55f, 0.24f, 0.20f, 0.96f)
+            : new Color(0.28f, 0.44f, 0.30f, 0.96f));
     }
 
     private void SelectActiveDemandGuest()
@@ -1086,6 +1091,7 @@ public class Room2DShowcaseViewController : MonoBehaviour
                     demandLoop.activeDemandRoomPreference,
                     demandLoop.activeDemandFloorPreference,
                     demandLoop.activeDemandFacingPreference)
+                + "\nPatience: " + GetFrontDeskPatienceLabel()
                 + "\nWait " + FormatSeconds(demandLoop.activeDemandWaitSeconds);
         }
 
@@ -1129,9 +1135,11 @@ public class Room2DShowcaseViewController : MonoBehaviour
                     demandLoop.activeDemandRoomPreference,
                     demandLoop.activeDemandFloorPreference,
                     demandLoop.activeDemandFacingPreference) + "\n"
+                + "Patience: " + GetFrontDeskPatienceLabel() + "\n"
                 + "Waiting: " + FormatSeconds(demandLoop.activeDemandWaitSeconds) + "\n"
                 + "Ready Rooms: " + GetReadyRoomCount() + "\n"
-                + "Action: " + GetFrontDeskSuggestionText();
+                + "Blocker: " + GetFrontDeskBlockerText() + "\n"
+                + "Action: " + GetFrontDeskNextActionText();
         }
 
         if (selectedFrontDeskGuestKind == 2)
@@ -1410,12 +1418,12 @@ public class Room2DShowcaseViewController : MonoBehaviour
 
         // Rooms View：顶部只保留薄信息条，避免旧 Debug 卡片挡住房间点击。
         ApplyAnchoredPanel(roomDemandPanel, new Vector2(0.04f, 0.92f), new Vector2(0.96f, 0.985f), Vector2.zero, Vector2.zero);
-        ApplyAnchoredPanel(roomRightLauncherPanel, new Vector2(0.60f, 0.80f), new Vector2(0.96f, 0.91f), Vector2.zero, Vector2.zero);
-        ApplyAnchoredPanel(roomSelectedPanel, new Vector2(0.04f, 0.80f), new Vector2(0.58f, 0.91f), Vector2.zero, Vector2.zero);
+        ApplyAnchoredPanel(roomRightLauncherPanel, new Vector2(0.04f, 0.74f), new Vector2(0.32f, 0.79f), Vector2.zero, Vector2.zero);
+        ApplyAnchoredPanel(roomSelectedPanel, new Vector2(0.04f, 0.80f), new Vector2(0.56f, 0.91f), Vector2.zero, Vector2.zero);
         ApplyAnchoredPanel(roomWorkersPanel, new Vector2(0.60f, 0.80f), new Vector2(0.96f, 0.91f), Vector2.zero, Vector2.zero);
         ApplyAnchoredPanel(roomWaitingGuestPeekPanel, new Vector2(0.10f, 0.38f), new Vector2(0.90f, 0.70f), Vector2.zero, Vector2.zero);
-        ApplyAnchoredPanel(roomHousekeeperPanel, new Vector2(0.10f, 0.40f), new Vector2(0.90f, 0.68f), Vector2.zero, Vector2.zero);
-        ApplyAnchoredPanel(roomInspectorPanel, new Vector2(0.10f, 0.42f), new Vector2(0.90f, 0.64f), Vector2.zero, Vector2.zero);
+        ApplyAnchoredPanel(roomHousekeeperPanel, new Vector2(0.60f, 0.66f), new Vector2(0.96f, 0.78f), Vector2.zero, Vector2.zero);
+        ApplyAnchoredPanel(roomInspectorPanel, new Vector2(0.60f, 0.51f), new Vector2(0.96f, 0.63f), Vector2.zero, Vector2.zero);
         ApplyAnchoredPanel(roomActionPopupPanel, new Vector2(0.12f, 0.31f), new Vector2(0.88f, 0.58f), Vector2.zero, Vector2.zero);
         ApplyAnchoredPanel(roomActionPopupButtonPanel, new Vector2(0.05f, 0.08f), new Vector2(0.95f, 0.45f), Vector2.zero, Vector2.zero);
         ApplyAnchoredPanel(roomInfoPopupPanel, new Vector2(0.10f, 0.30f), new Vector2(0.90f, 0.70f), Vector2.zero, Vector2.zero);
@@ -1463,6 +1471,8 @@ public class Room2DShowcaseViewController : MonoBehaviour
         SetPanelRaycast(roomDemandPanel, false);
         SetPanelRaycast(roomSelectedPanel, false);
         SetPanelRaycast(roomWorkersPanel, false);
+        SetPanelRaycast(roomHousekeeperPanel, false);
+        SetPanelRaycast(roomInspectorPanel, false);
 
         roomWaitingGuestCard = FindOrCreatePanel(roomWaitingGuestPeekPanel, "Card_RoomWaitingGuestPreview", new Color(0.12f, 0.16f, 0.23f, 0.96f));
         ApplyAnchoredPanel(roomWaitingGuestCard, new Vector2(0.06f, 0.18f), new Vector2(0.94f, 0.62f), Vector2.zero, Vector2.zero);
@@ -1475,15 +1485,15 @@ public class Room2DShowcaseViewController : MonoBehaviour
         roomWaitingGuestCardText.rectTransform.offsetMax = new Vector2(-14f, -12f);
 
         roomActionsPanel.gameObject.SetActive(false);
-        roomWorkersPanel.gameObject.SetActive(false);
+        roomWorkersPanel.gameObject.SetActive(true);
         roomWaitingGuestPeekPanel.gameObject.SetActive(false);
-        roomHousekeeperPanel.gameObject.SetActive(false);
-        roomInspectorPanel.gameObject.SetActive(false);
+        roomHousekeeperPanel.gameObject.SetActive(true);
+        roomInspectorPanel.gameObject.SetActive(true);
         roomActionPopupPanel.gameObject.SetActive(false);
         roomInfoPopupPanel.gameObject.SetActive(false);
         roomWorkerPopupPanel.gameObject.SetActive(false);
 
-        ApplyActionGrid(roomRightLauncherPanel, 3, new Vector2(100f, 34f), 8f);
+        ApplyActionGrid(roomRightLauncherPanel, 1, new Vector2(260f, 34f), 8f);
         roomOpenWaitingGuestsButton = FindOrCreateActionButton(roomRightLauncherPanel, "Button_OpenRoomWaitingGuests", "Guests", ToggleRoomWaitingGuestPeek);
         roomOpenHousekeeperPanelButton = FindOrCreateActionButton(roomRightLauncherPanel, "Button_OpenHousekeepers", "HSK", ToggleRoomHousekeeperPanel);
         roomOpenInspectorPanelButton = FindOrCreateActionButton(roomRightLauncherPanel, "Button_OpenInspectors", "INSP", ToggleRoomInspectorPanel);
@@ -1658,15 +1668,25 @@ public class Room2DShowcaseViewController : MonoBehaviour
         string duration = demoDayController != null ? FormatSeconds(demoDayController.operatingDurationSeconds) : "0s";
         int queue = frontDesk != null ? frontDesk.currentQueueCount : 0;
         int readyRooms = GetReadyRoomCount();
+        int dirtyRooms = GetRoomCountByState(Room2DState.Dirty);
+        int awaitingInspectionRooms = GetRoomCountByState(Room2DState.AwaitingInspection);
         int delayed = frontDesk != null ? frontDesk.totalDelayedCheckIns : 0;
         string pressure = frontDesk != null ? frontDesk.GetShowcasePressureLabel() : GetFrontDeskPressureLabel(queue, delayed);
         string focus = demoDayController != null ? demoDayController.GetShowcaseFocusText() : "Link demo day controller.";
+        string patience = GetFrontDeskPatienceLabel();
+        string score = demandLoop != null
+            ? demandLoop.prototypeSatisfactionScore + " (" + demandLoop.prototypeSatisfactionTrend + ")"
+            : "None";
 
         return "<b>Front Desk</b>\n"
             + phase + "  |  " + time + " / " + duration + "\n"
             + "Queue " + queue
-            + "  |  Ready " + readyRooms
             + "  |  Delay " + delayed + "\n"
+            + "Patience: " + patience + "\n"
+            + "Satisfaction: " + score + "\n"
+            + "Ready " + readyRooms
+            + "  |  Dirty " + dirtyRooms
+            + "  |  Insp " + awaitingInspectionRooms + "\n"
             + "Pressure: " + pressure + "\n"
             + "Focus: " + focus;
     }
@@ -1681,29 +1701,50 @@ public class Room2DShowcaseViewController : MonoBehaviour
         string guestHeadline = demandLoop.GetShowcaseCurrentGuestHeadline();
         string request = demandLoop.GetShowcaseCurrentGuestPreferenceLine();
         string roomReady = HasReadyRoomForFrontDesk() ? GetReadyRoomCount() + " ready rooms" : "No ready room";
-        string suggestion = frontDesk != null ? frontDesk.GetShowcaseActionHint() : GetFrontDeskSuggestionText();
+        string blocker = GetFrontDeskBlockerText();
+        string suggestion = GetFrontDeskNextActionText();
+        if (GetFrontDeskWaitingGuestCount() > 0 && !HasReadyRoomForFrontDesk())
+        {
+            suggestion = "Go to Rooms: clean and inspect a room.";
+        }
 
         return "<b>Current Desk Focus</b>\n"
             + guestHeadline + "\n"
             + "Request: " + request + "\n"
+            + "Patience: " + GetFrontDeskPatienceLabel() + "\n"
             + "Rooms: " + roomReady + "\n"
-            + "Action: " + suggestion;
+            + "Blocker: " + blocker + "\n"
+            + "Action: " + suggestion + "\n"
+            + "Impact: " + GetFrontDeskConsequenceText();
     }
 
     private string BuildFrontDeskResultText()
     {
         if (demandLoop == null)
         {
-            return "<b>Desk Notes</b>\nNo demand loop";
+            return "<b>Room Status</b>\nNo demand loop";
         }
 
-        return "<b>Desk Notes</b>\n"
-            + "Upcoming: " + demandLoop.upcomingDemandType
-            + " in " + FormatSeconds(demandLoop.upcomingDemandEtaSeconds) + "\n"
+        int readyRooms = GetRoomCountByState(Room2DState.Ready);
+        int dirtyRooms = GetRoomCountByState(Room2DState.Dirty);
+        int awaitingInspectionRooms = GetRoomCountByState(Room2DState.AwaitingInspection);
+        string nextStep = dirtyRooms > 0
+            ? "Switch to Rooms and assign HSK."
+            : awaitingInspectionRooms > 0
+                ? "Switch to Rooms and assign INSP."
+                : readyRooms > 0
+                    ? "Ready rooms are available for check-in."
+                    : "Keep monitoring room turnover.";
+
+        return "<b>Room Status</b>\n"
+            + "Ready: " + readyRooms
+            + "  |  Dirty: " + dirtyRooms
+            + "  |  Awaiting INSP: " + awaitingInspectionRooms + "\n"
+            + "Blocker: " + GetFrontDeskBlockerText() + "\n"
+            + "Front Desk Impact: " + GetFrontDeskConsequenceText() + "\n"
             + "Latest Room: " + demandLoop.lastChangedRoomName + "\n"
             + "Latest Result: " + demandLoop.lastOutcomeLabel + "\n"
-            + "Served " + demandLoop.successfulDemandCount
-            + "  |  Missed " + demandLoop.unmetDemandCount;
+            + "Next: " + nextStep;
     }
 
     private string BuildSelectedRoomText()
@@ -1751,7 +1792,11 @@ public class Room2DShowcaseViewController : MonoBehaviour
 
     private string BuildRoomWorkerText()
     {
-        return "<b>Workers</b>\n"
+        return "<b>Room Ops</b>\n"
+            + "Dirty / Insp / Ready: "
+            + GetRoomCountByState(Room2DState.Dirty) + " / "
+            + GetRoomCountByState(Room2DState.AwaitingInspection) + " / "
+            + GetRoomCountByState(Room2DState.Ready) + "\n"
             + "Selected: " + GetSelectedWorkerLine() + "\n"
             + "Target: " + GetSelectedRoomDisplayNameForHint() + "\n"
             + BuildWorkerRuntimeLine() + "\n"
@@ -1794,7 +1839,7 @@ public class Room2DShowcaseViewController : MonoBehaviour
 
         if (roomWorkersPanel != null)
         {
-            roomWorkersPanel.gameObject.SetActive(false);
+            roomWorkersPanel.gameObject.SetActive(currentView == ShowcaseView.Rooms);
         }
 
         if (roomWorkerPopupText != null)
@@ -1813,12 +1858,12 @@ public class Room2DShowcaseViewController : MonoBehaviour
 
         if (roomHousekeeperPanel != null)
         {
-            roomHousekeeperPanel.gameObject.SetActive(roomHousekeeperPanelVisible && currentView == ShowcaseView.Rooms);
+            roomHousekeeperPanel.gameObject.SetActive(currentView == ShowcaseView.Rooms);
         }
 
         if (roomInspectorPanel != null)
         {
-            roomInspectorPanel.gameObject.SetActive(roomInspectorPanelVisible && currentView == ShowcaseView.Rooms);
+            roomInspectorPanel.gameObject.SetActive(currentView == ShowcaseView.Rooms);
         }
 
         if (roomActionPopupPanel != null)
@@ -1864,6 +1909,13 @@ public class Room2DShowcaseViewController : MonoBehaviour
             roomInspectorPanelText.text = BuildInspectorPanelText();
         }
 
+        SetButtonVisible(roomOpenHousekeeperPanelButton, false);
+        SetButtonVisible(roomOpenInspectorPanelButton, false);
+        if (roomRightLauncherPanel != null)
+        {
+            roomRightLauncherPanel.gameObject.SetActive(currentView == ShowcaseView.Rooms);
+        }
+
         if (roomActionPopupText != null)
         {
             roomActionPopupText.text = BuildRoomActionPopupText(room);
@@ -1891,9 +1943,9 @@ public class Room2DShowcaseViewController : MonoBehaviour
     {
         // 房间弹窗只显示当前状态真正能做的事，避免玩家把测试按钮当成正常流程。
         SetButtonVisible(roomPopupAssignHousekeeperButton, isDirty);
-        SetButtonVisible(roomPopupMarkCleanPriorityButton, isDirty);
+        SetButtonVisible(roomPopupMarkCleanPriorityButton, false);
         SetButtonVisible(roomPopupAssignInspectorButton, isAwaitingInspection);
-        SetButtonVisible(roomPopupMarkInspectionPriorityButton, isAwaitingInspection);
+        SetButtonVisible(roomPopupMarkInspectionPriorityButton, false);
         SetButtonVisible(roomPopupReserveButton, isReady);
         SetButtonVisible(roomPopupInfoButton, isDirty || isAwaitingInspection || isReady);
         SetButtonVisible(roomPopupCloseButton, true);
@@ -2027,10 +2079,12 @@ public class Room2DShowcaseViewController : MonoBehaviour
         string roomName = room != null ? room.roomName : "None";
         string workerName = workerSelectionPanel != null ? workerSelectionPanel.selectedWorkerName : "None";
         string lastResult = workerSelectionPanel != null ? workerSelectionPanel.lastManualAssignmentResult : "None";
+        string statusHint = GetSelectedWorkerPopupStatusHint();
 
         return "<b>Assign Worker</b>\n"
             + "Room: " + roomName + "\n"
             + "Selected Worker: " + workerName + "\n"
+            + "Status: " + statusHint + "\n"
             + "Confirm to assign. Cancel to close.\n"
             + "Last: " + lastResult;
     }
@@ -2086,10 +2140,10 @@ public class Room2DShowcaseViewController : MonoBehaviour
     {
         if (workerSelectionPanel == null || workerSelectionPanel.housekeepers == null || workerSelectionPanel.housekeepers.Length == 0)
         {
-            return "<b>Housekeepers</b>\nNo HSK linked.";
+            return "<b>HSK Status</b>\nNo HSK linked.";
         }
 
-        string text = "<b>Housekeepers</b>\n";
+        string text = "<b>HSK Status</b>\n";
         for (int i = 0; i < workerSelectionPanel.housekeepers.Length; i++)
         {
             Housekeeper2D housekeeper = workerSelectionPanel.housekeepers[i];
@@ -2100,12 +2154,12 @@ public class Room2DShowcaseViewController : MonoBehaviour
 
             string selected = i == workerSelectionPanel.selectedHousekeeperIndex
                 && workerSelectionPanel.selectedWorkerType == Room2DWorkerSelectionPanel.PrototypeWorkerType.Housekeeper
-                ? "> "
-                : "- ";
-            text += selected + housekeeper.name
-                + ": " + housekeeper.currentState
-                + " / " + housekeeper.assignedRoomName
-                + " / " + FormatSeconds(housekeeper.cleaningTimerSeconds) + "\n";
+                ? "Selected"
+                : "Standby";
+            text += housekeeper.name + "\n"
+                + "State: " + housekeeper.GetStatusDisplayName() + "  |  " + selected + "\n"
+                + "Target: " + housekeeper.GetCurrentTargetRoomName() + "\n"
+                + "Timer: " + FormatSeconds(housekeeper.cleaningTimerSeconds) + "\n";
         }
 
         return text;
@@ -2115,20 +2169,20 @@ public class Room2DShowcaseViewController : MonoBehaviour
     {
         if (workerSelectionPanel == null || workerSelectionPanel.inspector == null)
         {
-            return "<b>Inspector</b>\nNo inspector linked.";
+            return "<b>INSP Status</b>\nNo INSP linked.";
         }
 
         Inspector2D inspectorWorker = workerSelectionPanel.inspector;
         string selected = workerSelectionPanel.selectedWorkerType == Room2DWorkerSelectionPanel.PrototypeWorkerType.Inspector
-            ? "> "
-            : "- ";
+            ? "Selected"
+            : "Standby";
 
-        return "<b>Inspector</b>\n"
-            + selected + inspectorWorker.name
-            + ": " + inspectorWorker.currentState
-            + " / " + inspectorWorker.assignedRoomName
-            + " / " + FormatSeconds(inspectorWorker.inspectionTimerSeconds)
-            + "\nConfirm when this room is awaiting inspection.";
+        return "<b>INSP Status</b>\n"
+            + inspectorWorker.name + "\n"
+            + "State: " + inspectorWorker.GetStatusDisplayName() + "  |  " + selected + "\n"
+            + "Target: " + inspectorWorker.GetCurrentTargetRoomName() + "\n"
+            + "Timer: " + FormatSeconds(inspectorWorker.inspectionTimerSeconds) + "\n"
+            + "Use Rooms to assign inspection.";
     }
 
     private string BuildRoomActionPopupText(Room2DEntity room)
@@ -2142,10 +2196,14 @@ public class Room2DShowcaseViewController : MonoBehaviour
         switch (room.currentState)
         {
             case Room2DState.Dirty:
-                actionHint = "Assign HSK or mark Clean Priority.";
+                actionHint = IsHousekeeperAvailable()
+                    ? "Assign HSK from Rooms."
+                    : "No available HSK.";
                 break;
             case Room2DState.AwaitingInspection:
-                actionHint = "Assign Inspector or mark Insp Priority.";
+                actionHint = IsInspectorAvailable()
+                    ? "Assign INSP from Rooms."
+                    : "No available INSP.";
                 break;
             case Room2DState.Ready:
                 actionHint = "Reserve for upcoming guest. Check-in is handled at Front Desk.";
@@ -2362,8 +2420,8 @@ public class Room2DShowcaseViewController : MonoBehaviour
                 return "HSK: None";
             }
 
-            return "HSK: " + housekeeper.currentState
-                + " / " + housekeeper.assignedRoomName
+            return "HSK: " + housekeeper.GetStatusDisplayName()
+                + " / " + housekeeper.GetCurrentTargetRoomName()
                 + " / " + FormatSeconds(housekeeper.cleaningTimerSeconds);
         }
 
@@ -2375,12 +2433,59 @@ public class Room2DShowcaseViewController : MonoBehaviour
                 return "Inspector: None";
             }
 
-            return "Inspector: " + inspectorWorker.currentState
-                + " / " + inspectorWorker.assignedRoomName
+            return "Inspector: " + inspectorWorker.GetStatusDisplayName()
+                + " / " + inspectorWorker.GetCurrentTargetRoomName()
                 + " / " + FormatSeconds(inspectorWorker.inspectionTimerSeconds);
         }
 
         return "State: No worker selected";
+    }
+
+    private bool IsHousekeeperAvailable()
+    {
+        // 先按“单 HSK”规则判断可用性，后面扩多人时只需要替换这里的选择策略。
+        Housekeeper2D housekeeper = GetSelectedHousekeeperForDisplay();
+        return housekeeper != null && housekeeper.IsAvailableForAssignment();
+    }
+
+    private bool IsInspectorAvailable()
+    {
+        // 当前只允许一个 Inspector 串行处理，未来加 Traveling 时也继续走这个入口。
+        return workerSelectionPanel != null
+            && workerSelectionPanel.inspector != null
+            && workerSelectionPanel.inspector.IsAvailableForAssignment();
+    }
+
+    private string GetSelectedWorkerPopupStatusHint()
+    {
+        if (workerSelectionPanel == null)
+        {
+            return "No worker linked";
+        }
+
+        if (workerSelectionPanel.selectedWorkerType == Room2DWorkerSelectionPanel.PrototypeWorkerType.Housekeeper)
+        {
+            Housekeeper2D housekeeper = GetSelectedHousekeeperForDisplay();
+            if (housekeeper == null)
+            {
+                return "No HSK linked";
+            }
+
+            return housekeeper.GetStatusDisplayName() + " / " + housekeeper.GetCurrentTargetRoomName();
+        }
+
+        if (workerSelectionPanel.selectedWorkerType == Room2DWorkerSelectionPanel.PrototypeWorkerType.Inspector)
+        {
+            Inspector2D inspectorWorker = workerSelectionPanel.inspector;
+            if (inspectorWorker == null)
+            {
+                return "No INSP linked";
+            }
+
+            return inspectorWorker.GetStatusDisplayName() + " / " + inspectorWorker.GetCurrentTargetRoomName();
+        }
+
+        return "No worker selected";
     }
 
     private Housekeeper2D GetSelectedHousekeeperForDisplay()
@@ -2504,6 +2609,17 @@ public class Room2DShowcaseViewController : MonoBehaviour
         return frontDesk.lastFrontDeskResult;
     }
 
+    private string GetFrontDeskConsequenceText()
+    {
+        // 前台等待惩罚由 FrontDesk2D 统一记录，UI 这里只负责显示。
+        if (frontDesk == null)
+        {
+            return "None";
+        }
+
+        return frontDesk.GetShowcaseConsequenceText();
+    }
+
     private string GetFrontDeskPressureLabel(int queue, int delayed)
     {
         if (delayed > 0 || queue >= 3)
@@ -2543,15 +2659,68 @@ public class Room2DShowcaseViewController : MonoBehaviour
 
         if (demandLoop.activeDemandWaitingForManualAssignment)
         {
-            return HasReadyRoomForFrontDesk() ? "Assign a ready room." : "Wait or prepare a room.";
+            return HasReadyRoomForFrontDesk()
+                ? "Return to Front Desk: assign/check in."
+                : "Switch to Rooms to prepare rooms.";
         }
 
         if (demandLoop.upcomingDemandEtaSeconds > 0f)
         {
-            return "Prepare before arrival.";
+            return "Watch room status before arrival.";
         }
 
         return "Call next guest.";
+    }
+
+    private string GetFrontDeskPatienceLabel()
+    {
+        return frontDesk != null ? frontDesk.GetShowcasePatienceLabel() : "None";
+    }
+
+    private string GetFrontDeskBlockerText()
+    {
+        if (frontDesk != null)
+        {
+            return frontDesk.GetShowcaseBlockerText();
+        }
+
+        if (demandLoop != null && demandLoop.activeDemandWaitingForManualAssignment)
+        {
+            return HasReadyRoomForFrontDesk()
+                ? "Ready room available"
+                : "Room readiness is blocking check-in";
+        }
+
+        return "No waiting guest";
+    }
+
+    private string GetFrontDeskNextActionText()
+    {
+        if (frontDesk != null)
+        {
+            return frontDesk.GetShowcaseActionHint();
+        }
+
+        return GetFrontDeskSuggestionText();
+    }
+
+    private int GetRoomCountByState(Room2DState targetState)
+    {
+        int count = 0;
+        Room2DEntity[] rooms = roomOverview != null && roomOverview.rooms != null && roomOverview.rooms.Length > 0
+            ? roomOverview.rooms
+            : FindObjectsByType<Room2DEntity>(FindObjectsSortMode.None);
+
+        for (int i = 0; i < rooms.Length; i++)
+        {
+            Room2DEntity room = rooms[i];
+            if (room != null && room.currentState == targetState)
+            {
+                count++;
+            }
+        }
+
+        return count;
     }
 
     private string GetReadyRoomRecommendationLabel(Room2DEntity room)
@@ -2582,14 +2751,9 @@ public class Room2DShowcaseViewController : MonoBehaviour
 
     private bool HasReadyRoomForFrontDesk()
     {
-        Room2DEntity[] rooms = FindObjectsByType<Room2DEntity>(FindObjectsSortMode.None);
-        for (int i = 0; i < rooms.Length; i++)
+        if (demandLoop != null)
         {
-            Room2DEntity room = rooms[i];
-            if (room != null && room.currentState == Room2DState.Ready)
-            {
-                return true;
-            }
+            return demandLoop.HasReadyRoomForActiveFrontDeskDemand();
         }
 
         return false;
@@ -3004,8 +3168,6 @@ public class Room2DShowcaseViewController : MonoBehaviour
     private void ToggleRoomWaitingGuestPeek()
     {
         roomWaitingGuestPeekVisible = !roomWaitingGuestPeekVisible;
-        roomHousekeeperPanelVisible = false;
-        roomInspectorPanelVisible = false;
     }
 
     private void CloseRoomWaitingGuestPeek()
@@ -3015,16 +3177,12 @@ public class Room2DShowcaseViewController : MonoBehaviour
 
     private void ToggleRoomHousekeeperPanel()
     {
-        roomHousekeeperPanelVisible = !roomHousekeeperPanelVisible;
-        roomWaitingGuestPeekVisible = false;
-        roomInspectorPanelVisible = false;
+        roomActionHint = "HSK status is pinned on the Rooms page.";
     }
 
     private void ToggleRoomInspectorPanel()
     {
-        roomInspectorPanelVisible = !roomInspectorPanelVisible;
-        roomWaitingGuestPeekVisible = false;
-        roomHousekeeperPanelVisible = false;
+        roomActionHint = "INSP status is pinned on the Rooms page.";
     }
 
     private void OpenRoomInfoPopup()
@@ -3047,6 +3205,16 @@ public class Room2DShowcaseViewController : MonoBehaviour
 
     private void OpenHousekeeperPopup()
     {
+        // 没有空闲 HSK 时，直接留在房间弹窗给反馈，避免玩家进入无效确认流程。
+        if (!IsHousekeeperAvailable())
+        {
+            roomWorkerPopupVisible = false;
+            roomActionPopupVisible = true;
+            roomInfoPopupVisible = false;
+            roomActionHint = BuildHousekeeperUnavailablePrompt();
+            return;
+        }
+
         SelectHousekeeper();
         roomWorkerPopupVisible = true;
         roomActionPopupVisible = false;
@@ -3056,6 +3224,16 @@ public class Room2DShowcaseViewController : MonoBehaviour
 
     private void OpenInspectorPopup()
     {
+        // INSP 同样只允许从 Rooms 发起，并在忙碌时立即返回清晰提示。
+        if (!IsInspectorAvailable())
+        {
+            roomWorkerPopupVisible = false;
+            roomActionPopupVisible = true;
+            roomInfoPopupVisible = false;
+            roomActionHint = BuildInspectorUnavailablePrompt();
+            return;
+        }
+
         SelectInspector();
         roomWorkerPopupVisible = true;
         roomActionPopupVisible = false;
@@ -3074,6 +3252,32 @@ public class Room2DShowcaseViewController : MonoBehaviour
     {
         roomWorkerPopupVisible = false;
         roomActionHint = "Worker assignment cancelled.";
+    }
+
+    private string BuildHousekeeperUnavailablePrompt()
+    {
+        Housekeeper2D housekeeper = GetSelectedHousekeeperForDisplay();
+        if (housekeeper == null)
+        {
+            return "No available HSK.";
+        }
+
+        return "No available HSK: "
+            + housekeeper.GetStatusDisplayName()
+            + " / " + housekeeper.GetCurrentTargetRoomName();
+    }
+
+    private string BuildInspectorUnavailablePrompt()
+    {
+        Inspector2D inspectorWorker = workerSelectionPanel != null ? workerSelectionPanel.inspector : null;
+        if (inspectorWorker == null)
+        {
+            return "No available INSP.";
+        }
+
+        return "No available INSP: "
+            + inspectorWorker.GetStatusDisplayName()
+            + " / " + inspectorWorker.GetCurrentTargetRoomName();
     }
 
     private void ServeLoungeNow()

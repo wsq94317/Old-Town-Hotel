@@ -1143,6 +1143,9 @@ MonoBehaviour:
   labelView: {fileID: 493678738591452166}
   roomOverview: {fileID: 0}
   housekeeper: {fileID: 0}
+  enablePrototypeClickSelection: 1
+  autoAddPrototypeClickCollider: 1
+  selectionManager: {fileID: 0}
   roomName: Room 101
   currentState: 0
   actionCount: 0

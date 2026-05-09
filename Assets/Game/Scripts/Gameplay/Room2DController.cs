@@ -501,7 +501,7 @@ public class Room2DController : MonoBehaviour
     {
         return housekeeper != null
             && housekeeper.assignedRoom == roomEntity
-            && housekeeper.currentState == Housekeeper2D.HousekeeperState.Busy;
+            && housekeeper.currentState == Housekeeper2D.HousekeeperState.Working;
     }
 
     private void DrawPrototypeDebugLabel()

@@ -103,6 +103,9 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
     public Room2DFloorPreference activeDemandFloorPreference = Room2DFloorPreference.NoPreference;
     public Room2DFacingPreference activeDemandFacingPreference = Room2DFacingPreference.NoPreference;
     public float activeDemandWaitSeconds;
+
+    // 默认关闭自动兜底分房：垂直切片里必须由玩家回到 Front Desk 手动完成入住。
+    public bool allowAutomaticFallbackAssignment;
     public float manualAssignmentFallbackDelaySeconds = 8f;
     public Room2DEntity activeReservedRoomForFallback;
     public string activeReservedRoomName = "None";
@@ -686,7 +689,9 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
         activeDemandWaitSeconds += Time.deltaTime;
         activeDemandStatus = "Waiting for manual assignment";
 
-        if (manualAssignmentFallbackDelaySeconds <= 0f || activeDemandWaitSeconds < manualAssignmentFallbackDelaySeconds)
+        if (!allowAutomaticFallbackAssignment
+            || manualAssignmentFallbackDelaySeconds <= 0f
+            || activeDemandWaitSeconds < manualAssignmentFallbackDelaySeconds)
         {
             return;
         }
@@ -1195,6 +1200,37 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
         return GetMatchDisplayName(matchQuality)
             + " / " + BuildDemandPreferenceSummary(roomPreference, floorPreference, facingPreference)
             + GetRoomTypeRiskSuffix(room, roomPreference);
+    }
+
+    public bool HasReadyRoomForActiveFrontDeskDemand()
+    {
+        // 前台只关心“现在有没有能手动入住的 Ready 房”。
+        // 房型/偏好风险不会阻止入住，只会影响结果和后续投诉。
+        FindRoomsIfNeeded();
+
+        if (complaintWaitingForReassignment)
+        {
+            return FindBestReadyRoomForDemand(
+                complaintDemandType,
+                complaintRoomPreference,
+                complaintFloorPreference,
+                complaintFacingPreference) != null;
+        }
+
+        if (activeDemandWaitingForManualAssignment)
+        {
+            return FindBestReadyRoomForDemand(
+                activeDemandType,
+                activeDemandRoomPreference,
+                activeDemandFloorPreference,
+                activeDemandFacingPreference) != null;
+        }
+
+        return FindBestReadyRoomForDemand(
+            upcomingDemandType,
+            upcomingDemandRoomPreference,
+            upcomingDemandFloorPreference,
+            upcomingDemandFacingPreference) != null;
     }
 
     public bool IsRoomReservedForPrototypeDemand(Room2DEntity room)

@@ -7,7 +7,8 @@ public class Housekeeper2D : MonoBehaviour
     public enum HousekeeperState
     {
         Idle,
-        Busy
+        Traveling,
+        Working
     }
 
     // 当前保洁状态。Idle 可以接新房间，Busy 不能接新房间。
@@ -31,6 +32,9 @@ public class Housekeeper2D : MonoBehaviour
     // 清洁需要的现实秒数。原型阶段先用固定时长。
     public float cleaningDurationSeconds = 5f;
     public float cleaningTimerSeconds;
+    // 先把 Traveling 的数据位准备好，后续再接真实移动/路径时间。
+    public float travelDurationSeconds;
+    public float travelTimerSeconds;
 
     // 可选：清洁开始/结束后刷新总览。
     public Room2DOverview roomOverview;
@@ -50,7 +54,13 @@ public class Housekeeper2D : MonoBehaviour
 
     private void Update()
     {
-        if (currentState != HousekeeperState.Busy)
+        if (currentState == HousekeeperState.Traveling)
+        {
+            TickTravelingPlaceholder();
+            return;
+        }
+
+        if (currentState != HousekeeperState.Working)
         {
             return;
         }
@@ -104,7 +114,7 @@ public class Housekeeper2D : MonoBehaviour
 
     public bool AssignRoom(Room2DEntity room)
     {
-        if (currentState != HousekeeperState.Idle || room == null)
+        if (!IsAvailableForAssignment() || room == null)
         {
             return false;
         }
@@ -118,11 +128,40 @@ public class Housekeeper2D : MonoBehaviour
         assignedRoom = room;
         assignedRoomName = room.roomName;
         cleaningTimerSeconds = 0f;
-        currentState = HousekeeperState.Busy;
+        currentState = HousekeeperState.Working;
 
         RefreshRoomVisual(room);
         RefreshOverview();
         return true;
+    }
+
+    // Rooms 页面以后会直接读这些方法，不需要自己猜 Busy/Idle 规则。
+    public bool IsAvailableForAssignment()
+    {
+        return currentState == HousekeeperState.Idle;
+    }
+
+    public bool IsWorkingOnRoom()
+    {
+        return currentState == HousekeeperState.Working && assignedRoom != null;
+    }
+
+    public string GetCurrentTargetRoomName()
+    {
+        return assignedRoom != null ? assignedRoom.roomName : "None";
+    }
+
+    public string GetStatusDisplayName()
+    {
+        switch (currentState)
+        {
+            case HousekeeperState.Traveling:
+                return "Traveling";
+            case HousekeeperState.Working:
+                return "Cleaning";
+            default:
+                return "Idle";
+        }
     }
 
     public string GetBestTargetText()
@@ -137,7 +176,7 @@ public class Housekeeper2D : MonoBehaviour
 
     public void FinishCurrentRoom()
     {
-        if (currentState != HousekeeperState.Busy)
+        if (currentState != HousekeeperState.Working)
         {
             return;
         }
@@ -147,6 +186,7 @@ public class Housekeeper2D : MonoBehaviour
         assignedRoom = null;
         assignedRoomName = "None";
         cleaningTimerSeconds = 0f;
+        travelTimerSeconds = 0f;
         currentState = HousekeeperState.Idle;
 
         if (roomToFinish != null && roomToFinish.CanFinishCleaning())
@@ -156,6 +196,25 @@ public class Housekeeper2D : MonoBehaviour
 
         RefreshRoomVisual(roomToFinish);
         RefreshOverview();
+    }
+
+    private void TickTravelingPlaceholder()
+    {
+        // 本轮不实现真实移动；这里先保留状态入口，后续可在进入房间前增加 travel time。
+        travelTimerSeconds += Time.deltaTime;
+
+        if (travelDurationSeconds <= 0f)
+        {
+            currentState = HousekeeperState.Working;
+            travelTimerSeconds = 0f;
+            return;
+        }
+
+        if (travelTimerSeconds >= travelDurationSeconds)
+        {
+            currentState = HousekeeperState.Working;
+            travelTimerSeconds = 0f;
+        }
     }
 
     private void FindReferencesIfNeeded()

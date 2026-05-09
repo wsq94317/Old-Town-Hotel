@@ -648,8 +648,8 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
             return "None";
         }
 
-        return housekeeper.currentState
-            + " / " + housekeeper.assignedRoomName
+        return housekeeper.GetStatusDisplayName()
+            + " / " + housekeeper.GetCurrentTargetRoomName()
             + " / " + FormatSeconds(housekeeper.cleaningTimerSeconds);
     }
 
@@ -670,8 +670,8 @@ public class Room2DPrototypeDebugHud : MonoBehaviour
             return "None";
         }
 
-        return inspector.currentState
-            + " / " + inspector.assignedRoomName
+        return inspector.GetStatusDisplayName()
+            + " / " + inspector.GetCurrentTargetRoomName()
             + " / " + FormatSeconds(inspector.inspectionTimerSeconds);
     }
 

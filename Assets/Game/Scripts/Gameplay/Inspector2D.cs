@@ -7,7 +7,8 @@ public class Inspector2D : MonoBehaviour
     public enum InspectorState
     {
         Idle,
-        Busy
+        Traveling,
+        Working
     }
 
     // 当前主管状态。Idle 可以接新房间，Busy 不能接新房间。
@@ -31,6 +32,9 @@ public class Inspector2D : MonoBehaviour
     // 检查需要的现实秒数。原型阶段先用固定时长。
     public float inspectionDurationSeconds = 4f;
     public float inspectionTimerSeconds;
+    // 先预留 Traveling 数据位，后续可以在到房前加移动时间。
+    public float travelDurationSeconds;
+    public float travelTimerSeconds;
 
     // 可选：检查开始/结束后刷新总览。
     public Room2DOverview roomOverview;
@@ -50,7 +54,13 @@ public class Inspector2D : MonoBehaviour
 
     private void Update()
     {
-        if (currentState != InspectorState.Busy)
+        if (currentState == InspectorState.Traveling)
+        {
+            TickTravelingPlaceholder();
+            return;
+        }
+
+        if (currentState != InspectorState.Working)
         {
             return;
         }
@@ -104,7 +114,7 @@ public class Inspector2D : MonoBehaviour
 
     public bool AssignRoom(Room2DEntity room)
     {
-        if (currentState != InspectorState.Idle || room == null)
+        if (!IsAvailableForAssignment() || room == null)
         {
             return false;
         }
@@ -118,11 +128,39 @@ public class Inspector2D : MonoBehaviour
         assignedRoom = room;
         assignedRoomName = room.roomName;
         inspectionTimerSeconds = 0f;
-        currentState = InspectorState.Busy;
+        currentState = InspectorState.Working;
 
         RefreshRoomVisual(room);
         RefreshOverview();
         return true;
+    }
+
+    public bool IsAvailableForAssignment()
+    {
+        return currentState == InspectorState.Idle;
+    }
+
+    public bool IsWorkingOnRoom()
+    {
+        return currentState == InspectorState.Working && assignedRoom != null;
+    }
+
+    public string GetCurrentTargetRoomName()
+    {
+        return assignedRoom != null ? assignedRoom.roomName : "None";
+    }
+
+    public string GetStatusDisplayName()
+    {
+        switch (currentState)
+        {
+            case InspectorState.Traveling:
+                return "Traveling";
+            case InspectorState.Working:
+                return "Inspecting";
+            default:
+                return "Idle";
+        }
     }
 
     public string GetBestTargetText()
@@ -137,7 +175,7 @@ public class Inspector2D : MonoBehaviour
 
     public void FinishCurrentRoom()
     {
-        if (currentState != InspectorState.Busy)
+        if (currentState != InspectorState.Working)
         {
             return;
         }
@@ -147,6 +185,7 @@ public class Inspector2D : MonoBehaviour
         assignedRoom = null;
         assignedRoomName = "None";
         inspectionTimerSeconds = 0f;
+        travelTimerSeconds = 0f;
         currentState = InspectorState.Idle;
 
         if (roomToFinish != null && roomToFinish.CanApproveInspection())
@@ -156,6 +195,25 @@ public class Inspector2D : MonoBehaviour
 
         RefreshRoomVisual(roomToFinish);
         RefreshOverview();
+    }
+
+    private void TickTravelingPlaceholder()
+    {
+        // 本轮不实现真实移动；只保留 Traveling -> Working 的扩展入口。
+        travelTimerSeconds += Time.deltaTime;
+
+        if (travelDurationSeconds <= 0f)
+        {
+            currentState = InspectorState.Working;
+            travelTimerSeconds = 0f;
+            return;
+        }
+
+        if (travelTimerSeconds >= travelDurationSeconds)
+        {
+            currentState = InspectorState.Working;
+            travelTimerSeconds = 0f;
+        }
     }
 
     private void FindReferencesIfNeeded()

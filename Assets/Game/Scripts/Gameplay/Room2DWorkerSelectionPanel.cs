@@ -121,6 +121,14 @@ public class Room2DWorkerSelectionPanel : MonoBehaviour
             return;
         }
 
+        if (!housekeeper.IsAvailableForAssignment())
+        {
+            lastManualAssignmentResult = "No available HSK: "
+                + housekeeper.GetStatusDisplayName()
+                + " / " + housekeeper.GetCurrentTargetRoomName();
+            return;
+        }
+
         bool assigned = housekeeper.AssignRoom(selectedRoom);
         lastManualAssignmentResult = assigned
             ? GetHousekeeperDisplayName(selectedHousekeeperIndex) + " -> " + selectedRoom.roomName
@@ -132,6 +140,14 @@ public class Room2DWorkerSelectionPanel : MonoBehaviour
         if (inspector == null)
         {
             lastManualAssignmentResult = "Assign failed: no inspector";
+            return;
+        }
+
+        if (!inspector.IsAvailableForAssignment())
+        {
+            lastManualAssignmentResult = "No available INSP: "
+                + inspector.GetStatusDisplayName()
+                + " / " + inspector.GetCurrentTargetRoomName();
             return;
         }
 
@@ -229,8 +245,8 @@ public class Room2DWorkerSelectionPanel : MonoBehaviour
 
             string selectedMark = selectedWorkerType == PrototypeWorkerType.Housekeeper && i == selectedHousekeeperIndex ? "> " : "- ";
             text += "\n" + selectedMark + GetHousekeeperDisplayName(i)
-                + ": " + housekeeper.currentState
-                + " / " + housekeeper.assignedRoomName
+                + ": " + housekeeper.GetStatusDisplayName()
+                + " / " + housekeeper.GetCurrentTargetRoomName()
                 + " / " + Mathf.FloorToInt(housekeeper.cleaningTimerSeconds) + "s";
         }
 
@@ -247,8 +263,8 @@ public class Room2DWorkerSelectionPanel : MonoBehaviour
         string selectedMark = selectedWorkerType == PrototypeWorkerType.Inspector ? "> " : "- ";
         return "Inspector\n"
             + selectedMark + GetInspectorDisplayName()
-            + ": " + inspector.currentState
-            + " / " + inspector.assignedRoomName
+            + ": " + inspector.GetStatusDisplayName()
+            + " / " + inspector.GetCurrentTargetRoomName()
             + " / " + Mathf.FloorToInt(inspector.inspectionTimerSeconds) + "s";
     }
 
