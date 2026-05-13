@@ -2,8 +2,21 @@ using UnityEngine;
 
 // 垂直切片 Demo Day 控制器。
 // 它只负责把现有原型组织成一轮可录屏的流程：准备 -> 营业 -> 结束。
+//
+// B+A 混合冲刺 Story 1 改造说明：
+//   - 新增 Room2DDayPhaseStateMachine 作为实际状态持有者。
+//   - 遗留三态枚举 DemoDayPhase 保持不变，供 DebugHud / ShowcaseViewController 继续使用。
+//   - currentPhase 从公开字段改为只读属性，映射自 phaseStateMachine.CurrentPhase：
+//       Preparation → DemoDayPhase.Preparation
+//       CheckInPeak → DemoDayPhase.Operating
+//       Recovery    → DemoDayPhase.Operating
+//       Ended       → DemoDayPhase.Ended
+//   - 遗留方法（EnterPreparationPhase / StartOperatingPeriod / EndDemoDay / RestartDemoDay）
+//     保持公开签名不变，内部转发给状态机，并保留原有副作用（SetDemandRunning 等）。
+//   - 新阶段（CheckInPeak / Recovery）通过 HUD 按钮触发时，副作用由 OnPhaseEntered 订阅驱动。
 public class Room2DDemoDayController : MonoBehaviour
 {
+    // 遗留三态枚举，保持不变以兼容 DebugHud / ShowcaseViewController。
     public enum DemoDayPhase
     {
         Preparation,
@@ -18,6 +31,9 @@ public class Room2DDemoDayController : MonoBehaviour
     public Lounge2D lounge;
     public Room2DOverview roomOverview;
 
+    // 新增：四态状态机引用；autoFindReferences 逻辑自动查找，也可 Inspector 手动赋值。
+    [SerializeField] private Room2DDayPhaseStateMachine phaseStateMachine;
+
     [Header("Demo Timing")]
     // 原型营业时长，到了以后自动进入 Ended，方便录制完整一轮。
     public bool startInPreparation = true;
@@ -26,7 +42,12 @@ public class Room2DDemoDayController : MonoBehaviour
     public float operatingTimerSeconds;
 
     [Header("Runtime")]
-    public DemoDayPhase currentPhase = DemoDayPhase.Preparation;
+    // currentPhase 现在是只读属性，映射自 phaseStateMachine；不再是可写字段。
+    public DemoDayPhase currentPhase => MapToDemoDayPhase(
+        phaseStateMachine != null
+            ? phaseStateMachine.CurrentPhase
+            : Room2DDayPhaseStateMachine.Room2DDayPhase.Preparation);
+
     public int demoDayIndex = 1;
     public string lastDemoAction = "None";
 
@@ -34,9 +55,24 @@ public class Room2DDemoDayController : MonoBehaviour
     {
         FindReferencesIfNeeded();
 
+        // 订阅状态机事件，让 HUD 按钮触发的阶段推进也能运行对应副作用。
+        if (phaseStateMachine != null)
+        {
+            phaseStateMachine.OnPhaseEntered += HandlePhaseEntered;
+        }
+
         if (startInPreparation)
         {
             EnterPreparationPhase();
+        }
+    }
+
+    private void OnDestroy()
+    {
+        // 与 Start 订阅配对，防止场景重载时残留悬空委托引用。
+        if (phaseStateMachine != null)
+        {
+            phaseStateMachine.OnPhaseEntered -= HandlePhaseEntered;
         }
     }
 
@@ -56,27 +92,90 @@ public class Room2DDemoDayController : MonoBehaviour
         }
     }
 
+    // 当状态机进入某阶段时（包括 HUD 按钮触发路径）执行副作用。
+    // 遗留的 EnterPreparationPhase / StartOperatingPeriod / EndDemoDay 方法自己管理副作用，
+    // 避免重复执行：它们先设置内部标志，再调用状态机。
+    // 这里仅响应"由 HUD 按钮直接触发"的阶段变化（即不经过遗留方法的路径）。
+    private bool _sideEffectsHandledByLegacyMethod = false;
+
+    private void HandlePhaseEntered(Room2DDayPhaseStateMachine.Room2DDayPhase phase)
+    {
+        // 遗留方法已自行处理副作用时，跳过，防止重复执行。
+        if (_sideEffectsHandledByLegacyMethod)
+        {
+            _sideEffectsHandledByLegacyMethod = false;
+            return;
+        }
+
+        switch (phase)
+        {
+            case Room2DDayPhaseStateMachine.Room2DDayPhase.Preparation:
+                // ResetToPreparation 路径：副作用由 EnterPreparationPhase 负责，此处无需重复。
+                break;
+
+            case Room2DDayPhaseStateMachine.Room2DDayPhase.CheckInPeak:
+                // HUD "Start Operating" 按钮触发：执行营业副作用。
+                operatingTimerSeconds = 0f;
+                lastDemoAction = "Operating period started";
+                SetDemandRunning(true);
+                SetFrontDeskRunning(true);
+                SetLoungeRunning(true);
+                if (demandLoop != null && demandLoop.useUpcomingDemandPreview)
+                {
+                    demandLoop.ScheduleUpcomingDemandPreview();
+                }
+                RefreshOverview();
+                break;
+
+            case Room2DDayPhaseStateMachine.Room2DDayPhase.Recovery:
+                // HUD "Begin Recovery" 按钮触发：当前无额外副作用（系统保持运行）。
+                lastDemoAction = "Recovery phase started";
+                break;
+
+            case Room2DDayPhaseStateMachine.Room2DDayPhase.Ended:
+                // HUD "End Day" 按钮 或 ForceJumpToEnded 触发：执行结束副作用。
+                lastDemoAction = "Demo day ended";
+                SetDemandRunning(false);
+                SetFrontDeskRunning(false);
+                SetLoungeRunning(false);
+                if (demandLoop != null)
+                {
+                    demandLoop.RefreshPrototypeDaySummary();
+                }
+                RefreshOverview();
+                break;
+        }
+    }
+
+    // ── 遗留公开方法（保持签名不变） ─────────────────────────────────────────
+
     [ContextMenu("Enter Preparation Phase")]
     public void EnterPreparationPhase()
     {
-        currentPhase = DemoDayPhase.Preparation;
         operatingTimerSeconds = 0f;
         lastDemoAction = "Preparation started";
 
-        // 准备阶段允许玩家看房、预留、标记优先级，但不自动推进入住需求。
+        // 副作用先于状态机调用，HandlePhaseEntered 将跳过重复处理。
+        _sideEffectsHandledByLegacyMethod = true;
         SetDemandRunning(false);
         SetFrontDeskRunning(false);
         SetLoungeRunning(false);
         RefreshOverview();
+
+        if (phaseStateMachine != null)
+        {
+            phaseStateMachine.ResetToPreparation();
+        }
     }
 
     [ContextMenu("Start Operating Period")]
     public void StartOperatingPeriod()
     {
-        currentPhase = DemoDayPhase.Operating;
         operatingTimerSeconds = 0f;
         lastDemoAction = "Operating period started";
 
+        // 副作用先于状态机调用，HandlePhaseEntered 将跳过重复处理。
+        _sideEffectsHandledByLegacyMethod = true;
         SetDemandRunning(true);
         SetFrontDeskRunning(true);
         SetLoungeRunning(true);
@@ -87,15 +186,22 @@ public class Room2DDemoDayController : MonoBehaviour
         }
 
         RefreshOverview();
+
+        // 如果状态机当前在 Preparation，推进到 CheckInPeak。
+        if (phaseStateMachine != null &&
+            phaseStateMachine.CurrentPhase == Room2DDayPhaseStateMachine.Room2DDayPhase.Preparation)
+        {
+            phaseStateMachine.RequestAdvancePhase();
+        }
     }
 
     [ContextMenu("End Demo Day")]
     public void EndDemoDay()
     {
-        currentPhase = DemoDayPhase.Ended;
         lastDemoAction = "Demo day ended";
 
-        // 结束阶段冻结新需求和 Lounge 自动消耗，方便看 summary 和录屏结尾。
+        // 副作用先于状态机调用，HandlePhaseEntered 将跳过重复处理。
+        _sideEffectsHandledByLegacyMethod = true;
         SetDemandRunning(false);
         SetFrontDeskRunning(false);
         SetLoungeRunning(false);
@@ -106,6 +212,12 @@ public class Room2DDemoDayController : MonoBehaviour
         }
 
         RefreshOverview();
+
+        // ForceJumpToEnded 绕过中间阶段，供遗留直接结束路径和自动计时器使用。
+        if (phaseStateMachine != null)
+        {
+            phaseStateMachine.ForceJumpToEnded();
+        }
     }
 
     [ContextMenu("Restart Demo Day")]
@@ -116,6 +228,8 @@ public class Room2DDemoDayController : MonoBehaviour
         EnterPreparationPhase();
         lastDemoAction = "Demo day restarted";
     }
+
+    // ── 文本辅助方法（签名不变） ──────────────────────────────────────────────
 
     public string GetDemoDaySummaryText()
     {
@@ -137,6 +251,8 @@ public class Room2DDemoDayController : MonoBehaviour
             + "/" + FormatSeconds(operatingDurationSeconds);
     }
 
+    // GetShowcasePhaseLabel 保持遗留三态映射，不改变 Room2DShowcaseViewController 行为。
+    // 新阶段标签（Check-In Peak / Recovery / Day Ended）由 Room2DDayPhaseStateMachine 的 HUD 展示。
     public string GetShowcasePhaseLabel()
     {
         switch (currentPhase)
@@ -181,11 +297,33 @@ public class Room2DDemoDayController : MonoBehaviour
             + "Next Run: " + GetNextRunAdviceLine();
     }
 
+    // ── 私有辅助 ─────────────────────────────────────────────────────────────
+
+    // 将四态枚举映射为遗留三态枚举，保持向后兼容。
+    private static DemoDayPhase MapToDemoDayPhase(Room2DDayPhaseStateMachine.Room2DDayPhase phase)
+    {
+        switch (phase)
+        {
+            case Room2DDayPhaseStateMachine.Room2DDayPhase.CheckInPeak:
+            case Room2DDayPhaseStateMachine.Room2DDayPhase.Recovery:
+                return DemoDayPhase.Operating;
+            case Room2DDayPhaseStateMachine.Room2DDayPhase.Ended:
+                return DemoDayPhase.Ended;
+            default:
+                return DemoDayPhase.Preparation;
+        }
+    }
+
     private void FindReferencesIfNeeded()
     {
         if (!autoFindReferences)
         {
             return;
+        }
+
+        if (phaseStateMachine == null)
+        {
+            phaseStateMachine = FindFirstObjectByType<Room2DDayPhaseStateMachine>();
         }
 
         if (demandLoop == null)
