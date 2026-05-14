@@ -9433,7 +9433,9 @@ MonoBehaviour:
   cleanCups: 8
   dirtyCups: 0
   milkStock: 12
-  teaCoffeeStock: 12
+  teaStock: 12
+  coffeeStock: 12
+  syrupStock: 15
   runDuringPlay: 1
   serviceIntervalSeconds: 7
   serviceTimerSeconds: 0
@@ -10159,6 +10161,7 @@ MonoBehaviour:
   operatingTimerSeconds: 0
   demoDayIndex: 1
   lastDemoAction: None
+  playerCash: 2450
 --- !u!4 &1858400008
 Transform:
   m_ObjectHideFlags: 0
