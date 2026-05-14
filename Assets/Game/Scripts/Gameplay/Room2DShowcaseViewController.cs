@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.Events;
@@ -171,6 +172,19 @@ public class Room2DShowcaseViewController : MonoBehaviour
 
     private const string RootName = "Room2DShowcaseViews";
 
+    // Story 3 Phase 5：Prep 阶段预分配 panel
+    [SerializeField] private Room2DPreAssignmentController preAssignmentController;
+    private RectTransform prepAssignmentPanel;
+    private RectTransform prepGuestStripContent;
+    private Button[] prepGuestSlotButtons; // 长度 = upcomingQueueCapacity (2)
+    private TMP_Text[] prepGuestSlotTexts; // 每张卡的标签 TMP（Type/BedType/Paired Room）
+    private RectTransform prepRoomGridContent;
+    private Button[] prepRoomButtons;       // 长度 = demandLoop.rooms.Length (12)
+    private TMP_Text[] prepRoomTexts;       // 房间卡标签 TMP（房号 + RoomCategory + 状态 + paired badge）
+    private TMP_Text prepLastActionText;
+    private Button prepConfirmButton;
+    private TMP_Text prepConfirmButtonLabel;
+
     private void Start()
     {
         FindReferencesIfNeeded();
@@ -181,6 +195,26 @@ public class Room2DShowcaseViewController : MonoBehaviour
         }
 
         SwitchView(currentView);
+
+        // Story 3：autofind controller + 订阅 state-changed 事件
+        if (preAssignmentController == null)
+        {
+            preAssignmentController = UnityEngine.Object.FindFirstObjectByType<Room2DPreAssignmentController>();
+        }
+        if (preAssignmentController != null)
+        {
+            preAssignmentController.OnStateChanged += RefreshPrepAssignmentPanel;
+            RefreshPrepAssignmentPanel(); // 立即同步当前状态（Awake 已触发 HandlePhaseEntered，UI 不能漏）
+        }
+    }
+
+    private void OnDestroy()
+    {
+        // Story 3：与 Start() 的 += 严格配对，防止场景重载残留委托。
+        if (preAssignmentController != null)
+        {
+            preAssignmentController.OnStateChanged -= RefreshPrepAssignmentPanel;
+        }
     }
 
     private void Update()
@@ -238,6 +272,7 @@ public class Room2DShowcaseViewController : MonoBehaviour
         BuildFrontDeskViewContent();
         BuildRoomViewContent();
         BuildLoungeViewContent();
+        BuildPrepAssignmentPanel(); // Story 3 Phase 5
 
         // Room View 需要尽量露出房间网格，所以只保留轻量透明提示，不挡住操作。
         SetPanelRaycast(frontDeskViewPanel, false);
@@ -1085,8 +1120,13 @@ public class Room2DShowcaseViewController : MonoBehaviour
 
         if (guestKind == 1)
         {
+            // Story 2(B+A Hybrid)：在 demand 类型下方追加 Guest 行
+            // (type / preference,Story 2 字段)和 Needs 行(room preference 显式化),
+            // 满足 AC5「Front Desk 等候卡显示 3 项标签」。
             return "<b>Check-In</b>\n"
                 + demandLoop.activeDemandType + " guest\n"
+                + demandLoop.activeGuestType + " / " + demandLoop.activeGuestPreference + "\n"
+                + "Needs: " + demandLoop.activeDemandRoomPreference + "\n"
                 + BuildDemandPreferenceShortLine(
                     demandLoop.activeDemandRoomPreference,
                     demandLoop.activeDemandFloorPreference,
@@ -1097,6 +1137,8 @@ public class Room2DShowcaseViewController : MonoBehaviour
 
         if (guestKind == 2)
         {
+            // Complaint 客人没有 Story 2 字段(complaint 数据通道独立),先不显示 Guest 行;
+            // 后续 sprint 若给 complaint 也加 type/preference,此处一并补。
             return "<b>Complaint</b>\n"
                 + demandLoop.complaintDemandType + " guest\n"
                 + BuildDemandPreferenceShortLine(
@@ -1108,8 +1150,11 @@ public class Room2DShowcaseViewController : MonoBehaviour
 
         if (guestKind == 3)
         {
+            // Story 2:upcoming 卡(Prep 阶段可见)显示 Guest + Needs,满足 AC4。
             return "<b>Next Guest</b>\n"
                 + demandLoop.upcomingDemandType + " guest\n"
+                + demandLoop.upcomingGuestType + " / " + demandLoop.upcomingGuestPreference + "\n"
+                + "Needs: " + demandLoop.upcomingDemandRoomPreference + "\n"
                 + BuildDemandPreferenceShortLine(
                     demandLoop.upcomingDemandRoomPreference,
                     demandLoop.upcomingDemandFloorPreference,
@@ -1129,8 +1174,12 @@ public class Room2DShowcaseViewController : MonoBehaviour
 
         if (selectedFrontDeskGuestKind == 1)
         {
+            // Story 2:详情面板补 Guest 行(type / preference)和 Needs 行(room preference),
+            // 与上层 BuildGuestCardText 卡片对齐,玩家点开后能看到完整身份信息。
             return "<b>Current Guest</b>\n"
                 + demandLoop.activeDemandType + " check-in guest\n"
+                + "Guest: " + demandLoop.activeGuestType + " / " + demandLoop.activeGuestPreference + "\n"
+                + "Needs: " + demandLoop.activeDemandRoomPreference + "\n"
                 + "Request: " + BuildDemandPreferenceShortLine(
                     demandLoop.activeDemandRoomPreference,
                     demandLoop.activeDemandFloorPreference,
@@ -1157,8 +1206,12 @@ public class Room2DShowcaseViewController : MonoBehaviour
 
         if (selectedFrontDeskGuestKind == 3)
         {
+            // Story 2:upcoming 详情同样显示 Guest 行(AC4 玩家在 Prep 看预分配决策时
+            // 能基于 type/preference 选房间)。
             return "<b>Next Guest</b>\n"
                 + demandLoop.upcomingDemandType + " incoming\n"
+                + "Guest: " + demandLoop.upcomingGuestType + " / " + demandLoop.upcomingGuestPreference + "\n"
+                + "Needs: " + demandLoop.upcomingDemandRoomPreference + "\n"
                 + "Request: " + BuildDemandPreferenceShortLine(
                     demandLoop.upcomingDemandRoomPreference,
                     demandLoop.upcomingDemandFloorPreference,
@@ -1661,6 +1714,233 @@ public class Room2DShowcaseViewController : MonoBehaviour
         }
     }
 
+    // ── Story 3 Phase 5：Prep 阶段预分配面板 ──────────────────────────────────
+
+    /// <summary>
+    /// 在 showcaseRoot 上创建 Prep 预分配面板（默认隐藏）。
+    /// 包含：标题行、guest 横向卡片区、房间 3×N 网格、最近操作文本、确认按钮。
+    /// </summary>
+    private void BuildPrepAssignmentPanel()
+    {
+        // 1. 根面板：深蓝底色、挂在 showcaseRoot（覆盖三视图之上）
+        prepAssignmentPanel = FindOrCreatePanel(showcaseRoot, "Panel_PrepAssignment", new Color(0.04f, 0.06f, 0.10f, 0.96f));
+        // 铺满 showcaseRoot 的顶部 70%（留底部导航栏空间）
+        prepAssignmentPanel.anchorMin = new Vector2(0f, 0.10f);
+        prepAssignmentPanel.anchorMax = new Vector2(1f, 1.0f);
+        prepAssignmentPanel.offsetMin = Vector2.zero;
+        prepAssignmentPanel.offsetMax = Vector2.zero;
+        // 默认隐藏；RefreshPrepAssignmentPanel 根据 IsPrepPhaseActive 决定显隐
+        prepAssignmentPanel.gameObject.SetActive(false);
+
+        // 2. 标题文本
+        TMP_Text header = FindOrCreateText(prepAssignmentPanel, "Text_PrepPanelHeader", "Prep — Pre-Assign Rooms");
+        header.fontSize = 22f;
+        header.color = new Color(0.75f, 0.88f, 1.0f, 1f);
+        header.alignment = TextAlignmentOptions.TopLeft;
+        ApplyDefaultFont(header);
+        header.rectTransform.anchorMin = new Vector2(0f, 1f);
+        header.rectTransform.anchorMax = new Vector2(1f, 1f);
+        header.rectTransform.pivot = new Vector2(0.5f, 1f);
+        header.rectTransform.offsetMin = new Vector2(18f, -56f);
+        header.rectTransform.offsetMax = new Vector2(-18f, -8f);
+
+        // 3. Guest 横向卡片区（HorizontalScrollContent 工具方法）
+        // topOffset=64 表示从面板顶部往下 64px 开始，bottomOffset=420 表示距底部 420px 结束
+        prepGuestStripContent = FindOrCreateHorizontalScrollContent(
+            prepAssignmentPanel,
+            "Scroll_PrepGuestStrip",
+            "Content_PrepGuestCards",
+            64f,   // topOffset（标题占据的高度）
+            420f); // bottomOffset（为房间网格 + 操作区留空间）
+
+        // 3a. 两个 guest slot 按钮（一屏内两张并排）
+        int slotCount = 2; // upcomingQueueCapacity = 2
+        prepGuestSlotButtons = new Button[slotCount];
+        prepGuestSlotTexts   = new TMP_Text[slotCount];
+        for (int i = 0; i < slotCount; i++)
+        {
+            int capturedIndex = i; // 捕获局部变量，避免闭包 bug
+            Button slotBtn = FindOrCreateButton(prepGuestStripContent, "Button_PrepGuestSlot_" + i, "Slot " + (i + 1));
+            // 覆盖默认 LayoutElement 尺寸，卡片宽 340、高 160
+            LayoutElement le = slotBtn.GetComponent<LayoutElement>();
+            if (le == null) le = slotBtn.gameObject.AddComponent<LayoutElement>();
+            le.preferredWidth  = 340f;
+            le.preferredHeight = 160f;
+            // 获取子 TMP 标签
+            TMP_Text lbl = slotBtn.GetComponentInChildren<TMP_Text>();
+            if (lbl == null) lbl = FindOrCreateText(slotBtn.transform as RectTransform, "Text (TMP)", "Slot " + (i + 1));
+            lbl.fontSize  = 17f;
+            lbl.alignment = TextAlignmentOptions.TopLeft;
+            lbl.rectTransform.offsetMin = new Vector2(10f, 6f);
+            lbl.rectTransform.offsetMax = new Vector2(-6f, -6f);
+            ApplyDefaultFont(lbl);
+            slotBtn.onClick.RemoveAllListeners();
+            // C2 guard：BuildPrepAssignmentPanel 在 Start() autofind 之前调用，
+            // 极窄窗口内 preAssignmentController 可能仍为 null；防御点击 NPE。
+            slotBtn.onClick.AddListener(() =>
+            {
+                if (preAssignmentController == null) return;
+                preAssignmentController.SelectGuestSlot(capturedIndex);
+            });
+            prepGuestSlotButtons[i] = slotBtn;
+            prepGuestSlotTexts[i]   = lbl;
+        }
+
+        // 4. 房间网格区（3 列 GridLayoutGroup）
+        prepRoomGridContent = FindOrCreatePanel(prepAssignmentPanel, "Grid_PrepRooms", new Color(0f, 0f, 0f, 0f));
+        prepRoomGridContent.anchorMin = new Vector2(0f, 0f);
+        prepRoomGridContent.anchorMax = new Vector2(1f, 1f);
+        prepRoomGridContent.offsetMin = new Vector2(10f, 148f);  // 底部留 confirm + action 区
+        prepRoomGridContent.offsetMax = new Vector2(-10f, -430f); // 顶部让出标题 + guest strip
+        // 使用现有 ApplyActionGrid 工具添加 GridLayoutGroup
+        ApplyActionGrid(prepRoomGridContent, 3, new Vector2(210f, 130f), 8f);
+
+        // 4a. 为每个房间创建一个按钮
+        Room2DEntity[] allRooms = demandLoop != null ? demandLoop.rooms : new Room2DEntity[0];
+        prepRoomButtons = new Button[allRooms.Length];
+        prepRoomTexts   = new TMP_Text[allRooms.Length];
+        for (int i = 0; i < allRooms.Length; i++)
+        {
+            int capturedRoom = i; // 捕获局部变量，避免闭包 bug
+            string btnName = "Button_PrepRoom_" + i;
+            string defaultLabel = allRooms[i] != null ? allRooms[i].roomName : "Room " + i;
+            Button roomBtn = FindOrCreateButton(prepRoomGridContent, btnName, defaultLabel);
+            // 覆盖 LayoutElement：GridLayoutGroup 控制尺寸，LayoutElement 设 preferred 无副作用
+            TMP_Text lbl = roomBtn.GetComponentInChildren<TMP_Text>();
+            if (lbl == null) lbl = FindOrCreateText(roomBtn.transform as RectTransform, "Text (TMP)", defaultLabel);
+            lbl.fontSize  = 15f;
+            lbl.alignment = TextAlignmentOptions.TopLeft;
+            lbl.rectTransform.offsetMin = new Vector2(8f, 4f);
+            lbl.rectTransform.offsetMax = new Vector2(-4f, -4f);
+            ApplyDefaultFont(lbl);
+            roomBtn.onClick.RemoveAllListeners();
+            roomBtn.onClick.AddListener(() =>
+            {
+                // C2 guard：autofind 极窄窗口 + scene 缺组件兜底。
+                if (preAssignmentController == null) return;
+                if (demandLoop != null && capturedRoom < demandLoop.rooms.Length)
+                    preAssignmentController.AttemptReserve(demandLoop.rooms[capturedRoom]);
+            });
+            prepRoomButtons[i] = roomBtn;
+            prepRoomTexts[i]   = lbl;
+        }
+
+        // 5. 最近操作文本（全宽，52px 高，锚定在确认按钮上方）
+        prepLastActionText = FindOrCreateText(prepAssignmentPanel, "Text_PrepLastAction", string.Empty);
+        prepLastActionText.fontSize  = 28f;
+        prepLastActionText.color     = Color.white;
+        prepLastActionText.alignment = TextAlignmentOptions.MidlineLeft;
+        ApplyDefaultFont(prepLastActionText);
+        prepLastActionText.rectTransform.anchorMin = new Vector2(0f, 0f);
+        prepLastActionText.rectTransform.anchorMax = new Vector2(1f, 0f);
+        prepLastActionText.rectTransform.pivot     = new Vector2(0.5f, 0f);
+        prepLastActionText.rectTransform.offsetMin = new Vector2(18f, 94f);
+        prepLastActionText.rectTransform.offsetMax = new Vector2(-18f, 146f);
+
+        // 6. 确认按钮（全宽，84px 高，金色底色）
+        prepConfirmButton = FindOrCreateButton(prepAssignmentPanel, "Button_PrepConfirm", "Confirm and Start Operating");
+        // 金色底色，覆盖默认深蓝
+        Image confirmImg = prepConfirmButton.GetComponent<Image>();
+        if (confirmImg != null) confirmImg.color = new Color(0.78f, 0.62f, 0.10f, 1f);
+        RectTransform confirmRect = prepConfirmButton.transform as RectTransform;
+        confirmRect.anchorMin = new Vector2(0f, 0f);
+        confirmRect.anchorMax = new Vector2(1f, 0f);
+        confirmRect.pivot     = new Vector2(0.5f, 0f);
+        confirmRect.offsetMin = new Vector2(18f, 8f);
+        confirmRect.offsetMax = new Vector2(-18f, 92f);
+        prepConfirmButtonLabel = prepConfirmButton.GetComponentInChildren<TMP_Text>();
+        if (prepConfirmButtonLabel != null)
+        {
+            prepConfirmButtonLabel.fontSize = 20f;
+            prepConfirmButtonLabel.color    = Color.white;
+        }
+        prepConfirmButton.onClick.RemoveAllListeners();
+        prepConfirmButton.onClick.AddListener(() =>
+        {
+            // C2 guard：与 guest/room 按钮一致,防 autofind 窗口内点击。
+            if (preAssignmentController == null) return;
+            preAssignmentController.RequestConfirm();
+        });
+    }
+
+    /// <summary>
+    /// 由 preAssignmentController.OnStateChanged 驱动，整体刷新 Prep 面板内容。
+    /// 显隐逻辑、guest 卡、房间卡、操作文本、确认按钮门控全部在这里同步。
+    /// </summary>
+    private void RefreshPrepAssignmentPanel()
+    {
+        if (prepAssignmentPanel == null) return;
+        if (preAssignmentController == null) return;
+
+        // 1. 根据阶段决定面板显隐
+        prepAssignmentPanel.gameObject.SetActive(preAssignmentController.IsPrepPhaseActive);
+        if (!preAssignmentController.IsPrepPhaseActive) return;
+
+        // 2. 刷新 guest slot 卡片（最多 2 个）
+        if (prepGuestSlotButtons != null)
+        {
+            for (int i = 0; i < prepGuestSlotButtons.Length; i++)
+            {
+                if (demandLoop == null || i >= demandLoop.UpcomingQueueCount)
+                {
+                    prepGuestSlotTexts[i].text        = "Slot " + (i + 1) + "\nempty\n—";
+                    prepGuestSlotButtons[i].interactable = false;
+                    continue;
+                }
+                Room2DGuestType          gt  = demandLoop.GetUpcomingGuestType(i);
+                Room2DBedTypePreference  bp  = demandLoop.GetUpcomingBedTypePreference(i);
+                Room2DEntity             rr  = demandLoop.GetReservedRoomAt(i);
+                string l1 = "Slot " + (i + 1) + (preAssignmentController.SelectedSlotIndex == i ? " [SELECTED]" : "");
+                string l2 = gt + " / " + bp;
+                string l3 = rr != null ? "→ " + rr.roomName : "→ unassigned";
+                prepGuestSlotTexts[i].text        = l1 + "\n" + l2 + "\n" + l3;
+                prepGuestSlotButtons[i].interactable = true;
+            }
+        }
+
+        // 3. 刷新房间卡片
+        if (prepRoomButtons != null && demandLoop != null)
+        {
+            IReadOnlyList<Room2DEntity> reserved = demandLoop.ReservedRoomsForUpcomingDemands;
+            for (int i = 0; i < prepRoomButtons.Length && i < demandLoop.rooms.Length; i++)
+            {
+                Room2DEntity room = demandLoop.rooms[i];
+                if (room == null)
+                {
+                    prepRoomTexts[i].text           = "(missing)";
+                    prepRoomButtons[i].interactable = false;
+                    continue;
+                }
+                // 查找该房间是否已被预留到某个 slot
+                int pairedSlot = -1;
+                if (reserved != null)
+                {
+                    for (int s = 0; s < reserved.Count; s++)
+                    {
+                        if (reserved[s] == room) { pairedSlot = s; break; }
+                    }
+                }
+                string line3 = pairedSlot >= 0 ? "PAIRED Slot " + (pairedSlot + 1) : "Available";
+                prepRoomTexts[i].text           = room.roomName + "\n" + room.roomCategory + " bed\n" + line3;
+                prepRoomButtons[i].interactable = true;
+            }
+        }
+
+        // 4. 最近操作文本
+        if (prepLastActionText != null)
+        {
+            prepLastActionText.text = preAssignmentController.LastActionMessage ?? string.Empty;
+        }
+
+        // 5. 确认按钮门控
+        if (prepConfirmButton != null)
+        {
+            prepConfirmButton.interactable = preAssignmentController.CanConfirm;
+        }
+    }
+
+    // ── Story 3 Phase 5 end ───────────────────────────────────────────────────
+
     private string BuildFrontDeskStatusText()
     {
         string phase = demoDayController != null ? demoDayController.GetShowcasePhaseLabel() : "None";
@@ -2122,8 +2402,12 @@ public class Room2DShowcaseViewController : MonoBehaviour
 
         if (demandLoop.activeDemandWaitingForManualAssignment)
         {
+            // Story 2(B+A Hybrid):Rooms 弹窗 Waiting Guests 卡片亦显示 Guest type/preference
+            // 与 Needs(room preference),满足 AC5 在房间视图里的可读性 — 与 Front Desk 卡片一致。
             return "<b>Waiting Guest</b>\n"
                 + demandLoop.activeDemandType + " guest\n"
+                + demandLoop.activeGuestType + " / " + demandLoop.activeGuestPreference + "\n"
+                + "Needs: " + demandLoop.activeDemandRoomPreference + "\n"
                 + BuildDemandPreferenceShortLine(
                     demandLoop.activeDemandRoomPreference,
                     demandLoop.activeDemandFloorPreference,
@@ -2131,8 +2415,11 @@ public class Room2DShowcaseViewController : MonoBehaviour
                 + "Wait " + FormatSeconds(demandLoop.activeDemandWaitSeconds);
         }
 
+        // Story 2:No-waiting 状态下也带 upcoming 客人身份信息(AC4 Prep 阶段决策依据)。
         return "<b>No Waiting Guest</b>\n"
             + "Next: " + demandLoop.upcomingDemandType + " guest\n"
+            + demandLoop.upcomingGuestType + " / " + demandLoop.upcomingGuestPreference + "\n"
+            + "Needs: " + demandLoop.upcomingDemandRoomPreference + "\n"
             + "ETA " + FormatSeconds(demandLoop.upcomingDemandEtaSeconds);
     }
 

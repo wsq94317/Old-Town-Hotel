@@ -1,7 +1,8 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 // 最小外部需求循环。
-// 它不创建真实客人对象，只模拟“有人想入住”和“住满一段时间后退房”。
+// 它不创建真实客人对象，只模拟”有人想入住”和”住满一段时间后退房”。
 public class Room2DPrototypeDemandLoop : MonoBehaviour
 {
     public enum Room2DDemandType
@@ -104,6 +105,41 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
     public Room2DFacingPreference activeDemandFacingPreference = Room2DFacingPreference.NoPreference;
     public float activeDemandWaitSeconds;
 
+    [Header("Guest Identity")]
+    // B+A Hybrid sprint：每位客人随机赋一个 type（3 种）+ preference（3 种）。
+    // 这些字段与 upcomingDemand* / activeDemand* 平行追加，不替换或重命名现有字段，
+    // 以避免触发 Room2DPrototypeDemandLoop（2080+ 行）里大量读取点的回归风险。
+    // 详见 ADR 0006 — 3-Phase Day Structure。
+    public Room2DGuestType upcomingGuestType = Room2DGuestType.Business;
+    public Room2DGuestPreference upcomingGuestPreference = Room2DGuestPreference.QuietFloor;
+    public Room2DGuestType activeGuestType = Room2DGuestType.Business;
+    public Room2DGuestPreference activeGuestPreference = Room2DGuestPreference.QuietFloor;
+
+    [Header("Multi-Slot Upcoming Queue (Story 3)")]
+    // Story 3 Q1 方案 B：把 upcoming demand 升级为最多 N 个 slot 的队列。
+    // 新 list 字段与旧 single 字段并行存在；旧字段镜像 slot[0]，保持 Story 2 测试绿色。
+    // Phase 4（UI run）完成后再删除旧字段。
+    [SerializeField] private int upcomingQueueCapacity = 2;
+
+    // 各 upcoming slot 的队列数据（index 与 reservedRoomsForUpcomingDemands 一一对应）。
+    private List<Room2DDemandType> _upcomingDemandTypes;
+    private List<Room2DRoomPreference> _upcomingDemandRoomPreferences;
+    private List<Room2DFloorPreference> _upcomingDemandFloorPreferences;
+    private List<Room2DFacingPreference> _upcomingDemandFacingPreferences;
+    private List<Room2DGuestType> _upcomingGuestTypes;
+    private List<Room2DGuestPreference> _upcomingGuestPreferences;
+    private List<Room2DBedTypePreference> _upcomingBedTypePreferences;
+
+    // null 表示对应 slot 尚未预分配房间。
+    private List<Room2DEntity> _reservedRoomsForUpcomingDemands;
+
+    /// <summary>当前 upcoming 队列里有多少个 slot（≤ upcomingQueueCapacity）。</summary>
+    public int UpcomingQueueCount => _upcomingGuestTypes != null ? _upcomingGuestTypes.Count : 0;
+
+    /// <summary>只读视图，供 UI 和 Controller 读取当前所有预留房间（null = 未分配）。</summary>
+    public IReadOnlyList<Room2DEntity> ReservedRoomsForUpcomingDemands =>
+        _reservedRoomsForUpcomingDemands;
+
     // 默认关闭自动兜底分房：垂直切片里必须由玩家回到 Front Desk 手动完成入住。
     public bool allowAutomaticFallbackAssignment;
     public float manualAssignmentFallbackDelaySeconds = 8f;
@@ -181,9 +217,39 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
 
     private void Start()
     {
+        InitialiseUpcomingQueue();
         FindRoomsIfNeeded();
         ScheduleUpcomingDemandPreview();
         RefreshPrototypeDaySummary();
+    }
+
+    // 确保多 slot 列表在 Start 之前已分配；AddComponent 测试环境里 Awake 之后会立刻调用 public 方法，
+    // 所以用惰性初始化保护所有入口（EnsureQueuesInitialised）。
+    private void InitialiseUpcomingQueue()
+    {
+        if (_upcomingDemandTypes != null)
+        {
+            return;
+        }
+
+        int cap = Mathf.Max(1, upcomingQueueCapacity);
+        _upcomingDemandTypes = new List<Room2DDemandType>(cap);
+        _upcomingDemandRoomPreferences = new List<Room2DRoomPreference>(cap);
+        _upcomingDemandFloorPreferences = new List<Room2DFloorPreference>(cap);
+        _upcomingDemandFacingPreferences = new List<Room2DFacingPreference>(cap);
+        _upcomingGuestTypes = new List<Room2DGuestType>(cap);
+        _upcomingGuestPreferences = new List<Room2DGuestPreference>(cap);
+        _upcomingBedTypePreferences = new List<Room2DBedTypePreference>(cap);
+        _reservedRoomsForUpcomingDemands = new List<Room2DEntity>(cap);
+    }
+
+    // 惰性初始化保护：任何 public 方法在 Start 之前被调用时（EditMode 测试、AddComponent 立即调用）都能安全使用列表。
+    private void EnsureQueuesInitialised()
+    {
+        if (_upcomingDemandTypes == null)
+        {
+            InitialiseUpcomingQueue();
+        }
     }
 
     private void Update()
@@ -252,12 +318,162 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
     [ContextMenu("Schedule Upcoming Demand Preview")]
     public void ScheduleUpcomingDemandPreview()
     {
+        EnsureQueuesInitialised();
+
+        // 旧 single 字段：slot[0] 的快照，保持 Story 2 测试路径和 UI 不变。
         upcomingDemandType = nextDemandType;
         upcomingDemandRoomPreference = nextDemandRoomPreference;
         upcomingDemandFloorPreference = nextDemandFloorPreference;
         upcomingDemandFacingPreference = nextDemandFacingPreference;
+        // 客人 minimal identity：每生成一个 upcoming demand，随机赋 type + preference。
+        // PickRandom* 暴露 public 是为了 EditMode 测试可在不依赖场景的情况下校验分布。
+        upcomingGuestType = PickRandomGuestType();
+        upcomingGuestPreference = PickRandomGuestPreference();
         upcomingDemandEtaSeconds = Mathf.Max(0f, demandIntervalSeconds);
         upcomingDemandPreviewText = BuildUpcomingDemandPreviewText("Incoming");
+
+        // 多 slot 队列填充：只补充缺少的 slot，不重置已存在的（避免覆盖玩家的预分配）。
+        // 每次调用负责让队列达到 upcomingQueueCapacity 容量上限。
+        int cap = Mathf.Max(1, upcomingQueueCapacity);
+        int existing = _upcomingGuestTypes.Count;
+
+        // slot[0] 镜像旧 single 字段（保证向后兼容）。
+        if (existing == 0)
+        {
+            _upcomingDemandTypes.Add(upcomingDemandType);
+            _upcomingDemandRoomPreferences.Add(upcomingDemandRoomPreference);
+            _upcomingDemandFloorPreferences.Add(upcomingDemandFloorPreference);
+            _upcomingDemandFacingPreferences.Add(upcomingDemandFacingPreference);
+            _upcomingGuestTypes.Add(upcomingGuestType);
+            _upcomingGuestPreferences.Add(upcomingGuestPreference);
+            _upcomingBedTypePreferences.Add(PickRandomBedTypePreference(upcomingGuestType));
+            _reservedRoomsForUpcomingDemands.Add(null);
+        }
+        else
+        {
+            // 更新 slot[0] 数据以保持与旧字段同步（仅在 slot 刚被 pop 后重建时发生）。
+            _upcomingDemandTypes[0] = upcomingDemandType;
+            _upcomingDemandRoomPreferences[0] = upcomingDemandRoomPreference;
+            _upcomingDemandFloorPreferences[0] = upcomingDemandFloorPreference;
+            _upcomingDemandFacingPreferences[0] = upcomingDemandFacingPreference;
+            _upcomingGuestTypes[0] = upcomingGuestType;
+            _upcomingGuestPreferences[0] = upcomingGuestPreference;
+            _upcomingBedTypePreferences[0] = PickRandomBedTypePreference(upcomingGuestType);
+            // 注意：不重置 slot[0] 的 reservedRoom，保留玩家已配对的状态。
+        }
+
+        // 填满剩余 slot（slot[1] ... slot[cap-1]）。
+        for (int i = _upcomingGuestTypes.Count; i < cap; i++)
+        {
+            Room2DGuestType extraGuestType = PickRandomGuestType();
+            Room2DGuestPreference extraGuestPref = PickRandomGuestPreference();
+            _upcomingDemandTypes.Add(nextDemandType);
+            _upcomingDemandRoomPreferences.Add(nextDemandRoomPreference);
+            _upcomingDemandFloorPreferences.Add(nextDemandFloorPreference);
+            _upcomingDemandFacingPreferences.Add(nextDemandFacingPreference);
+            _upcomingGuestTypes.Add(extraGuestType);
+            _upcomingGuestPreferences.Add(extraGuestPref);
+            _upcomingBedTypePreferences.Add(PickRandomBedTypePreference(extraGuestType));
+            _reservedRoomsForUpcomingDemands.Add(null);
+        }
+    }
+
+    // ── 客人身份随机生成（测试种子） ──────────────────────────────────────
+    // PickRandomGuestType / PickRandomGuestPreference 是 public 的最小测试 seam：
+    //   - EditMode 测试用 UnityEngine.Random.InitState() 固定种子后调用 100 次
+    //   - 不需要 rooms / overview / scene 依赖，纯粹返回枚举值
+    //   - 修改随机分布逻辑（例如以后引入加权）只需改这两个方法
+
+    public Room2DGuestType PickRandomGuestType()
+    {
+        int index = UnityEngine.Random.Range(0, 3);
+        switch (index)
+        {
+            case 0: return Room2DGuestType.Business;
+            case 1: return Room2DGuestType.Family;
+            default: return Room2DGuestType.VIP;
+        }
+    }
+
+    public Room2DGuestPreference PickRandomGuestPreference()
+    {
+        int index = UnityEngine.Random.Range(0, 3);
+        switch (index)
+        {
+            case 0: return Room2DGuestPreference.QuietFloor;
+            case 1: return Room2DGuestPreference.HighFloor;
+            default: return Room2DGuestPreference.GroundFloor;
+        }
+    }
+
+    // Story 3 Q2 方案 C：按客人类型生成 BedType 偏好分布。
+    //   Business → Any 50% / Single 50%（经济舱客户，无硬约束或最低标准）
+    //   Family   → Family 70% / Twin 30%（家庭客倾向 Family 房，少数能接受 Twin）
+    //   VIP      → Single 60% / Family 40%（高端单人或套房）
+    // 测试覆盖：DemandLoopMultiSlotTest 的 3 个分布断言。
+    public Room2DBedTypePreference PickRandomBedTypePreference(Room2DGuestType guestType)
+    {
+        // UnityEngine.Random.value 区间 [0, 1)，便于配置百分比阈值。
+        float roll = UnityEngine.Random.value;
+        switch (guestType)
+        {
+            case Room2DGuestType.Business:
+                // 50/50：Any vs Single
+                return roll < 0.5f ? Room2DBedTypePreference.Any : Room2DBedTypePreference.Single;
+
+            case Room2DGuestType.Family:
+                // 70/30：Family vs Twin
+                return roll < 0.7f ? Room2DBedTypePreference.Family : Room2DBedTypePreference.Twin;
+
+            case Room2DGuestType.VIP:
+                // 60/40：Single vs Family
+                return roll < 0.6f ? Room2DBedTypePreference.Single : Room2DBedTypePreference.Family;
+
+            default:
+                // 未来若新增枚举值，默认 Any（无约束），便于平滑兼容。
+                return Room2DBedTypePreference.Any;
+        }
+    }
+
+    // Story 3 Phase 2：slot-indexed 读 seam，供 EditMode multi-slot 测试断言队列状态。
+    // 读不到（index 越界或队列未初始化）时返回 enum 默认值并不抛异常 —— 测试侧自己判断。
+    public Room2DGuestType GetUpcomingGuestType(int slotIndex)
+    {
+        if (_upcomingGuestTypes == null || slotIndex < 0 || slotIndex >= _upcomingGuestTypes.Count)
+        {
+            return default;
+        }
+        return _upcomingGuestTypes[slotIndex];
+    }
+
+    public Room2DBedTypePreference GetUpcomingBedTypePreference(int slotIndex)
+    {
+        if (_upcomingBedTypePreferences == null
+            || slotIndex < 0
+            || slotIndex >= _upcomingBedTypePreferences.Count)
+        {
+            return default;
+        }
+        return _upcomingBedTypePreferences[slotIndex];
+    }
+
+    public Room2DEntity GetReservedRoomAt(int slotIndex)
+    {
+        if (_reservedRoomsForUpcomingDemands == null
+            || slotIndex < 0
+            || slotIndex >= _reservedRoomsForUpcomingDemands.Count)
+        {
+            return null;
+        }
+        return _reservedRoomsForUpcomingDemands[slotIndex];
+    }
+
+    // AC6 回归保护用的 public 测试 seam：暴露 private DoesRoomMatchRoomTypePreference()。
+    // 添加 guest type/preference 字段不应影响既有 room-type 匹配逻辑；
+    // 该 seam 让 EditMode 测试无需 InternalsVisibleTo 即可断言行为不退化。
+    public bool DoesRoomMatchRoomTypePreferenceForTesting(Room2DEntity room, Room2DRoomPreference roomPreference)
+    {
+        return DoesRoomMatchRoomTypePreference(room, roomPreference);
     }
 
     [ContextMenu("Activate Upcoming Demand Now")]
@@ -288,6 +504,12 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
         reservedRoomName = "None";
         lastReservationResult = "Reservation cleared";
         lastPreparationAction = lastReservationResult;
+        // Story 3 Phase 2：保持 slot[0] mirror 同步（编辑器手动清空时多 slot 列表也要清，否则 Inspector 显示混淆）。
+        EnsureQueuesInitialised();
+        if (_reservedRoomsForUpcomingDemands.Count > 0)
+        {
+            _reservedRoomsForUpcomingDemands[0] = null;
+        }
     }
 
     public void ReserveRoomForUpcomingDemand(Room2DEntity room)
@@ -309,6 +531,92 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
             + GetRoomTypeRiskSuffix(room, upcomingDemandRoomPreference);
         lastPreparationAction = lastReservationResult;
         preparationActionCount++;
+
+        // Slot 0 mirror（保持 Story 2 调用点不变）。
+        EnsureQueuesInitialised();
+        if (_reservedRoomsForUpcomingDemands.Count > 0)
+        {
+            _reservedRoomsForUpcomingDemands[0] = room;
+        }
+    }
+
+    // Story 3 Phase 2：slot-indexed 预分配 overload。
+    // 返回值 ok=true 表示成功;false 表示 slotIndex 越界或 room 为 null。
+    //
+    // 同房不可占两 slot 规则:若 room 已在另一个 slot 占用,先释放那个 slot。
+    // 设计依据见 Story 3 AC5 第二段(切换 slot 后再点同房 → 旧 slot 解除)。
+    //
+    // 副作用契约与既有 1-arg 版本保持一致:更新 `lastReservationResult` / `lastPreparationAction` /
+    // `preparationActionCount`。slot 0 的写入同时镜像到 legacy `reservedRoomForUpcomingDemand` 字段。
+    public bool ReserveRoomForUpcomingDemand(int slotIndex, Room2DEntity room)
+    {
+        EnsureQueuesInitialised();
+
+        if (room == null)
+        {
+            lastReservationResult = "Reserve failed: room is None";
+            lastPreparationAction = lastReservationResult;
+            return false;
+        }
+
+        if (slotIndex < 0 || slotIndex >= _reservedRoomsForUpcomingDemands.Count)
+        {
+            lastReservationResult = "Reserve failed: slot " + slotIndex + " out of range";
+            lastPreparationAction = lastReservationResult;
+            return false;
+        }
+
+        // 同房转移:若 room 已在另一个 slot,先释放旧 slot。
+        for (int i = 0; i < _reservedRoomsForUpcomingDemands.Count; i++)
+        {
+            if (i != slotIndex && _reservedRoomsForUpcomingDemands[i] == room)
+            {
+                _reservedRoomsForUpcomingDemands[i] = null;
+            }
+        }
+
+        _reservedRoomsForUpcomingDemands[slotIndex] = room;
+
+        // Slot 0 镜像到 legacy 字段,保 Story 2 Showcase UI 行为。
+        if (slotIndex == 0)
+        {
+            reservedRoomForUpcomingDemand = room;
+            reservedRoomName = room.roomName;
+        }
+        else if (_reservedRoomsForUpcomingDemands[0] == null)
+        {
+            // Slot 0 此时是空的(可能刚被同房转移清掉),把 legacy 也清掉避免陈旧数据。
+            reservedRoomForUpcomingDemand = null;
+            reservedRoomName = "None";
+        }
+
+        lastReservationResult = "Reserved " + room.roomName + " for slot " + slotIndex;
+        lastPreparationAction = lastReservationResult;
+        preparationActionCount++;
+        return true;
+    }
+
+    // Story 3 Phase 2:解除指定 slot 的房间预分配。
+    // slotIndex 越界则静默 no-op(测试与 UI 均依赖此防御性行为,避免越界 throw)。
+    public void ClearReservedRoom(int slotIndex)
+    {
+        EnsureQueuesInitialised();
+
+        if (slotIndex < 0 || slotIndex >= _reservedRoomsForUpcomingDemands.Count)
+        {
+            return;
+        }
+
+        _reservedRoomsForUpcomingDemands[slotIndex] = null;
+
+        if (slotIndex == 0)
+        {
+            // Slot 0 与 legacy 字段同步,UI 立即看到 "None"。
+            reservedRoomForUpcomingDemand = null;
+            reservedRoomName = "None";
+            lastReservationResult = "Reservation cleared (slot 0)";
+            lastPreparationAction = lastReservationResult;
+        }
     }
 
     [ContextMenu("Mark Selected Dirty Room As Priority")]
@@ -608,11 +916,56 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
             return;
         }
 
-        Room2DDemandType demandType = upcomingDemandType;
-        Room2DRoomPreference roomPreference = upcomingDemandRoomPreference;
-        Room2DFloorPreference floorPreference = upcomingDemandFloorPreference;
-        Room2DFacingPreference facingPreference = upcomingDemandFacingPreference;
-        Room2DEntity reservedRoom = reservedRoomForUpcomingDemand;
+        EnsureQueuesInitialised();
+
+        // FIFO pop：从多 slot 队列取 slot[0]，其余 slot 向前移一位（RemoveAt 做位移）。
+        // 同时写回旧 single 字段（向后兼容 Story 2 路径）。
+        Room2DDemandType demandType;
+        Room2DRoomPreference roomPreference;
+        Room2DFloorPreference floorPreference;
+        Room2DFacingPreference facingPreference;
+        Room2DEntity reservedRoom;
+
+        if (_upcomingGuestTypes.Count > 0)
+        {
+            // 从多 slot 队列取值。
+            demandType = _upcomingDemandTypes[0];
+            roomPreference = _upcomingDemandRoomPreferences[0];
+            floorPreference = _upcomingDemandFloorPreferences[0];
+            facingPreference = _upcomingDemandFacingPreferences[0];
+            reservedRoom = _reservedRoomsForUpcomingDemands[0];
+
+            // 客人身份从 slot[0] 同步到 active 字段（旧路径兼容）。
+            activeGuestType = _upcomingGuestTypes[0];
+            activeGuestPreference = _upcomingGuestPreferences[0];
+
+            // FIFO：移除 slot[0]，队列向左移位。
+            _upcomingDemandTypes.RemoveAt(0);
+            _upcomingDemandRoomPreferences.RemoveAt(0);
+            _upcomingDemandFloorPreferences.RemoveAt(0);
+            _upcomingDemandFacingPreferences.RemoveAt(0);
+            _upcomingGuestTypes.RemoveAt(0);
+            _upcomingGuestPreferences.RemoveAt(0);
+            _upcomingBedTypePreferences.RemoveAt(0);
+            _reservedRoomsForUpcomingDemands.RemoveAt(0);
+        }
+        else
+        {
+            // 队列为空时退回旧 single 字段（极端边界情况）。
+            demandType = upcomingDemandType;
+            roomPreference = upcomingDemandRoomPreference;
+            floorPreference = upcomingDemandFloorPreference;
+            facingPreference = upcomingDemandFacingPreference;
+            reservedRoom = reservedRoomForUpcomingDemand;
+            activeGuestType = upcomingGuestType;
+            activeGuestPreference = upcomingGuestPreference;
+        }
+
+        // 旧 single 字段同步（保持 Story 2 调用点不变）。
+        upcomingDemandType = demandType;
+        upcomingDemandRoomPreference = roomPreference;
+        upcomingDemandFloorPreference = floorPreference;
+        upcomingDemandFacingPreference = facingPreference;
 
         activatedUpcomingDemandCount++;
         lastActivatedUpcomingDemandText = demandType + " / "
@@ -996,8 +1349,17 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
 
     public string GetManualAssignmentText()
     {
+        // B+A Hybrid sprint：Front Desk 调用此文本渲染 active demand 卡（Peak 阶段可见），
+        // 因此在原 Type/Prefs 上方追加 Guest 和 Needs 两行，与 GetActiveDemandCardText() 对齐，
+        // 满足 AC5「Front Desk 等候卡显示 3 项标签」。
         return "Active Demand\n"
             + "Status: " + activeDemandStatus + "\n"
+            + "Guest: " + (activeDemandWaitingForManualAssignment
+                ? activeGuestType + " / " + activeGuestPreference
+                : "None") + "\n"
+            + "Needs: " + (activeDemandWaitingForManualAssignment
+                ? activeDemandRoomPreference.ToString()
+                : "None") + "\n"
             + "Type: " + (activeDemandWaitingForManualAssignment ? activeDemandType.ToString() : "None") + "\n"
             + "Prefs: " + (activeDemandWaitingForManualAssignment
                 ? BuildDemandPreferenceSummary(activeDemandRoomPreference, activeDemandFloorPreference, activeDemandFacingPreference)
@@ -1012,6 +1374,8 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
     public string GetUpcomingDemandCardText()
     {
         // 只把已有 upcoming demand 数据整理成卡片文本，不创建真实客人或队列。
+        // B+A Hybrid sprint：在已有 Type/Prefs/ETA 之外增加 Guest 行（type + preference）
+        // 和 Needs 行（room preference 显式化），以满足 AC4「upcoming-guest 卡显示 3 项标签」。
         if (!useUpcomingDemandPreview)
         {
             return "[Upcoming Demand]\n"
@@ -1026,6 +1390,8 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
         }
 
         return "[Upcoming Demand]\n"
+            + "Guest: " + upcomingGuestType + " / " + upcomingGuestPreference + "\n"
+            + "Needs: " + upcomingDemandRoomPreference + "\n"
             + "Type: " + upcomingDemandType + "\n"
             + "Prefs: " + BuildDemandPreferenceSummary(
                 upcomingDemandRoomPreference,
@@ -1040,9 +1406,17 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
     public string GetActiveDemandCardText()
     {
         // Active demand 是当前等待玩家分房的需求；没有 active 时也显示空卡片，便于观察状态切换。
+        // B+A Hybrid sprint：在 Type/Prefs 之外增加 Guest（type+preference）与 Needs（room preference）
+        // 两行，以满足 AC5「Front Desk 等候卡显示 3 项标签」。
         string demandTypeText = activeDemandWaitingForManualAssignment ? activeDemandType.ToString() : "None";
         string preferenceText = activeDemandWaitingForManualAssignment
             ? BuildDemandPreferenceSummary(activeDemandRoomPreference, activeDemandFloorPreference, activeDemandFacingPreference)
+            : "None";
+        string guestText = activeDemandWaitingForManualAssignment
+            ? activeGuestType + " / " + activeGuestPreference
+            : "None";
+        string needsText = activeDemandWaitingForManualAssignment
+            ? activeDemandRoomPreference.ToString()
             : "None";
         string waitText = activeDemandWaitingForManualAssignment
             ? FormatSeconds(activeDemandWaitSeconds) + " / " + FormatSeconds(manualAssignmentFallbackDelaySeconds)
@@ -1050,6 +1424,8 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
 
         return "[Active Demand]\n"
             + "Status: " + activeDemandStatus + "\n"
+            + "Guest: " + guestText + "\n"
+            + "Needs: " + needsText + "\n"
             + "Type: " + demandTypeText + "\n"
             + "Prefs: " + preferenceText + "\n"
             + "Wait: " + waitText + "\n"

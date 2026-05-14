@@ -62,6 +62,13 @@ public class Room2DEntity : MonoBehaviour
     public Room2DBlockReason blockReason = Room2DBlockReason.None;
     public float blockRemainingHours;
 
+    [Header("Room Category")]
+    // 床型分类（Story 3 Q2 方案 C 新增）。默认 Single；
+    // Inspector 手动配置 或 Room2DPrototypeRoomConfigApplier 规则批量写入。
+    // 预分配硬约束：客人 BedTypePreference != Any 时必须与此字段匹配，否则拒绝配对。
+    // 字段公开以对齐项目其他 tunable 惯例（prototypeRoomType / prototypeFacing 等都是 public 字段）。
+    public Room2DRoomCategory roomCategory = Room2DRoomCategory.Single;
+
     [Header("Room Attributes")]
     // 房间内部属性数据。不要用 Hierarchy 当作玩法数据源，UI/存档以后读取这个数组。
     public Room2DAttribute[] roomAttributes;

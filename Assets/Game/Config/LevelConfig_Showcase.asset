@@ -1,0 +1,51 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a7d05e24bedc94ab191e231039a20d52, type: 3}
+  m_Name: LevelConfig_Showcase
+  m_EditorClassIdentifier: OldTownHotel.Game::Room2DLevelConfigSO
+  levelName: Showcase
+  levelDescription: 
+  roomRules:
+  - ruleName: Rule0
+    floorNumber: 1
+    roomNumberStart: 101
+    roomNumberEnd: 106
+    roomType: 0
+    facing: 0
+    roomCategory: 0
+    replaceRoomAttributes: 0
+    roomAttributes: []
+  - ruleName: Rule1
+    floorNumber: 2
+    roomNumberStart: 201
+    roomNumberEnd: 204
+    roomType: 0
+    facing: 0
+    roomCategory: 1
+    replaceRoomAttributes: 0
+    roomAttributes: []
+  - ruleName: Rule2
+    floorNumber: 3
+    roomNumberStart: 301
+    roomNumberEnd: 302
+    roomType: 1
+    facing: 0
+    roomCategory: 2
+    replaceRoomAttributes: 0
+    roomAttributes: []
+  defaultRoomType: 0
+  defaultFacing: 0
+  defaultRoomCategory: 0
+  replaceDefaultAttributes: 0
+  defaultAttributes: []
+  balanceConfig: {fileID: 0}
+  guestTypeConfig: {fileID: 0}

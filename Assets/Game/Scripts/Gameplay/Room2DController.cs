@@ -67,7 +67,9 @@ public class Room2DController : MonoBehaviour
 
     [Header("Prototype Debug Room Label")]
     // 原型调试标签：直接显示在 Game 窗口里，不依赖 Canvas，方便快速看每个房间是谁。
-    public bool showPrototypeDebugLabel = true;
+    // Story 3.6 (UI 重构) 后默认 false:新 UI 由 prefab + Controller 负责显示房间信息,
+    // 不再依赖 OnGUI 调试 label。原默认 true 是 prototype 阶段为了方便看房号。
+    public bool showPrototypeDebugLabel = false;
     public Vector2 debugLabelScreenOffset = new Vector2(-60f, -62f);
     public Vector2 debugLabelSize = new Vector2(130f, 64f);
     public int debugLabelFontSize = 16;

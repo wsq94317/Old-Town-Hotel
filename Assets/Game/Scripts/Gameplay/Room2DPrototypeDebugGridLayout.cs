@@ -25,6 +25,17 @@ public class Room2DPrototypeDebugGridLayout : MonoBehaviour
     public int floorNumber = 1;
     public int startRoomNumber = 101;
 
+    // Story 3.5 多层编号支持。设为 true 时:按 floorPlan 数组依次拆分房间到各楼层,
+    // 每层独立编号(楼层 N 起号 = N*100+1)。设为 false 时:沿用旧单层连续编号。
+    //
+    // 示例:floorPlan = [6, 4, 2] 表示 12 房按 6/4/2 拆到 floor 1/2/3,得到:
+    //   floor 1 → 101..106(6 房,与 Rule 0 Single 对应)
+    //   floor 2 → 201..204(4 房,与 Rule 1 Twin 对应)
+    //   floor 3 → 301..302(2 房,与 Rule 2 Family 对应)
+    [Header("Multi-Floor Plan (Story 3.5)")]
+    public bool useMultiFloorNumbering = false;
+    public int[] floorPlan = { 6, 4, 2 };
+
     // 保留每个房间当前 Z，避免破坏你现有的 2D 层级/相机关系。
     public bool preserveRoomZ = true;
     public float fallbackRoomZ;
@@ -88,7 +99,18 @@ public class Room2DPrototypeDebugGridLayout : MonoBehaviour
 
             if (assignRoomNumbersAfterArrange && rooms[i].roomEntity != null)
             {
-                rooms[i].roomEntity.SetIdentity(floorNumber, startRoomNumber + i);
+                // Story 3.5：可选多层编号。若 useMultiFloorNumbering = true,
+                // 按 floorPlan 数组把房间拆到各楼层,每层独立起号。
+                if (useMultiFloorNumbering)
+                {
+                    GetFloorAndRoomNumber(i, out int derivedFloor, out int derivedRoomNumber);
+                    rooms[i].roomEntity.SetIdentity(derivedFloor, derivedRoomNumber);
+                }
+                else
+                {
+                    // 旧单层逻辑(向后兼容)。
+                    rooms[i].roomEntity.SetIdentity(floorNumber, startRoomNumber + i);
+                }
             }
 
             if (refreshVisualsAfterArrange)
@@ -110,6 +132,41 @@ public class Room2DPrototypeDebugGridLayout : MonoBehaviour
         {
             FindRoomsInScene();
         }
+    }
+
+    // Story 3.5：根据 floorPlan 数组把全局 index 映射到 (floor, roomNumber)。
+    //   - 从 floor 1 开始,逐层累加;index 落入哪层,该层的本地序号 + 100*层号 + 1 即为 roomNumber
+    //   - floorPlan = [6,4,2] 时:index 0..5 → floor 1 101..106;index 6..9 → floor 2 201..204;index 10..11 → floor 3 301..302
+    //   - floorPlan 数组容量不够覆盖所有 index 时,溢出的 index 全部归到最后一层(防御性兜底)
+    private void GetFloorAndRoomNumber(int globalIndex, out int derivedFloor, out int derivedRoomNumber)
+    {
+        if (floorPlan == null || floorPlan.Length == 0)
+        {
+            // 退化为单层 fallback。
+            derivedFloor = floorNumber;
+            derivedRoomNumber = startRoomNumber + globalIndex;
+            return;
+        }
+
+        int cumulative = 0;
+        for (int f = 0; f < floorPlan.Length; f++)
+        {
+            int floorCapacity = Mathf.Max(0, floorPlan[f]);
+            if (globalIndex < cumulative + floorCapacity)
+            {
+                int localIndex = globalIndex - cumulative;
+                derivedFloor = f + 1; // floor 编号从 1 开始
+                derivedRoomNumber = (f + 1) * 100 + 1 + localIndex;
+                return;
+            }
+            cumulative += floorCapacity;
+        }
+
+        // 溢出 floorPlan 总容量 → 归到最后一层(防御)。
+        int lastFloor = floorPlan.Length;
+        int overflow = globalIndex - cumulative;
+        derivedFloor = lastFloor;
+        derivedRoomNumber = lastFloor * 100 + floorPlan[lastFloor - 1] + 1 + overflow;
     }
 
     private float GetGridPercent(int index, int count)
