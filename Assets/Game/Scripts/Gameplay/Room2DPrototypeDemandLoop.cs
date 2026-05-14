@@ -1,6 +1,36 @@
 using System.Collections.Generic;
 using UnityEngine;
 
+// 房间对当前客人的适配等级（UI 适合/一般/不适合 徽标）。
+// Suitable = 床型完全匹配；SoSo = 床型不匹配但仍 Ready（fallback）；
+// Unsuitable = 已被过滤，不会出现在返回列表里（保留枚举值便于将来扩展）。
+public enum RoomSuitabilityRank
+{
+    // 适合 —— 床型匹配（未来：+ soft prefs 也匹配）。
+    Suitable,
+
+    // 一般 —— 床型不匹配但房间是 Ready；玩家仍可强制入住（fallback）。
+    // 未来 soft prefs 失败但床型匹配的情况也走这一档。
+    SoSo,
+
+    // 不适合 —— 当前用作 sentinel；GetReadyRoomsForGuest 不会返回此档（已过滤）。
+    Unsuitable
+}
+
+// (Room, Rank) 元组型 value type，给 UI Modal 1 列表使用。
+// 只读 struct：UI 侧不需要也不应该改 Rank。
+public readonly struct RoomSuitability
+{
+    public readonly Room2DEntity Room;
+    public readonly RoomSuitabilityRank Rank;
+
+    public RoomSuitability(Room2DEntity room, RoomSuitabilityRank rank)
+    {
+        Room = room;
+        Rank = rank;
+    }
+}
+
 // 最小外部需求循环。
 // 它不创建真实客人对象，只模拟”有人想入住”和”住满一段时间后退房”。
 public class Room2DPrototypeDemandLoop : MonoBehaviour
@@ -1607,6 +1637,134 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
             upcomingDemandRoomPreference,
             upcomingDemandFloorPreference,
             upcomingDemandFacingPreference) != null;
+    }
+
+    // 前台 CTA 用：当前客人（以 bed-type 偏好表征）是否有任何可入住的 Ready 房？
+    //
+    // 与 HasReadyRoomForActiveFrontDeskDemand 不同：那个方法走匹配质量评估流程；
+    // 这个方法只看 "Ready"，因为 UI Modal 1 允许玩家选 SoSo 房（床型不符也行）。
+    // 因此只要有任意 Ready 房，结果就是 true。
+    //
+    // TODO: soft prefs —— 未来若 guest config 引入楼层/朝向硬约束，可在这里加 filter。
+    public bool HasReadyRoomForGuest(Room2DBedTypePreference bedTypePreference)
+    {
+        FindRoomsIfNeeded();
+
+        if (rooms == null)
+        {
+            return false;
+        }
+
+        for (int i = 0; i < rooms.Length; i++)
+        {
+            if (rooms[i] != null && rooms[i].CanSimulateCheckIn())
+            {
+                // bedTypePreference 在这里其实不影响布尔结果（SoSo 也算 fallback），
+                // 但保留参数以便未来引入硬过滤时不破坏调用方签名。
+                _ = bedTypePreference;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    // UI Modal 1 列表用：返回每个 Ready 房 + 其适配等级，按 Suitable→SoSo、
+    // 同档内按 roomNumber 升序排序。非 Ready 房直接过滤掉，不在结果中出现。
+    //
+    // 适配规则（与文档同步；prototype 暂只看床型）：
+    //   - Ready 且 room.roomCategory 匹配 bedTypePreference → Suitable（适合）
+    //   - Ready 且 不匹配                                  → SoSo  （一般）
+    //   - bedTypePreference == Any → 全部 Ready 房算 Suitable（Business 无约束）
+    //
+    // TODO: soft prefs —— 未来 floor / facing / quiet 偏好失败可把 Suitable 降级为 SoSo。
+    public IReadOnlyList<RoomSuitability> GetReadyRoomsForGuest(Room2DBedTypePreference bedTypePreference)
+    {
+        FindRoomsIfNeeded();
+
+        var result = new List<RoomSuitability>();
+
+        if (rooms == null)
+        {
+            return result;
+        }
+
+        for (int i = 0; i < rooms.Length; i++)
+        {
+            Room2DEntity room = rooms[i];
+            if (room == null || !room.CanSimulateCheckIn())
+            {
+                continue;
+            }
+
+            RoomSuitabilityRank rank = EvaluateBedTypeSuitability(room, bedTypePreference);
+            result.Add(new RoomSuitability(room, rank));
+        }
+
+        // 排序：Suitable 优先（rank 枚举值升序 = Suitable < SoSo < Unsuitable），
+        // 同档内 roomNumber 升序。沿用项目内手写排序惯例（SortRoomsByRoomNumber 同款），
+        // 不引入 LINQ —— 本仓库 Gameplay/ 下当前无 OrderBy/ThenBy 使用。
+        for (int i = 0; i < result.Count - 1; i++)
+        {
+            for (int j = i + 1; j < result.Count; j++)
+            {
+                bool jWins = false;
+
+                if ((int)result[j].Rank < (int)result[i].Rank)
+                {
+                    jWins = true;
+                }
+                else if (result[j].Rank == result[i].Rank
+                    && GetRoomNumber(result[j].Room) < GetRoomNumber(result[i].Room))
+                {
+                    jWins = true;
+                }
+
+                if (jWins)
+                {
+                    RoomSuitability temp = result[i];
+                    result[i] = result[j];
+                    result[j] = temp;
+                }
+            }
+        }
+
+        return result;
+    }
+
+    // 床型适配判定 —— 单房视图。Any 视为无约束 → Suitable；
+    // 其它 bedType 与 room.roomCategory 精确比对（与 Room2DPreAssignmentRules.MatchesCategory 同语义）。
+    private RoomSuitabilityRank EvaluateBedTypeSuitability(
+        Room2DEntity room,
+        Room2DBedTypePreference bedTypePreference)
+    {
+        if (room == null)
+        {
+            return RoomSuitabilityRank.SoSo;
+        }
+
+        if (bedTypePreference == Room2DBedTypePreference.Any)
+        {
+            return RoomSuitabilityRank.Suitable;
+        }
+
+        switch (bedTypePreference)
+        {
+            case Room2DBedTypePreference.Single:
+                return room.roomCategory == Room2DRoomCategory.Single
+                    ? RoomSuitabilityRank.Suitable
+                    : RoomSuitabilityRank.SoSo;
+            case Room2DBedTypePreference.Twin:
+                return room.roomCategory == Room2DRoomCategory.Twin
+                    ? RoomSuitabilityRank.Suitable
+                    : RoomSuitabilityRank.SoSo;
+            case Room2DBedTypePreference.Family:
+                return room.roomCategory == Room2DRoomCategory.Family
+                    ? RoomSuitabilityRank.Suitable
+                    : RoomSuitabilityRank.SoSo;
+            default:
+                return RoomSuitabilityRank.SoSo;
+        }
     }
 
     public bool IsRoomReservedForPrototypeDemand(Room2DEntity room)

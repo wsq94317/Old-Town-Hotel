@@ -51,6 +51,20 @@ public class Room2DDemoDayController : MonoBehaviour
     public int demoDayIndex = 1;
     public string lastDemoAction = "None";
 
+    // ── UI 只读访问器（ui-spec.md §6 / §3.2） ────────────────────────────────
+    // 顶部状态栏使用这些 getter；它们不改变游戏语义，仅暴露既有字段供 UI 绑定。
+
+    // 顶部状态栏 DAY 计数 — 直接映射现有 demoDayIndex（保持现有字段名，零行为变更）。
+    public int CurrentDay => demoDayIndex;
+
+    // 顶部状态栏 money — ui-spec.md §3.2 ratified Room2DDemoDayController 为 PlayerCash 所有者。
+    // 这是唯一新增的后端字段；默认 2450 匹配 mockup 数值。
+    [Header("Player Cash (UI top bar)")]
+    [SerializeField] private int playerCash = 2450;
+
+    // 公开只读 getter，UI 顶部状态栏绑定。
+    public int PlayerCash => playerCash;
+
     private void Start()
     {
         FindReferencesIfNeeded();

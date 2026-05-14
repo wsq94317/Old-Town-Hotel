@@ -141,6 +141,55 @@ public class Housekeeper2D : MonoBehaviour
         return currentState == HousekeeperState.Idle;
     }
 
+    // ── UI 只读访问器（ui-spec.md §6 — HSK 卡片 / Modal 4 → Modal 5 门控） ───
+    //
+    // 这些 getter 仅暴露既有运行时字段，不引入新游戏状态：
+    //   IsBusy                  → 非 Idle 即视为 Busy（Traveling / Working）
+    //   CurrentActivityLabel    → 中文活动标签，便于 UI 直接绑定
+    //   RemainingSeconds        → 当前 Working 剩余清洁秒数，类型 float 与现有字段一致
+    //   AssignedRoomNumber      → 当前清洁中房号（null 表示空闲）
+
+    /// <summary>HSK 是否处于 Busy 状态（非 Idle）。Modal 4 → Modal 5 门控读取此值。</summary>
+    public bool IsBusy => currentState != HousekeeperState.Idle;
+
+    /// <summary>当前活动的中文标签，UI HSK 卡片直接绑定。</summary>
+    public string CurrentActivityLabel
+    {
+        get
+        {
+            switch (currentState)
+            {
+                case HousekeeperState.Working:   return "清洁中";
+                case HousekeeperState.Traveling: return "前往房间";
+                default:                          return "空闲";
+            }
+        }
+    }
+
+    /// <summary>
+    /// 当前 Working 状态下剩余清洁秒数。Idle / Traveling 时返回 0。
+    /// 类型为 float 与 cleaningTimerSeconds / cleaningDurationSeconds 保持一致。
+    /// </summary>
+    public float RemainingSeconds
+    {
+        get
+        {
+            if (currentState != HousekeeperState.Working)
+            {
+                return 0f;
+            }
+
+            float remaining = cleaningDurationSeconds - cleaningTimerSeconds;
+            return remaining > 0f ? remaining : 0f;
+        }
+    }
+
+    /// <summary>
+    /// 当前分配房间的房号；HSK Idle 或无房间时返回 null。
+    /// UI HSK 卡片 target 字段绑定此 getter。
+    /// </summary>
+    public int? AssignedRoomNumber => assignedRoom != null ? assignedRoom.roomNumber : (int?)null;
+
     public bool IsWorkingOnRoom()
     {
         return currentState == HousekeeperState.Working && assignedRoom != null;

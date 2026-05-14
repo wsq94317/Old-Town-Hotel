@@ -2562,7 +2562,9 @@ public class Room2DShowcaseViewController : MonoBehaviour
             + "Clean Cups: " + lounge.cleanCups + "\n"
             + "Dirty Cups: " + lounge.dirtyCups + "\n"
             + "Milk: " + lounge.milkStock + "\n"
-            + "Tea / Coffee: " + lounge.teaCoffeeStock + "\n"
+            + "Tea: " + lounge.teaStock + "\n"
+            + "Coffee: " + lounge.coffeeStock + "\n"
+            + "Syrup: " + lounge.syrupStock + "\n"
             + "Summary: " + lounge.GetShowcaseStockSummary();
     }
 
@@ -2803,7 +2805,9 @@ public class Room2DShowcaseViewController : MonoBehaviour
             + "Clean Cups: " + lounge.cleanCups + "\n"
             + "Dirty Cups: " + lounge.dirtyCups + "\n"
             + "Milk: " + lounge.milkStock + "\n"
-            + "Tea/Coffee: " + lounge.teaCoffeeStock + "\n"
+            + "Tea: " + lounge.teaStock + "\n"
+            + "Coffee: " + lounge.coffeeStock + "\n"
+            + "Syrup: " + lounge.syrupStock + "\n"
             + "Washing: " + washingText;
     }
 
@@ -2824,7 +2828,10 @@ public class Room2DShowcaseViewController : MonoBehaviour
             return "Needs cups";
         }
 
-        if (lounge.milkStock <= lounge.lowStockThreshold || lounge.teaCoffeeStock <= lounge.lowStockThreshold)
+        if (lounge.milkStock <= lounge.lowStockThreshold
+            || lounge.teaStock <= lounge.lowStockThreshold
+            || lounge.coffeeStock <= lounge.lowStockThreshold
+            || lounge.syrupStock <= lounge.lowStockThreshold)
         {
             return "Needs stock";
         }

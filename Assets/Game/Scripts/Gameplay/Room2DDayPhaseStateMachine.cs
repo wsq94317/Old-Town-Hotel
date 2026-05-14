@@ -48,6 +48,34 @@ public class Room2DDayPhaseStateMachine : MonoBehaviour
     /// <summary>当前阶段（只读）。</summary>
     public Room2DDayPhase CurrentPhase => _currentPhase;
 
+    // ── UI 只读访问器（ui-spec.md §6 / §3.2 顶部状态栏 wall-clock） ──────────
+    //
+    // UI 顶部状态栏需要类似 "10:30 AM" 的时钟字符串。
+    // 当前原型并没有真实的 in-game hour/minute 时间轴 —— 状态机只持有抽象的
+    // Preparation / CheckInPeak / Recovery / Ended 四态。
+    // 这里返回阶段对应的占位标签（"PREP" / "PEAK" / "RECOVERY" / "ENDED"），
+    // 让 UI 立即可绑定，不阻塞 ui-spec 推进。
+    // TODO(future): 当 in-game clock 系统上线后，将此 getter 升级为真实时分格式
+    //   "10:30 AM" 风格。此 getter 名称保持 CurrentTimeOfDayLabel 不变。
+    /// <summary>
+    /// 顶部状态栏 wall-clock 占位标签。当前以阶段名作为兜底显示。
+    /// 未来接入真实日内时钟时，将返回 "10:30 AM" 风格的字符串。
+    /// </summary>
+    public string CurrentTimeOfDayLabel
+    {
+        get
+        {
+            switch (_currentPhase)
+            {
+                case Room2DDayPhase.Preparation: return "PREP";
+                case Room2DDayPhase.CheckInPeak: return "PEAK";
+                case Room2DDayPhase.Recovery:    return "RECOVERY";
+                case Room2DDayPhase.Ended:       return "ENDED";
+                default:                          return _currentPhase.ToString();
+            }
+        }
+    }
+
     // ── Unity 生命周期 ───────────────────────────────────────────────────────
 
     private void Awake()

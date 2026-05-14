@@ -46,6 +46,18 @@ public class FrontDesk2D : MonoBehaviour
     private bool delayRecordedForCurrentDemand;
     private WaitingGuestPatienceState highestPenalizedPatienceState = WaitingGuestPatienceState.Normal;
 
+    // ── UI 只读访问器（ui-spec.md §6 / §3.2 顶部状态栏 mood %） ──────────────
+    //
+    // FrontDesk2D 自身并不持有满意度分数；分数的权威所有者是 Room2DPrototypeDemandLoop
+    // 上的 prototypeSatisfactionScore（int）。ui-spec.md §6 仍将 FrontDesk2D 列为绑定
+    // 路径，因此此处暴露一个直通 getter，零行为变更（不缓存、不偏移、不舍入）。
+    // 当 demandLoop 引用未连接时返回 0，避免 UI 绑定时 NullReference。
+    /// <summary>
+    /// 顶部状态栏 mood % 数据源。直通 demand loop 的 prototypeSatisfactionScore。
+    /// 类型为 int 与现有字段保持一致；如果 demandLoop 未连接返回 0。
+    /// </summary>
+    public int SatisfactionScore => demandLoop != null ? demandLoop.prototypeSatisfactionScore : 0;
+
     private void Start()
     {
         FindReferencesIfNeeded();

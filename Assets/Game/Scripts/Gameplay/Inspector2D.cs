@@ -140,6 +140,55 @@ public class Inspector2D : MonoBehaviour
         return currentState == InspectorState.Idle;
     }
 
+    // ── UI 只读访问器（ui-spec.md §6 — INSP 卡片，与 HSK 对称） ──────────────
+    //
+    // 这些 getter 仅暴露既有运行时字段，不引入新游戏状态：
+    //   IsBusy                  → 非 Idle 即视为 Busy（Traveling / Working）
+    //   CurrentActivityLabel    → 中文活动标签
+    //   RemainingSeconds        → 当前 Working 剩余检查秒数，类型 float
+    //   AssignedRoomNumber      → 当前检查中房号（null 表示空闲）
+
+    /// <summary>Inspector 是否处于 Busy 状态（非 Idle）。</summary>
+    public bool IsBusy => currentState != InspectorState.Idle;
+
+    /// <summary>当前活动的中文标签，UI INSP 卡片直接绑定。</summary>
+    public string CurrentActivityLabel
+    {
+        get
+        {
+            switch (currentState)
+            {
+                case InspectorState.Working:   return "检查中";
+                case InspectorState.Traveling: return "前往房间";
+                default:                        return "空闲";
+            }
+        }
+    }
+
+    /// <summary>
+    /// 当前 Working 状态下剩余检查秒数。Idle / Traveling 时返回 0。
+    /// 类型为 float 与 inspectionTimerSeconds / inspectionDurationSeconds 保持一致。
+    /// </summary>
+    public float RemainingSeconds
+    {
+        get
+        {
+            if (currentState != InspectorState.Working)
+            {
+                return 0f;
+            }
+
+            float remaining = inspectionDurationSeconds - inspectionTimerSeconds;
+            return remaining > 0f ? remaining : 0f;
+        }
+    }
+
+    /// <summary>
+    /// 当前分配房间的房号；Inspector Idle 或无房间时返回 null。
+    /// UI INSP 卡片 target 字段绑定此 getter。
+    /// </summary>
+    public int? AssignedRoomNumber => assignedRoom != null ? assignedRoom.roomNumber : (int?)null;
+
     public bool IsWorkingOnRoom()
     {
         return currentState == InspectorState.Working && assignedRoom != null;

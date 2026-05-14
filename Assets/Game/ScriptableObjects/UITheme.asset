@@ -1,0 +1,40 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 60922080ccb034efcaf4f31bd6599919, type: 3}
+  m_Name: UITheme
+  m_EditorClassIdentifier: OldTownHotel.Game::UITheme
+  creamPage: {r: 1, g: 0.96862745, b: 0.9098039, a: 1}
+  creamSoft: {r: 0.9529412, g: 0.9019608, b: 0.8156863, a: 1}
+  brownDeep: {r: 0.72156864, g: 0.36862746, b: 0.23529412, a: 1}
+  goldAccent: {r: 0.7882353, g: 0.6039216, b: 0.2901961, a: 1}
+  stateReady: {r: 0.41568628, g: 0.62352943, b: 0.36078432, a: 1}
+  stateDirty: {r: 0.72156864, g: 0.34509805, b: 0.25882354, a: 1}
+  stateCleaning: {r: 0.2901961, g: 0.43529412, b: 0.64705884, a: 1}
+  stateInsp: {r: 0.5176471, g: 0.34901962, b: 0.5568628, a: 1}
+  stateOccupied: {r: 0.43137255, g: 0.30588236, b: 0.22745098, a: 1}
+  stateBlocked: {r: 0.41960785, g: 0.41960785, b: 0.41960785, a: 1}
+  warnRed: {r: 0.65882355, g: 0.26666668, b: 0.18039216, a: 1}
+  infoBlue: {r: 0.3529412, g: 0.47843137, b: 0.61960787, a: 1}
+  successGreen: {r: 0.41568628, g: 0.62352943, b: 0.36078432, a: 1}
+  secondaryGrey: {r: 0.5411765, g: 0.49411765, b: 0.43137255, a: 1}
+  titleLg: 24
+  titleMd: 20
+  titleSm: 18
+  bodyMd: 16
+  bodySm: 14
+  aux: 12
+  modalAnim: 0.16
+  stateColorFade: 0.2
+  buttonPress: 0.08
+  toastDuration: 1.8
+  warningShake: 0.24
+  pollFallbackHz: 4
