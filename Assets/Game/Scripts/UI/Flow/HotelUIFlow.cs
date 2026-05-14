@@ -106,7 +106,7 @@ public sealed class HotelUIFlow : MonoBehaviour
 
     private void HandleRoomSelectedForActiveGuest(Room2DEntity room)
     {
-        if (toast != null) toast.Show($"已选择房间 {room.roomNumber}");
+        if (toast != null) toast.Show($"Selected Room {room.roomNumber}");
         // TODO: trigger check-in via FrontDesk2D when active-guest plumbing is wired.
     }
 
@@ -115,8 +115,8 @@ public sealed class HotelUIFlow : MonoBehaviour
         if (modalManager == null || guestDetailsModalPrefab == null) return;
         var modal = modalManager.Show(guestDetailsModalPrefab);
         modal.Setup(guestRef, null,
-                    "—", "—", "偏好: —", "等待: —", "情绪: —",
-                    "预算: —", "预计入住: —");
+                    "—", "—", "Prefers: —", "Waiting: —", "Mood: —",
+                    "Budget: —", "Stay: —");
         modal.OnAssignRoomClicked += HandleViewAvailableRooms;
     }
 
@@ -133,7 +133,7 @@ public sealed class HotelUIFlow : MonoBehaviour
     {
         if (modalManager == null || roomActionsModalPrefab == null || room == null) return;
         var modal = modalManager.Show(roomActionsModalPrefab);
-        modal.Setup(room, "楼层信息: —", "脏污时长: —", "优先级: 普通");
+        modal.Setup(room, "Floor: —", "Dirty since: —", "Priority: Normal");
         modal.OnAssignHskClicked += () => HandleAssignHskRequested(room);
     }
 
@@ -153,21 +153,21 @@ public sealed class HotelUIFlow : MonoBehaviour
 
         if (assignHskModalPrefab == null) return;
         var modal = modalManager.Show(assignHskModalPrefab);
-        modal.Setup(room.roomNumber, housekeeper != null ? housekeeper.CurrentActivityLabel : "空闲", 45f);
+        modal.Setup(room.roomNumber, housekeeper != null ? housekeeper.CurrentActivityLabel : "Idle", 45f);
         modal.OnConfirmed += () =>
         {
             // TODO: trigger Housekeeper2D.Assign(room) when the public method exists; currently a gameplay-side gap.
-            if (toast != null) toast.Show($"已安排 HSK 前往房间 {room.roomNumber}");
+            if (toast != null) toast.Show($"HSK dispatched to Room {room.roomNumber}");
         };
     }
 
     private void HandleHskDetailsRequested()
     {
-        if (toast != null) toast.Show("HSK 详情：" + (housekeeper != null ? housekeeper.CurrentActivityLabel : "空闲"));
+        if (toast != null) toast.Show("HSK status: " + (housekeeper != null ? housekeeper.CurrentActivityLabel : "Idle"));
     }
 
     private void HandleInspDetailsRequested()
     {
-        if (toast != null) toast.Show("INSP 详情：" + (inspector != null ? inspector.CurrentActivityLabel : "空闲"));
+        if (toast != null) toast.Show("INSP status: " + (inspector != null ? inspector.CurrentActivityLabel : "Idle"));
     }
 }

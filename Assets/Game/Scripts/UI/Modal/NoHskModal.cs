@@ -16,8 +16,8 @@ public sealed class NoHskModal : ModalBase
 
     public void Setup(string title = null, string body = null)
     {
-        if (titleLabel != null) titleLabel.text = string.IsNullOrEmpty(title) ? "无可用 HSK" : title;
-        if (bodyLabel != null) bodyLabel.text = string.IsNullOrEmpty(body) ? "目前 HSK 正在工作中，请稍后再试或等待完成。" : body;
+        if (titleLabel != null) titleLabel.text = string.IsNullOrEmpty(title) ? "No HSK Available" : title;
+        if (bodyLabel != null) bodyLabel.text = string.IsNullOrEmpty(body) ? "HSK is currently busy. Please try again later." : body;
     }
 
     protected override void OnOpened()

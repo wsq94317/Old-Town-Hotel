@@ -19,7 +19,7 @@ public sealed class AchievementsModal : ModalBase
 
     public void Setup(IList<AchievementEntryInfo> entries)
     {
-        if (titleLabel != null) titleLabel.text = "成就";
+        if (titleLabel != null) titleLabel.text = "Achievements";
 
         ClearEntries();
 
@@ -27,7 +27,7 @@ public sealed class AchievementsModal : ModalBase
         if (emptyPlaceholderLabel != null)
         {
             emptyPlaceholderLabel.gameObject.SetActive(empty);
-            if (empty) emptyPlaceholderLabel.text = "暂无成就 — 敬请期待";
+            if (empty) emptyPlaceholderLabel.text = "No achievements yet — coming soon";
         }
         if (entryRoot != null) entryRoot.gameObject.SetActive(!empty);
 

@@ -18,7 +18,7 @@ public sealed class InventoryCardView : MonoBehaviour
 
     [Header("Editor preview")]
     [SerializeField] private Sprite previewIcon;
-    [SerializeField] private string previewLabel = "牛奶";
+    [SerializeField] private string previewLabel = "Milk";
     [SerializeField] private int previewCurrent = 8;
     [SerializeField] private int previewMax = 20;
     [SerializeField] private int previewLowThreshold = 5;

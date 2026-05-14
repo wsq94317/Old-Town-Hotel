@@ -17,7 +17,7 @@ public sealed class WorkerStatusCardView : MonoBehaviour
     [Header("Editor preview")]
     [SerializeField] private Sprite previewPortrait;
     [SerializeField] private string previewRole = "HOUSEKEEPER (HSK)";
-    [SerializeField] private string previewActivity = "清洁中";
+    [SerializeField] private string previewActivity = "Cleaning";
     [SerializeField] private int previewTargetRoom = 201;
     [SerializeField] private float previewRemaining = 45f;
     [SerializeField] private bool previewBusy = true;
@@ -35,7 +35,7 @@ public sealed class WorkerStatusCardView : MonoBehaviour
             if (isBusy && assignedRoomNumber.HasValue)
             {
                 targetRoomLabel.gameObject.SetActive(true);
-                targetRoomLabel.text = $"目标房间: {assignedRoomNumber.Value}";
+                targetRoomLabel.text = $"Target: Room {assignedRoomNumber.Value}";
             }
             else
             {
@@ -48,7 +48,7 @@ public sealed class WorkerStatusCardView : MonoBehaviour
             if (isBusy && remainingSeconds > 0f)
             {
                 remainingLabel.gameObject.SetActive(true);
-                remainingLabel.text = $"剩余时间: {Mathf.CeilToInt(remainingSeconds)}s";
+                remainingLabel.text = $"Remaining: {Mathf.CeilToInt(remainingSeconds)}s";
             }
             else
             {

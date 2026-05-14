@@ -116,12 +116,12 @@ public sealed class LoungeScreenController : MonoBehaviour
         int lowThreshold = lounge.lowStockThreshold;
         int lowCupThreshold = lounge.lowCleanCupThreshold;
 
-        if (cleanCupsCard != null) cleanCupsCard.Bind(iconCleanCup, "干净杯子",  lounge.cleanCups, cleanCupsMax, lowCupThreshold);
-        if (dirtyCupsCard != null) dirtyCupsCard.Bind(iconDirtyCup, "脏杯子",    lounge.dirtyCups, dirtyCupsMax, dirtyCupsMax + 1); // never low for dirty
-        if (milkCard != null)      milkCard.Bind(iconMilk,           "牛奶",     lounge.milkStock, milkMax, lowThreshold);
-        if (teaCard != null)       teaCard.Bind(iconTea,             "茶叶",     lounge.teaStock, teaMax, lowThreshold);
-        if (coffeeCard != null)    coffeeCard.Bind(iconCoffee,       "咖啡豆",   lounge.coffeeStock, coffeeMax, lowThreshold);
-        if (syrupCard != null)     syrupCard.Bind(iconSyrup,         "糖浆",     lounge.syrupStock, syrupMax, lowThreshold);
+        if (cleanCupsCard != null) cleanCupsCard.Bind(iconCleanCup, "Clean Cups", lounge.cleanCups, cleanCupsMax, lowCupThreshold);
+        if (dirtyCupsCard != null) dirtyCupsCard.Bind(iconDirtyCup, "Dirty Cups", lounge.dirtyCups, dirtyCupsMax, dirtyCupsMax + 1); // never low for dirty
+        if (milkCard != null)      milkCard.Bind(iconMilk,           "Milk",      lounge.milkStock, milkMax, lowThreshold);
+        if (teaCard != null)       teaCard.Bind(iconTea,             "Tea",       lounge.teaStock, teaMax, lowThreshold);
+        if (coffeeCard != null)    coffeeCard.Bind(iconCoffee,       "Coffee",    lounge.coffeeStock, coffeeMax, lowThreshold);
+        if (syrupCard != null)     syrupCard.Bind(iconSyrup,         "Syrup",     lounge.syrupStock, syrupMax, lowThreshold);
     }
 
     private void RefreshDishwasher()
@@ -132,9 +132,9 @@ public sealed class LoungeScreenController : MonoBehaviour
 
     private void RefreshQuickActions()
     {
-        if (washCupsButton != null) washCupsButton.Bind(iconWashCups, "清洗杯子", true);
-        if (welcomeGuestButton != null) welcomeGuestButton.Bind(iconWelcomeGuest, "招待客人", false);
-        if (refillButton != null) refillButton.Bind(iconRefill, "补充库存", false);
+        if (washCupsButton != null) washCupsButton.Bind(iconWashCups, "Wash Cups", true);
+        if (welcomeGuestButton != null) welcomeGuestButton.Bind(iconWelcomeGuest, "Welcome Guest", false);
+        if (refillButton != null) refillButton.Bind(iconRefill, "Refill", false);
     }
 
     private void HandleWashCups() => OnWashCupsRequested?.Invoke();

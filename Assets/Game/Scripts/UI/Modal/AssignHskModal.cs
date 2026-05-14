@@ -17,11 +17,11 @@ public sealed class AssignHskModal : ModalBase
 
     public void Setup(int targetRoomNumber, string hskCurrentActivity, float estimatedCompletionSeconds)
     {
-        if (titleLabel != null) titleLabel.text = "分配 HSK";
-        if (bodyLabel != null) bodyLabel.text = $"当前状态: {hskCurrentActivity}\n目标房间: {targetRoomNumber}";
+        if (titleLabel != null) titleLabel.text = "Assign HSK";
+        if (bodyLabel != null) bodyLabel.text = $"Current: {hskCurrentActivity}\nTarget: Room {targetRoomNumber}";
         if (estimatedCompletionLabel != null)
             estimatedCompletionLabel.text = estimatedCompletionSeconds > 0
-                ? $"预计完成: 约 {Mathf.CeilToInt(estimatedCompletionSeconds)}s"
+                ? $"Est. completion: ~{Mathf.CeilToInt(estimatedCompletionSeconds)}s"
                 : "";
     }
 

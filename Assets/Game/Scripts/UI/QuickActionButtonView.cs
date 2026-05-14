@@ -14,7 +14,7 @@ public sealed class QuickActionButtonView : MonoBehaviour
 
     [Header("Editor preview")]
     [SerializeField] private Sprite previewIcon;
-    [SerializeField] private string previewLabel = "清洗杯子";
+    [SerializeField] private string previewLabel = "Wash Cups";
     [SerializeField] private bool previewEnabled = true;
 
     public event Action OnClicked;

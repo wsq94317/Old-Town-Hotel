@@ -151,16 +151,16 @@ public class Inspector2D : MonoBehaviour
     /// <summary>Inspector 是否处于 Busy 状态（非 Idle）。</summary>
     public bool IsBusy => currentState != InspectorState.Idle;
 
-    /// <summary>当前活动的中文标签，UI INSP 卡片直接绑定。</summary>
+    /// <summary>Current activity label (English — editor has no CJK font, see memory: in-game-text-english-only).</summary>
     public string CurrentActivityLabel
     {
         get
         {
             switch (currentState)
             {
-                case InspectorState.Working:   return "检查中";
-                case InspectorState.Traveling: return "前往房间";
-                default:                        return "空闲";
+                case InspectorState.Working:   return "Inspecting";
+                case InspectorState.Traveling: return "En route";
+                default:                        return "Idle";
             }
         }
     }

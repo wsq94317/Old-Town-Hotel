@@ -39,17 +39,17 @@ public sealed class ChooseRoomRowView : MonoBehaviour
         switch (rank)
         {
             case RoomSuitabilityRank.Suitable:
-                suitabilityBadgeLabel.text = "适合 ✓";
+                suitabilityBadgeLabel.text = "Match";
                 if (suitabilityBadgeBackground != null && theme != null)
                     suitabilityBadgeBackground.color = theme.stateReady;
                 break;
             case RoomSuitabilityRank.SoSo:
-                suitabilityBadgeLabel.text = "一般";
+                suitabilityBadgeLabel.text = "OK";
                 if (suitabilityBadgeBackground != null && theme != null)
                     suitabilityBadgeBackground.color = theme.goldAccent;
                 break;
             case RoomSuitabilityRank.Unsuitable:
-                suitabilityBadgeLabel.text = "不适合";
+                suitabilityBadgeLabel.text = "No";
                 if (suitabilityBadgeBackground != null && theme != null)
                     suitabilityBadgeBackground.color = theme.secondaryGrey;
                 break;

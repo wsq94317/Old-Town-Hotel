@@ -60,24 +60,24 @@ namespace OldTownHotel.Tests.EditMode
         // ── CurrentActivityLabel ────────────────────────────────────────────
 
         [Test]
-        public void test_currentActivityLabel_idle_returns_kongxian()
+        public void test_currentActivityLabel_idle_returns_Idle()
         {
             _insp.currentState = Inspector2D.InspectorState.Idle;
-            Assert.That(_insp.CurrentActivityLabel, Is.EqualTo("空闲"));
+            Assert.That(_insp.CurrentActivityLabel, Is.EqualTo("Idle"));
         }
 
         [Test]
-        public void test_currentActivityLabel_working_returns_jianchazhong()
+        public void test_currentActivityLabel_working_returns_Inspecting()
         {
             _insp.currentState = Inspector2D.InspectorState.Working;
-            Assert.That(_insp.CurrentActivityLabel, Is.EqualTo("检查中"));
+            Assert.That(_insp.CurrentActivityLabel, Is.EqualTo("Inspecting"));
         }
 
         [Test]
-        public void test_currentActivityLabel_traveling_returns_qianwang()
+        public void test_currentActivityLabel_traveling_returns_EnRoute()
         {
             _insp.currentState = Inspector2D.InspectorState.Traveling;
-            Assert.That(_insp.CurrentActivityLabel, Is.EqualTo("前往房间"));
+            Assert.That(_insp.CurrentActivityLabel, Is.EqualTo("En route"));
         }
 
         // ── RemainingSeconds ────────────────────────────────────────────────

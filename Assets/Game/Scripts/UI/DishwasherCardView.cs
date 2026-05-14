@@ -22,7 +22,7 @@ public sealed class DishwasherCardView : MonoBehaviour
     public void Bind(bool washing, float remainingSeconds, float totalDurationSeconds)
     {
         if (statusLabel != null)
-            statusLabel.text = washing ? "运行中" : "空闲";
+            statusLabel.text = washing ? "Running" : "Idle";
 
         if (remainingLabel != null)
         {
@@ -34,7 +34,7 @@ public sealed class DishwasherCardView : MonoBehaviour
             else
             {
                 remainingLabel.gameObject.SetActive(true);
-                remainingLabel.text = $"剩余时间: {Mathf.CeilToInt(remainingSeconds)}s";
+                remainingLabel.text = $"Remaining: {Mathf.CeilToInt(remainingSeconds)}s";
             }
         }
 

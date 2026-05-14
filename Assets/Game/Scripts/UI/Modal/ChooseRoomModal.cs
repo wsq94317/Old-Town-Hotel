@@ -23,7 +23,7 @@ public sealed class ChooseRoomModal : ModalBase
 
     public void Setup(IList<RoomSuitability> readyRooms)
     {
-        if (titleLabel != null) titleLabel.text = "选择可用房间";
+        if (titleLabel != null) titleLabel.text = "Choose Available Room";
 
         ClearRows();
 
@@ -31,7 +31,7 @@ public sealed class ChooseRoomModal : ModalBase
         if (emptyBanner != null) emptyBanner.SetActive(empty);
         if (gotoRoomsButton != null) gotoRoomsButton.gameObject.SetActive(empty);
         if (emptyBannerLabel != null && empty)
-            emptyBannerLabel.text = "没有合适的可用房间，需要清洁/检查房间";
+            emptyBannerLabel.text = "No suitable room — clean or inspect rooms first";
 
         if (!empty)
         {

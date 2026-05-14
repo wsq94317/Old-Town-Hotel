@@ -152,16 +152,16 @@ public class Housekeeper2D : MonoBehaviour
     /// <summary>HSK 是否处于 Busy 状态（非 Idle）。Modal 4 → Modal 5 门控读取此值。</summary>
     public bool IsBusy => currentState != HousekeeperState.Idle;
 
-    /// <summary>当前活动的中文标签，UI HSK 卡片直接绑定。</summary>
+    /// <summary>Current activity label (English — editor has no CJK font, see memory: in-game-text-english-only).</summary>
     public string CurrentActivityLabel
     {
         get
         {
             switch (currentState)
             {
-                case HousekeeperState.Working:   return "清洁中";
-                case HousekeeperState.Traveling: return "前往房间";
-                default:                          return "空闲";
+                case HousekeeperState.Working:   return "Cleaning";
+                case HousekeeperState.Traveling: return "En route";
+                default:                          return "Idle";
             }
         }
     }

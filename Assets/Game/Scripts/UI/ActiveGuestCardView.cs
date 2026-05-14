@@ -24,11 +24,11 @@ public sealed class ActiveGuestCardView : MonoBehaviour
     [SerializeField] private Sprite previewPortrait;
     [SerializeField] private string previewType = "BUSINESS GUEST";
     [SerializeField] private string previewRequiredRoom = "KING ROOM";
-    [SerializeField] private string previewPreference = "偏好: 高楼层, 安静朝向";
-    [SerializeField] private string previewWait = "等待时间: 12 分钟";
-    [SerializeField] private string previewMood = "情绪: 😐 正常";
-    [SerializeField] private string previewNotes = "备注: 希望尽快办理入住";
-    [SerializeField] private string previewCtaLabel = "查看可用房间";
+    [SerializeField] private string previewPreference = "Prefers: High floor, Quiet side";
+    [SerializeField] private string previewWait = "Waiting: 12 min";
+    [SerializeField] private string previewMood = "Mood: Normal";
+    [SerializeField] private string previewNotes = "Note: Wants quick check-in";
+    [SerializeField] private string previewCtaLabel = "Check Available Rooms";
 
     public event Action OnCtaClicked;
 

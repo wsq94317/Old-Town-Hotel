@@ -23,10 +23,10 @@ public sealed class DayEndSummaryModal : ModalBase
     public void Setup(int dayJustCompleted, int servicedCount, int earnings,
                       int satisfactionStart, int satisfactionEnd, string unlockedAchievementsCsv)
     {
-        if (titleLabel != null) titleLabel.text = $"DAY {dayJustCompleted} 结算";
-        if (servicedCountLabel != null) servicedCountLabel.text = $"服务客人数: {servicedCount}";
-        if (earningsLabel != null) earningsLabel.text = earnings >= 0 ? $"今日收入: +${earnings:N0}" : $"今日支出: -${(-earnings):N0}";
-        if (satisfactionDeltaLabel != null) satisfactionDeltaLabel.text = $"满意度变化: {satisfactionStart}% → {satisfactionEnd}%";
+        if (titleLabel != null) titleLabel.text = $"Day {dayJustCompleted} Summary";
+        if (servicedCountLabel != null) servicedCountLabel.text = $"Guests served: {servicedCount}";
+        if (earningsLabel != null) earningsLabel.text = earnings >= 0 ? $"Today: +${earnings:N0}" : $"Today: -${(-earnings):N0}";
+        if (satisfactionDeltaLabel != null) satisfactionDeltaLabel.text = $"Satisfaction: {satisfactionStart}% -> {satisfactionEnd}%";
 
         bool hasUnlocks = !string.IsNullOrEmpty(unlockedAchievementsCsv);
         if (unlockedSection != null) unlockedSection.SetActive(hasUnlocks);

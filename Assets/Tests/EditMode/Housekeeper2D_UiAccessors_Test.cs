@@ -76,24 +76,24 @@ namespace OldTownHotel.Tests.EditMode
         // ── CurrentActivityLabel ────────────────────────────────────────────
 
         [Test]
-        public void test_currentActivityLabel_idle_returns_kongxian()
+        public void test_currentActivityLabel_idle_returns_Idle()
         {
             _hsk.currentState = Housekeeper2D.HousekeeperState.Idle;
-            Assert.That(_hsk.CurrentActivityLabel, Is.EqualTo("空闲"));
+            Assert.That(_hsk.CurrentActivityLabel, Is.EqualTo("Idle"));
         }
 
         [Test]
-        public void test_currentActivityLabel_working_returns_qingjie()
+        public void test_currentActivityLabel_working_returns_Cleaning()
         {
             _hsk.currentState = Housekeeper2D.HousekeeperState.Working;
-            Assert.That(_hsk.CurrentActivityLabel, Is.EqualTo("清洁中"));
+            Assert.That(_hsk.CurrentActivityLabel, Is.EqualTo("Cleaning"));
         }
 
         [Test]
-        public void test_currentActivityLabel_traveling_returns_qianwang()
+        public void test_currentActivityLabel_traveling_returns_EnRoute()
         {
             _hsk.currentState = Housekeeper2D.HousekeeperState.Traveling;
-            Assert.That(_hsk.CurrentActivityLabel, Is.EqualTo("前往房间"));
+            Assert.That(_hsk.CurrentActivityLabel, Is.EqualTo("En route"));
         }
 
         // ── RemainingSeconds ────────────────────────────────────────────────
