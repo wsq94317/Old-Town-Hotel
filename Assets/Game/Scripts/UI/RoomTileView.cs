@@ -67,7 +67,7 @@ public sealed class RoomTileView : MonoBehaviour
 
     private static string ExtractBedLetter(Room2DEntity room)
     {
-        string fullName = room.GetPrototypeBedTypeDisplayName();
+        string fullName = room.roomCategory.ToString();
         if (string.IsNullOrEmpty(fullName)) return "?";
         return fullName.Substring(0, 1).ToUpperInvariant();
     }

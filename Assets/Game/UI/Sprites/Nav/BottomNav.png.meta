@@ -189,7 +189,7 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: BottomNav_Rooms_Inactive
+      name: BottomNav_Lounge_Inactive
       rect:
         serializedVersion: 2
         x: 681
@@ -211,7 +211,7 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: BottomNav_Lounge_Inactive
+      name: BottomNav_Rooms_Inactive
       rect:
         serializedVersion: 2
         x: 1134
@@ -274,11 +274,11 @@ TextureImporter:
       BottomNav_5: -2143088059
       BottomNav_6: 1211347693
       BottomNav_Lounge_Active: -1021213406
-      BottomNav_Lounge_Inactive: -1477949265
+      BottomNav_Lounge_Inactive: -1511768028
       BottomNav_Reception_Active: -938391879
       BottomNav_Reception_Inactive: 615243318
       BottomNav_Rooms_Active: -581482600
-      BottomNav_Rooms_Inactive: -1511768028
+      BottomNav_Rooms_Inactive: -1477949265
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 
