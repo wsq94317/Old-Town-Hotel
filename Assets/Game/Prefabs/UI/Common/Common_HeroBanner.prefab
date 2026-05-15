@@ -60,20 +60,20 @@ MonoBehaviour:
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
-  m_RaycastTarget: 1
+  m_RaycastTarget: 0
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: 8732d53fbf90e417496ea6e760bea4e8, type: 3}
-  m_Type: 3
+  m_Sprite: {fileID: -1918018094, guid: 8732d53fbf90e417496ea6e760bea4e8, type: 3}
+  m_Type: 1
   m_PreserveAspect: 1
-  m_FillCenter: 1
+  m_FillCenter: 0
   m_FillMethod: 4
   m_FillAmount: 1
   m_FillClockwise: 1
-  m_FillOrigin: 0
+  m_FillOrigin: 2
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 1
 --- !u!114 &1657814763626176030
@@ -89,7 +89,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: OldTownHotel.Game::HeroBannerView
   bannerImage: {fileID: 6384981450455243747}
-  frontDeskSprite: {fileID: 21300000, guid: 8732d53fbf90e417496ea6e760bea4e8, type: 3}
+  frontDeskSprite: {fileID: -1918018094, guid: 8732d53fbf90e417496ea6e760bea4e8, type: 3}
   roomsSprite: {fileID: 21300000, guid: 4ef3eabb8b0dd4648b6f0861ff744cec, type: 3}
   loungeSprite: {fileID: 21300000, guid: 117079c1a0ff24bf5ad765644a369ee7, type: 3}
   previewTab: 0
