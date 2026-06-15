@@ -5,9 +5,18 @@ public sealed class UITheme : ScriptableObject
 {
     [Header("Palette — page & structure")]
     public Color creamPage   = Hex("#FFF7E8");
+    public Color cardWhite    = Hex("#FFFFFF");
     public Color creamSoft   = Hex("#F3E6D0");
     public Color brownDeep   = Hex("#B85E3C");
     public Color goldAccent  = Hex("#C99A4A");
+
+    [Header("Text colors (high contrast on cream)")]
+    public Color inkDark = Hex("#3A2A1C");
+    public Color inkSoft = Hex("#6B5840");
+
+    [Header("Button")]
+    public Color buttonGold       = Hex("#C2872F");
+    public Color buttonGoldShadow = Hex("#9C6A22");
 
     [Header("Room state colors")]
     public Color stateReady    = Hex("#6A9F5C");
@@ -23,13 +32,14 @@ public sealed class UITheme : ScriptableObject
     public Color successGreen  = Hex("#6A9F5C");
     public Color secondaryGrey = Hex("#8A7E6E");
 
-    [Header("Typography (size in points)")]
-    public float titleLg = 24f;
-    public float titleMd = 20f;
-    public float titleSm = 18f;
-    public float bodyMd  = 16f;
-    public float bodySm  = 14f;
-    public float aux     = 12f;
+    [Header("Typography (size in points, 1080x1920 reference)")]
+    public float displayXl = 48f;
+    public float titleLg = 40f;
+    public float titleMd = 34f;
+    public float titleSm = 28f;
+    public float bodyMd  = 28f;
+    public float bodySm  = 24f;
+    public float aux     = 20f;
 
     [Header("Animation timings (seconds)")]
     public float modalAnim       = 0.16f;
@@ -44,9 +54,14 @@ public sealed class UITheme : ScriptableObject
     private void Reset()
     {
         creamPage      = Hex("#FFF7E8");
+        cardWhite      = Hex("#FFFFFF");
         creamSoft      = Hex("#F3E6D0");
         brownDeep      = Hex("#B85E3C");
         goldAccent     = Hex("#C99A4A");
+        inkDark        = Hex("#3A2A1C");
+        inkSoft        = Hex("#6B5840");
+        buttonGold     = Hex("#C2872F");
+        buttonGoldShadow = Hex("#9C6A22");
         stateReady     = Hex("#6A9F5C");
         stateDirty     = Hex("#B85842");
         stateCleaning  = Hex("#4A6FA5");
