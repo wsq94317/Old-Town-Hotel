@@ -34,8 +34,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 100, y: -12}
-  m_SizeDelta: {x: 220, y: 22}
+  m_AnchoredPosition: {x: 124, y: -16}
+  m_SizeDelta: {x: 340, y: 36}
   m_Pivot: {x: 0, y: 1}
 --- !u!222 &3323609429801619256
 CanvasRenderer:
@@ -75,7 +75,7 @@ MonoBehaviour:
   m_fontColor32:
     serializedVersion: 2
     rgba: 4282146488
-  m_fontColor: {r: 0.72156864, g: 0.36862746, b: 0.23529412, a: 1}
+  m_fontColor: {r: 0.22745098, g: 0.16470589, b: 0.10980392, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
   m_fontColorGradient:
@@ -92,8 +92,8 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 16
-  m_fontSizeBase: 16
+  m_fontSize: 28
+  m_fontSizeBase: 28
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
@@ -149,6 +149,7 @@ GameObject:
   - component: {fileID: 4449013838810760740}
   - component: {fileID: 6699145146380086950}
   - component: {fileID: 1234907378338470993}
+  - component: {fileID: 7660114287247394448}
   m_Layer: 0
   m_Name: Common_DishwasherCard
   m_TagString: Untagged
@@ -200,15 +201,15 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 0.96862745, b: 0.9098039, a: 1}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 0}
-  m_Type: 0
+  m_Sprite: {fileID: 10905, guid: 0000000000000000f000000000000000, type: 0}
+  m_Type: 1
   m_PreserveAspect: 0
   m_FillCenter: 1
   m_FillMethod: 4
@@ -237,6 +238,21 @@ MonoBehaviour:
   previewWashing: 1
   previewRemaining: 35
   previewDuration: 60
+--- !u!114 &7660114287247394448
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4195822233210823659}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cfabb0440166ab443bba8876756fdfa9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Shadow
+  m_EffectColor: {r: 0.41960785, g: 0.34509805, b: 0.2509804, a: 0.32}
+  m_EffectDistance: {x: 4, y: -6}
+  m_UseGraphicAlpha: 1
 --- !u!1 &6742541046134908177
 GameObject:
   m_ObjectHideFlags: 0
@@ -271,8 +287,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 12, y: -12}
-  m_SizeDelta: {x: 72, y: 72}
+  m_AnchoredPosition: {x: 20, y: -14}
+  m_SizeDelta: {x: 88, y: 88}
   m_Pivot: {x: 0, y: 1}
 --- !u!222 &6489543126292377450
 CanvasRenderer:
@@ -421,8 +437,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 100, y: -40}
-  m_SizeDelta: {x: 220, y: 22}
+  m_AnchoredPosition: {x: 124, y: -56}
+  m_SizeDelta: {x: 360, y: 30}
   m_Pivot: {x: 0, y: 1}
 --- !u!222 &515612654495708118
 CanvasRenderer:
@@ -462,7 +478,7 @@ MonoBehaviour:
   m_fontColor32:
     serializedVersion: 2
     rgba: 4285431434
-  m_fontColor: {r: 0.5411765, g: 0.49411765, b: 0.43137255, a: 1}
+  m_fontColor: {r: 0.41960785, g: 0.34509805, b: 0.2509804, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
   m_fontColorGradient:
@@ -479,8 +495,8 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 13
-  m_fontSizeBase: 13
+  m_fontSize: 22
+  m_fontSizeBase: 22
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
