@@ -136,9 +136,9 @@ TextureImporter:
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: 0
+      tessellationDetail: -1
       bones: []
-      spriteID: 4fd3b1932fef442ab91b29aa033c748d
+      spriteID: 1f40505bffffffff0800000000000000
       internalID: -1257962255
       vertices: []
       indices: 
@@ -148,19 +148,19 @@ TextureImporter:
       name: Inventory_Tea
       rect:
         serializedVersion: 2
-        x: 296
+        x: 355
         y: 161
-        width: 317
+        width: 258
         height: 218
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
-      border: {x: 53, y: 0, z: 0, w: 3}
+      border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: 0
+      tessellationDetail: -1
       bones: []
-      spriteID: 6b898fce9df45422b97c905e4deb8268
+      spriteID: 4fe86e7cffffffff0800000000000000
       internalID: -941191436
       vertices: []
       indices: 
@@ -170,23 +170,19 @@ TextureImporter:
       name: Inventory_DirtyCup
       rect:
         serializedVersion: 2
-        x: 819
-        y: 624
-        width: 259
-        height: 213
+        x: 818
+        y: 634
+        width: 261
+        height: 202
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
-      outline:
-      - - {x: -143, y: -9}
-        - {x: -73, y: -9}
-        - {x: -73, y: 14}
-        - {x: -143, y: 14}
+      outline: []
       physicsShape: []
-      tessellationDetail: 0
+      tessellationDetail: -1
       bones: []
-      spriteID: a019655def0654c549e779f1d21369d8
+      spriteID: 5d9b9a83000000000800000000000000
       internalID: 950647253
       vertices: []
       indices: 
@@ -197,18 +193,18 @@ TextureImporter:
       rect:
         serializedVersion: 2
         x: 815
-        y: 142
-        width: 236
-        height: 202
+        y: 162
+        width: 232
+        height: 184
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
-      border: {x: 0, y: 27, z: 10, w: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: 0
+      tessellationDetail: -1
       bones: []
-      spriteID: 5fa7d0e434a5e47d99359c49ed1a4c45
+      spriteID: 92e16e78ffffffff0800000000000000
       internalID: -2014962135
       vertices: []
       indices: 
@@ -228,9 +224,9 @@ TextureImporter:
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: 0
+      tessellationDetail: -1
       bones: []
-      spriteID: e8b74ea703c82414fa89f8b4229ff9df
+      spriteID: fc1671a4000000000800000000000000
       internalID: 1243046351
       vertices: []
       indices: 
@@ -240,19 +236,19 @@ TextureImporter:
       name: Inventory_Syrup
       rect:
         serializedVersion: 2
-        x: 1124
-        y: 18
-        width: 380
-        height: 382
+        x: 1150
+        y: 157
+        width: 167
+        height: 247
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
-      border: {x: 30, y: 140, z: 194, w: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: 0
+      tessellationDetail: -1
       bones: []
-      spriteID: e7b61a4c77dfd4139afcf604a9361b5a
+      spriteID: ef7c213affffffff0800000000000000
       internalID: -1559050242
       vertices: []
       indices: 
