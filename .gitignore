@@ -108,3 +108,6 @@ InitTestScene*.unity*
 
 # Superpowers brainstorm visual companion
 .superpowers/
+
+# MCP editor screenshots
+Assets/Screenshots/
