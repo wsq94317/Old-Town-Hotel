@@ -17,10 +17,16 @@ public sealed class RoomTileView : MonoBehaviour
     [Header("Theme")]
     [SerializeField] private UITheme theme;
 
+    [Header("Interior sprites by bed type (optional decoration)")]
+    [SerializeField] private Sprite interiorSingle;
+    [SerializeField] private Sprite interiorTwin;
+    [SerializeField] private Sprite interiorFamily;
+    [SerializeField] private Sprite interiorKing;
+
     [Header("Editor preview (no effect at runtime)")]
     [SerializeField] private Room2DState previewState = Room2DState.Ready;
     [SerializeField] private int previewRoomNumber = 301;
-    [SerializeField] private string previewBedLetter = "K";
+    [SerializeField] private Room2DRoomCategory previewRoomCategory = Room2DRoomCategory.Single;
     [SerializeField] private string previewTimer = "";
 
     public event Action<RoomTileView> OnTapped;
@@ -39,7 +45,7 @@ public sealed class RoomTileView : MonoBehaviour
         if (boundRoom == null) return;
 
         var state = boundRoom.currentState;
-        ApplyVisuals(state, boundRoom.roomNumber, ExtractBedLetter(boundRoom));
+        ApplyVisuals(state, boundRoom.roomNumber, ExtractBedLetter(boundRoom), boundRoom.roomCategory);
     }
 
     public void SetTimerText(string text)
@@ -50,10 +56,14 @@ public sealed class RoomTileView : MonoBehaviour
         if (hasText) timerLabel.text = text;
     }
 
-    private void ApplyVisuals(Room2DState state, int roomNumber, string bedLetter)
+    private void ApplyVisuals(Room2DState state, int roomNumber, string bedLetter, Room2DRoomCategory category)
     {
-        if (backgroundImage != null && theme != null)
-            backgroundImage.color = RoomStateUiMap.GetColor(state, theme);
+        if (backgroundImage != null)
+        {
+            if (theme != null) backgroundImage.color = RoomStateUiMap.GetColor(state, theme);
+            var interior = PickInteriorSprite(category);
+            if (interior != null) backgroundImage.sprite = interior;
+        }
 
         if (roomNumberLabel != null)
             roomNumberLabel.text = roomNumber.ToString();
@@ -63,6 +73,28 @@ public sealed class RoomTileView : MonoBehaviour
 
         if (bedTypeLabel != null)
             bedTypeLabel.text = bedLetter;
+    }
+
+    private Sprite PickInteriorSprite(Room2DRoomCategory category)
+    {
+        switch (category)
+        {
+            case Room2DRoomCategory.Single: return interiorSingle;
+            case Room2DRoomCategory.Twin:   return interiorTwin;
+            case Room2DRoomCategory.Family: return interiorFamily;
+            default:                         return interiorSingle;
+        }
+    }
+
+    private static string LetterForCategory(Room2DRoomCategory category)
+    {
+        switch (category)
+        {
+            case Room2DRoomCategory.Single: return "S";
+            case Room2DRoomCategory.Twin:   return "T";
+            case Room2DRoomCategory.Family: return "F";
+            default:                         return "?";
+        }
     }
 
     private static string ExtractBedLetter(Room2DEntity room)
@@ -88,7 +120,7 @@ public sealed class RoomTileView : MonoBehaviour
     private void OnValidate()
     {
         if (Application.isPlaying) return;
-        ApplyVisuals(previewState, previewRoomNumber, previewBedLetter);
+        ApplyVisuals(previewState, previewRoomNumber, LetterForCategory(previewRoomCategory), previewRoomCategory);
         SetTimerText(previewTimer);
     }
 #endif

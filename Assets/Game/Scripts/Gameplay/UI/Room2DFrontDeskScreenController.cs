@@ -34,7 +34,9 @@ public class Room2DFrontDeskScreenController : MonoBehaviour
 
     // ── UI references(Awake 时按 Hierarchy 路径自动找)─────────────────────
     private TMP_Text _dayLabel;
+    private TMP_Text _phaseLabel;
     private TMP_Text _scoreLabel;
+    private TMP_Text _moneyLabel;
     private TMP_Text _guestTypeLabel;
     private TMP_Text _needsLabel;
     private RectTransform _patienceBarFill;
@@ -45,6 +47,15 @@ public class Room2DFrontDeskScreenController : MonoBehaviour
     private Button _frontDeskTabButton;
     private Button _roomsTabButton;
     private Button _loungeTabButton;
+
+    // RoomStatusPanel 计数 + badge
+    private TMP_Text _readyCount;
+    private TMP_Text _dirtyCount;
+    private TMP_Text _cleaningCount;
+    private TMP_Text _inspectCount;
+    private TMP_Text _occupiedCount;
+    private TMP_Text _blockedCount;
+    private RectTransform _roomBadgeGrid;
 
     private float _refreshTimer;
 
@@ -75,16 +86,31 @@ public class Room2DFrontDeskScreenController : MonoBehaviour
     private void FindUiElements()
     {
         // 按 prefab Hierarchy 的固定路径找子元素;若 user 改动 prefab 结构,这里要同步改。
-        _dayLabel = FindChildTmp("HeaderBar/DayLabel");
-        _scoreLabel = FindChildTmp("HeaderBar/ScoreLabel");
-        _guestTypeLabel = FindChildTmp("ActiveGuestCard/GuestTypeLabel");
-        _needsLabel = FindChildTmp("ActiveGuestCard/NeedsLabel");
+        // HeaderBar 4 段(新密集布局:DayCell/PhaseCell/ScoreCell/MoneyCell 下挂 *Label)
+        _dayLabel = FindChildTmp("HeaderBar/DayCell/DayLabel");
+        _phaseLabel = FindChildTmp("HeaderBar/PhaseCell/PhaseLabel");
+        _scoreLabel = FindChildTmp("HeaderBar/ScoreCell/ScoreLabel");
+        _moneyLabel = FindChildTmp("HeaderBar/MoneyCell/MoneyLabel");
 
-        Transform bar = transform.Find("ActiveGuestCard/PatienceBarTrack/PatienceBarFill");
+        // ActiveGuestCard 现在在 MidSection 下
+        _guestTypeLabel = FindChildTmp("MidSection/ActiveGuestCard/GuestTypeLabel");
+        _needsLabel = FindChildTmp("MidSection/ActiveGuestCard/NeedsLabel");
+
+        Transform bar = transform.Find("MidSection/ActiveGuestCard/PatienceBarTrack/PatienceBarFill");
         if (bar != null) _patienceBarFill = bar as RectTransform;
 
         Transform queue = transform.Find("QueueContent");
         if (queue != null) _queueContent = queue as RectTransform;
+
+        // RoomStatusPanel 计数 + badge grid
+        _readyCount = FindChildTmp("MidSection/RoomStatusPanel/StateCounts/ReadyRow/ReadyCount");
+        _dirtyCount = FindChildTmp("MidSection/RoomStatusPanel/StateCounts/DirtyRow/DirtyCount");
+        _cleaningCount = FindChildTmp("MidSection/RoomStatusPanel/StateCounts/CleaningRow/CleaningCount");
+        _inspectCount = FindChildTmp("MidSection/RoomStatusPanel/StateCounts/InspectRow/InspectCount");
+        _occupiedCount = FindChildTmp("MidSection/RoomStatusPanel/StateCounts/OccupiedRow/OccupiedCount");
+        _blockedCount = FindChildTmp("MidSection/RoomStatusPanel/StateCounts/BlockedRow/BlockedCount");
+        Transform grid = transform.Find("MidSection/RoomStatusPanel/RoomBadgeGrid");
+        if (grid != null) _roomBadgeGrid = grid as RectTransform;
 
         _checkInButton = FindChildButton("ActionButtonRow/CheckInButton");
         _compensateButton = FindChildButton("ActionButtonRow/CompensateButton");
@@ -179,20 +205,87 @@ public class Room2DFrontDeskScreenController : MonoBehaviour
         RefreshHeader();
         RefreshActiveGuest();
         RefreshQueue();
+        RefreshRoomStatus();
 
         lastRefreshResult = "Refreshed @ " + Time.time.ToString("F1") + "s";
     }
 
     private void RefreshHeader()
     {
+        // 密集 HUD:Day 只显示数字(caption "DAY" 已在 prefab 里)
         if (_dayLabel != null && demoDayController != null)
         {
-            _dayLabel.text = "Day " + Mathf.Max(1, demoDayController.demoDayIndex);
+            _dayLabel.text = Mathf.Max(1, demoDayController.demoDayIndex).ToString();
         }
-        // Score 字段尚未实现(Story 4 加)—— 暂时占位
-        if (_scoreLabel != null)
+        // Phase:从 state machine 读当前阶段
+        if (_phaseLabel != null && phaseStateMachine != null)
         {
-            _scoreLabel.text = "Score: --";
+            _phaseLabel.text = phaseStateMachine.CurrentPhase.ToString();
+        }
+        // Score / Money 字段 Story 4 / 8 加 —— 暂时占位
+        if (_scoreLabel != null) _scoreLabel.text = "--";
+        if (_moneyLabel != null) _moneyLabel.text = "$--";
+    }
+
+    // RoomStatusPanel:统计 12 房各状态数量 + 更新 mini badge 颜色/房号
+    private void RefreshRoomStatus()
+    {
+        if (demandLoop == null || demandLoop.rooms == null) return;
+
+        int ready = 0, dirty = 0, cleaning = 0, inspect = 0, occupied = 0, blocked = 0;
+        var rooms = demandLoop.rooms;
+        for (int i = 0; i < rooms.Length; i++)
+        {
+            if (rooms[i] == null) continue;
+            switch (rooms[i].currentState)
+            {
+                case Room2DState.Ready: ready++; break;
+                case Room2DState.Dirty: dirty++; break;
+                case Room2DState.Cleaning: cleaning++; break;
+                case Room2DState.AwaitingInspection: inspect++; break;
+                case Room2DState.Occupied: occupied++; break;
+                case Room2DState.Blocked: blocked++; break;
+            }
+        }
+
+        if (_readyCount != null) _readyCount.text = ready.ToString();
+        if (_dirtyCount != null) _dirtyCount.text = dirty.ToString();
+        if (_cleaningCount != null) _cleaningCount.text = cleaning.ToString();
+        if (_inspectCount != null) _inspectCount.text = inspect.ToString();
+        if (_occupiedCount != null) _occupiedCount.text = occupied.ToString();
+        if (_blockedCount != null) _blockedCount.text = blocked.ToString();
+
+        // 更新 12 房 mini badge:房号 + 状态色
+        if (_roomBadgeGrid != null)
+        {
+            for (int i = 0; i < _roomBadgeGrid.childCount && i < rooms.Length; i++)
+            {
+                var badge = _roomBadgeGrid.GetChild(i);
+                var img = badge.GetComponent<Image>();
+                var numTransform = badge.Find("Num");
+                if (rooms[i] == null) continue;
+
+                if (img != null) img.color = GetBadgeColor(rooms[i].currentState);
+                if (numTransform != null)
+                {
+                    var tmp = numTransform.GetComponent<TMP_Text>();
+                    if (tmp != null) tmp.text = rooms[i].roomNumber.ToString();
+                }
+            }
+        }
+    }
+
+    private static Color GetBadgeColor(Room2DState state)
+    {
+        switch (state)
+        {
+            case Room2DState.Ready: return new Color(0.30f, 0.62f, 0.36f, 1f);          // 绿
+            case Room2DState.Dirty: return new Color(0.62f, 0.40f, 0.28f, 1f);          // 棕
+            case Room2DState.Cleaning: return new Color(0.30f, 0.46f, 0.62f, 1f);       // 蓝
+            case Room2DState.AwaitingInspection: return new Color(0.62f, 0.58f, 0.28f, 1f); // 黄
+            case Room2DState.Occupied: return new Color(0.45f, 0.32f, 0.55f, 1f);       // 紫
+            case Room2DState.Blocked: return new Color(0.55f, 0.28f, 0.30f, 1f);        // 红
+            default: return new Color(0.28f, 0.31f, 0.36f, 1f);                          // 灰
         }
     }
 
