@@ -142,7 +142,7 @@ MonoBehaviour:
   stateLabel: {fileID: 6950565223574454275}
   bedTypeLabel: {fileID: 2052974337104140161}
   timerLabel: {fileID: 3071911246491942961}
-  tapButton: {fileID: 0}
+  tapButton: {fileID: 8492349837928565927}
   theme: {fileID: 11400000, guid: 568ea261267fa4cf0970162e69d9421d, type: 2}
   interiorSingle: {fileID: -1805510866, guid: 7c2cf7f1ccbc34e20868214f8f7cfb24, type: 3}
   interiorTwin: {fileID: -1799646317, guid: 7c2cf7f1ccbc34e20868214f8f7cfb24, type: 3}
