@@ -7,9 +7,9 @@ A cozy, retro **hotel-management simulation** built solo in **Unity 6 (C#)**. Ru
 > **Status:** 🚧 In active development. Core loops are playable (front desk, room day-cycle, housekeeping/inspection, day-end). Art, content and polish are ongoing.
 > **Engine:** Unity `6000.3.x` · **Language:** C# · **Input:** Unity Input System
 
-| Front Desk | Rooms |
-|:---:|:---:|
-| ![Front desk](Assets/Screenshots/readme_frontdesk.png) | ![Rooms](Assets/Screenshots/readme_rooms.png) |
+| Front Desk | Rooms | The Lounge |
+|:---:|:---:|:---:|
+| ![Front desk](Assets/Screenshots/readme_frontdesk.png) | ![Rooms](Assets/Screenshots/readme_rooms.png) | ![The Lounge](Assets/Screenshots/readme_lounge.png) |
 
 ---
 
@@ -31,7 +31,8 @@ You run a small old-town hotel. Each in-game day you:
 | **Guest preferences & room assignment** | Match guests to rooms by bed type / attributes; satisfaction-driven |
 | **Per-room day-cycle state machine** | Rooms move through *due-out → stayover → dirty → cleaning → awaiting inspection → ready / blocked*, with guards on risky transitions |
 | **Housekeeping & inspection loop** | Assign housekeepers, inspector queue, pass / reject / rework tracking |
-| **Inventory** | Stock tracking tied to room operations |
+| **The Lounge (café)** | Serve guests drinks, manage cup & ingredient stock (clean/dirty cups, milk, tea, coffee, syrup), wash cups and refill |
+| **Inventory** | Stock tracking tied to room and café operations |
 | **Time, scoring & achievements** | In-game time manager, day-end summary, achievement system |
 
 ## 🏗️ Architecture & engineering
