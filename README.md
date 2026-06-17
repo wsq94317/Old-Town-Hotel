@@ -7,8 +7,9 @@ A cozy, retro **hotel-management simulation** built solo in **Unity 6 (C#)**. Ru
 > **Status:** 🚧 In active development. Core loops are playable (front desk, room day-cycle, housekeeping/inspection, day-end). Art, content and polish are ongoing.
 > **Engine:** Unity `6000.3.x` · **Language:** C# · **Input:** Unity Input System
 
-<!-- Screenshots are being refreshed — newer captures coming. -->
-![Front desk](Assets/Screenshots/frontdesk_overlay.png)
+| Front Desk | Rooms |
+|:---:|:---:|
+| ![Front desk](Assets/Screenshots/readme_frontdesk.png) | ![Rooms](Assets/Screenshots/readme_rooms.png) |
 
 ---
 
@@ -16,8 +17,8 @@ A cozy, retro **hotel-management simulation** built solo in **Unity 6 (C#)**. Ru
 
 You run a small old-town hotel. Each in-game day you:
 
-1. **Take guests from the queue** at the front desk and read their details and **preferences**.
-2. **Assign them to suitable rooms** (bed type and other attributes matter to satisfaction).
+1. **Take guests from the queue** at the front desk and read their details and **preferences** (e.g. high floor, quiet side, mood, special notes).
+2. **Assign them to suitable rooms** — bed type (King / Twin / Family / Standard) and other attributes affect satisfaction.
 3. **Dispatch housekeeping** to clean turned-over rooms and send an **inspector** to pass or reject the work.
 4. **Track inventory** and keep the operation supplied.
 5. **Close the day** on a day-end summary and chase **achievements** — balancing guest happiness against the chaos of a busy front desk.
@@ -26,7 +27,7 @@ You run a small old-town hotel. Each in-game day you:
 
 | System | What it does |
 |---|---|
-| **Front desk & guest queue** | Incoming-guest flow, guest detail cards, check-in handling |
+| **Front desk & guest queue** | Incoming-guest flow, guest detail cards, preferences, check-in handling |
 | **Guest preferences & room assignment** | Match guests to rooms by bed type / attributes; satisfaction-driven |
 | **Per-room day-cycle state machine** | Rooms move through *due-out → stayover → dirty → cleaning → awaiting inspection → ready / blocked*, with guards on risky transitions |
 | **Housekeeping & inspection loop** | Assign housekeepers, inspector queue, pass / reject / rework tracking |
@@ -36,8 +37,8 @@ You run a small old-town hotel. Each in-game day you:
 ## 🏗️ Architecture & engineering
 
 - **Data-driven design** — gameplay balance and content live in `ScriptableObject` configs (room balance, bed-type preferences, etc.) so values can be tuned without touching code.
-- **UI framework** — a reusable modal system (`ModalManager` / `ModalBase`) with clean view ↔ controller separation (`FrontDeskScreenController`, `*View`, `*Modal` components).
-- **State machines** — explicit per-room day-phase state machine rather than scattered flags.
+- **UI framework** — a reusable modal system (`ModalManager` / `ModalBase`) with clean view ↔ controller separation (`FrontDeskScreenController`, `*View`, `*Modal` components) and a bottom-nav shell (Front Desk / Rooms / Lounge).
+- **State machines** — an explicit per-room day-phase state machine rather than scattered flags.
 - **Scenes** — Boot, Main Menu, Front Desk, Lounge, Rooms (plus a 2D rooms prototype).
 - **~80 C# scripts**, EditMode **unit tests**, and a full **GDD / ADR documentation set** (`design/`, `docs/`).
 - **AI-assisted workflow** — built with Claude / Claude Code under build / lint / test discipline.
@@ -65,4 +66,4 @@ Tests/              EditMode unit tests
 - GitHub: [github.com/wsq94317](https://github.com/wsq94317)
 - LinkedIn: [linkedin.com/in/siqi-wu-percy](https://www.linkedin.com/in/siqi-wu-percy)
 
-<sub>This is a personal work-in-progress project shared as a portfolio piece. Code and a build walkthrough are available on request.</sub>
+<sub>Personal work-in-progress project shared as a portfolio piece. Code and a build walkthrough are available on request.</sub>
