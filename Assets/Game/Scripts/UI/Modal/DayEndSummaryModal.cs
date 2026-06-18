@@ -9,6 +9,7 @@ public sealed class DayEndSummaryModal : ModalBase
     [SerializeField] private TextMeshProUGUI titleLabel;
     [SerializeField] private TextMeshProUGUI servicedCountLabel;
     [SerializeField] private TextMeshProUGUI earningsLabel;
+    [SerializeField] private TextMeshProUGUI wagesLabel; // optional; null-safe (income/wages breakdown)
     [SerializeField] private TextMeshProUGUI satisfactionDeltaLabel;
     [SerializeField] private GameObject unlockedSection;
     [SerializeField] private TextMeshProUGUI unlockedListLabel;
@@ -20,12 +21,14 @@ public sealed class DayEndSummaryModal : ModalBase
     public event Action OnContinueClicked;
     public event Action OnReplayClicked;
 
-    public void Setup(int dayJustCompleted, int servicedCount, int earnings,
+    public void Setup(int dayJustCompleted, int servicedCount, int income, int wages,
                       int satisfactionStart, int satisfactionEnd, string unlockedAchievementsCsv)
     {
+        int net = income - wages;
         if (titleLabel != null) titleLabel.text = $"Day {dayJustCompleted} Summary";
         if (servicedCountLabel != null) servicedCountLabel.text = $"Guests served: {servicedCount}";
-        if (earningsLabel != null) earningsLabel.text = earnings >= 0 ? $"Today: +${earnings:N0}" : $"Today: -${(-earnings):N0}";
+        if (earningsLabel != null) earningsLabel.text = net >= 0 ? $"Net: +${net:N0}" : $"Net: -${(-net):N0}";
+        if (wagesLabel != null) wagesLabel.text = $"Income ${income:N0}    Wages -${wages:N0}";
         if (satisfactionDeltaLabel != null) satisfactionDeltaLabel.text = $"Satisfaction: {satisfactionStart}% -> {satisfactionEnd}%";
 
         bool hasUnlocks = !string.IsNullOrEmpty(unlockedAchievementsCsv);

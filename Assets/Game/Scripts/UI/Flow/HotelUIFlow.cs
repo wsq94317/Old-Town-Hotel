@@ -25,6 +25,7 @@ public sealed class HotelUIFlow : MonoBehaviour
     [SerializeField] private Housekeeper2D housekeeper;
     [SerializeField] private Inspector2D inspector;
     [SerializeField] private Room2DPrototypeDemandLoop demandLoop;
+    [SerializeField] private Room2DDemoDayController dayController;
 
     [Header("Toast")]
     [SerializeField] private ToastView toast;
@@ -50,6 +51,10 @@ public sealed class HotelUIFlow : MonoBehaviour
         {
             loungeScreen.OnSettingsRequested += HandleSettingsRequested;
         }
+        if (dayController != null)
+        {
+            dayController.OnDaySettled += HandleDaySettled;
+        }
     }
 
     private void OnDestroy()
@@ -72,6 +77,19 @@ public sealed class HotelUIFlow : MonoBehaviour
         {
             loungeScreen.OnSettingsRequested -= HandleSettingsRequested;
         }
+        if (dayController != null)
+        {
+            dayController.OnDaySettled -= HandleDaySettled;
+        }
+    }
+
+    // 日结：弹出 Day-End 损益（收入/工资/净利）。
+    private void HandleDaySettled(int day, int servedGuests, DayLedger ledger)
+    {
+        if (modalManager == null || dayEndModalPrefab == null) return;
+        int sat = demandLoop != null ? demandLoop.prototypeSatisfactionScore : 0;
+        var modal = modalManager.Show(dayEndModalPrefab);
+        modal.Setup(day, servedGuests, ledger.Income, ledger.Wages, sat, sat, null);
     }
 
     private void Start()

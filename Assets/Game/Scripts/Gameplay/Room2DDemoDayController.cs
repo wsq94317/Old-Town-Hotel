@@ -30,6 +30,7 @@ public class Room2DDemoDayController : MonoBehaviour
     public FrontDesk2D frontDesk;
     public Lounge2D lounge;
     public Room2DOverview roomOverview;
+    public EconomySystem economy;
 
     // 新增：四态状态机引用；autoFindReferences 逻辑自动查找，也可 Inspector 手动赋值。
     [SerializeField] private Room2DDayPhaseStateMachine phaseStateMachine;
@@ -227,11 +228,29 @@ public class Room2DDemoDayController : MonoBehaviour
 
         RefreshOverview();
 
+        SettleEconomicDay();
+
         // ForceJumpToEnded 绕过中间阶段，供遗留直接结束路径和自动计时器使用。
         if (phaseStateMachine != null)
         {
             phaseStateMachine.ForceJumpToEnded();
         }
+    }
+
+    // ── 经济结算（Phase 1） ───────────────────────────────────────────────────
+    // 一天结束时：按当日成功服务客人数算收入、扣全员工资，结果写回 PlayerCash。
+    public DayLedger LastDayLedger { get; private set; }
+
+    // 日结完成事件：(day, servedGuests, ledger)。UI 层订阅以弹出 Day-End 损益。
+    public event System.Action<int, int, DayLedger> OnDaySettled;
+
+    private void SettleEconomicDay()
+    {
+        if (economy == null) return;
+        int served = demandLoop != null ? demandLoop.successfulDemandCount : 0;
+        LastDayLedger = economy.CloseEconomicDay(served);
+        playerCash = economy.Cash;
+        OnDaySettled?.Invoke(demoDayIndex, served, LastDayLedger);
     }
 
     [ContextMenu("Restart Demo Day")]
@@ -358,6 +377,11 @@ public class Room2DDemoDayController : MonoBehaviour
         if (roomOverview == null)
         {
             roomOverview = FindFirstObjectByType<Room2DOverview>();
+        }
+
+        if (economy == null)
+        {
+            economy = FindFirstObjectByType<EconomySystem>();
         }
     }
 
