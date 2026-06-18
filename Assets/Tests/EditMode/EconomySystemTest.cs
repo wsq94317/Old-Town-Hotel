@@ -92,5 +92,56 @@ namespace OldTownHotel.Tests.EditMode
             // value = 10 * 10000 = 100000; limit = 50000 - 0 debt
             Assert.That(_econ.CreditLimit(10, 0), Is.EqualTo(50000));
         }
+
+        [Test]
+        public void HireCandidate_AddsToRoster_AndChargesSigningCost()
+        {
+            var bob = new StaffMember(StaffRole.Housekeeper, "Bob", 40);
+            bool ok = _econ.HireCandidate(bob, 100);
+            Assert.That(ok, Is.True);
+            Assert.That(_econ.Payroll.Count, Is.EqualTo(4));
+            Assert.That(_econ.Cash, Is.EqualTo(900));               // 1000 - 100
+            Assert.That(_econ.Payroll.TotalDailyWages, Is.EqualTo(225)); // 185 + 40
+        }
+
+        [Test]
+        public void HireCandidate_FailsWhenSigningCostUnaffordable()
+        {
+            var rich = new StaffMember(StaffRole.Manager, "Rich", 90);
+            bool ok = _econ.HireCandidate(rich, 99999);
+            Assert.That(ok, Is.False);
+            Assert.That(_econ.Payroll.Count, Is.EqualTo(3));
+            Assert.That(_econ.Cash, Is.EqualTo(1000));
+        }
+
+        [Test]
+        public void FireStaff_RemovesFromRoster()
+        {
+            var bob = new StaffMember(StaffRole.Housekeeper, "Bob", 40);
+            _econ.HireCandidate(bob);
+            _econ.FireStaff(bob);
+            Assert.That(_econ.Payroll.Count, Is.EqualTo(3));
+        }
+
+        [Test]
+        public void GiveRaise_RaisesWage_ReflectedInTotalWages()
+        {
+            var liz = new StaffMember(StaffRole.Reception, "Liz", 50);
+            _econ.HireCandidate(liz);
+            int before = _econ.Payroll.TotalDailyWages;
+            _econ.GiveRaise(liz, 70);
+            Assert.That(liz.DailyWage, Is.EqualTo(70));
+            Assert.That(_econ.Payroll.TotalDailyWages, Is.EqualTo(before + 20));
+        }
+
+        [Test]
+        public void RefuseRaise_DropsMorale()
+        {
+            var liz = new StaffMember(StaffRole.Reception, "Liz", 50);
+            _econ.HireCandidate(liz);
+            int before = liz.Morale;
+            _econ.RefuseRaise(liz, 20);
+            Assert.That(liz.Morale, Is.EqualTo(before - 20));
+        }
     }
 }

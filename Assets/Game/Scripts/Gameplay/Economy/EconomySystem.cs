@@ -68,4 +68,26 @@ public sealed class EconomySystem : MonoBehaviour
         Cash -= repaid;
         return repaid;
     }
+
+    // ── Hiring / firing / raises (Phase 4c) ──────────────────────────────────
+    // Hire a candidate; if a signing cost is set, it must be affordable. Returns success.
+    public bool HireCandidate(StaffMember candidate, int signingCost = 0)
+    {
+        if (candidate == null) return false;
+        if (signingCost > 0)
+        {
+            if (Cash < signingCost) return false;
+            Cash -= signingCost;
+        }
+        Payroll.Hire(candidate);
+        return true;
+    }
+
+    public void FireStaff(StaffMember member) => Payroll.Fire(member);
+
+    // Accept a staffer's raise: higher wage flows into TotalDailyWages, morale rises.
+    public void GiveRaise(StaffMember member, int newDailyWage) => member?.GiveRaise(newDailyWage);
+
+    // Refuse a raise: morale drops (risk of quitting later).
+    public void RefuseRaise(StaffMember member, int moralePenalty = 20) => member?.AdjustMorale(-moralePenalty);
 }
