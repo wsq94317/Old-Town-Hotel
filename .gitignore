@@ -111,3 +111,9 @@ InitTestScene*.unity*
 
 # MCP editor screenshots
 Assets/Screenshots/
+
+# Private design/production docs (kept local only, out of the public repo)
+design/
+Docs/
+docs/
+production/
