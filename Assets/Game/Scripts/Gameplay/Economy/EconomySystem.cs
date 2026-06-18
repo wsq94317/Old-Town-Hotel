@@ -90,4 +90,14 @@ public sealed class EconomySystem : MonoBehaviour
 
     // Refuse a raise: morale drops (risk of quitting later).
     public void RefuseRaise(StaffMember member, int moralePenalty = 20) => member?.AdjustMorale(-moralePenalty);
+
+    // ── Generic spend (renovation, etc., Phase 5) ────────────────────────────
+    // Deduct `amount` from cash if affordable. Returns true if paid.
+    public bool TrySpend(int amount)
+    {
+        if (amount <= 0) return true;
+        if (Cash < amount) return false;
+        Cash -= amount;
+        return true;
+    }
 }
