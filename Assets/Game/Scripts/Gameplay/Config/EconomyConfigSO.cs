@@ -17,6 +17,19 @@ public sealed class EconomyConfigSO : ScriptableObject
     public int managerDailyWage = 90;
     public int inspectorDailyWage = 55;
 
+    [Header("Loan & finance (Phase 3)")]
+    [Tooltip("Debt the player inherits when taking over the old hotel.")]
+    public int startingLoan = 183000;
+    [Tooltip("Simple daily interest on the outstanding loan (0.0015 = 0.15%/day).")]
+    public float dailyInterestRate = 0.0015f;
+    [Tooltip("Bank will lend up to hotelValue * this factor (minus current debt).")]
+    public float creditLimitFactor = 0.5f;
+
+    [Header("Hotel valuation (Phase 3)")]
+    public int baseHotelValue = 50000;
+    public int perRoomValue = 8000;
+    public int renovatedRoomBonus = 12000;
+
     public int WageFor(StaffRole role)
     {
         switch (role)

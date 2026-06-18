@@ -8,6 +8,7 @@ public sealed class EconomySystem : MonoBehaviour
     [SerializeField] private EconomyConfigSO config;
 
     public PayrollLedger Payroll { get; private set; }
+    public LoanAccount Loan { get; private set; }
     public int Cash { get; private set; }
     public DayLedger LastDayLedger { get; private set; }
 
@@ -21,6 +22,7 @@ public sealed class EconomySystem : MonoBehaviour
     {
         config = cfg;
         Cash = cfg.startingCash;
+        Loan = new LoanAccount(cfg.startingLoan, cfg.dailyInterestRate);
         Payroll = new PayrollLedger();
         Payroll.Hire(new StaffMember(StaffRole.Reception, "Reception", cfg.WageFor(StaffRole.Reception)));
         Payroll.Hire(new StaffMember(StaffRole.Housekeeper, "Housekeeper", cfg.WageFor(StaffRole.Housekeeper)));
@@ -29,13 +31,41 @@ public sealed class EconomySystem : MonoBehaviour
 
     public void InitializeForTest(EconomyConfigSO cfg) => Initialize(cfg);
 
-    // Settle the day: credit room revenue, debit wages, update cash. Returns the P&L.
+    // Settle the day: credit room revenue, debit wages + accrued loan interest, update cash.
     public DayLedger CloseEconomicDay(int servedGuests)
     {
         int income = Mathf.Max(0, servedGuests) * config.roomRevenuePerGuest;
-        DayLedger ledger = Payroll.CloseDay(income, Cash);
+        int interest = Loan != null ? Loan.AccrueDailyInterest() : 0;
+        DayLedger ledger = new DayLedger(income, Payroll.TotalDailyWages, interest, 0, Cash);
         Cash = ledger.ClosingBalance;
         LastDayLedger = ledger;
         return ledger;
+    }
+
+    // ── Finance actions (Phase 3) ────────────────────────────────────────────
+    public int ComputeHotelValue(int openRooms, int renovatedRooms)
+        => HotelValuation.Compute(openRooms, renovatedRooms,
+                                  config.baseHotelValue, config.perRoomValue, config.renovatedRoomBonus);
+
+    public int CreditLimit(int openRooms, int renovatedRooms)
+        => HotelValuation.CreditLimit(ComputeHotelValue(openRooms, renovatedRooms),
+                                      config.creditLimitFactor, Loan != null ? Loan.Balance : 0);
+
+    public int Borrow(int amount)
+    {
+        if (Loan == null || amount <= 0) return 0;
+        Loan.Borrow(amount);
+        Cash += amount;
+        return amount;
+    }
+
+    // Repay from cash; capped at both available cash and outstanding balance. Returns repaid amount.
+    public int RepayLoan(int amount)
+    {
+        if (Loan == null) return 0;
+        int payable = Mathf.Min(amount, Cash);
+        int repaid = Loan.Repay(payable);
+        Cash -= repaid;
+        return repaid;
     }
 }

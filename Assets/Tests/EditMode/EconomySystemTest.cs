@@ -19,6 +19,8 @@ namespace OldTownHotel.Tests.EditMode
             _config.receptionDailyWage = 50;
             _config.housekeeperDailyWage = 45;
             _config.managerDailyWage = 90;
+            _config.startingLoan = 0;        // wages-focused tests: no loan interest
+            _config.dailyInterestRate = 0f;
             _go = new GameObject("Econ");
             _econ = _go.AddComponent<EconomySystem>();
             _econ.InitializeForTest(_config);
@@ -48,6 +50,47 @@ namespace OldTownHotel.Tests.EditMode
             Assert.That(d.Income, Is.EqualTo(400));
             Assert.That(d.Wages, Is.EqualTo(185));
             Assert.That(_econ.Cash, Is.EqualTo(1215));
+        }
+
+        [Test]
+        public void CloseEconomicDay_AccruesLoanInterest_AndGrowsBalance()
+        {
+            _config.startingCash = 1000;
+            _config.startingLoan = 100000;
+            _config.dailyInterestRate = 0.001f;
+            _econ.InitializeForTest(_config); // re-init with a loan
+            DayLedger d = _econ.CloseEconomicDay(servedGuests: 0); // income 0, wages 185, interest 100
+            Assert.That(d.Interest, Is.EqualTo(100));
+            Assert.That(_econ.Loan.Balance, Is.EqualTo(100100));
+            Assert.That(_econ.Cash, Is.EqualTo(1000 - 185 - 100));
+        }
+
+        [Test]
+        public void BorrowAndRepay_AdjustCashAndLoan()
+        {
+            _config.startingCash = 1000;
+            _config.startingLoan = 0;
+            _econ.InitializeForTest(_config);
+            _econ.Borrow(5000);
+            Assert.That(_econ.Cash, Is.EqualTo(6000));
+            Assert.That(_econ.Loan.Balance, Is.EqualTo(5000));
+            int repaid = _econ.RepayLoan(3000);
+            Assert.That(repaid, Is.EqualTo(3000));
+            Assert.That(_econ.Cash, Is.EqualTo(3000));
+            Assert.That(_econ.Loan.Balance, Is.EqualTo(2000));
+        }
+
+        [Test]
+        public void CreditLimit_UsesValueFactorMinusDebt()
+        {
+            _config.startingLoan = 0;
+            _config.baseHotelValue = 0;
+            _config.perRoomValue = 10000;
+            _config.renovatedRoomBonus = 0;
+            _config.creditLimitFactor = 0.5f;
+            _econ.InitializeForTest(_config);
+            // value = 10 * 10000 = 100000; limit = 50000 - 0 debt
+            Assert.That(_econ.CreditLimit(10, 0), Is.EqualTo(50000));
         }
     }
 }
