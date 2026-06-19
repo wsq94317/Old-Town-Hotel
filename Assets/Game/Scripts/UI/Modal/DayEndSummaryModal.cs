@@ -21,14 +21,17 @@ public sealed class DayEndSummaryModal : ModalBase
     public event Action OnContinueClicked;
     public event Action OnReplayClicked;
 
-    public void Setup(int dayJustCompleted, int servicedCount, int income, int wages,
+    public void Setup(int dayJustCompleted, int servicedCount, int income, int wages, int interest,
                       int satisfactionStart, int satisfactionEnd, string unlockedAchievementsCsv)
     {
-        int net = income - wages;
+        int net = income - wages - interest;
         if (titleLabel != null) titleLabel.text = $"Day {dayJustCompleted} Summary";
         if (servicedCountLabel != null) servicedCountLabel.text = $"Guests served: {servicedCount}";
         if (earningsLabel != null) earningsLabel.text = net >= 0 ? $"Net: +${net:N0}" : $"Net: -${(-net):N0}";
-        if (wagesLabel != null) wagesLabel.text = $"Income ${income:N0}    Wages -${wages:N0}";
+        if (wagesLabel != null)
+            wagesLabel.text = interest > 0
+                ? $"Income ${income:N0}   Wages -${wages:N0}   Interest -${interest:N0}"
+                : $"Income ${income:N0}   Wages -${wages:N0}";
         if (satisfactionDeltaLabel != null) satisfactionDeltaLabel.text = $"Satisfaction: {satisfactionStart}% -> {satisfactionEnd}%";
 
         bool hasUnlocks = !string.IsNullOrEmpty(unlockedAchievementsCsv);

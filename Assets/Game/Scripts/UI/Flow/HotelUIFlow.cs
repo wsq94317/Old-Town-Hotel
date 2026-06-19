@@ -108,7 +108,7 @@ public sealed class HotelUIFlow : MonoBehaviour
         if (modalManager == null || dayEndModalPrefab == null) return;
         int sat = demandLoop != null ? demandLoop.prototypeSatisfactionScore : 0;
         var modal = modalManager.Show(dayEndModalPrefab);
-        modal.Setup(day, servedGuests, ledger.Income, ledger.Wages, sat, sat, null);
+        modal.Setup(day, servedGuests, ledger.Income, ledger.Wages, ledger.Interest, sat, sat, null);
     }
 
     private void Start()
