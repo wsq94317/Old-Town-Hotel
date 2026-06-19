@@ -35,6 +35,13 @@ public sealed class ManagerOfficeScreenController : MonoBehaviour
     [SerializeField] private Button repayButton;
     [SerializeField] private Button borrowButton;
 
+    [Header("Staff detail panel")]
+    [SerializeField] private GameObject staffPanel;
+    [SerializeField] private Button staffOpenButton;       // the Staff card as a button
+    [SerializeField] private Transform rosterContent;      // VerticalLayoutGroup container
+    [SerializeField] private StaffCardView staffCardTemplate; // inactive template cloned per member
+    [SerializeField] private int raiseStep = 5;
+
     [Header("Valuation inputs (until renovation feeds these)")]
     [SerializeField] private int openRoomsForValue = 4;
     [SerializeField] private int renovatedRoomsForValue = 0;
@@ -50,6 +57,8 @@ public sealed class ManagerOfficeScreenController : MonoBehaviour
         if (financeOpenButton != null) financeOpenButton.onClick.AddListener(OpenFinanceDetail);
         if (repayButton != null) repayButton.onClick.AddListener(DoRepay);
         if (borrowButton != null) borrowButton.onClick.AddListener(DoBorrow);
+        if (staffOpenButton != null) staffOpenButton.onClick.AddListener(OpenStaffDetail);
+        if (staffCardTemplate != null) staffCardTemplate.gameObject.SetActive(false);
     }
 
     private void OnDestroy()
@@ -58,6 +67,7 @@ public sealed class ManagerOfficeScreenController : MonoBehaviour
         if (financeOpenButton != null) financeOpenButton.onClick.RemoveListener(OpenFinanceDetail);
         if (repayButton != null) repayButton.onClick.RemoveListener(DoRepay);
         if (borrowButton != null) borrowButton.onClick.RemoveListener(DoBorrow);
+        if (staffOpenButton != null) staffOpenButton.onClick.RemoveListener(OpenStaffDetail);
     }
 
     private void OnEnable()
@@ -70,6 +80,7 @@ public sealed class ManagerOfficeScreenController : MonoBehaviour
     {
         _openDetail = null;
         if (financePanel != null) financePanel.SetActive(false);
+        if (staffPanel != null) staffPanel.SetActive(false);
         if (hubGrid != null) hubGrid.SetActive(true);
         Refresh();
     }
@@ -127,6 +138,51 @@ public sealed class ManagerOfficeScreenController : MonoBehaviour
         int credit = economy.CreditLimit(openRoomsForValue, renovatedRoomsForValue);
         economy.Borrow(Mathf.Min(loanStep, credit));
         RefreshFinance();
+    }
+
+    private void OpenStaffDetail()
+    {
+        if (staffPanel == null) return;
+        if (hubGrid != null) hubGrid.SetActive(false);
+        staffPanel.SetActive(true);
+        _openDetail = staffPanel;
+        RebuildRoster();
+    }
+
+    public void RebuildRoster()
+    {
+        if (economy == null || economy.Payroll == null || rosterContent == null || staffCardTemplate == null) return;
+
+        // Clear previous clones (keep the inactive template).
+        for (int i = rosterContent.childCount - 1; i >= 0; i--)
+        {
+            var child = rosterContent.GetChild(i);
+            if (child.gameObject != staffCardTemplate.gameObject) Destroy(child.gameObject);
+        }
+
+        foreach (var member in economy.Payroll.Roster)
+        {
+            var go = Instantiate(staffCardTemplate.gameObject, rosterContent);
+            go.SetActive(true);
+            var view = go.GetComponent<StaffCardView>();
+            if (view != null) view.Bind(member, DoRaise, DoFire);
+        }
+    }
+
+    private void DoRaise(StaffMember member)
+    {
+        if (economy == null || member == null) return;
+        economy.GiveRaise(member, member.DailyWage + raiseStep);
+        RebuildRoster();
+        Refresh();
+    }
+
+    private void DoFire(StaffMember member)
+    {
+        if (economy == null || member == null) return;
+        economy.FireStaff(member);
+        RebuildRoster();
+        Refresh();
     }
 
     private void HandleClose()
