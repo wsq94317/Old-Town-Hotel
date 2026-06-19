@@ -46,6 +46,13 @@ public sealed class ManagerOfficeScreenController : MonoBehaviour
     [SerializeField] private StaffCardView staffCardTemplate; // inactive template cloned per member
     [SerializeField] private int raiseStep = 5;
 
+    [Header("Renovation detail panel")]
+    [SerializeField] private GameObject renovationPanel;
+    [SerializeField] private Button renovationOpenButton;  // the Renovation card as a button
+    [SerializeField] private Transform roomListContent;    // ScrollRect content
+    [SerializeField] private RoomRowView roomRowTemplate;  // inactive template cloned per room
+    [SerializeField] private TextMeshProUGUI renovDetailSummary;
+
     [Header("Valuation inputs (until renovation feeds these)")]
     [SerializeField] private int openRoomsForValue = 4;
     [SerializeField] private int renovatedRoomsForValue = 0;
@@ -63,6 +70,8 @@ public sealed class ManagerOfficeScreenController : MonoBehaviour
         if (borrowButton != null) borrowButton.onClick.AddListener(DoBorrow);
         if (staffOpenButton != null) staffOpenButton.onClick.AddListener(OpenStaffDetail);
         if (staffCardTemplate != null) staffCardTemplate.gameObject.SetActive(false);
+        if (renovationOpenButton != null) renovationOpenButton.onClick.AddListener(OpenRenovationDetail);
+        if (roomRowTemplate != null) roomRowTemplate.gameObject.SetActive(false);
     }
 
     private void OnDestroy()
@@ -72,6 +81,7 @@ public sealed class ManagerOfficeScreenController : MonoBehaviour
         if (repayButton != null) repayButton.onClick.RemoveListener(DoRepay);
         if (borrowButton != null) borrowButton.onClick.RemoveListener(DoBorrow);
         if (staffOpenButton != null) staffOpenButton.onClick.RemoveListener(OpenStaffDetail);
+        if (renovationOpenButton != null) renovationOpenButton.onClick.RemoveListener(OpenRenovationDetail);
     }
 
     private void OnEnable()
@@ -85,6 +95,7 @@ public sealed class ManagerOfficeScreenController : MonoBehaviour
         _openDetail = null;
         if (financePanel != null) financePanel.SetActive(false);
         if (staffPanel != null) staffPanel.SetActive(false);
+        if (renovationPanel != null) renovationPanel.SetActive(false);
         if (hubGrid != null) hubGrid.SetActive(true);
         Refresh();
     }
@@ -195,6 +206,47 @@ public sealed class ManagerOfficeScreenController : MonoBehaviour
         if (economy == null || member == null) return;
         economy.FireStaff(member);
         RebuildRoster();
+        Refresh();
+    }
+
+    private void OpenRenovationDetail()
+    {
+        if (renovationPanel == null) return;
+        if (hubGrid != null) hubGrid.SetActive(false);
+        renovationPanel.SetActive(true);
+        _openDetail = renovationPanel;
+        RebuildRooms();
+    }
+
+    public void RebuildRooms()
+    {
+        if (renovation == null || roomListContent == null || roomRowTemplate == null) return;
+
+        for (int i = roomListContent.childCount - 1; i >= 0; i--)
+        {
+            var child = roomListContent.GetChild(i);
+            if (child.gameObject != roomRowTemplate.gameObject) Destroy(child.gameObject);
+        }
+
+        foreach (var room in renovation.RoomNumbers)
+        {
+            var go = Instantiate(roomRowTemplate.gameObject, roomListContent);
+            go.SetActive(true);
+            var view = go.GetComponent<RoomRowView>();
+            if (view != null)
+                view.Bind(room, renovation.TierOf(room), renovation.IsRenovating(room),
+                          renovation.DaysRemaining(room), renovation.Config, DoUpgrade);
+        }
+
+        if (renovDetailSummary != null)
+            renovDetailSummary.text = $"{renovation.RenovatedCount} / {renovation.TotalRooms} renovated";
+    }
+
+    private void DoUpgrade(int room, RoomTier target)
+    {
+        if (renovation == null) return;
+        renovation.StartRenovation(new[] { room }, target);
+        RebuildRooms();
         Refresh();
     }
 
