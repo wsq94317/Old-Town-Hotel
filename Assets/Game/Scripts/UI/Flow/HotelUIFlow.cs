@@ -27,6 +27,11 @@ public sealed class HotelUIFlow : MonoBehaviour
     [SerializeField] private Room2DPrototypeDemandLoop demandLoop;
     [SerializeField] private Room2DDemoDayController dayController;
 
+    [Header("Manager Office")]
+    [SerializeField] private GameObject managerOfficeScreen;
+    [SerializeField] private ManagerOfficeScreenController managerOffice;
+    [SerializeField] private UnityEngine.UI.Button officeEntryButton;
+
     [Header("Toast")]
     [SerializeField] private ToastView toast;
 
@@ -55,6 +60,8 @@ public sealed class HotelUIFlow : MonoBehaviour
         {
             dayController.OnDaySettled += HandleDaySettled;
         }
+        if (officeEntryButton != null) officeEntryButton.onClick.AddListener(OpenManagerOffice);
+        if (managerOffice != null) managerOffice.OnCloseRequested += CloseManagerOffice;
     }
 
     private void OnDestroy()
@@ -81,6 +88,18 @@ public sealed class HotelUIFlow : MonoBehaviour
         {
             dayController.OnDaySettled -= HandleDaySettled;
         }
+        if (officeEntryButton != null) officeEntryButton.onClick.RemoveListener(OpenManagerOffice);
+        if (managerOffice != null) managerOffice.OnCloseRequested -= CloseManagerOffice;
+    }
+
+    private void OpenManagerOffice()
+    {
+        if (managerOfficeScreen != null) managerOfficeScreen.SetActive(true);
+    }
+
+    private void CloseManagerOffice()
+    {
+        if (managerOfficeScreen != null) managerOfficeScreen.SetActive(false);
     }
 
     // 日结：弹出 Day-End 损益（收入/工资/净利）。
