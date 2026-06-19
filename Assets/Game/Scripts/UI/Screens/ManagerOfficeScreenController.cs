@@ -20,6 +20,10 @@ public sealed class ManagerOfficeScreenController : MonoBehaviour
     [Header("Staff card (hub summary)")]
     [SerializeField] private TextMeshProUGUI staffValue;
 
+    [Header("Renovation (hub summary + valuation source)")]
+    [SerializeField] private RenovationSystem renovation;
+    [SerializeField] private TextMeshProUGUI renovSummary;
+
     [Header("Navigation")]
     [SerializeField] private GameObject hubGrid;           // the 2x2 card grid (hidden while a detail is open)
     [SerializeField] private Button closeButton;           // shared Back
@@ -98,7 +102,14 @@ public sealed class ManagerOfficeScreenController : MonoBehaviour
             int net = economy.LastDayLedger.Net;
             netValue.text = net >= 0 ? $"+${net:N0}" : $"-${-net:N0}";
         }
+        if (renovSummary != null && renovation != null)
+            renovSummary.text = $"{renovation.RenovatedCount} / {renovation.TotalRooms} renovated";
     }
+
+    // Rooms feeding valuation: live from RenovationSystem when present, else the serialized fallback.
+    private (int open, int renovated) ValuationRooms()
+        => renovation != null ? (renovation.OpenCount, renovation.RenovatedCount)
+                              : (openRoomsForValue, renovatedRoomsForValue);
 
     private void OpenFinanceDetail()
     {
@@ -115,8 +126,9 @@ public sealed class ManagerOfficeScreenController : MonoBehaviour
         int loan = economy.Loan != null ? economy.Loan.Balance : 0;
         float rate = economy.Loan != null ? economy.Loan.DailyInterestRate : 0f;
         int interest = Mathf.RoundToInt(loan * rate);
-        int value = economy.ComputeHotelValue(openRoomsForValue, renovatedRoomsForValue);
-        int credit = economy.CreditLimit(openRoomsForValue, renovatedRoomsForValue);
+        var (open, renov) = ValuationRooms();
+        int value = economy.ComputeHotelValue(open, renov);
+        int credit = economy.CreditLimit(open, renov);
 
         if (finCash != null) finCash.text = $"${economy.Cash:N0}";
         if (finLoan != null) finLoan.text = loan > 0 ? $"-${loan:N0}" : "$0";
@@ -135,7 +147,8 @@ public sealed class ManagerOfficeScreenController : MonoBehaviour
     private void DoBorrow()
     {
         if (economy == null) return;
-        int credit = economy.CreditLimit(openRoomsForValue, renovatedRoomsForValue);
+        var (open, renov) = ValuationRooms();
+        int credit = economy.CreditLimit(open, renov);
         economy.Borrow(Mathf.Min(loanStep, credit));
         RefreshFinance();
     }
