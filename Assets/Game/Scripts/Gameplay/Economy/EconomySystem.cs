@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 // Owns the live cash balance + payroll ledger and settles one economic day.
@@ -90,6 +91,55 @@ public sealed class EconomySystem : MonoBehaviour
 
     // Refuse a raise: morale drops (risk of quitting later).
     public void RefuseRaise(StaffMember member, int moralePenalty = 20) => member?.AdjustMorale(-moralePenalty);
+
+    // ── Save / load (capture + restore full economy state) ───────────────────
+    public EconomyState CaptureState()
+    {
+        var s = new EconomyState
+        {
+            cash = Cash,
+            loanBalance = Loan != null ? Loan.Balance : 0,
+            loanRate = Loan != null ? Loan.DailyInterestRate : 0f
+        };
+        if (Payroll != null)
+        {
+            foreach (var m in Payroll.Roster)
+            {
+                var ss = new StaffState
+                {
+                    role = (int)m.Role,
+                    name = m.DisplayName,
+                    wage = m.DailyWage,
+                    speed = m.Attributes.Speed,
+                    quality = m.Attributes.Quality,
+                    stamina = m.Attributes.Stamina,
+                    education = m.EducationLevel,
+                    morale = m.Morale
+                };
+                foreach (var tr in m.Traits) ss.traits.Add((int)tr);
+                s.staff.Add(ss);
+            }
+        }
+        return s;
+    }
+
+    public void RestoreState(EconomyState s)
+    {
+        if (s == null) return;
+        Cash = s.cash;
+        Loan = new LoanAccount(s.loanBalance, s.loanRate);
+        Payroll = new PayrollLedger();
+        foreach (var ss in s.staff)
+        {
+            var traits = new List<StaffTrait>();
+            foreach (var t in ss.traits) traits.Add((StaffTrait)t);
+            var member = new StaffMember((StaffRole)ss.role, ss.name, ss.wage,
+                                         new StaffAttributes(ss.speed, ss.quality, ss.stamina),
+                                         ss.education, traits);
+            member.AdjustMorale(ss.morale - StaffMember.DefaultMorale); // set exact saved morale
+            Payroll.Hire(member);
+        }
+    }
 
     // ── Generic spend (renovation, etc., Phase 5) ────────────────────────────
     // Deduct `amount` from cash if affordable. Returns true if paid.

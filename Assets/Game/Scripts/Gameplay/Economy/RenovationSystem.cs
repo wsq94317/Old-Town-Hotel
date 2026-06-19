@@ -102,6 +102,41 @@ public sealed class RenovationSystem : MonoBehaviour
         return list;
     }
 
+    // ── Save / load ──────────────────────────────────────────────────────────
+    public RenovationState CaptureState()
+    {
+        var s = new RenovationState
+        {
+            totalRooms = totalRooms,
+            startingRoomNumber = startingRoomNumber
+        };
+        if (_tiers != null && _roomOrder != null)
+            foreach (var n in _roomOrder)
+                s.rooms.Add(new RoomTierEntry { room = n, tier = (int)_tiers[n] });
+        if (_queue != null)
+            foreach (var j in _queue.Active)
+                s.jobs.Add(new RenoJobEntry { room = j.RoomNumber, targetTier = (int)j.TargetTier, daysRemaining = j.DaysRemaining });
+        return s;
+    }
+
+    public void RestoreState(RenovationState s)
+    {
+        if (s == null) return;
+        totalRooms = s.totalRooms;
+        startingRoomNumber = s.startingRoomNumber;
+        _tiers = new Dictionary<int, RoomTier>();
+        _roomOrder = new List<int>();
+        foreach (var e in s.rooms)
+        {
+            if (!_tiers.ContainsKey(e.room)) _roomOrder.Add(e.room);
+            _tiers[e.room] = (RoomTier)e.tier;
+        }
+        _queue = new RenovationQueue();
+        foreach (var j in s.jobs)
+            _queue.Start(new RenovationJob(j.room, (RoomTier)j.targetTier, j.daysRemaining));
+        Recount();
+    }
+
     private void HandleDaySettled(int day, int served, DayLedger ledger) => AdvanceDay();
 
     // Advance renovations one day; completed jobs flip their room's tier.
