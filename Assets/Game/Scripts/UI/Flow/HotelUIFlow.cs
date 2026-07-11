@@ -37,6 +37,10 @@ public sealed class HotelUIFlow : MonoBehaviour
     [Header("Toast")]
     [SerializeField] private ToastView toast;
 
+    [Header("Day flow")]
+    [Tooltip("Start the operating period automatically once the scene is up — without this the day sits in PREP forever (this shell has no Start Day button yet). Interim until the Morning Brief modal (ui-spec §9.2) owns day start.")]
+    [SerializeField] private bool autoStartOperatingPeriod = true;
+
     private void Awake()
     {
         if (bottomNav != null) bottomNav.OnTabSelected += HandleTabSelected;
@@ -116,6 +120,20 @@ public sealed class HotelUIFlow : MonoBehaviour
     private void Start()
     {
         SwitchToTab(HotelTab.FrontDesk);
+        if (autoStartOperatingPeriod) StartCoroutine(AutoStartOperatingPeriod());
+    }
+
+    // The day controller's own Start() enters Preparation and pauses the demand
+    // loop — if we open the doors before it has run, it overrides us. Always let
+    // at least one frame pass, then wait for its Start to complete (3s cap).
+    private System.Collections.IEnumerator AutoStartOperatingPeriod()
+    {
+        float deadline = Time.unscaledTime + 3f;
+        do
+        {
+            yield return null;
+        } while (Time.unscaledTime < deadline && (dayController == null || !dayController.didStart));
+        if (dayController != null) dayController.StartOperatingPeriod();
     }
 
     public void SwitchToTab(HotelTab tab)
@@ -135,18 +153,26 @@ public sealed class HotelUIFlow : MonoBehaviour
     {
         if (modalManager == null || chooseRoomModalPrefab == null) return;
         var modal = modalManager.Show(chooseRoomModalPrefab);
-        // Soft-prefs not modelled yet — feeding an empty list as a placeholder so the empty banner renders.
-        // When the active guest's bed-type preference is wired through HotelUIFlow, replace with:
-        //   demandLoop.GetReadyRoomsForGuest(activeBedTypePreference)
-        modal.Setup(new System.Collections.Generic.List<RoomSuitability>());
+        // Any = every Ready room is Suitable; bed-type soft prefs land with the
+        // per-guest plumbing (the demand system doesn't carry a bed preference yet).
+        var readyRooms = demandLoop != null
+            ? new System.Collections.Generic.List<RoomSuitability>(demandLoop.GetReadyRoomsForGuest(Room2DBedTypePreference.Any))
+            : new System.Collections.Generic.List<RoomSuitability>();
+        modal.Setup(readyRooms);
         modal.OnGotoRoomsRequested += () => SwitchToTab(HotelTab.Rooms);
         modal.OnRoomSelected += HandleRoomSelectedForActiveGuest;
     }
 
     private void HandleRoomSelectedForActiveGuest(Room2DEntity room)
     {
-        if (toast != null) toast.Show($"Selected Room {room.roomNumber}");
-        // TODO: trigger check-in via FrontDesk2D when active-guest plumbing is wired.
+        // Real check-in: occupies the room, records the match-quality outcome
+        // (settled as revenue at checkout), and handles complaint reassignment.
+        bool ok = demandLoop != null && room != null && demandLoop.AssignRoomToActiveDemand(room);
+        if (toast != null)
+        {
+            toast.Show(ok ? $"Checked in — Room {room.roomNumber}"
+                          : demandLoop != null ? demandLoop.lastManualAssignmentResult : "Check-in failed");
+        }
     }
 
     private void HandleQueueCardTapped(object guestRef)
