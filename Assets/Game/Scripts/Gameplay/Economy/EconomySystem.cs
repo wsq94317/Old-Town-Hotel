@@ -8,10 +8,15 @@ public sealed class EconomySystem : MonoBehaviour
 {
     [SerializeField] private EconomyConfigSO config;
 
+    public EconomyConfigSO Config => config;
     public PayrollLedger Payroll { get; private set; }
     public LoanAccount Loan { get; private set; }
+    public ReputationLedger Reputation { get; private set; }
     public int Cash { get; private set; }
     public DayLedger LastDayLedger { get; private set; }
+
+    private int _pendingCheckoutIncome;
+    private int _pendingCheckoutCount;
 
     private void Awake()
     {
@@ -24,6 +29,9 @@ public sealed class EconomySystem : MonoBehaviour
         config = cfg;
         Cash = cfg.startingCash;
         Loan = new LoanAccount(cfg.startingLoan, cfg.dailyInterestRate);
+        Reputation = new ReputationLedger(cfg.reputationWindowSize);
+        _pendingCheckoutIncome = 0;
+        _pendingCheckoutCount = 0;
         Payroll = new PayrollLedger();
         Payroll.Hire(new StaffMember(StaffRole.Reception, "Reception", cfg.WageFor(StaffRole.Reception)));
         Payroll.Hire(new StaffMember(StaffRole.Housekeeper, "Housekeeper", cfg.WageFor(StaffRole.Housekeeper)));
@@ -32,10 +40,38 @@ public sealed class EconomySystem : MonoBehaviour
 
     public void InitializeForTest(EconomyConfigSO cfg) => Initialize(cfg);
 
+    // ── Checkout income (Phase 6: tier price × satisfaction) ─────────────────
+    // Credit one checked-out guest: nightly rate (caller resolves the room's tier
+    // via RenovationConfigSO.NightlyRevenueFor) times the stay's satisfaction
+    // multiplier. Banked into income at day close; also feeds the star rating.
+    // Returns the credited amount (for UI toasts / coin fly).
+    public int RecordCheckout(int nightlyRate, float satisfactionMult)
+    {
+        float mult = Mathf.Clamp(satisfactionMult,
+                                 ReputationLedger.MinSatisfaction,
+                                 ReputationLedger.MaxSatisfaction);
+        int amount = Mathf.RoundToInt(Mathf.Max(0, nightlyRate) * mult);
+        _pendingCheckoutIncome += amount;
+        _pendingCheckoutCount++;
+        Reputation?.RecordGuest(mult);
+        return amount;
+    }
+
+    // How many guests today's star rating attracts (demand-loop spawn budget).
+    public int DailyGuestTarget
+        => config != null && Reputation != null ? config.GuestsPerDayFor(Reputation.Stars) : 0;
+
     // Settle the day: credit room revenue, debit wages + accrued loan interest, update cash.
+    // Income prefers per-checkout tiered revenue (RecordCheckout); the flat
+    // servedGuests × roomRevenuePerGuest path remains as fallback until the
+    // checkout hook is wired everywhere.
     public DayLedger CloseEconomicDay(int servedGuests)
     {
-        int income = Mathf.Max(0, servedGuests) * config.roomRevenuePerGuest;
+        int income = _pendingCheckoutCount > 0
+            ? _pendingCheckoutIncome
+            : Mathf.Max(0, servedGuests) * config.roomRevenuePerGuest;
+        _pendingCheckoutIncome = 0;
+        _pendingCheckoutCount = 0;
         int interest = Loan != null ? Loan.AccrueDailyInterest() : 0;
         DayLedger ledger = new DayLedger(income, Payroll.TotalDailyWages, interest, 0, Cash);
         Cash = ledger.ClosingBalance;
@@ -99,7 +135,8 @@ public sealed class EconomySystem : MonoBehaviour
         {
             cash = Cash,
             loanBalance = Loan != null ? Loan.Balance : 0,
-            loanRate = Loan != null ? Loan.DailyInterestRate : 0f
+            loanRate = Loan != null ? Loan.DailyInterestRate : 0f,
+            reputationSamples = Reputation != null ? Reputation.ExportSamples() : new List<float>()
         };
         if (Payroll != null)
         {
@@ -128,6 +165,10 @@ public sealed class EconomySystem : MonoBehaviour
         if (s == null) return;
         Cash = s.cash;
         Loan = new LoanAccount(s.loanBalance, s.loanRate);
+        Reputation = new ReputationLedger(config != null ? config.reputationWindowSize : 20);
+        Reputation.ImportSamples(s.reputationSamples);
+        _pendingCheckoutIncome = 0;
+        _pendingCheckoutCount = 0;
         Payroll = new PayrollLedger();
         foreach (var ss in s.staff)
         {

@@ -217,6 +217,15 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
     public Room2DRoomPreference lastDemandRoomPreference = Room2DRoomPreference.AnyRoom;
     public Room2DFloorPreference lastDemandFloorPreference = Room2DFloorPreference.NoPreference;
     public Room2DFacingPreference lastDemandFacingPreference = Room2DFacingPreference.NoPreference;
+    [Header("Economy checkout revenue (Phase 6)")]
+    public EconomySystem economySystem;
+    public RenovationSystem renovationSystem;
+
+    // 入住时按房号记下匹配质量，退房时结算成收入 = 档次房价 × 满意度系数（economy GDD §4.1）。
+    private readonly Dictionary<int, Room2DMatchQuality> _stayQualityByRoom =
+        new Dictionary<int, Room2DMatchQuality>();
+    private bool _economyRefsSearched;
+
     public Room2DMatchQuality lastMatchQuality = Room2DMatchQuality.NormalMatch;
     public string lastMatchQualityLabel = "Normal Match";
     public int lastCleanlinessSuitability;
@@ -1191,6 +1200,8 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
         if (originalRoom.currentState == Room2DState.Occupied)
         {
             originalRoom.SimulateCheckout();
+            // 投诉离店按 PoorMatch 结算房费（住了但不满意）。
+            SettleCheckoutRevenue(originalRoom, Room2DMatchQuality.PoorMatch);
             RefreshRoomVisual(originalRoom);
         }
 
@@ -1801,12 +1812,56 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
             {
                 simulatedCheckoutCount++;
                 lastChangedRoomName = room.roomName;
+                SettleCheckoutRevenue(room);
                 RefreshRoomVisual(room);
             }
         }
 
         RefreshOverview();
         RefreshPrototypeDaySummary();
+    }
+
+    // 结算一次退房：房间档次的 nightly rate × 该次入住的匹配质量系数，记入经济系统。
+    // 场景里没有 EconomySystem 时静默跳过（日结走旧的按人头固定价路径）。
+    private void SettleCheckoutRevenue(Room2DEntity room, Room2DMatchQuality? forcedQuality = null)
+    {
+        if (room == null) return;
+        if (!_economyRefsSearched)
+        {
+            _economyRefsSearched = true;
+            if (economySystem == null) economySystem = FindFirstObjectByType<EconomySystem>();
+            if (renovationSystem == null) renovationSystem = FindFirstObjectByType<RenovationSystem>();
+        }
+
+        Room2DMatchQuality quality = Room2DMatchQuality.NormalMatch;
+        if (_stayQualityByRoom.TryGetValue(room.roomNumber, out Room2DMatchQuality stored))
+        {
+            quality = stored;
+            _stayQualityByRoom.Remove(room.roomNumber);
+        }
+        if (forcedQuality.HasValue) quality = forcedQuality.Value;
+
+        if (economySystem == null || economySystem.Config == null) return;
+        EconomyConfigSO cfg = economySystem.Config;
+
+        int nightly = renovationSystem != null && renovationSystem.Config != null
+            ? renovationSystem.Config.NightlyRevenueFor(renovationSystem.TierOf(room.roomNumber))
+            : cfg.roomRevenuePerGuest;
+
+        float mult;
+        switch (quality)
+        {
+            case Room2DMatchQuality.GoodMatch:
+                mult = cfg.goodMatchMultiplier;
+                break;
+            case Room2DMatchQuality.PoorMatch:
+                mult = cfg.poorMatchMultiplier;
+                break;
+            default:
+                mult = cfg.normalMatchMultiplier;
+                break;
+        }
+        economySystem.RecordCheckout(nightly, mult);
     }
 
     [ContextMenu("Refresh Prototype Day Summary")]
@@ -2529,6 +2584,7 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
 
         IncrementMatchCount(matchQuality);
         RecordOutcome(outcomeResult, GetScoreDelta(outcomeResult));
+        if (room != null) _stayQualityByRoom[room.roomNumber] = matchQuality;
 
         string roomName = room != null ? room.roomName : "None";
         string roomTypeName = room != null ? room.GetPrototypeRoomTypeDisplayName() : "None";

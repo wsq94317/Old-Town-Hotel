@@ -18,3 +18,18 @@ MonoBehaviour:
   housekeeperDailyWage: 45
   managerDailyWage: 90
   inspectorDailyWage: 55
+  startingLoan: 183000
+  dailyInterestRate: 0.0005
+  creditLimitFactor: 0.5
+  baseHotelValue: 50000
+  perRoomValue: 8000
+  renovatedRoomBonus: 12000
+  reputationWindowSize: 20
+  guestsBelow2Stars: 3
+  guestsBelow3Stars: 5
+  guestsBelow4Stars: 7
+  guestsBelow45Stars: 9
+  guestsTopStars: 12
+  goodMatchMultiplier: 1.3
+  normalMatchMultiplier: 1
+  poorMatchMultiplier: 0.7

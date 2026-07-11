@@ -20,8 +20,8 @@ public sealed class EconomyConfigSO : ScriptableObject
     [Header("Loan & finance (Phase 3)")]
     [Tooltip("Debt the player inherits when taking over the old hotel.")]
     public int startingLoan = 183000;
-    [Tooltip("Simple daily interest on the outstanding loan (0.0015 = 0.15%/day).")]
-    public float dailyInterestRate = 0.0015f;
+    [Tooltip("Simple daily interest on the outstanding loan (0.0005 = 0.05%/day). 0.0015 bled ~$200/day in P1 — see tuning-knobs red flag 2026-07-04.")]
+    public float dailyInterestRate = 0.0005f;
     [Tooltip("Bank will lend up to hotelValue * this factor (minus current debt).")]
     public float creditLimitFactor = 0.5f;
 
@@ -29,6 +29,33 @@ public sealed class EconomyConfigSO : ScriptableObject
     public int baseHotelValue = 50000;
     public int perRoomValue = 8000;
     public int renovatedRoomBonus = 12000;
+
+    [Header("Reputation & guest flow (Phase 6)")]
+    [Tooltip("Rolling window of recent checkouts feeding the star rating.")]
+    public int reputationWindowSize = 20;
+    [Tooltip("Guests per day by star bracket: <2★ / <3★ / <4★ / <4.5★ / top.")]
+    public int guestsBelow2Stars = 3;
+    public int guestsBelow3Stars = 5;
+    public int guestsBelow4Stars = 7;
+    public int guestsBelow45Stars = 9;
+    public int guestsTopStars = 12;
+
+    [Header("Checkout satisfaction multipliers (Phase 6)")]
+    [Tooltip("Room revenue multiplier when the stay matched the guest's preferences well.")]
+    public float goodMatchMultiplier = 1.3f;
+    [Tooltip("Multiplier for an acceptable but non-ideal match.")]
+    public float normalMatchMultiplier = 1.0f;
+    [Tooltip("Multiplier when preferences were poorly matched (complaints).")]
+    public float poorMatchMultiplier = 0.7f;
+
+    public int GuestsPerDayFor(float stars)
+    {
+        if (stars < 2f) return guestsBelow2Stars;
+        if (stars < 3f) return guestsBelow3Stars;
+        if (stars < 4f) return guestsBelow4Stars;
+        if (stars < 4.5f) return guestsBelow45Stars;
+        return guestsTopStars;
+    }
 
     public int WageFor(StaffRole role)
     {

@@ -9,6 +9,17 @@ public sealed class PayrollLedger
     public IReadOnlyList<StaffMember> Roster => _roster;
     public int Count => _roster.Count;
 
+    // Roster-change events so scene systems (StaffCrew) can sync worker instances.
+    public event System.Action<StaffMember> OnHired;
+    public event System.Action<StaffMember> OnFired;
+
+    public int CountByRole(StaffRole role)
+    {
+        int n = 0;
+        for (int i = 0; i < _roster.Count; i++) if (_roster[i].Role == role) n++;
+        return n;
+    }
+
     public int TotalDailyWages
     {
         get
@@ -21,12 +32,14 @@ public sealed class PayrollLedger
 
     public void Hire(StaffMember member)
     {
-        if (member != null && !_roster.Contains(member)) _roster.Add(member);
+        if (member == null || _roster.Contains(member)) return;
+        _roster.Add(member);
+        OnHired?.Invoke(member);
     }
 
     public void Fire(StaffMember member)
     {
-        _roster.Remove(member);
+        if (_roster.Remove(member)) OnFired?.Invoke(member);
     }
 
     // Settle one day: credit income, debit total wages, return the P&L + new balance.

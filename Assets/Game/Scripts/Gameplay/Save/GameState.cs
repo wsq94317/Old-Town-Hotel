@@ -24,6 +24,7 @@ public sealed class EconomyState
     public int loanBalance;
     public float loanRate;
     public List<StaffState> staff = new List<StaffState>();
+    public List<float> reputationSamples = new List<float>(); // Phase 6 ★ rating window
 }
 
 [Serializable]

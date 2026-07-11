@@ -22,10 +22,12 @@ public sealed class HotelUIFlow : MonoBehaviour
     [SerializeField] private AchievementsModal achievementsModalPrefab;
 
     [Header("Gameplay refs")]
-    [SerializeField] private Housekeeper2D housekeeper;
+    [SerializeField] private Housekeeper2D housekeeper; // legacy single-HSK fallback when no StaffCrew
     [SerializeField] private Inspector2D inspector;
     [SerializeField] private Room2DPrototypeDemandLoop demandLoop;
     [SerializeField] private Room2DDemoDayController dayController;
+    [SerializeField] private StaffCrew staffCrew;   // ADR 0008 multi-staff dispatch
+    [SerializeField] private BossCover bossCover;   // "Do It Yourself"
 
     [Header("Manager Office")]
     [SerializeField] private GameObject managerOfficeScreen;
@@ -172,13 +174,22 @@ public sealed class HotelUIFlow : MonoBehaviour
         var modal = modalManager.Show(roomActionsModalPrefab);
         modal.Setup(room, "Floor: —", "Dirty since: —", "Priority: Normal");
         modal.OnAssignHskClicked += () => HandleAssignHskRequested(room);
+        modal.OnDoItYourselfClicked += () => HandleBossCleanRequested(room);
+    }
+
+    // Route through StaffCrew when present (any idle worker); legacy single-HSK path otherwise.
+    private Housekeeper2D PickIdleHousekeeper()
+    {
+        if (staffCrew != null) return staffCrew.FindIdleHousekeeper();
+        return housekeeper != null && !housekeeper.IsBusy ? housekeeper : null;
     }
 
     private void HandleAssignHskRequested(Room2DEntity room)
     {
         if (modalManager == null || room == null) return;
 
-        if (housekeeper != null && housekeeper.IsBusy)
+        Housekeeper2D worker = PickIdleHousekeeper();
+        if (worker == null)
         {
             if (noHskModalPrefab != null)
             {
@@ -190,12 +201,29 @@ public sealed class HotelUIFlow : MonoBehaviour
 
         if (assignHskModalPrefab == null) return;
         var modal = modalManager.Show(assignHskModalPrefab);
-        modal.Setup(room.roomNumber, housekeeper != null ? housekeeper.CurrentActivityLabel : "Idle", 45f);
+        modal.Setup(room.roomNumber, worker.CurrentActivityLabel, worker.cleaningDurationSeconds);
         modal.OnConfirmed += () =>
         {
-            // TODO: trigger Housekeeper2D.Assign(room) when the public method exists; currently a gameplay-side gap.
-            if (toast != null) toast.Show($"HSK dispatched to Room {room.roomNumber}");
+            // Re-pick at confirm time — the worker chosen at modal-open may have been taken.
+            Housekeeper2D confirmed = PickIdleHousekeeper();
+            bool ok = confirmed != null && confirmed.AssignRoom(room);
+            if (toast != null)
+                toast.Show(ok ? $"HSK dispatched to Room {room.roomNumber}" : "No available HSK");
         };
+    }
+
+    // "Do It Yourself" — the boss covers the cleaning himself (free, slow, one at a time).
+    private void HandleBossCleanRequested(Room2DEntity room)
+    {
+        if (room == null || bossCover == null) return;
+        if (bossCover.IsBusy)
+        {
+            if (toast != null) toast.Show(bossCover.BusyLabel);
+            return;
+        }
+        bool ok = bossCover.TryCleanRoom(room);
+        if (toast != null)
+            toast.Show(ok ? $"You start cleaning Room {room.roomNumber}…" : "Can't clean that room right now");
     }
 
     private void HandleHskDetailsRequested()

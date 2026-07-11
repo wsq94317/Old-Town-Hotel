@@ -13,11 +13,13 @@ public sealed class RoomActionsModal : ModalBase
     [SerializeField] private TextMeshProUGUI dirtySinceLabel;
     [SerializeField] private TextMeshProUGUI priorityLabel;
     [SerializeField] private Button assignHskButton;
+    [SerializeField] private Button doItYourselfButton; // boss cover (ADR 0008) — optional until prefab wired
     [SerializeField] private Button setPriorityButton;
     [SerializeField] private Button roomInfoButton;
     [SerializeField] private Button closeButton;
 
     public event Action OnAssignHskClicked;
+    public event Action OnDoItYourselfClicked;
     public event Action OnSetPriorityClicked;
     public event Action OnRoomInfoClicked;
 
@@ -35,6 +37,7 @@ public sealed class RoomActionsModal : ModalBase
 
         bool canAssignHsk = room != null && room.currentState == Room2DState.Dirty;
         if (assignHskButton != null) assignHskButton.interactable = canAssignHsk;
+        if (doItYourselfButton != null) doItYourselfButton.interactable = canAssignHsk;
     }
 
     protected override void OnOpened()
@@ -43,6 +46,11 @@ public sealed class RoomActionsModal : ModalBase
         {
             assignHskButton.onClick.RemoveAllListeners();
             assignHskButton.onClick.AddListener(() => { OnAssignHskClicked?.Invoke(); Close(); });
+        }
+        if (doItYourselfButton != null)
+        {
+            doItYourselfButton.onClick.RemoveAllListeners();
+            doItYourselfButton.onClick.AddListener(() => { OnDoItYourselfClicked?.Invoke(); Close(); });
         }
         if (setPriorityButton != null)
         {
