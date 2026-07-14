@@ -12,6 +12,11 @@ public sealed class FrontDeskScreenController : MonoBehaviour
     [SerializeField] private Transform queueListRoot;
     [SerializeField] private GuestQueueCardView queueCardPrefab;
 
+    [Header("Guest portraits by type")]
+    [SerializeField] private Sprite portraitBusiness;
+    [SerializeField] private Sprite portraitFamily;
+    [SerializeField] private Sprite portraitVip;
+
     [Header("Gameplay sources")]
     [SerializeField] private Room2DDemoDayController dayController;
     [SerializeField] private Room2DDayPhaseStateMachine phaseStateMachine;
@@ -32,6 +37,11 @@ public sealed class FrontDeskScreenController : MonoBehaviour
     {
         if (activeGuestCard != null) activeGuestCard.OnCtaClicked += HandleCtaClicked;
         if (topBar != null) topBar.OnSettingsClicked += HandleSettingsClicked;
+        // Mockup-era placeholder cards are baked into the scene under the queue
+        // root; clear them so only live-bound cards render.
+        if (queueListRoot != null)
+            for (int i = queueListRoot.childCount - 1; i >= 0; i--)
+                Destroy(queueListRoot.GetChild(i).gameObject);
     }
 
     private void OnDestroy()
@@ -72,16 +82,95 @@ public sealed class FrontDeskScreenController : MonoBehaviour
 
     private void RefreshActiveGuest()
     {
-        if (activeGuestCard == null) return;
+        if (activeGuestCard == null || demandLoop == null) return;
 
-        // Active guest plumbing: presenter-side stubbed for now.
-        // The demand loop owns the active guest concept; binding is filled by HotelUIFlow when guest data is available.
-        // This method is a placeholder so the screen renders without crashing.
+        bool complaint = demandLoop.complaintWaitingForReassignment;
+        if (!demandLoop.activeDemandWaitingForManualAssignment && !complaint)
+        {
+            activeGuestCard.BindEmpty(NextArrivalText());
+            return;
+        }
+
+        var type = demandLoop.activeGuestType;
+        float waitSeconds = demandLoop.activeDemandWaitSeconds;
+        activeGuestCard.Bind(
+            demandLoop,
+            PortraitFor(type),
+            $"{type.ToString().ToUpperInvariant()} GUEST",
+            demandLoop.activeDemandRoomPreference == Room2DPrototypeDemandLoop.Room2DRoomPreference.BetterRoomPreferred
+                ? "BETTER ROOM" : "ANY ROOM",
+            BuildPreferenceText(),
+            $"Waiting: {Mathf.FloorToInt(waitSeconds)}s",
+            $"Mood: {MoodName(waitSeconds)}",
+            complaint ? "Note: Complaint — wants a different room" : string.Empty,
+            "Check Available Rooms");
     }
+
+    private readonly List<GuestQueueCardInfo> queueInfos = new List<GuestQueueCardInfo>();
 
     private void RefreshQueue()
     {
-        // Queue plumbing: same as above — HotelUIFlow will push queue data via PushQueue() when wired.
+        if (demandLoop == null || queueCardPrefab == null || queueListRoot == null) return;
+        queueInfos.Clear();
+        int count = demandLoop.UpcomingQueueCount;
+        for (int i = 0; i < count; i++)
+        {
+            var type = demandLoop.GetUpcomingGuestType(i);
+            queueInfos.Add(new GuestQueueCardInfo
+            {
+                guestRef = i,
+                portrait = PortraitFor(type),
+                typeLabel = type.ToString().ToUpperInvariant(),
+                needLabel = BedNeedText(demandLoop.GetUpcomingBedTypePreference(i)),
+                waitText = i == 0 && demandLoop.upcomingDemandEtaSeconds > 0f
+                    ? $"in {Mathf.CeilToInt(demandLoop.upcomingDemandEtaSeconds)}s"
+                    : "queued",
+                mood = GuestPatienceState.Calm,
+            });
+        }
+        PushQueue(queueInfos);
+    }
+
+    private Sprite PortraitFor(Room2DGuestType type)
+    {
+        switch (type)
+        {
+            case Room2DGuestType.Family: return portraitFamily;
+            case Room2DGuestType.VIP:    return portraitVip;
+            default:                     return portraitBusiness;
+        }
+    }
+
+    private string BuildPreferenceText()
+    {
+        string floor = demandLoop.activeDemandFloorPreference switch
+        {
+            Room2DPrototypeDemandLoop.Room2DFloorPreference.HighFloorPreferred => "High floor",
+            Room2DPrototypeDemandLoop.Room2DFloorPreference.LowFloorPreferred => "Low floor",
+            _ => null,
+        };
+        string facing = demandLoop.activeDemandFacingPreference switch
+        {
+            Room2DPrototypeDemandLoop.Room2DFacingPreference.QuietPreferred => "Quiet side",
+            Room2DPrototypeDemandLoop.Room2DFacingPreference.ViewPreferred => "View side",
+            _ => null,
+        };
+        if (floor == null && facing == null) return "Prefers: Anything";
+        if (floor != null && facing != null) return $"Prefers: {floor}, {facing}";
+        return $"Prefers: {floor ?? facing}";
+    }
+
+    private static string MoodName(float waitSeconds)
+        => waitSeconds < 20f ? "Normal" : waitSeconds < 45f ? "Impatient" : "Angry";
+
+    private static string BedNeedText(Room2DBedTypePreference pref)
+        => pref == Room2DBedTypePreference.Any ? "ANY ROOM" : $"{pref.ToString().ToUpperInvariant()} ROOM";
+
+    private string NextArrivalText()
+    {
+        if (demandLoop != null && demandLoop.upcomingDemandEtaSeconds > 0f)
+            return $"No guest at the desk — next arrives in {Mathf.CeilToInt(demandLoop.upcomingDemandEtaSeconds)}s";
+        return "No guest at the desk";
     }
 
     public void PushQueue(IList<GuestQueueCardInfo> entries)
@@ -92,7 +181,7 @@ public sealed class FrontDeskScreenController : MonoBehaviour
             var info = entries[i];
             var card = spawnedCards[i];
             card.gameObject.SetActive(true);
-            card.Bind(info.guestRef, info.portrait, info.typeLabel, info.needLabel, info.waitMinutes, info.mood);
+            card.Bind(info.guestRef, info.portrait, info.typeLabel, info.needLabel, info.waitText, info.mood);
         }
         for (int i = entries.Count; i < spawnedCards.Count; i++)
         {
@@ -141,7 +230,7 @@ public sealed class GuestQueueCardInfo
     public Sprite portrait;
     public string typeLabel;
     public string needLabel;
-    public int waitMinutes;
+    public string waitText;
     public GuestPatienceState mood;
 }
 

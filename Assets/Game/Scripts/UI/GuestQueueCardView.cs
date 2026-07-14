@@ -39,13 +39,13 @@ public sealed class GuestQueueCardView : MonoBehaviour
 
     public object BoundGuestRef { get; private set; }
 
-    public void Bind(object guestRef, Sprite portrait, string guestType, string roomNeed, int waitMinutes, GuestPatienceState mood)
+    public void Bind(object guestRef, Sprite portrait, string guestType, string roomNeed, string waitText, GuestPatienceState mood)
     {
         BoundGuestRef = guestRef;
         if (portraitImage != null) portraitImage.sprite = portrait;
         if (typeLabel != null) typeLabel.text = guestType ?? string.Empty;
         if (needLabel != null) needLabel.text = roomNeed ?? string.Empty;
-        if (waitLabel != null) waitLabel.text = $"{waitMinutes} min";
+        if (waitLabel != null) waitLabel.text = waitText ?? string.Empty;
         if (moodIcon != null) moodIcon.sprite = SpriteForMood(mood);
     }
 
@@ -77,7 +77,7 @@ public sealed class GuestQueueCardView : MonoBehaviour
     private void OnValidate()
     {
         if (Application.isPlaying) return;
-        Bind(null, previewPortrait, previewType, previewNeed, previewWaitMinutes, previewMood);
+        Bind(null, previewPortrait, previewType, previewNeed, $"{previewWaitMinutes} min", previewMood);
     }
 #endif
 }

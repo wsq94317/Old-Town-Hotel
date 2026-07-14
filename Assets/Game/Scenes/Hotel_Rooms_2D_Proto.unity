@@ -18613,6 +18613,7 @@ MonoBehaviour:
   managerOffice: {fileID: 401492691}
   officeEntryButton: {fileID: 1550220982}
   toast: {fileID: 145243819}
+  autoStartOperatingPeriod: 1
 --- !u!4 &1771836697
 Transform:
   m_ObjectHideFlags: 0
@@ -23720,9 +23721,21 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 1512229141}
     - target: {fileID: 3976686964538278451, guid: 5f62d3871a50b4c948b1ed150d25bef6, type: 3}
+      propertyPath: portraitVip
+      value: 
+      objectReference: {fileID: -1301392205, guid: 7cbbf9800d8ce4478b51f7154a0b25ce, type: 3}
+    - target: {fileID: 3976686964538278451, guid: 5f62d3871a50b4c948b1ed150d25bef6, type: 3}
       propertyPath: dayController
       value: 
       objectReference: {fileID: 1858400007}
+    - target: {fileID: 3976686964538278451, guid: 5f62d3871a50b4c948b1ed150d25bef6, type: 3}
+      propertyPath: portraitFamily
+      value: 
+      objectReference: {fileID: -1670784035, guid: 7cbbf9800d8ce4478b51f7154a0b25ce, type: 3}
+    - target: {fileID: 3976686964538278451, guid: 5f62d3871a50b4c948b1ed150d25bef6, type: 3}
+      propertyPath: portraitBusiness
+      value: 
+      objectReference: {fileID: 1232246225, guid: 7cbbf9800d8ce4478b51f7154a0b25ce, type: 3}
     - target: {fileID: 3976686964538278451, guid: 5f62d3871a50b4c948b1ed150d25bef6, type: 3}
       propertyPath: phaseStateMachine
       value: 

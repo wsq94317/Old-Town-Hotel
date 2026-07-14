@@ -27,7 +27,12 @@ public sealed class DayEndSummaryModal : ModalBase
         int net = income - wages - interest;
         if (titleLabel != null) titleLabel.text = $"Day {dayJustCompleted} Summary";
         if (servicedCountLabel != null) servicedCountLabel.text = $"Guests served: {servicedCount}";
-        if (earningsLabel != null) earningsLabel.text = net >= 0 ? $"Net: +${net:N0}" : $"Net: -${(-net):N0}";
+        if (earningsLabel != null)
+        {
+            earningsLabel.text = net >= 0 ? $"Net: +${net:N0}" : $"Net: -${(-net):N0}";
+            earningsLabel.color = net >= 0 ? new Color(0.416f, 0.624f, 0.361f)   // profit green
+                                           : new Color(0.659f, 0.267f, 0.180f);  // loss red
+        }
         if (wagesLabel != null)
             wagesLabel.text = interest > 0
                 ? $"Income ${income:N0}   Wages -${wages:N0}   Interest -${interest:N0}"

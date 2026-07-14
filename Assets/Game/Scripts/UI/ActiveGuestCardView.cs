@@ -17,6 +17,7 @@ public sealed class ActiveGuestCardView : MonoBehaviour
     [SerializeField] private Button ctaButton;
     [SerializeField] private TextMeshProUGUI ctaButtonLabel;
     [SerializeField] private GameObject emptyStatePlaceholder;
+    [SerializeField] private TextMeshProUGUI emptyStateLabel; // optional message inside the placeholder
     [SerializeField] private GameObject contentRoot;
 
     [Header("Editor preview")]
@@ -34,11 +35,12 @@ public sealed class ActiveGuestCardView : MonoBehaviour
 
     public object BoundGuestRef { get; private set; }
 
-    public void BindEmpty()
+    public void BindEmpty(string message = null)
     {
         BoundGuestRef = null;
         if (contentRoot != null) contentRoot.SetActive(false);
         if (emptyStatePlaceholder != null) emptyStatePlaceholder.SetActive(true);
+        if (emptyStateLabel != null && !string.IsNullOrEmpty(message)) emptyStateLabel.text = message;
     }
 
     public void Bind(object guestRef, Sprite portrait, string type, string requiredRoom,

@@ -13,6 +13,7 @@ public sealed class RoomTileView : MonoBehaviour
     [SerializeField] private TextMeshProUGUI bedTypeLabel;
     [SerializeField] private TextMeshProUGUI timerLabel;
     [SerializeField] private Button tapButton;
+    [SerializeField] private Image stateBadgeImage; // colored strip behind stateLabel
 
     [Header("Theme")]
     [SerializeField] private UITheme theme;
@@ -60,7 +61,14 @@ public sealed class RoomTileView : MonoBehaviour
     {
         if (backgroundImage != null)
         {
-            if (theme != null) backgroundImage.color = RoomStateUiMap.GetColor(state, theme);
+            // Keep the room photo readable: a light state-hued wash instead of a
+            // full tint (the old full tint made every state look the same green).
+            if (theme != null)
+            {
+                Color stateColor = RoomStateUiMap.GetColor(state, theme);
+                backgroundImage.color = Color.Lerp(Color.white, stateColor, 0.25f);
+                if (stateBadgeImage != null) stateBadgeImage.color = stateColor;
+            }
             var interior = PickInteriorSprite(category);
             if (interior != null) backgroundImage.sprite = interior;
         }
