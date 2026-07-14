@@ -195,9 +195,11 @@ public class Room2DDemoDayController : MonoBehaviour
         SetFrontDeskRunning(true);
         SetLoungeRunning(true);
 
-        if (demandLoop != null && demandLoop.useUpcomingDemandPreview)
+        if (demandLoop != null)
         {
-            demandLoop.ScheduleUpcomingDemandPreview();
+            if (demandLoop.useUpcomingDemandPreview) demandLoop.ScheduleUpcomingDemandPreview();
+            // 昨晚的客人清晨退房（没有过夜客时铺"昨晚的烂摊子"）——保洁的一天由此开始。
+            demandLoop.BeginMorningCheckoutWave();
         }
 
         RefreshOverview();
@@ -248,7 +250,9 @@ public class Room2DDemoDayController : MonoBehaviour
     {
         if (economy == null) return;
         int served = demandLoop != null ? demandLoop.successfulDemandCount : 0;
-        LastDayLedger = economy.CloseEconomicDay(served);
+        // 房费以退房结算为准（过夜模型）；按人头的兜底路径会让过夜客人被收两次。
+        bool checkoutRevenueLive = demandLoop != null && demandLoop.economySystem != null;
+        LastDayLedger = economy.CloseEconomicDay(checkoutRevenueLive ? 0 : served);
         playerCash = economy.Cash;
         OnDaySettled?.Invoke(demoDayIndex, served, LastDayLedger);
     }
@@ -258,6 +262,7 @@ public class Room2DDemoDayController : MonoBehaviour
     {
         demoDayIndex++;
         ResetPressureSystemsForNewDemoDay();
+        if (demandLoop != null) demandLoop.successfulDemandCount = 0; // 每日入住数，勿跨天累加
         EnterPreparationPhase();
         lastDemoAction = "Demo day restarted";
     }

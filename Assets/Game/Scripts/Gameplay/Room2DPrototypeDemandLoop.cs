@@ -181,8 +181,17 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
     public string lastResolvedAssignmentMode = "None";
 
     [Header("Occupancy")]
-    // Occupied 房间住满多少现实秒后自动退房，重新变成 Dirty。
-    public float occupiedDurationSeconds = 20f;
+    // Occupied 房间住满多少现实秒后自动退房。过夜模型：设为远大于一个营业日，
+    // 让退房统一发生在次日清晨的退房潮（BeginMorningCheckoutWave）。
+    public float occupiedDurationSeconds = 100000f;
+
+    [Header("Morning checkout wave (overnight stays)")]
+    [Tooltip("Seconds after the day opens before the first overnight guest checks out.")]
+    public float checkoutWaveFirstDelaySeconds = 3f;
+    [Tooltip("Stagger between successive overnight checkouts.")]
+    public float checkoutWaveIntervalSeconds = 4f;
+    [Tooltip("When a day opens with no overnight guests (fresh boot or loaded save — room occupancy isn't persisted), seed this many dirty rooms so housekeeping still has a morning.")]
+    public int fallbackMorningDirtyRooms = 3;
     public int simulatedCheckoutCount;
 
     [Header("Prototype Complaint Reassignment")]
@@ -1787,6 +1796,40 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
 
         return room == reservedRoomForUpcomingDemand
             || room == activeReservedRoomForFallback;
+    }
+
+    // 开门营业时调用：昨晚过夜的客人在清晨错峰退房 —— 逐间结算房费、产生脏房，
+    // 保洁的一天从退房潮开始。没有过夜客时（新开局/读档）用"昨晚的烂摊子"垫场。
+    public void BeginMorningCheckoutWave()
+    {
+        FindRoomsIfNeeded();
+        if (rooms == null) return;
+
+        int waveIndex = 0;
+        foreach (var room in rooms)
+        {
+            if (room == null || room.currentState != Room2DState.Occupied) continue;
+            // 让 ProcessOccupiedCheckouts 在 first + interval*i 秒后触发该房退房。
+            room.stateElapsedSeconds = occupiedDurationSeconds
+                - (checkoutWaveFirstDelaySeconds + checkoutWaveIntervalSeconds * waveIndex);
+            waveIndex++;
+        }
+
+        if (waveIndex == 0 && fallbackMorningDirtyRooms > 0)
+        {
+            int seeded = 0;
+            foreach (var room in rooms)
+            {
+                if (seeded >= fallbackMorningDirtyRooms) break;
+                if (room == null || room.currentState != Room2DState.Ready) continue;
+                room.currentState = Room2DState.Dirty;
+                room.guestCheckedOut = true;
+                room.stateElapsedSeconds = 0f;
+                RefreshRoomVisual(room);
+                seeded++;
+            }
+            if (seeded > 0) RefreshOverview();
+        }
     }
 
     [ContextMenu("Process Occupied Checkouts")]

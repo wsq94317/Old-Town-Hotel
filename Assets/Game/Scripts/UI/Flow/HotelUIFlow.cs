@@ -115,6 +115,16 @@ public sealed class HotelUIFlow : MonoBehaviour
         int sat = demandLoop != null ? demandLoop.prototypeSatisfactionScore : 0;
         var modal = modalManager.Show(dayEndModalPrefab);
         modal.Setup(day, servedGuests, ledger.Income, ledger.Wages, ledger.Interest, sat, sat, null);
+        modal.OnContinueClicked += HandleContinueToNextDay;
+    }
+
+    // Day-end Continue: roll the calendar and open the doors — the morning
+    // checkout wave fires inside StartOperatingPeriod.
+    private void HandleContinueToNextDay()
+    {
+        if (dayController == null) return;
+        dayController.RestartDemoDay();
+        dayController.StartOperatingPeriod();
     }
 
     private void Start()
