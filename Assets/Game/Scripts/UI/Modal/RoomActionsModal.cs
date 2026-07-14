@@ -38,6 +38,20 @@ public sealed class RoomActionsModal : ModalBase
         bool canAssignHsk = room != null && room.currentState == Room2DState.Dirty;
         if (assignHskButton != null) assignHskButton.interactable = canAssignHsk;
         if (doItYourselfButton != null) doItYourselfButton.interactable = canAssignHsk;
+        // Button tint only greys the background — grey the labels too, or a
+        // disabled action reads as a broken button.
+        TintLabel(assignHskButton, canAssignHsk, Color.white);
+        TintLabel(doItYourselfButton, canAssignHsk, new Color(0.227f, 0.165f, 0.110f));
+        if (stateLabel != null && room != null && !canAssignHsk)
+            stateLabel.text += "  ·  nothing to clean";
+    }
+
+    private static void TintLabel(Button button, bool enabled, Color enabledColor)
+    {
+        if (button == null) return;
+        var label = button.GetComponentInChildren<TextMeshProUGUI>();
+        if (label != null)
+            label.color = enabled ? enabledColor : new Color(0.62f, 0.58f, 0.52f);
     }
 
     protected override void OnOpened()

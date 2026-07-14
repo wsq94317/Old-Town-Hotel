@@ -23,6 +23,11 @@ public sealed class EconomySystem : MonoBehaviour
         if (config != null) Initialize(config);
     }
 
+    private void Start()
+    {
+        EnsureInitialized(); // second chance if Awake ran before config was ready
+    }
+
     // Production init (Awake) and explicit test init share this.
     public void Initialize(EconomyConfigSO cfg)
     {
@@ -40,6 +45,21 @@ public sealed class EconomySystem : MonoBehaviour
 
     public void InitializeForTest(EconomyConfigSO cfg) => Initialize(cfg);
 
+    // Self-heal: if Awake never initialized us (script-order/asset-import edge
+    // cases), initialize on first use instead of NRE-looping the day settle.
+    private bool EnsureInitialized()
+    {
+        if (Payroll != null) return true;
+        if (config == null)
+        {
+            Debug.LogError("EconomySystem: no EconomyConfigSO assigned — economy disabled.", this);
+            return false;
+        }
+        Debug.LogWarning("EconomySystem: initializing lazily (Awake didn't run with a config — check script order).", this);
+        Initialize(config);
+        return true;
+    }
+
     // ── Checkout income (Phase 6: tier price × satisfaction) ─────────────────
     // Credit one checked-out guest: nightly rate (caller resolves the room's tier
     // via RenovationConfigSO.NightlyRevenueFor) times the stay's satisfaction
@@ -47,6 +67,7 @@ public sealed class EconomySystem : MonoBehaviour
     // Returns the credited amount (for UI toasts / coin fly).
     public int RecordCheckout(int nightlyRate, float satisfactionMult)
     {
+        if (!EnsureInitialized()) return 0;
         float mult = Mathf.Clamp(satisfactionMult,
                                  ReputationLedger.MinSatisfaction,
                                  ReputationLedger.MaxSatisfaction);
@@ -67,6 +88,7 @@ public sealed class EconomySystem : MonoBehaviour
     // checkout hook is wired everywhere.
     public DayLedger CloseEconomicDay(int servedGuests)
     {
+        if (!EnsureInitialized()) return default;
         int income = _pendingCheckoutCount > 0
             ? _pendingCheckoutIncome
             : Mathf.Max(0, servedGuests) * config.roomRevenuePerGuest;
@@ -110,7 +132,7 @@ public sealed class EconomySystem : MonoBehaviour
     // Hire a candidate; if a signing cost is set, it must be affordable. Returns success.
     public bool HireCandidate(StaffMember candidate, int signingCost = 0)
     {
-        if (candidate == null) return false;
+        if (candidate == null || !EnsureInitialized()) return false;
         if (signingCost > 0)
         {
             if (Cash < signingCost) return false;
