@@ -73,6 +73,7 @@ public class WorldInputController : MonoBehaviour
 
     private ManagerInteraction _interaction;
     private ComplaintInteraction _complaint;
+    private DailyEventInteraction _events;
 
     private void HandleTap(Vector2 screenPos)
     {
@@ -81,6 +82,8 @@ public class WorldInputController : MonoBehaviour
         if (_interaction != null && _interaction.PanelOpen) return;
         if (_complaint == null) _complaint = FindFirstObjectByType<ComplaintInteraction>();
         if (_complaint != null && _complaint.PanelOpen) return;
+        if (_events == null) _events = FindFirstObjectByType<DailyEventInteraction>();
+        if (_events != null && _events.PanelOpen) return;
 
         if (_cam == null) { _cam = Camera.main; if (_cam == null) return; }
         Ray ray = _cam.ScreenPointToRay(screenPos);
