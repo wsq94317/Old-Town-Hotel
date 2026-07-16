@@ -180,6 +180,12 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
     public string lastAssignmentMode = "None";
     public string lastResolvedAssignmentMode = "None";
 
+    [Header("Closing / Phase Gating (day-cycle v2)")]
+    // CheckInPeak 才收新客；Preparation/Recovery 只运转退房潮与在场客人。
+    public bool acceptingNewGuests = true;
+    // 最近一次打烊清场送走的等待客人数（调试/测试用）。
+    public int lastClosingClearedGuestCount;
+
     [Header("Occupancy")]
     // Occupied 房间住满多少现实秒后自动退房。过夜模型：设为远大于一个营业日，
     // 让退房统一发生在次日清晨的退房潮（BeginMorningCheckoutWave）。
@@ -307,17 +313,22 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
             return;
         }
 
-        if (useUpcomingDemandPreview)
+        // day-cycle v2：只有开门迎客时段（CheckInPeak）才产生新客；
+        // 退房潮、在场客人（active/complaint）与日汇总在任何营业时段都照常运转。
+        if (acceptingNewGuests)
         {
-            TickUpcomingDemandPreview();
-        }
-        else
-        {
-            demandTimerSeconds += Time.deltaTime;
-            if (demandTimerSeconds >= demandIntervalSeconds)
+            if (useUpcomingDemandPreview)
             {
-                demandTimerSeconds = 0f;
-                GenerateOneDemand();
+                TickUpcomingDemandPreview();
+            }
+            else
+            {
+                demandTimerSeconds += Time.deltaTime;
+                if (demandTimerSeconds >= demandIntervalSeconds)
+                {
+                    demandTimerSeconds = 0f;
+                    GenerateOneDemand();
+                }
             }
         }
 
@@ -1796,6 +1807,48 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
 
         return room == reservedRoomForUpcomingDemand
             || room == activeReservedRoomForFallback;
+    }
+
+    // 18:00 打烊前清场：所有还在等待入住的客人（active + upcoming 队列 + 投诉重派等待）
+    // 全部离开，本版不做声誉惩罚。已入住（Occupied）客人不受影响，照常过夜。
+    public void ClearWaitingGuestsForClosing()
+    {
+        EnsureQueuesInitialised();
+        int cleared = 0;
+
+        if (activeDemandWaitingForManualAssignment)
+        {
+            activeDemandWaitingForManualAssignment = false;
+            activeDemandWaitSeconds = 0f;
+            activeReservedRoomForFallback = null;
+            activeReservedRoomName = "None";
+            activeDemandStatus = "Left - closing time";
+            cleared++;
+        }
+
+        cleared += _upcomingGuestTypes.Count;
+        _upcomingDemandTypes.Clear();
+        _upcomingDemandRoomPreferences.Clear();
+        _upcomingDemandFloorPreferences.Clear();
+        _upcomingDemandFacingPreferences.Clear();
+        _upcomingGuestTypes.Clear();
+        _upcomingGuestPreferences.Clear();
+        _upcomingBedTypePreferences.Clear();
+        _reservedRoomsForUpcomingDemands.Clear();
+        upcomingDemandEtaSeconds = 0f;
+        upcomingDemandPreviewText = "None";
+        reservedRoomForUpcomingDemand = null;
+        reservedRoomName = "None";
+
+        if (complaintWaitingForReassignment)
+        {
+            complaintWaitingForReassignment = false;
+            complaintReassignmentWaitSeconds = 0f;
+            complaintStatus = "Guest left - closing time";
+            cleared++;
+        }
+
+        lastClosingClearedGuestCount = cleared;
     }
 
     // 开门营业时调用：昨晚过夜的客人在清晨错峰退房 —— 逐间结算房费、产生脏房，
