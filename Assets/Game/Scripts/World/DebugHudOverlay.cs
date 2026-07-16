@@ -58,7 +58,7 @@ public class DebugHudOverlay : MonoBehaviour
             }
         }
         GUI.Label(new Rect(10, 10, 600, 22), $"Day {dayController.CurrentDay}  {dayController.Clock.CurrentTimeFormatted}  [{dayController.currentPhase}]");
-        GUI.Label(new Rect(10, 32, 600, 22), $"Cash ${(economy != null ? economy.Cash : dayController.PlayerCash)}");
+        GUI.Label(new Rect(10, 32, 600, 22), $"Cash ${(economy != null ? economy.Cash : dayController.PlayerCash)}   Prestige {ManagerReputation.Prestige}");
         GUI.Label(new Rect(10, 54, 600, 22), $"Rooms  dirty:{dirty}  cleaning:{cleaning}  inspect:{awaiting}  occupied:{occupied}");
         GUI.Label(new Rect(10, 76, 600, 22), demandLoop != null ? $"Guests  served:{demandLoop.successfulDemandCount}  queue:{demandLoop.UpcomingQueueCount}  checkouts:{demandLoop.simulatedCheckoutCount}" : "");
     }
