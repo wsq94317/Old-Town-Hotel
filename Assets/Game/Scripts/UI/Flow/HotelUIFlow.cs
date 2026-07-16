@@ -37,10 +37,6 @@ public sealed class HotelUIFlow : MonoBehaviour
     [Header("Toast")]
     [SerializeField] private ToastView toast;
 
-    [Header("Day flow")]
-    [Tooltip("Start the operating period automatically once the scene is up — without this the day sits in PREP forever (this shell has no Start Day button yet). Interim until the Morning Brief modal (ui-spec §9.2) owns day start.")]
-    [SerializeField] private bool autoStartOperatingPeriod = true;
-
     private void Awake()
     {
         if (bottomNav != null) bottomNav.OnTabSelected += HandleTabSelected;
@@ -118,32 +114,19 @@ public sealed class HotelUIFlow : MonoBehaviour
         modal.OnContinueClicked += HandleContinueToNextDay;
     }
 
-    // Day-end Continue: roll the calendar and open the doors — the morning
-    // checkout wave fires inside StartOperatingPeriod.
+    // Day-end Continue: roll the calendar back to 8:00 Preparation — the morning
+    // checkout wave and the 10:00 doors-open are both driven by the GameClock.
     private void HandleContinueToNextDay()
     {
         if (dayController == null) return;
         dayController.RestartDemoDay();
-        dayController.StartOperatingPeriod();
     }
 
     private void Start()
     {
         SwitchToTab(HotelTab.FrontDesk);
-        if (autoStartOperatingPeriod) StartCoroutine(AutoStartOperatingPeriod());
-    }
-
-    // The day controller's own Start() enters Preparation and pauses the demand
-    // loop — if we open the doors before it has run, it overrides us. Always let
-    // at least one frame pass, then wait for its Start to complete (3s cap).
-    private System.Collections.IEnumerator AutoStartOperatingPeriod()
-    {
-        float deadline = Time.unscaledTime + 3f;
-        do
-        {
-            yield return null;
-        } while (Time.unscaledTime < deadline && (dayController == null || !dayController.didStart));
-        if (dayController != null) dayController.StartOperatingPeriod();
+        // day-cycle v2: the day flows on the GameClock (8:00 Preparation starts
+        // automatically) — the old auto-start coroutine is gone.
     }
 
     public void SwitchToTab(HotelTab tab)
