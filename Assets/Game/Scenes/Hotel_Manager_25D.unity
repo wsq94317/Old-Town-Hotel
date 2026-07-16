@@ -10763,6 +10763,7 @@ GameObject:
   - component: {fileID: 1696817221}
   - component: {fileID: 1696817220}
   - component: {fileID: 1696817223}
+  - component: {fileID: 1696817224}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -10864,6 +10865,18 @@ MonoBehaviour:
   cameraOffset: {x: -8, y: 10, z: -8}
   worldMinXZ: {x: -10, y: -6}
   worldMaxXZ: {x: 10, y: 6}
+--- !u!114 &1696817224
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1696817219}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 18635d8d5ad3da8499dc3b307e84cc43, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: OldTownHotel.Game::CameraShaker
 --- !u!1 &1713728610
 GameObject:
   m_ObjectHideFlags: 0
@@ -12830,6 +12843,7 @@ GameObject:
   - component: {fileID: 2129138151}
   - component: {fileID: 2129138153}
   - component: {fileID: 2129138154}
+  - component: {fileID: 2129138155}
   m_Layer: 0
   m_Name: Systems
   m_TagString: Untagged
@@ -13140,6 +13154,19 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: OldTownHotel.Game::ManagerInteraction
   manager: {fileID: 128087638}
+  demandLoop: {fileID: 2129138147}
+--- !u!114 &2129138155
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2129138142}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d9253df7b7237c1419c4af38d4a091be, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: OldTownHotel.Game::JuiceHooks
   demandLoop: {fileID: 2129138147}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
