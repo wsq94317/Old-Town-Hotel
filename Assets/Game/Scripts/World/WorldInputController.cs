@@ -42,7 +42,7 @@ public class WorldInputController : MonoBehaviour
             if (_classifier.IsDragging && cameraRig != null)
             {
                 cameraRig.SetPeeking(true);
-                cameraRig.ApplyPeekDelta(pos - _lastPos);
+                cameraRig.ApplyPeekScreenDrag(_lastPos, pos);
             }
             _lastPos = pos;
         }
