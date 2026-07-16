@@ -43,6 +43,13 @@ public sealed class GameClock
         _currentHour = Mathf.Min(_dayEndHour, _currentHour + realDeltaSeconds * hoursPerRealSecond);
     }
 
+    /// <summary>直接推进 N 个游戏小时（事件用：如进警局跳过营业时间）。到打烊即 clamp。</summary>
+    public void AdvanceGameHours(float gameHours)
+    {
+        if (gameHours <= 0f) return;
+        _currentHour = Mathf.Min(_dayEndHour, _currentHour + gameHours);
+    }
+
     /// <summary>回到当日开始时刻（新一天用）。</summary>
     public void ResetToDayStart() => _currentHour = _dayStartHour;
 

@@ -12844,6 +12844,7 @@ GameObject:
   - component: {fileID: 2129138153}
   - component: {fileID: 2129138154}
   - component: {fileID: 2129138155}
+  - component: {fileID: 2129138156}
   m_Layer: 0
   m_Name: Systems
   m_TagString: Untagged
@@ -13168,6 +13169,26 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: OldTownHotel.Game::JuiceHooks
   demandLoop: {fileID: 2129138147}
+--- !u!114 &2129138156
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2129138142}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8af1a78651d2d784f8041800f27eb1f6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: OldTownHotel.Game::ComplaintInteraction
+  demandLoop: {fileID: 2129138147}
+  dayController: {fileID: 2129138148}
+  economy: {fileID: 2129138146}
+  spawner: {fileID: 2129138152}
+  manager: {fileID: 0}
+  complaintPoint: {x: -0.9, y: 0, z: 2.2}
+  doorPoint: {x: 0, y: 0, z: -5.2}
+  rngSeed: 777
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

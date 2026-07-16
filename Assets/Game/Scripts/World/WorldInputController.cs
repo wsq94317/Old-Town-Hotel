@@ -72,12 +72,15 @@ public class WorldInputController : MonoBehaviour
         EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
 
     private ManagerInteraction _interaction;
+    private ComplaintInteraction _complaint;
 
     private void HandleTap(Vector2 screenPos)
     {
         // OnGUI 决策面板打开时吞掉世界点击（OnGUI 不走 EventSystem）。
         if (_interaction == null) _interaction = FindFirstObjectByType<ManagerInteraction>();
         if (_interaction != null && _interaction.PanelOpen) return;
+        if (_complaint == null) _complaint = FindFirstObjectByType<ComplaintInteraction>();
+        if (_complaint != null && _complaint.PanelOpen) return;
 
         if (_cam == null) { _cam = Camera.main; if (_cam == null) return; }
         Ray ray = _cam.ScreenPointToRay(screenPos);

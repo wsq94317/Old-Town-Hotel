@@ -53,6 +53,16 @@ public class GameClockTest
     }
 
     [Test]
+    public void AdvanceGameHours_JumpsAndClamps()
+    {
+        var clock = new GameClock(180f, 8f, 22f);
+        clock.AdvanceGameHours(3f);
+        Assert.AreEqual(11f, clock.CurrentHour, 0.001f);
+        clock.AdvanceGameHours(999f);
+        Assert.AreEqual(22f, clock.CurrentHour, 0.001f); // clamp 到打烊
+    }
+
+    [Test]
     public void ResetToDayStart_RewindsClock()
     {
         var clock = MakeClock();
