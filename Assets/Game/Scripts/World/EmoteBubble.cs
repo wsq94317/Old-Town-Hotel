@@ -4,10 +4,10 @@ using UnityEngine;
 // 💤=灰蓝(偷懒) / 🐌=棕(拖延标记) / ❗=红(抓包瞬间闪现)。
 public class EmoteBubble : MonoBehaviour
 {
-    public enum Emote { None, Sleep, Delay, Alert }
+    public enum Emote { None, Sleep, Delay, Alert, Grudge }
 
     private Renderer _renderer;
-    private static Material _matSleep, _matDelay, _matAlert;
+    private static Material _matSleep, _matDelay, _matAlert, _matGrudge;
 
     public static EmoteBubble Attach(Transform parent)
     {
@@ -43,6 +43,9 @@ public class EmoteBubble : MonoBehaviour
             case Emote.Delay:
                 if (_matDelay == null) _matDelay = new Material(shader) { color = new Color(0.6f, 0.4f, 0.2f) };
                 return _matDelay;
+            case Emote.Grudge:
+                if (_matGrudge == null) _matGrudge = new Material(shader) { color = new Color(0.75f, 0.15f, 0.5f) };
+                return _matGrudge;
             default:
                 if (_matAlert == null) _matAlert = new Material(shader) { color = new Color(0.95f, 0.15f, 0.15f) };
                 return _matAlert;

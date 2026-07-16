@@ -90,6 +90,13 @@ public class WorldInputController : MonoBehaviour
         // 忽略 trigger（楼梯触发盒）；NavBlock 隐形墙在 Ignore Raycast 层，同样不拦射线。
         if (!Physics.Raycast(ray, out RaycastHit hit, 200f, ~0, QueryTriggerInteraction.Ignore)) return;
 
+        // 指挥模式：这次点击=指定房间
+        if (_interaction != null && _interaction.InCommandMode)
+        {
+            _interaction.CommandTarget(hit.point);
+            return;
+        }
+
         // 点到员工 → 交给监督交互（近=开面板，远=走过去）
         var staff = hit.collider.GetComponentInParent<StaffAgent>();
         if (staff != null)

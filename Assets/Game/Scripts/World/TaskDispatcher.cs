@@ -56,4 +56,41 @@ public class TaskDispatcher : MonoBehaviour
     {
         if (room != null) _claimed.Remove(room);
     }
+
+    /// <summary>经理指挥插队：把某间房强塞给指定员工（抢占双方的当前任务/认领）。</summary>
+    public bool ForceAssign(StaffAgent agent, Room2DEntity room)
+    {
+        if (agent == null || room == null || agent.Member == null) return false;
+
+        StaffTaskKind kind;
+        if (room.currentState == Room2DState.Dirty && agent.Member.Role == StaffRole.Housekeeper)
+            kind = StaffTaskKind.Clean;
+        else if (room.currentState == Room2DState.AwaitingInspection && agent.Member.Role == StaffRole.Inspector)
+            kind = StaffTaskKind.Inspect;
+        else
+            return false; // 房态与角色不匹配
+
+        // 目标房已被别人认领 → 只让占用该房的那位撂下
+        if (_claimed.Contains(room) && spawner != null)
+        {
+            foreach (var other in spawner.Agents)
+            {
+                if (other != null && other != agent && other.CurrentTaskRoom == room)
+                {
+                    other.AbortTask();
+                    break;
+                }
+            }
+        }
+        // 该员工手头有活 → 撂下（AbortTask 触发 OnTaskFinished 释放旧 claim）
+        if (!agent.IsIdle) agent.AbortTask();
+
+        EnsureSubscribed(agent);
+        if (agent.AssignTask(new StaffTask(room, kind)))
+        {
+            _claimed.Add(room);
+            return true;
+        }
+        return false;
+    }
 }

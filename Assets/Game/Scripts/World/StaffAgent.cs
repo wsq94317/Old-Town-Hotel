@@ -37,6 +37,13 @@ public class StaffAgent : MonoBehaviour
     public bool HasDelayMark { get; private set; }
     public bool IsSlacking => _slack != null && _slack.Current == SlackFsm.State.Slacking;
 
+    private float _grudgeUntil;
+    /// <summary>Diva 被训斥后的记仇窗口：拒接任何任务（💢）。</summary>
+    public bool IsGrudging => Time.time < _grudgeUntil;
+
+    /// <summary>当前任务目标房（无任务=null）。指挥抢占判定用。</summary>
+    public Room2DEntity CurrentTaskRoom => _hasTask ? _task.Room : null;
+
     /// <summary>任务结束（完成或放弃）——TaskDispatcher 订阅以释放 claim。</summary>
     public event System.Action<StaffAgent, Room2DEntity> OnTaskFinished;
 
@@ -69,6 +76,7 @@ public class StaffAgent : MonoBehaviour
     public bool AssignTask(StaffTask task)
     {
         if (_state != AgentState.Idle || task.Room == null) return false;
+        if (IsGrudging) return false; // 记仇中：老娘不干
         _task = task;
         _hasTask = true;
         _slack?.ResetShiftRecord();
@@ -219,9 +227,29 @@ public class StaffAgent : MonoBehaviour
         var outcome = CatchResolutionLogic.Resolve(choice, Member);
         Member?.AdjustMorale(outcome.MoraleDelta);
         if (outcome.SpeedBuff) _speedBuffUntil = Time.time + 20f;
+        if (outcome.GrudgeTriggered)
+        {
+            // Diva 记仇：30 秒拒接单，💢 挂头顶；正在干的活直接撂挑子
+            _grudgeUntil = Time.time + 30f;
+            AbortTask();
+            FloatingTextFx.Spawn(transform.position, "HMPH!", new Color(0.85f, 0.2f, 0.55f));
+        }
         _slack?.ResetShiftRecord();
         HasDelayMark = false;
-        // ContagionSignal / Grudge 的扩散效果留 M4+（记录在 NIGHT_LOG 假设）
+        // ContagionSignal（无视→偷懒传染）仍为占位信号
+    }
+
+    /// <summary>中止当前任务（指挥插队/记仇撂挑子用）：打扫到一半的房间回 Dirty，claim 由事件释放。</summary>
+    public void AbortTask()
+    {
+        if (_state == AgentState.Idle) return;
+        if (_state == AgentState.Working && _hasTask
+            && _task.Kind == StaffTaskKind.Clean && _task.Room != null
+            && _task.Room.currentState == Room2DState.Cleaning)
+        {
+            _task.Room.SetState(Room2DState.Dirty); // 半途而废=白扫
+        }
+        FinishTask();
     }
 
     /// <summary>质询（点 🐌）：有偷懒记录=抓包成立；否则错怪好人。</summary>
@@ -247,6 +275,7 @@ public class StaffAgent : MonoBehaviour
     {
         if (_emote == null) return;
         if (IsSlacking) _emote.Show(EmoteBubble.Emote.Sleep);
+        else if (IsGrudging) _emote.Show(EmoteBubble.Emote.Grudge);
         else if (HasDelayMark) _emote.Show(EmoteBubble.Emote.Delay);
         else _emote.Show(EmoteBubble.Emote.None);
     }

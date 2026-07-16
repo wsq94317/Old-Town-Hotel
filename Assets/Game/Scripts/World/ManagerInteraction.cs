@@ -17,6 +17,36 @@ public class ManagerInteraction : MonoBehaviour
     /// <summary>有决策面板打开（OnGUI 不走 EventSystem，WorldInputController 靠它拦截穿透点击）。</summary>
     public bool PanelOpen => _caughtAgent != null || _panelAgent != null;
 
+    // ── 指挥模式：面板选"指挥"后，下一次世界点击=指定房间插队 ────────────────
+    private StaffAgent _commandAgent;
+    private TaskDispatcher _dispatcher;
+
+    public bool InCommandMode => _commandAgent != null;
+
+    /// <summary>指挥模式下的世界点击：就近找房（3m 内）强制指派。</summary>
+    public void CommandTarget(Vector3 worldPoint)
+    {
+        var agent = _commandAgent;
+        _commandAgent = null;
+        if (agent == null || demandLoop == null || demandLoop.rooms == null) return;
+        if (_dispatcher == null) _dispatcher = FindFirstObjectByType<TaskDispatcher>();
+        if (_dispatcher == null) return;
+
+        Room2DEntity best = null;
+        float bestDist = 3f;
+        foreach (var r in demandLoop.rooms)
+        {
+            if (r == null) continue;
+            Vector3 d = r.transform.position - worldPoint;
+            d.y = 0f;
+            if (d.magnitude < bestDist) { bestDist = d.magnitude; best = r; }
+        }
+        if (best == null) { Say("No room there."); return; }
+        Say(_dispatcher.ForceAssign(agent, best)
+            ? $"{agent.Member?.DisplayName} → Room {best.roomNumber}. Chop chop."
+            : $"Room {best.roomNumber} doesn't need {agent.Member?.Role} right now.");
+    }
+
     private void Awake()
     {
         if (manager == null) manager = FindFirstObjectByType<ManagerController>();
@@ -95,8 +125,8 @@ public class ManagerInteraction : MonoBehaviour
         if (_panelAgent != null)
         {
             var m = _panelAgent.Member;
-            GUI.Box(new Rect(w * 0.5f - 150, h * 0.4f, 300, 122),
-                $"{m?.DisplayName} ({m?.Role})  morale:{m?.Morale}");
+            GUI.Box(new Rect(w * 0.5f - 150, h * 0.4f, 300, 150),
+                $"{m?.DisplayName} ({m?.Role})  morale:{m?.Morale}" + (_panelAgent.IsGrudging ? "  💢 GRUDGING" : ""));
             if (GUI.Button(new Rect(w * 0.5f - 130, h * 0.4f + 34, 260, 24), "Hurry up! (speed up, morale -3)"))
             { _panelAgent.Hurry(); Say("Hurried."); _panelAgent = null; }
             bool canInterrogate = _panelAgent.HasDelayMark;
@@ -110,7 +140,13 @@ public class ManagerInteraction : MonoBehaviour
                 else Say($"WRONG ACCUSATION! {agent.Member?.DisplayName} is furious (morale {SupervisionTuning.WrongAccusationMoraleDelta}).");
             }
             GUI.enabled = true;
-            if (GUI.Button(new Rect(w * 0.5f - 130, h * 0.4f + 90, 260, 24), "Close"))
+            if (GUI.Button(new Rect(w * 0.5f - 130, h * 0.4f + 90, 260, 24), "Command → tap a room"))
+            {
+                _commandAgent = _panelAgent;
+                _panelAgent = null;
+                Say("Now tap the room you want them on.");
+            }
+            if (GUI.Button(new Rect(w * 0.5f - 130, h * 0.4f + 118, 260, 24), "Close"))
                 _panelAgent = null;
             return;
         }
