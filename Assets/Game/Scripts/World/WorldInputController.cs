@@ -71,8 +71,14 @@ public class WorldInputController : MonoBehaviour
     private static bool IsOverUi() =>
         EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
 
+    private ManagerInteraction _interaction;
+
     private void HandleTap(Vector2 screenPos)
     {
+        // OnGUI 决策面板打开时吞掉世界点击（OnGUI 不走 EventSystem）。
+        if (_interaction == null) _interaction = FindFirstObjectByType<ManagerInteraction>();
+        if (_interaction != null && _interaction.PanelOpen) return;
+
         if (_cam == null) { _cam = Camera.main; if (_cam == null) return; }
         Ray ray = _cam.ScreenPointToRay(screenPos);
         // 忽略 trigger（楼梯触发盒）；NavBlock 隐形墙在 Ignore Raycast 层，同样不拦射线。

@@ -19,6 +19,15 @@
 - StaffAgent 跨层状态机（走楼梯点→瞬移，FloorNavigator 有测试）；TaskDispatcher 0.5s 节拍派活（claim 表防重复）；AgentFloorVisibility 隐藏层不可见
 - Play 验证：3 过夜客退房 → HSK 上 2F 打扫 → INSP 跟进验房 → 全部回 Ready，同时新客自动入住。199/199 测试绿
 
+### [3] M2-T5 两天全自主验收 — commit `1e3d1c0` ✅
+- 400 秒无人干预：Day1 垫场退房→自动扫/验→自动入住；Day2 **7 位真实过夜客**退房、净利 +308、自动进入 Day3。M2 正式完成
+
+### [4] M3 监督玩法核心 — commit `fc9c0a1` ✅
+- **纯逻辑全 TDD（210/210 绿）**：SlackFsm（经理不在场才偷懒；进层→惊醒延迟(Lazy 3s/普通1.5s)→2s 慌张装忙，两窗口内靠近=现场抓包；偷懒冻结工作进度+留班次记录）；CatchResolution（督促-5/训斥-15+Diva再-10/无视+3）；InterrogateLogic（🐌质询：有记录=坐实，无=错怪-20士气）；FlawPolicy（瑕疵率按 Quality 40%→5% 插值、INSP 漏检 50%→5%）
+- 集成：StaffAgent 嵌 FSM+拖延标记+瑕疵/漏检 roll；EmoteBubble（💤/🐌/❗色块占位）；RoomFlaw（房角污渍，经理同层可见，走近→OnGUI"打回重扫"）；ManagerInteraction（抓包三选一面板/员工面板[催一催/质询]/瑕疵打回）；点击员工路由进 WorldInputController
+- **Play 验证**：Inspector 真实偷懒（💤+🐌 挂起、进度冻结）→ 经理空降突袭 → OnAnyCaught 事件触发→面板弹出；打扫瑕疵按概率出现。控制台零错误
+- **假设（醒后请确认）**：①无"记仇"特质→用 Diva 承担训斥记仇；②打回重扫不指定原 HSK（dispatcher 正常派）；③"无视→偷懒传染"只返回信号未实现扩散（留 M4）；④OnGUI 临时面板，正式 UI 统一 M6；⑤数值全在 SupervisionTuning 静态类（占位，日后迁 SO）
+
 ### [2] M2-T4 客人关键节点可视化 — commit `75b572f` ✅
 - GuestAgent（一次性行程走位器，跨层同员工方案）+ GuestFlowVisualizer（纯表现层镜像模拟：到店→排队→入住上楼进房→消失；退房→出门消失）
 - Play 验证：3 退房客走完离场、4 新客排队→入住→上 2F 进房。零模拟状态改动

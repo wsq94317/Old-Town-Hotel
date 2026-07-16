@@ -14,6 +14,9 @@ public class ManagerInteraction : MonoBehaviour
     private string _lastMessage = "";
     private float _messageUntil;
 
+    /// <summary>有决策面板打开（OnGUI 不走 EventSystem，WorldInputController 靠它拦截穿透点击）。</summary>
+    public bool PanelOpen => _caughtAgent != null || _panelAgent != null;
+
     private void Awake()
     {
         if (manager == null) manager = FindFirstObjectByType<ManagerController>();
