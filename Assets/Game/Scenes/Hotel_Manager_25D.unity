@@ -651,7 +651,7 @@ GameObject:
   - component: {fileID: 99153057}
   - component: {fileID: 99153058}
   m_Layer: 0
-  m_Name: RoomAnchor
+  m_Name: Room_108_Anchor
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -666,11 +666,11 @@ Transform:
   m_GameObject: {fileID: 99153056}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalPosition: {x: 7.5, y: 4, z: -3.5}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 1278388641}
+  m_Father: {fileID: 694643968}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &99153058
 MonoBehaviour:
@@ -2567,7 +2567,7 @@ GameObject:
   - component: {fileID: 313166240}
   - component: {fileID: 313166241}
   m_Layer: 0
-  m_Name: RoomAnchor
+  m_Name: Room_111_Anchor
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -2582,11 +2582,11 @@ Transform:
   m_GameObject: {fileID: 313166239}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalPosition: {x: 2.5, y: 8, z: 3.5}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 1196261454}
+  m_Father: {fileID: 694643968}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &313166241
 MonoBehaviour:
@@ -2762,7 +2762,6 @@ Transform:
   - {fileID: 302812767}
   - {fileID: 1600609496}
   - {fileID: 1791337618}
-  - {fileID: 716018114}
   m_Father: {fileID: 1652457200}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &332590249
@@ -3681,7 +3680,6 @@ Transform:
   - {fileID: 52977678}
   - {fileID: 312773821}
   - {fileID: 295144475}
-  - {fileID: 2119796845}
   m_Father: {fileID: 1652457200}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &494373714
@@ -3920,7 +3918,7 @@ GameObject:
   - component: {fileID: 508002940}
   - component: {fileID: 508002941}
   m_Layer: 0
-  m_Name: RoomAnchor
+  m_Name: Room_109_Anchor
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -3935,11 +3933,11 @@ Transform:
   m_GameObject: {fileID: 508002939}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalPosition: {x: -7.5, y: 8, z: 3.5}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 998753408}
+  m_Father: {fileID: 694643968}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &508002941
 MonoBehaviour:
@@ -4079,7 +4077,6 @@ Transform:
   - {fileID: 1135973016}
   - {fileID: 1358309884}
   - {fileID: 1066759217}
-  - {fileID: 775736324}
   m_Father: {fileID: 1652457200}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &536228955
@@ -4632,7 +4629,6 @@ Transform:
   - {fileID: 163088935}
   - {fileID: 1038191927}
   - {fileID: 1128193131}
-  - {fileID: 1715416179}
   m_Father: {fileID: 722618742}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &608218411
@@ -5362,7 +5358,7 @@ GameObject:
   - component: {fileID: 684585513}
   - component: {fileID: 684585514}
   m_Layer: 0
-  m_Name: RoomAnchor
+  m_Name: Room_101_Anchor
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -5377,11 +5373,11 @@ Transform:
   m_GameObject: {fileID: 684585512}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalPosition: {x: -7.5, y: 4, z: 3.5}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 1840006116}
+  m_Father: {fileID: 694643968}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &684585514
 MonoBehaviour:
@@ -5418,6 +5414,49 @@ MonoBehaviour:
   blockRemainingHours: 0
   roomCategory: 0
   roomAttributes: []
+--- !u!1 &694643967
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 694643968}
+  m_Layer: 0
+  m_Name: RoomData
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &694643968
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 694643967}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 1982563886}
+  - {fileID: 716018114}
+  - {fileID: 1958636435}
+  - {fileID: 1713728611}
+  - {fileID: 1715416179}
+  - {fileID: 99153057}
+  - {fileID: 1272614178}
+  - {fileID: 508002940}
+  - {fileID: 2119796845}
+  - {fileID: 684585513}
+  - {fileID: 313166240}
+  - {fileID: 775736324}
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &710115472
 GameObject:
   m_ObjectHideFlags: 0
@@ -5493,7 +5532,7 @@ GameObject:
   - component: {fileID: 716018114}
   - component: {fileID: 716018115}
   m_Layer: 0
-  m_Name: RoomAnchor
+  m_Name: Room_104_Anchor
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -5508,11 +5547,11 @@ Transform:
   m_GameObject: {fileID: 716018113}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalPosition: {x: 7.5, y: 4, z: 3.5}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 332390760}
+  m_Father: {fileID: 694643968}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &716018115
 MonoBehaviour:
@@ -5837,7 +5876,7 @@ GameObject:
   - component: {fileID: 775736324}
   - component: {fileID: 775736325}
   m_Layer: 0
-  m_Name: RoomAnchor
+  m_Name: Room_106_Anchor
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -5852,11 +5891,11 @@ Transform:
   m_GameObject: {fileID: 775736323}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalPosition: {x: -2.5, y: 4, z: -3.5}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 528597911}
+  m_Father: {fileID: 694643968}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &775736325
 MonoBehaviour:
@@ -6928,7 +6967,6 @@ Transform:
   - {fileID: 890467663}
   - {fileID: 176634005}
   - {fileID: 824421804}
-  - {fileID: 508002940}
   m_Father: {fileID: 722618742}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1032733612
@@ -7190,7 +7228,6 @@ Transform:
   - {fileID: 255074304}
   - {fileID: 609270993}
   - {fileID: 253645213}
-  - {fileID: 1713728611}
   m_Father: {fileID: 722618742}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1066365396
@@ -8220,7 +8257,6 @@ Transform:
   - {fileID: 1900925832}
   - {fileID: 501603718}
   - {fileID: 2328777}
-  - {fileID: 1982563886}
   m_Father: {fileID: 1652457200}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1192445360
@@ -8309,7 +8345,6 @@ Transform:
   - {fileID: 680016714}
   - {fileID: 308704748}
   - {fileID: 1594804311}
-  - {fileID: 313166240}
   m_Father: {fileID: 722618742}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1197458054
@@ -8837,7 +8872,7 @@ GameObject:
   - component: {fileID: 1272614178}
   - component: {fileID: 1272614179}
   m_Layer: 0
-  m_Name: RoomAnchor
+  m_Name: Room_107_Anchor
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -8852,11 +8887,11 @@ Transform:
   m_GameObject: {fileID: 1272614177}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalPosition: {x: 2.5, y: 4, z: -3.5}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 1352165636}
+  m_Father: {fileID: 694643968}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &1272614179
 MonoBehaviour:
@@ -8926,7 +8961,6 @@ Transform:
   - {fileID: 1365069783}
   - {fileID: 1757280854}
   - {fileID: 641671180}
-  - {fileID: 99153057}
   m_Father: {fileID: 1652457200}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1352165635
@@ -8962,7 +8996,6 @@ Transform:
   - {fileID: 769101298}
   - {fileID: 1961968999}
   - {fileID: 1891784820}
-  - {fileID: 1272614178}
   m_Father: {fileID: 1652457200}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1358309883
@@ -9502,7 +9535,6 @@ Transform:
   - {fileID: 988503449}
   - {fileID: 1500816684}
   - {fileID: 1810915178}
-  - {fileID: 1958636435}
   m_Father: {fileID: 1652457200}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1443254567
@@ -10827,11 +10859,11 @@ MonoBehaviour:
   target: {fileID: 128087641}
   floors: {fileID: 734262739}
   followLerp: 6
-  peekRadius: 4
   peekReturnLerp: 8
   peekHoldSeconds: 1.5
-  dragToWorld: 0.02
   cameraOffset: {x: -8, y: 10, z: -8}
+  worldMinXZ: {x: -10, y: -6}
+  worldMaxXZ: {x: 10, y: 6}
 --- !u!1 &1713728610
 GameObject:
   m_ObjectHideFlags: 0
@@ -10843,7 +10875,7 @@ GameObject:
   - component: {fileID: 1713728611}
   - component: {fileID: 1713728612}
   m_Layer: 0
-  m_Name: RoomAnchor
+  m_Name: Room_110_Anchor
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -10858,11 +10890,11 @@ Transform:
   m_GameObject: {fileID: 1713728610}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalPosition: {x: -2.5, y: 8, z: 3.5}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 1062215550}
+  m_Father: {fileID: 694643968}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &1713728612
 MonoBehaviour:
@@ -10910,7 +10942,7 @@ GameObject:
   - component: {fileID: 1715416179}
   - component: {fileID: 1715416180}
   m_Layer: 0
-  m_Name: RoomAnchor
+  m_Name: Room_112_Anchor
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -10925,11 +10957,11 @@ Transform:
   m_GameObject: {fileID: 1715416178}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalPosition: {x: 7.5, y: 8, z: 3.5}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 596850919}
+  m_Father: {fileID: 694643968}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &1715416180
 MonoBehaviour:
@@ -11614,7 +11646,6 @@ Transform:
   - {fileID: 837757796}
   - {fileID: 133616815}
   - {fileID: 1219132725}
-  - {fileID: 684585513}
   m_Father: {fileID: 1652457200}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1856547254
@@ -12204,7 +12235,7 @@ GameObject:
   - component: {fileID: 1958636435}
   - component: {fileID: 1958636436}
   m_Layer: 0
-  m_Name: RoomAnchor
+  m_Name: Room_102_Anchor
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -12219,11 +12250,11 @@ Transform:
   m_GameObject: {fileID: 1958636434}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalPosition: {x: -2.5, y: 4, z: 3.5}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 1424771172}
+  m_Father: {fileID: 694643968}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &1958636436
 MonoBehaviour:
@@ -12490,7 +12521,7 @@ GameObject:
   - component: {fileID: 1982563886}
   - component: {fileID: 1982563887}
   m_Layer: 0
-  m_Name: RoomAnchor
+  m_Name: Room_103_Anchor
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -12505,11 +12536,11 @@ Transform:
   m_GameObject: {fileID: 1982563885}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalPosition: {x: 2.5, y: 4, z: 3.5}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 1191481091}
+  m_Father: {fileID: 694643968}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &1982563887
 MonoBehaviour:
@@ -12723,7 +12754,7 @@ GameObject:
   - component: {fileID: 2119796845}
   - component: {fileID: 2119796846}
   m_Layer: 0
-  m_Name: RoomAnchor
+  m_Name: Room_105_Anchor
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -12738,11 +12769,11 @@ Transform:
   m_GameObject: {fileID: 2119796844}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalPosition: {x: -7.5, y: 4, z: -3.5}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 475672475}
+  m_Father: {fileID: 694643968}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &2119796846
 MonoBehaviour:
@@ -12779,6 +12810,274 @@ MonoBehaviour:
   blockRemainingHours: 0
   roomCategory: 0
   roomAttributes: []
+--- !u!1 &2129138142
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2129138150}
+  - component: {fileID: 2129138149}
+  - component: {fileID: 2129138148}
+  - component: {fileID: 2129138147}
+  - component: {fileID: 2129138146}
+  - component: {fileID: 2129138145}
+  - component: {fileID: 2129138144}
+  - component: {fileID: 2129138143}
+  m_Layer: 0
+  m_Name: Systems
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &2129138143
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2129138142}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e9555c85efe70944aae20248003974e1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: OldTownHotel.Game::DebugHudOverlay
+  dayController: {fileID: 0}
+  demandLoop: {fileID: 0}
+  economy: {fileID: 0}
+  autoContinueDelaySeconds: 3
+--- !u!114 &2129138144
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2129138142}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 30d980753a8e9f6438db8944087c6975, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: OldTownHotel.Game::SaveCoordinator
+  economy: {fileID: 2129138146}
+  renovation: {fileID: 2129138145}
+  dayController: {fileID: 2129138148}
+  demandLoop: {fileID: 2129138147}
+  autoLoadOnStart: 0
+  autoSaveOnDayEnd: 1
+--- !u!114 &2129138145
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2129138142}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 25ad28889a08f9b4ca17469e069fe2d4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: OldTownHotel.Game::RenovationSystem
+  config: {fileID: 11400000, guid: de4c413330eb4874da53e1f1c148d565, type: 2}
+  economy: {fileID: 0}
+  dayController: {fileID: 0}
+  totalRooms: 8
+  startingRoomNumber: 101
+--- !u!114 &2129138146
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2129138142}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d7db33cf921815a4e8561217d3616ad8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: OldTownHotel.Game::EconomySystem
+  config: {fileID: 11400000, guid: 2655617a3b300d54085f439e504e9d05, type: 2}
+--- !u!114 &2129138147
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2129138142}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 31297b68799554d199110d68bfedaf28, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: OldTownHotel.Game::Room2DPrototypeDemandLoop
+  runDuringPlay: 1
+  autoFindReferences: 1
+  rooms: []
+  roomOverview: {fileID: 0}
+  selectionManager: {fileID: 0}
+  demandIntervalSeconds: 8
+  demandTimerSeconds: 0
+  alternateDemandTypes: 1
+  nextDemandType: 0
+  alternateDemandRoomPreferences: 1
+  nextDemandRoomPreference: 0
+  nextDemandFloorPreference: 0
+  nextDemandFacingPreference: 0
+  generatedDemandCount: 0
+  successfulDemandCount: 0
+  unmetDemandCount: 0
+  useUpcomingDemandPreview: 1
+  upcomingDemandType: 0
+  upcomingDemandRoomPreference: 0
+  upcomingDemandFloorPreference: 0
+  upcomingDemandFacingPreference: 0
+  upcomingDemandEtaSeconds: 0
+  upcomingDemandPreviewText: None
+  lastActivatedUpcomingDemandText: None
+  activatedUpcomingDemandCount: 0
+  reservedRoomForUpcomingDemand: {fileID: 0}
+  reservedRoomName: None
+  lastReservationResult: None
+  priorityDirtyRoom: {fileID: 0}
+  priorityDirtyRoomName: None
+  priorityInspectionRoom: {fileID: 0}
+  priorityInspectionRoomName: None
+  lastPreparationAction: None
+  preparationActionCount: 0
+  useManualActiveDemand: 1
+  activeDemandWaitingForManualAssignment: 0
+  activeDemandType: 0
+  activeDemandRoomPreference: 0
+  activeDemandFloorPreference: 0
+  activeDemandFacingPreference: 0
+  activeDemandWaitSeconds: 0
+  upcomingGuestType: 0
+  upcomingGuestPreference: 0
+  activeGuestType: 0
+  activeGuestPreference: 0
+  upcomingQueueCapacity: 2
+  allowAutomaticFallbackAssignment: 1
+  manualAssignmentFallbackDelaySeconds: 4
+  activeReservedRoomForFallback: {fileID: 0}
+  activeReservedRoomName: None
+  activeDemandStatus: None
+  lastManualAssignmentResult: None
+  lastAssignmentMode: None
+  lastResolvedAssignmentMode: None
+  acceptingNewGuests: 1
+  lastClosingClearedGuestCount: 0
+  occupiedDurationSeconds: 100000
+  checkoutWaveFirstDelaySeconds: 6
+  checkoutWaveIntervalSeconds: 7
+  fallbackMorningDepartures: 3
+  simulatedCheckoutCount: 0
+  enableComplaintReassignment: 1
+  complaintDelaySeconds: 60
+  complaintPatienceSeconds: 20
+  complaintPatienceLossMultiplier: 2
+  complaintCompensationPenaltyScore: -6
+  complaintPatienceExpiredPenaltyScore: -4
+  pendingComplaintRoom: {fileID: 0}
+  pendingComplaintRoomName: None
+  pendingComplaintTimerSeconds: 0
+  complaintWaitingForReassignment: 0
+  complaintReassignmentWaitSeconds: 0
+  complaintPatienceRemainingSeconds: 0
+  complaintPatiencePenaltyApplied: 0
+  complaintDemandType: 0
+  complaintRoomPreference: 0
+  complaintFloorPreference: 0
+  complaintFacingPreference: 0
+  roomComplaintCount: 0
+  complaintReassignmentCount: 0
+  compensationRequestCount: 0
+  complaintStatus: None
+  lastComplaintResult: None
+  lastDemandResult: None
+  lastChangedRoomName: None
+  lastDemandType: 0
+  lastDemandRoomPreference: 0
+  lastDemandFloorPreference: 0
+  lastDemandFacingPreference: 0
+  economySystem: {fileID: 2129138146}
+  renovationSystem: {fileID: 2129138145}
+  lastMatchQuality: 1
+  lastMatchQualityLabel: Normal Match
+  lastCleanlinessSuitability: 0
+  lastWearSuitability: 0
+  prototypeSatisfactionScore: 0
+  prototypeSatisfactionTrend: Neutral
+  lastOutcomeResult: 1
+  lastOutcomeLabel: Neutral
+  lastOutcomeSummary: None
+  goodMatchCount: 0
+  normalMatchCount: 0
+  poorMatchCount: 0
+  positiveOutcomeCount: 0
+  neutralOutcomeCount: 0
+  negativeOutcomeCount: 0
+  servicePressurePenaltyCount: 0
+  lastServicePressureResult: None
+  summaryDirtyCount: 0
+  summaryAwaitingInspectionCount: 0
+  summaryOldestDirtySeconds: 0
+  summaryStatusHint: No demands yet
+--- !u!114 &2129138148
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2129138142}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e03e25c7c6fd4b8a9fd67b4f64f38d24, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: OldTownHotel.Game::Room2DDemoDayController
+  autoFindReferences: 1
+  demandLoop: {fileID: 2129138147}
+  frontDesk: {fileID: 0}
+  lounge: {fileID: 0}
+  roomOverview: {fileID: 0}
+  economy: {fileID: 2129138146}
+  phaseStateMachine: {fileID: 2129138149}
+  startInPreparation: 1
+  autoEndOperatingPeriod: 1
+  operatingDurationSeconds: 180
+  operatingTimerSeconds: 0
+  demoDayIndex: 1
+  lastDemoAction: None
+  playerCash: 2450
+  balanceConfig: {fileID: 11400000, guid: d83f5a5b44e0c81408bd1812005abb1f, type: 2}
+--- !u!114 &2129138149
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2129138142}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ace26dff60b9247579849295996a9659, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: OldTownHotel.Game::Room2DDayPhaseStateMachine
+  advanceButton: {fileID: 0}
+  phaseLabel: {fileID: 0}
+  advanceButtonLabel: {fileID: 0}
+--- !u!4 &2129138150
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2129138142}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
@@ -12787,3 +13086,5 @@ SceneRoots:
   - {fileID: 1696817222}
   - {fileID: 572584090}
   - {fileID: 128087641}
+  - {fileID: 2129138150}
+  - {fileID: 694643968}
