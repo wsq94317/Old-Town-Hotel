@@ -12847,6 +12847,7 @@ GameObject:
   - component: {fileID: 2129138156}
   - component: {fileID: 2129138157}
   - component: {fileID: 2129138158}
+  - component: {fileID: 2129138159}
   m_Layer: 0
   m_Name: Systems
   m_TagString: Untagged
@@ -12869,7 +12870,7 @@ MonoBehaviour:
   dayController: {fileID: 0}
   demandLoop: {fileID: 0}
   economy: {fileID: 0}
-  autoContinueDelaySeconds: 3
+  autoContinueDelaySeconds: 6
 --- !u!114 &2129138144
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -13229,6 +13230,20 @@ MonoBehaviour:
   archetypes:
   - {fileID: 11400000, guid: 9423c9547ba50ae43a6de7c07b9e1196, type: 2}
   - {fileID: 11400000, guid: 7990c154b6f25074ca6ccd5e32665f8d, type: 2}
+--- !u!114 &2129138159
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2129138142}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 863e50d416370864cbea3d75d772f793, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: OldTownHotel.Game::DayEndCelebration
+  dayController: {fileID: 2129138148}
+  manager: {fileID: 0}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
