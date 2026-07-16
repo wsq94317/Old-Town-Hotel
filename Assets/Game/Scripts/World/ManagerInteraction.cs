@@ -8,6 +8,7 @@ public class ManagerInteraction : MonoBehaviour
 {
     [SerializeField] private ManagerController manager;
     [SerializeField] private Room2DPrototypeDemandLoop demandLoop;
+    [SerializeField] private EconomySystem economy;
 
     private StaffAgent _caughtAgent;      // 现场抓包决策中
     private StaffAgent _panelAgent;       // 点击打开的员工面板
@@ -51,6 +52,7 @@ public class ManagerInteraction : MonoBehaviour
     {
         if (manager == null) manager = FindFirstObjectByType<ManagerController>();
         if (demandLoop == null) demandLoop = FindFirstObjectByType<Room2DPrototypeDemandLoop>();
+        if (economy == null) economy = FindFirstObjectByType<EconomySystem>();
         StaffAgent.OnAnyCaught += HandleCaught;
     }
 
@@ -146,7 +148,18 @@ public class ManagerInteraction : MonoBehaviour
                 _panelAgent = null;
                 Say("Now tap the room you want them on.");
             }
-            if (GUI.Button(new Rect(w * 0.5f - 130, h * 0.4f + 118, 260, 24), "Close"))
+            if (GUI.Button(new Rect(w * 0.5f - 130, h * 0.4f + 118, 125, 24), "FIRE THEM"))
+            {
+                var victim = _panelAgent;
+                _panelAgent = null;
+                if (economy != null && victim?.Member != null)
+                {
+                    FloatingTextFx.Spawn(victim.transform.position, "FIRED!", new Color(1f, 0.25f, 0.2f), 1.2f);
+                    economy.FireStaff(victim.Member); // Spawner 经 OnFired 收走纸片人（含走人演出）
+                    Say($"{victim.Member.DisplayName} is packing. The stapler goes with them.");
+                }
+            }
+            if (GUI.Button(new Rect(w * 0.5f + 5, h * 0.4f + 118, 125, 24), "Close"))
                 _panelAgent = null;
             return;
         }

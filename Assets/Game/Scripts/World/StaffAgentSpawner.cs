@@ -107,8 +107,17 @@ public class StaffAgentSpawner : MonoBehaviour
         if (member == null || !_byMember.TryGetValue(member, out GameObject go)) return;
         _byMember.Remove(member);
         var agent = go.GetComponent<StaffAgent>();
-        if (agent != null) _agents.Remove(agent);
-        Destroy(go); // 走人小演出留 M5
+        if (agent != null)
+        {
+            _agents.Remove(agent);
+            agent.AbortTask();          // 撂下手头活（半途房回 Dirty）
+            Destroy(agent);             // 不再接单
+        }
+        // 走人小演出：收拾好心情走向大门，出门即消失
+        var walker = go.GetComponent<GuestAgent>();
+        if (walker == null) walker = go.AddComponent<GuestAgent>();
+        var walkerRef = walker;
+        walker.TravelTo(new Vector3(0f, 0f, -5.2f), () => Destroy(walkerRef.gameObject));
     }
 
     private static Material MaterialFor(StaffRole role)

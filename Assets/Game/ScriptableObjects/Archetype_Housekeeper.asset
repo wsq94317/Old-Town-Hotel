@@ -1,0 +1,33 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 81a00a9f470151a46abba1e5f0c52213, type: 3}
+  m_Name: Archetype_Housekeeper
+  m_EditorClassIdentifier: OldTownHotel.Game::StaffArchetypeSO
+  role: 1
+  namePool:
+  - Bea
+  - Max
+  - Ivy
+  - Gus
+  - Lou
+  - Pam
+  - Rex
+  - Sue
+  wageMin: 35
+  wageMax: 60
+  speedRange: {x: 30, y: 85}
+  qualityRange: {x: 30, y: 85}
+  staminaRange: {x: 30, y: 85}
+  educationLevel: 0
+  possibleTraits: 01000000020000000600000004000000080000000700000005000000
+  minTraits: 1
+  maxTraits: 2
