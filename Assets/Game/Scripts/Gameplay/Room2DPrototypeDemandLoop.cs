@@ -189,7 +189,10 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
     [Header("Occupancy")]
     // Occupied 房间住满多少现实秒后自动退房。过夜模型：设为远大于一个营业日，
     // 让退房统一发生在次日清晨的退房潮（BeginMorningCheckoutWave）。
-    public float occupiedDurationSeconds = 100000f;
+    // 注意：不要用 100000 级别的大数——float 在 1e5 量级的精度只剩 ~0.008s，
+    // 高帧率下 elapsed += deltaTime 会被浮点吸收（加法归零，退房永不触发）。
+    // 1000 已远大于一个营业日（180s），且精度安全。
+    public float occupiedDurationSeconds = 1000f;
 
     [Header("Morning checkout wave (overnight stays)")]
     [Tooltip("Seconds after the day opens before the first overnight guest leaves on their own. Also the player's tap-to-check-out window.")]
