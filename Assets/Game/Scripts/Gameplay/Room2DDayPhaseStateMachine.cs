@@ -57,14 +57,22 @@ public class Room2DDayPhaseStateMachine : MonoBehaviour
     // 让 UI 立即可绑定，不阻塞 ui-spec 推进。
     // TODO(future): 当 in-game clock 系统上线后，将此 getter 升级为真实时分格式
     //   "10:30 AM" 风格。此 getter 名称保持 CurrentTimeOfDayLabel 不变。
+    // day-cycle v2：真实时钟由 Room2DDemoDayController 注入；null/空返回时退回相位占位标签。
+    public System.Func<string> TimeLabelProvider { get; set; }
+
     /// <summary>
-    /// 顶部状态栏 wall-clock 占位标签。当前以阶段名作为兜底显示。
-    /// 未来接入真实日内时钟时，将返回 "10:30 AM" 风格的字符串。
+    /// 顶部状态栏 wall-clock 标签。已注入 TimeLabelProvider 时返回真实钟面（"14:37"），
+    /// 否则以阶段名作为兜底显示。
     /// </summary>
     public string CurrentTimeOfDayLabel
     {
         get
         {
+            if (TimeLabelProvider != null)
+            {
+                string label = TimeLabelProvider();
+                if (!string.IsNullOrEmpty(label)) return label;
+            }
             switch (_currentPhase)
             {
                 case Room2DDayPhase.Preparation: return "PREP";

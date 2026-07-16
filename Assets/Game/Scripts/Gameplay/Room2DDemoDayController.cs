@@ -35,8 +35,9 @@ public class Room2DDemoDayController : MonoBehaviour
     // 新增：四态状态机引用；autoFindReferences 逻辑自动查找，也可 Inspector 手动赋值。
     [SerializeField] private Room2DDayPhaseStateMachine phaseStateMachine;
 
-    [Header("Demo Timing")]
-    // 原型营业时长，到了以后自动进入 Ended，方便录制完整一轮。
+    [Header("Demo Timing (legacy)")]
+    // day-cycle v2：日终由 GameClock 22:00 里程碑驱动（见 TickClock），
+    // autoEndOperatingPeriod / operatingDurationSeconds 不再参与日终判定，仅保留序列化兼容。
     public bool startInPreparation = true;
     public bool autoEndOperatingPeriod = true;
     public float operatingDurationSeconds = 180f;
@@ -66,6 +67,36 @@ public class Room2DDemoDayController : MonoBehaviour
     // 公开只读 getter，UI 顶部状态栏绑定。
     public int PlayerCash => playerCash;
 
+    // ── 游戏内时钟（day-cycle v2）────────────────────────────────────────────
+    [Header("Game Clock (day-cycle v2)")]
+    [SerializeField] private Room2DBalanceConfigSO balanceConfig;
+    private GameClock _clock;
+    private bool _morningWaveFired;
+    private bool _daySettled;
+
+    /// <summary>游戏内时钟（惰性创建；config 缺省时用硬编码默认值）。</summary>
+    public GameClock Clock { get { EnsureClock(); return _clock; } }
+
+    private float DayLengthRealSeconds => balanceConfig != null ? balanceConfig.dayLengthRealSeconds : 180f;
+    private float DayStartHour => balanceConfig != null ? balanceConfig.dayStartHour : 8f;
+    private float OpenDoorsHour => balanceConfig != null ? balanceConfig.openDoorsHour : 10f;
+    private float StopArrivalsHour => balanceConfig != null ? balanceConfig.stopArrivalsHour : 18f;
+    private float CloseHour => balanceConfig != null ? balanceConfig.closeHour : 22f;
+
+    private void EnsureClock()
+    {
+        if (_clock == null) _clock = new GameClock(DayLengthRealSeconds, DayStartHour, CloseHour);
+    }
+
+    /// <summary>EditMode 测试接缝：完成 Start() 里做的事件订阅 + 时钟接线。</summary>
+    public void WireForTesting(Room2DDayPhaseStateMachine stateMachine)
+    {
+        phaseStateMachine = stateMachine;
+        phaseStateMachine.OnPhaseEntered += HandlePhaseEntered;
+        EnsureClock();
+        phaseStateMachine.TimeLabelProvider = () => _clock.CurrentTimeFormatted;
+    }
+
     private void Start()
     {
         FindReferencesIfNeeded();
@@ -74,6 +105,9 @@ public class Room2DDemoDayController : MonoBehaviour
         if (phaseStateMachine != null)
         {
             phaseStateMachine.OnPhaseEntered += HandlePhaseEntered;
+            // 顶栏 wall-clock 走真实时钟（day-cycle v2）。
+            EnsureClock();
+            phaseStateMachine.TimeLabelProvider = () => _clock.CurrentTimeFormatted;
         }
 
         if (startInPreparation)
@@ -94,16 +128,46 @@ public class Room2DDemoDayController : MonoBehaviour
     private void Update()
     {
         FindReferencesIfNeeded();
+        TickClock(Time.deltaTime);
+    }
 
-        if (currentPhase != DemoDayPhase.Operating)
+    /// <summary>时钟推进 + 里程碑检查。Update 的可测试化身；EditMode 测试直接调用。</summary>
+    public void TickClock(float deltaSeconds)
+    {
+        if (currentPhase == DemoDayPhase.Ended) return;
+        EnsureClock();
+
+        // 早晨退房潮：延迟到日内第一次 tick 触发，确保 boot 时 SaveCoordinator
+        // 的占用恢复（Start 阶段）先于退房潮执行。
+        if (!_morningWaveFired)
         {
+            _morningWaveFired = true;
+            if (demandLoop != null) demandLoop.BeginMorningCheckoutWave();
+        }
+
+        _clock.Advance(deltaSeconds);
+        if (currentPhase == DemoDayPhase.Operating) operatingTimerSeconds += deltaSeconds; // 遗留 HUD 文本仍读它
+
+        if (phaseStateMachine == null) return;
+        var phase = phaseStateMachine.CurrentPhase;
+
+        if (phase == Room2DDayPhaseStateMachine.Room2DDayPhase.Preparation
+            && _clock.HasReachedHour(OpenDoorsHour))
+        {
+            StartOperatingPeriod(); // 10:00 开门迎客
             return;
         }
 
-        operatingTimerSeconds += Time.deltaTime;
-        if (autoEndOperatingPeriod && operatingTimerSeconds >= operatingDurationSeconds)
+        if (phase == Room2DDayPhaseStateMachine.Room2DDayPhase.CheckInPeak
+            && _clock.HasReachedHour(StopArrivalsHour))
         {
-            EndDemoDay();
+            phaseStateMachine.RequestAdvancePhase(); // 18:00 → Recovery（副作用走 HandlePhaseEntered）
+            return;
+        }
+
+        if (phase == Room2DDayPhaseStateMachine.Room2DDayPhase.Recovery && _clock.DayEndReached)
+        {
+            EndDemoDay(); // 22:00 自动日结
         }
     }
 
@@ -133,6 +197,7 @@ public class Room2DDemoDayController : MonoBehaviour
                 operatingTimerSeconds = 0f;
                 lastDemoAction = "Operating period started";
                 SetDemandRunning(true);
+                SetAcceptingNewGuests(true);
                 SetFrontDeskRunning(true);
                 SetLoungeRunning(true);
                 if (demandLoop != null && demandLoop.useUpcomingDemandPreview)
@@ -143,8 +208,10 @@ public class Room2DDemoDayController : MonoBehaviour
                 break;
 
             case Room2DDayPhaseStateMachine.Room2DDayPhase.Recovery:
-                // HUD "Begin Recovery" 按钮触发：当前无额外副作用（系统保持运行）。
-                lastDemoAction = "Recovery phase started";
+                // 18:00 打烊前清尾：不收新客，送走等待中的客人；员工继续打扫。
+                lastDemoAction = "Recovery - doors closed to new arrivals";
+                SetAcceptingNewGuests(false);
+                if (demandLoop != null) demandLoop.ClearWaitingGuestsForClosing();
                 break;
 
             case Room2DDayPhaseStateMachine.Room2DDayPhase.Ended:
@@ -167,12 +234,17 @@ public class Room2DDemoDayController : MonoBehaviour
     [ContextMenu("Enter Preparation Phase")]
     public void EnterPreparationPhase()
     {
+        EnsureClock();
+        _clock.ResetToDayStart();
+        _morningWaveFired = false;
+        _daySettled = false;
         operatingTimerSeconds = 0f;
         lastDemoAction = "Preparation started";
 
         // 副作用先于状态机调用，HandlePhaseEntered 将跳过重复处理。
         _sideEffectsHandledByLegacyMethod = true;
-        SetDemandRunning(false);
+        SetDemandRunning(true);        // 退房潮/在场客人照常运转……
+        SetAcceptingNewGuests(false);  // ……但 10:00 开门前不收新客
         SetFrontDeskRunning(false);
         SetLoungeRunning(false);
         RefreshOverview();
@@ -192,14 +264,14 @@ public class Room2DDemoDayController : MonoBehaviour
         // 副作用先于状态机调用，HandlePhaseEntered 将跳过重复处理。
         _sideEffectsHandledByLegacyMethod = true;
         SetDemandRunning(true);
+        SetAcceptingNewGuests(true);   // 10:00 开门迎客——从现在起才收新客
         SetFrontDeskRunning(true);
         SetLoungeRunning(true);
 
         if (demandLoop != null)
         {
             if (demandLoop.useUpcomingDemandPreview) demandLoop.ScheduleUpcomingDemandPreview();
-            // 昨晚的客人清晨退房（没有过夜客时铺"昨晚的烂摊子"）——保洁的一天由此开始。
-            demandLoop.BeginMorningCheckoutWave();
+            // 早晨退房潮已移到 Preparation（TickClock 首帧触发），此处不再重复。
         }
 
         RefreshOverview();
@@ -274,8 +346,7 @@ public class Room2DDemoDayController : MonoBehaviour
         return "[Demo Day]\n"
             + "Day: " + demoDayIndex + "\n"
             + "Phase: " + currentPhase + "\n"
-            + "Time: " + FormatSeconds(operatingTimerSeconds)
-            + " / " + FormatSeconds(operatingDurationSeconds) + "\n"
+            + "Time: " + Clock.CurrentTimeFormatted + "\n"
             + GetFrontDeskLine() + "\n"
             + GetLoungeLine() + "\n"
             + "Status: " + GetPhaseHint() + "\n"
@@ -284,9 +355,7 @@ public class Room2DDemoDayController : MonoBehaviour
 
     public string GetCompactDemoDayText()
     {
-        return "Demo: " + currentPhase
-            + " " + FormatSeconds(operatingTimerSeconds)
-            + "/" + FormatSeconds(operatingDurationSeconds);
+        return "Demo: " + currentPhase + " " + Clock.CurrentTimeFormatted;
     }
 
     // GetShowcasePhaseLabel 保持遗留三态映射，不改变 Room2DShowcaseViewController 行为。
@@ -313,8 +382,7 @@ public class Room2DDemoDayController : MonoBehaviour
     {
         return "[Demo Flow]\n"
             + "Phase: " + currentPhase + "\n"
-            + "Time: " + FormatSeconds(operatingTimerSeconds)
-            + " / " + FormatSeconds(operatingDurationSeconds) + "\n"
+            + "Time: " + Clock.CurrentTimeFormatted + "\n"
             + "Focus: " + GetRecordingFocusText() + "\n"
             + GetFrontDeskLine() + "\n"
             + GetLoungeLine();
@@ -396,6 +464,12 @@ public class Room2DDemoDayController : MonoBehaviour
         {
             demandLoop.runDuringPlay = shouldRun;
         }
+    }
+
+    // day-cycle v2：新客闸门——只有 CheckInPeak（10:00-18:00）收新客。
+    private void SetAcceptingNewGuests(bool accepting)
+    {
+        if (demandLoop != null) demandLoop.acceptingNewGuests = accepting;
     }
 
     private void SetFrontDeskRunning(bool shouldRun)
