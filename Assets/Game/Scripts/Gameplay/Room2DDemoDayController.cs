@@ -220,11 +220,13 @@ public class Room2DDemoDayController : MonoBehaviour
                 SetDemandRunning(false);
                 SetFrontDeskRunning(false);
                 SetLoungeRunning(false);
+                CollapseRoomWorkForDayEnd();
                 if (demandLoop != null)
                 {
                     demandLoop.RefreshPrototypeDaySummary();
                 }
                 RefreshOverview();
+                SettleEconomicDay();   // settle-once guard 保证与 EndDemoDay 路径不重复结算
                 break;
         }
     }
@@ -295,6 +297,8 @@ public class Room2DDemoDayController : MonoBehaviour
         SetFrontDeskRunning(false);
         SetLoungeRunning(false);
 
+        CollapseRoomWorkForDayEnd();
+
         if (demandLoop != null)
         {
             demandLoop.RefreshPrototypeDaySummary();
@@ -311,6 +315,21 @@ public class Room2DDemoDayController : MonoBehaviour
         }
     }
 
+    // 22:00 收尾：当班工序自然完成——打扫中的完成到待检，检查中的完成放行；
+    // Dirty / AwaitingInspection / Occupied / Ready / Blocked 原样过夜，任何房态都不卡死。
+    // （BossCover 内部包的也是 Housekeeper2D，一并覆盖。）
+    private void CollapseRoomWorkForDayEnd()
+    {
+        foreach (var hsk in FindObjectsByType<Housekeeper2D>(FindObjectsSortMode.None))
+        {
+            if (hsk != null && hsk.IsWorkingOnRoom()) hsk.FinishCurrentRoom();
+        }
+        foreach (var insp in FindObjectsByType<Inspector2D>(FindObjectsSortMode.None))
+        {
+            if (insp != null && insp.IsWorkingOnRoom()) insp.FinishCurrentRoom();
+        }
+    }
+
     // ── 经济结算（Phase 1） ───────────────────────────────────────────────────
     // 一天结束时：按当日成功服务客人数算收入、扣全员工资，结果写回 PlayerCash。
     public DayLedger LastDayLedger { get; private set; }
@@ -321,6 +340,8 @@ public class Room2DDemoDayController : MonoBehaviour
     private void SettleEconomicDay()
     {
         if (economy == null) return;
+        if (_daySettled) return;   // 日终统一收口：无论从哪条路径进 Ended，只结算一次
+        _daySettled = true;
         int served = demandLoop != null ? demandLoop.successfulDemandCount : 0;
         // 房费以退房结算为准（过夜模型）；按人头的兜底路径会让过夜客人被收两次。
         bool checkoutRevenueLive = demandLoop != null && demandLoop.economySystem != null;
