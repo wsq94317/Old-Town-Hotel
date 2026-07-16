@@ -218,7 +218,17 @@ public sealed class HotelUIFlow : MonoBehaviour
         var modal = modalManager.Show(roomActionsModalPrefab);
         modal.Setup(room, "Floor: —", "Dirty since: —", "Priority: Normal");
         modal.OnAssignHskClicked += () => HandleAssignHskRequested(room);
+        modal.OnAssignInspectorClicked += () => HandleAssignInspectorRequested(room);
         modal.OnDoItYourselfClicked += () => HandleBossCleanRequested(room);
+    }
+
+    // 派主管验房（AwaitingInspection → Ready 的唯一通道）。
+    private void HandleAssignInspectorRequested(Room2DEntity room)
+    {
+        if (room == null) return;
+        bool ok = inspector != null && inspector.AssignRoom(room);
+        if (toast != null)
+            toast.Show(ok ? $"Inspector sent to Room {room.roomNumber}" : "Inspector unavailable");
     }
 
     // Route through StaffCrew when present (any idle worker); legacy single-HSK path otherwise.
