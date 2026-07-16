@@ -77,6 +77,15 @@ public class WorldInputController : MonoBehaviour
         Ray ray = _cam.ScreenPointToRay(screenPos);
         // 忽略 trigger（楼梯触发盒）；NavBlock 隐形墙在 Ignore Raycast 层，同样不拦射线。
         if (!Physics.Raycast(ray, out RaycastHit hit, 200f, ~0, QueryTriggerInteraction.Ignore)) return;
+
+        // 点到员工 → 交给监督交互（近=开面板，远=走过去）
+        var staff = hit.collider.GetComponentInParent<StaffAgent>();
+        if (staff != null)
+        {
+            var interaction = FindFirstObjectByType<ManagerInteraction>();
+            if (interaction != null) { interaction.OnStaffTapped(staff); return; }
+        }
+
         if (manager != null) manager.MoveTo(hit.point);
         ClickMarkerFx.Spawn(hit.point);
     }

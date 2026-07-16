@@ -77,6 +77,12 @@ public class StaffAgentSpawner : MonoBehaviour
         nav.angularSpeed = 720f;
         nav.acceleration = 16f;
 
+        // 点击选中用（M3 监督交互）
+        var cap = go.AddComponent<CapsuleCollider>();
+        cap.height = 1.6f;
+        cap.radius = 0.35f;
+        cap.center = new Vector3(0, 0.8f, 0);
+
         // 纸片视觉（颜色按角色）
         var quad = GameObject.CreatePrimitive(PrimitiveType.Quad);
         Destroy(quad.GetComponent<Collider>());
@@ -88,7 +94,8 @@ public class StaffAgentSpawner : MonoBehaviour
         quad.AddComponent<BillboardSprite>();
 
         var agent = go.AddComponent<StaffAgent>();
-        agent.Init(member);
+        // 每人独立种子（可复现），避免全员同帧同结果
+        agent.Init(member, new System.Random(_agents.Count * 7919 + 12345));
         go.AddComponent<AgentFloorVisibility>();
 
         _agents.Add(agent);
