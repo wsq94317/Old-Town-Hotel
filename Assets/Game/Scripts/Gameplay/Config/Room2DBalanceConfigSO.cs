@@ -6,10 +6,13 @@ using UnityEngine;
 [CreateAssetMenu(fileName = "BalanceConfig", menuName = "Old Town Hotel/Balance Config", order = 101)]
 public sealed class Room2DBalanceConfigSO : ScriptableObject
 {
-    [Header("Day Length(占位 —— Story 6 填实)")]
-    public float prepPhaseSeconds = 45f;
-    public float peakPhaseSeconds = 120f;
-    public float recoveryPhaseSeconds = 45f;
+    [Header("Game Clock (day-cycle v2)")]
+    [Tooltip("一天(dayStartHour→closeHour)映射的真实秒数")]
+    public float dayLengthRealSeconds = 180f;
+    public float dayStartHour = 8f;      // 日开始 & 早晨退房潮
+    public float openDoorsHour = 10f;    // 开门迎客(CheckInPeak)
+    public float stopArrivalsHour = 18f; // 停止新客(Recovery)
+    public float closeHour = 22f;        // 打烊自动日结(Ended)
 
     [Header("Demand Loop")]
     public int upcomingQueueCapacity = 2;
