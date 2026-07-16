@@ -40,6 +40,7 @@ public sealed class SaveCoordinator : MonoBehaviour
         if (renovation != null) gs.renovation = renovation.CaptureState();
         gs.progress.day = dayController != null ? dayController.CurrentDay : 0;
         gs.progress.satisfaction = demandLoop != null ? demandLoop.prototypeSatisfactionScore : 0;
+        gs.rooms = demandLoop != null ? demandLoop.CaptureOccupancy() : new RoomsState();
         return gs;
     }
 
@@ -53,6 +54,9 @@ public sealed class SaveCoordinator : MonoBehaviour
         if (renovation != null) renovation.RestoreState(gs.renovation);
         if (dayController != null) dayController.demoDayIndex = gs.progress.day;
         if (demandLoop != null) demandLoop.prototypeSatisfactionScore = gs.progress.satisfaction;
+        // 过夜占用（save v2）：此时是 Start 阶段，早于控制器首帧 TickClock 触发的
+        // 晨间退房潮——恢复必然先于退房潮（wave 因此从 EnterPreparationPhase 移出）。
+        if (demandLoop != null) demandLoop.RestoreOccupancy(gs.rooms);
     }
 
     public void NewGame() => SaveService.Delete();

@@ -1809,6 +1809,48 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
             || room == activeReservedRoomForFallback;
     }
 
+    // ── 过夜占用存取（save v2）───────────────────────────────────────────────
+
+    /// <summary>捕获当前 Occupied 房间 + 该次入住的匹配质量（供日结自动存档）。</summary>
+    public RoomsState CaptureOccupancy()
+    {
+        FindRoomsIfNeeded();
+        var state = new RoomsState();
+        if (rooms == null) return state;
+        foreach (var room in rooms)
+        {
+            if (room == null || room.currentState != Room2DState.Occupied) continue;
+            Room2DMatchQuality quality = _stayQualityByRoom.TryGetValue(room.roomNumber, out Room2DMatchQuality stored)
+                ? stored
+                : Room2DMatchQuality.NormalMatch;
+            state.occupied.Add(new OccupiedRoomEntry { room = room.roomNumber, stayQuality = (int)quality });
+        }
+        return state;
+    }
+
+    /// <summary>读档恢复过夜占用；退房潮的错峰排程由 BeginMorningCheckoutWave 负责。</summary>
+    public void RestoreOccupancy(RoomsState state)
+    {
+        if (state == null || state.occupied == null || state.occupied.Count == 0) return;
+        FindRoomsIfNeeded();
+        if (rooms == null) return;
+        foreach (var entry in state.occupied)
+        {
+            Room2DEntity room = null;
+            foreach (var candidate in rooms)
+            {
+                if (candidate != null && candidate.roomNumber == entry.room) { room = candidate; break; }
+            }
+            if (room == null) continue;
+            room.currentState = Room2DState.Occupied;
+            room.stateElapsedSeconds = 0f;
+            room.guestCheckedOut = false;
+            _stayQualityByRoom[room.roomNumber] = (Room2DMatchQuality)entry.stayQuality;
+            RefreshRoomVisual(room);
+        }
+        RefreshOverview();
+    }
+
     // 18:00 打烊前清场：所有还在等待入住的客人（active + upcoming 队列 + 投诉重派等待）
     // 全部离开，本版不做声誉惩罚。已入住（Occupied）客人不受影响，照常过夜。
     public void ClearWaitingGuestsForClosing()
