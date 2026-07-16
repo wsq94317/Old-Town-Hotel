@@ -16,6 +16,9 @@ public class StairZone : MonoBehaviour
         if (floorVisibility == null) floorVisibility = FindFirstObjectByType<FloorVisibilityController>();
     }
 
+    [Tooltip("意图判定半径：只有寻路目的地落在楼梯格附近才触发，路过不触发")]
+    [SerializeField] private float intentRadius = 1.6f;
+
     private void OnTriggerEnter(Collider other)
     {
         var manager = other.GetComponentInParent<ManagerController>();
@@ -23,6 +26,14 @@ public class StairZone : MonoBehaviour
 
         var agent = manager.GetComponent<NavMeshAgent>();
         if (agent == null) return;
+
+        // 意图判定：目的地必须就是这块楼梯格（水平距离），否则视为路过，不切层。
+        // 防止去走廊尽头房间的寻路擦到触发盒被误传送。
+        Vector3 dest = agent.hasPath ? agent.destination : manager.transform.position;
+        Vector2 destXZ = new Vector2(dest.x, dest.z);
+        Vector2 padXZ = new Vector2(transform.position.x, transform.position.z);
+        if (Vector2.Distance(destXZ, padXZ) > intentRadius) return;
+
         agent.Warp(exitPoint.position);
         agent.ResetPath();
 
