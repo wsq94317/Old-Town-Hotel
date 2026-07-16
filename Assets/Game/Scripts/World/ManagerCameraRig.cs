@@ -1,21 +1,21 @@
 using UnityEngine;
-using UnityEngine.InputSystem;
 
-// 固定 45° 正交跟随相机：平滑跟随经理；单指拖屏=临时窥视偏移（松手回弹）；
-// 楼层切换时瞬间跳到新层高度（不插值穿楼板）。
-// 编辑器里用鼠标右键拖动模拟窥视（左键留给点击寻路）；真机手势细分 M6 打磨。
+// 固定 45° 正交跟随相机。输入判定在 WorldInputController，这里只接收窥视增量：
+//   窥视中：ApplyPeekDelta 累积偏移（上限 peekRadius）
+//   松手后：以较慢的 peekReturnLerp 回正到经理位置（用户要求"回去慢一点"）
+//   楼层切换：瞬间跳到新层高度（不插值穿楼板）
 public class ManagerCameraRig : MonoBehaviour
 {
     [SerializeField] private Transform target;                 // Manager
     [SerializeField] private FloorVisibilityController floors;
     [SerializeField] private float followLerp = 6f;
     [SerializeField] private float peekRadius = 4f;
-    [SerializeField] private float peekReturnLerp = 8f;
+    [SerializeField] private float peekReturnLerp = 2.5f;      // 回正慢速
     [SerializeField] private float dragToWorld = 0.02f;        // 像素→世界系数
-    [SerializeField] private Vector3 cameraOffset = new Vector3(-8f, 10f, -8f); // 45° 视角回退量
+    [SerializeField] private Vector3 cameraOffset = new Vector3(-8f, 10f, -8f);
 
     private Vector3 _peekOffset;
-    private Vector2? _lastDragPos;
+    private bool _peeking;
     private bool _snapNextFrame;
 
     private void Awake()
@@ -31,10 +31,26 @@ public class ManagerCameraRig : MonoBehaviour
 
     private void HandleFloorChanged(int _) => _snapNextFrame = true;
 
+    /// <summary>窥视增量（屏幕像素），由 WorldInputController 在拖动时喂入。</summary>
+    public void ApplyPeekDelta(Vector2 pixelDelta)
+    {
+        Vector3 right = transform.right; right.y = 0f; right.Normalize();
+        Vector3 fwd = transform.forward; fwd.y = 0f; fwd.Normalize();
+        _peekOffset -= (right * pixelDelta.x + fwd * pixelDelta.y) * dragToWorld;
+        _peekOffset = Vector3.ClampMagnitude(_peekOffset, peekRadius);
+    }
+
+    /// <summary>是否处于窥视中；false 时偏移慢速回零（回正到经理）。</summary>
+    public void SetPeeking(bool peeking) => _peeking = peeking;
+
     private void LateUpdate()
     {
         if (target == null) return;
-        UpdatePeek();
+
+        if (!_peeking)
+        {
+            _peekOffset = Vector3.Lerp(_peekOffset, Vector3.zero, Time.deltaTime * peekReturnLerp);
+        }
 
         Vector3 desired = target.position + cameraOffset + _peekOffset;
         if (_snapNextFrame)
@@ -46,33 +62,5 @@ public class ManagerCameraRig : MonoBehaviour
         {
             transform.position = Vector3.Lerp(transform.position, desired, Time.deltaTime * followLerp);
         }
-    }
-
-    private void UpdatePeek()
-    {
-        Vector2? drag = ReadDrag();
-        if (drag.HasValue && _lastDragPos.HasValue)
-        {
-            Vector2 delta = drag.Value - _lastDragPos.Value;
-            // 屏幕拖动映射到相机右/前的水平面（XZ）。
-            Vector3 right = transform.right; right.y = 0f; right.Normalize();
-            Vector3 fwd = transform.forward; fwd.y = 0f; fwd.Normalize();
-            _peekOffset -= (right * delta.x + fwd * delta.y) * dragToWorld;
-            _peekOffset = Vector3.ClampMagnitude(_peekOffset, peekRadius);
-        }
-        else if (!drag.HasValue)
-        {
-            _peekOffset = Vector3.Lerp(_peekOffset, Vector3.zero, Time.deltaTime * peekReturnLerp);
-        }
-        _lastDragPos = drag;
-    }
-
-    private Vector2? ReadDrag()
-    {
-        if (Touchscreen.current != null && Touchscreen.current.primaryTouch.press.isPressed)
-            return Touchscreen.current.primaryTouch.position.ReadValue();
-        if (Mouse.current != null && Mouse.current.rightButton.isPressed)
-            return Mouse.current.position.ReadValue();
-        return null;
     }
 }
