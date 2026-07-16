@@ -11,6 +11,7 @@ public class ManagerCameraRig : MonoBehaviour
     [SerializeField] private float followLerp = 6f;
     [SerializeField] private float peekRadius = 4f;
     [SerializeField] private float peekReturnLerp = 2.5f;      // 回正慢速
+    [SerializeField] private float peekHoldSeconds = 1.5f;     // 松手后视角停留时长，之后才开始回正
     [SerializeField] private float dragToWorld = 0.02f;        // 像素→世界系数
     [SerializeField] private Vector3 cameraOffset = new Vector3(-8f, 10f, -8f);
 
@@ -40,14 +41,23 @@ public class ManagerCameraRig : MonoBehaviour
         _peekOffset = Vector3.ClampMagnitude(_peekOffset, peekRadius);
     }
 
-    /// <summary>是否处于窥视中；false 时偏移慢速回零（回正到经理）。</summary>
-    public void SetPeeking(bool peeking) => _peeking = peeking;
+    private float _holdUntil;
+
+    /// <summary>是否处于窥视中；结束窥视后先停留 peekHoldSeconds，再慢速回正到经理。</summary>
+    public void SetPeeking(bool peeking)
+    {
+        if (_peeking && !peeking)
+        {
+            _holdUntil = Time.time + peekHoldSeconds; // 松手瞬间起算停留窗口
+        }
+        _peeking = peeking;
+    }
 
     private void LateUpdate()
     {
         if (target == null) return;
 
-        if (!_peeking)
+        if (!_peeking && Time.time >= _holdUntil)
         {
             _peekOffset = Vector3.Lerp(_peekOffset, Vector3.zero, Time.deltaTime * peekReturnLerp);
         }
