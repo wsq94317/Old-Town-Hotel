@@ -192,12 +192,13 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
     public float occupiedDurationSeconds = 100000f;
 
     [Header("Morning checkout wave (overnight stays)")]
-    [Tooltip("Seconds after the day opens before the first overnight guest checks out.")]
-    public float checkoutWaveFirstDelaySeconds = 3f;
-    [Tooltip("Stagger between successive overnight checkouts.")]
-    public float checkoutWaveIntervalSeconds = 4f;
-    [Tooltip("When a day opens with no overnight guests (fresh boot or loaded save — room occupancy isn't persisted), seed this many dirty rooms so housekeeping still has a morning.")]
-    public int fallbackMorningDirtyRooms = 3;
+    [Tooltip("Seconds after the day opens before the first overnight guest leaves on their own. Also the player's tap-to-check-out window.")]
+    public float checkoutWaveFirstDelaySeconds = 6f;
+    [Tooltip("Stagger between successive overnight self-checkouts — keeps the departure cards tappable one by one.")]
+    public float checkoutWaveIntervalSeconds = 7f;
+    [Tooltip("When a day opens with no overnight guests (fresh boot), seed this many overnight departures so day 1 still runs the full checkout flow.")]
+    [UnityEngine.Serialization.FormerlySerializedAs("fallbackMorningDirtyRooms")]
+    public int fallbackMorningDepartures = 3;
     public int simulatedCheckoutCount;
 
     [Header("Prototype Complaint Reassignment")]
@@ -239,6 +240,35 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
     // 入住时按房号记下匹配质量，退房时结算成收入 = 档次房价 × 满意度系数（economy GDD §4.1）。
     private readonly Dictionary<int, Room2DMatchQuality> _stayQualityByRoom =
         new Dictionary<int, Room2DMatchQuality>();
+
+    // 入住时按房号记下客人类型，退房卡片显示真实头像；随 save v2 的 guestType 字段持久化。
+    private readonly Dictionary<int, Room2DGuestType> _stayGuestTypeByRoom =
+        new Dictionary<int, Room2DGuestType>();
+
+    // 晨间待退房队列（退房卡片流）：错峰计时是"客人自己走"的兜底，玩家点卡可提前办结。
+    private readonly List<Room2DEntity> _pendingDepartures = new List<Room2DEntity>();
+
+    /// <summary>退房完成事件：(房间, 入账金额, 是否玩家办理)。UI 弹 toast 用，点卡与自动离开都触发。</summary>
+    public event System.Action<Room2DEntity, int, bool> OnDepartureCheckedOut;
+
+    /// <summary>晨间待退房队列长度。前台退房卡片绑定。</summary>
+    public int DepartureCount => _pendingDepartures.Count;
+
+    /// <summary>按序取待退房房间；越界返回 null。</summary>
+    public Room2DEntity GetDepartureRoom(int index) =>
+        index >= 0 && index < _pendingDepartures.Count ? _pendingDepartures[index] : null;
+
+    /// <summary>待退房客人的类型（头像用）；未知时按 Business 兜底。</summary>
+    public Room2DGuestType GetDepartureGuestType(int index)
+    {
+        Room2DEntity room = GetDepartureRoom(index);
+        if (room != null && _stayGuestTypeByRoom.TryGetValue(room.roomNumber, out Room2DGuestType type))
+        {
+            return type;
+        }
+        return Room2DGuestType.Business;
+    }
+
     private bool _economyRefsSearched;
 
     public Room2DMatchQuality lastMatchQuality = Room2DMatchQuality.NormalMatch;
@@ -1823,7 +1853,15 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
             Room2DMatchQuality quality = _stayQualityByRoom.TryGetValue(room.roomNumber, out Room2DMatchQuality stored)
                 ? stored
                 : Room2DMatchQuality.NormalMatch;
-            state.occupied.Add(new OccupiedRoomEntry { room = room.roomNumber, stayQuality = (int)quality });
+            Room2DGuestType guestType = _stayGuestTypeByRoom.TryGetValue(room.roomNumber, out Room2DGuestType storedType)
+                ? storedType
+                : Room2DGuestType.Business;
+            state.occupied.Add(new OccupiedRoomEntry
+            {
+                room = room.roomNumber,
+                stayQuality = (int)quality,
+                guestType = (int)guestType
+            });
         }
         return state;
     }
@@ -1846,6 +1884,7 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
             room.stateElapsedSeconds = 0f;
             room.guestCheckedOut = false;
             _stayQualityByRoom[room.roomNumber] = (Room2DMatchQuality)entry.stayQuality;
+            _stayGuestTypeByRoom[room.roomNumber] = (Room2DGuestType)entry.guestType;
             RefreshRoomVisual(room);
         }
         RefreshOverview();
@@ -1893,12 +1932,39 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
         lastClosingClearedGuestCount = cleared;
     }
 
-    // 开门营业时调用：昨晚过夜的客人在清晨错峰退房 —— 逐间结算房费、产生脏房，
-    // 保洁的一天从退房潮开始。没有过夜客时（新开局/读档）用"昨晚的烂摊子"垫场。
+    // 早晨（Preparation 首帧）调用：昨晚过夜的客人进入待退房队列并错峰退房——
+    // 玩家可在前台点卡提前办结，不点也会到点自动离开。没有过夜客时（新开局）
+    // 垫几位"昨晚的过夜客"，让第一天也走完整退房流程。
     public void BeginMorningCheckoutWave()
     {
         FindRoomsIfNeeded();
         if (rooms == null) return;
+
+        _pendingDepartures.Clear();
+
+        bool anyOvernight = false;
+        foreach (var room in rooms)
+        {
+            if (room != null && room.currentState == Room2DState.Occupied) { anyOvernight = true; break; }
+        }
+
+        if (!anyOvernight && fallbackMorningDepartures > 0)
+        {
+            int seeded = 0;
+            foreach (var room in rooms)
+            {
+                if (seeded >= fallbackMorningDepartures) break;
+                if (room == null || room.currentState != Room2DState.Ready) continue;
+                room.currentState = Room2DState.Occupied;
+                room.guestCheckedOut = false;
+                room.stateElapsedSeconds = 0f;
+                _stayQualityByRoom[room.roomNumber] = Room2DMatchQuality.NormalMatch;
+                _stayGuestTypeByRoom[room.roomNumber] = PickRandomGuestType();
+                RefreshRoomVisual(room);
+                seeded++;
+            }
+            if (seeded > 0) RefreshOverview();
+        }
 
         int waveIndex = 0;
         foreach (var room in rooms)
@@ -1907,24 +1973,25 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
             // 让 ProcessOccupiedCheckouts 在 first + interval*i 秒后触发该房退房。
             room.stateElapsedSeconds = occupiedDurationSeconds
                 - (checkoutWaveFirstDelaySeconds + checkoutWaveIntervalSeconds * waveIndex);
+            _pendingDepartures.Add(room);
             waveIndex++;
         }
+    }
 
-        if (waveIndex == 0 && fallbackMorningDirtyRooms > 0)
-        {
-            int seeded = 0;
-            foreach (var room in rooms)
-            {
-                if (seeded >= fallbackMorningDirtyRooms) break;
-                if (room == null || room.currentState != Room2DState.Ready) continue;
-                room.currentState = Room2DState.Dirty;
-                room.guestCheckedOut = true;
-                room.stateElapsedSeconds = 0f;
-                RefreshRoomVisual(room);
-                seeded++;
-            }
-            if (seeded > 0) RefreshOverview();
-        }
+    /// <summary>玩家点退房卡：立即办结退房并入账。房间不在待退房队列时返回 false。</summary>
+    public bool TryCheckOutDeparture(Room2DEntity room)
+    {
+        if (room == null || !_pendingDepartures.Contains(room)) return false;
+        if (!room.SimulateCheckout()) return false;
+        simulatedCheckoutCount++;
+        lastChangedRoomName = room.roomName;
+        int amount = SettleCheckoutRevenue(room);
+        _pendingDepartures.Remove(room);
+        RefreshRoomVisual(room);
+        RefreshOverview();
+        RefreshPrototypeDaySummary();
+        OnDepartureCheckedOut?.Invoke(room, amount, true);
+        return true;
     }
 
     [ContextMenu("Process Occupied Checkouts")]
@@ -1950,8 +2017,11 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
             {
                 simulatedCheckoutCount++;
                 lastChangedRoomName = room.roomName;
-                SettleCheckoutRevenue(room);
+                int amount = SettleCheckoutRevenue(room);
+                _pendingDepartures.Remove(room);
                 RefreshRoomVisual(room);
+                // 客人自己离开（玩家没点卡）——byPlayer=false。
+                OnDepartureCheckedOut?.Invoke(room, amount, false);
             }
         }
 
@@ -1960,10 +2030,11 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
     }
 
     // 结算一次退房：房间档次的 nightly rate × 该次入住的匹配质量系数，记入经济系统。
-    // 场景里没有 EconomySystem 时静默跳过（日结走旧的按人头固定价路径）。
-    private void SettleCheckoutRevenue(Room2DEntity room, Room2DMatchQuality? forcedQuality = null)
+    // 返回入账金额（toast 展示用）；场景里没有 EconomySystem 时静默跳过并返回 0
+    // （日结走旧的按人头固定价路径）。
+    private int SettleCheckoutRevenue(Room2DEntity room, Room2DMatchQuality? forcedQuality = null)
     {
-        if (room == null) return;
+        if (room == null) return 0;
         if (!_economyRefsSearched)
         {
             _economyRefsSearched = true;
@@ -1977,9 +2048,10 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
             quality = stored;
             _stayQualityByRoom.Remove(room.roomNumber);
         }
+        _stayGuestTypeByRoom.Remove(room.roomNumber);
         if (forcedQuality.HasValue) quality = forcedQuality.Value;
 
-        if (economySystem == null || economySystem.Config == null) return;
+        if (economySystem == null || economySystem.Config == null) return 0;
         EconomyConfigSO cfg = economySystem.Config;
 
         int nightly = renovationSystem != null && renovationSystem.Config != null
@@ -2000,6 +2072,7 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
                 break;
         }
         economySystem.RecordCheckout(nightly, mult);
+        return Mathf.RoundToInt(nightly * mult);
     }
 
     [ContextMenu("Refresh Prototype Day Summary")]
@@ -2722,7 +2795,11 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
 
         IncrementMatchCount(matchQuality);
         RecordOutcome(outcomeResult, GetScoreDelta(outcomeResult));
-        if (room != null) _stayQualityByRoom[room.roomNumber] = matchQuality;
+        if (room != null)
+        {
+            _stayQualityByRoom[room.roomNumber] = matchQuality;
+            _stayGuestTypeByRoom[room.roomNumber] = activeGuestType; // 退房卡片头像用
+        }
 
         string roomName = room != null ? room.roomName : "None";
         string roomTypeName = room != null ? room.GetPrototypeRoomTypeDisplayName() : "None";

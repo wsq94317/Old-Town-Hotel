@@ -51,7 +51,12 @@ public sealed class ProgressState
 }
 
 [Serializable]
-public sealed class OccupiedRoomEntry { public int room; public int stayQuality; } // stayQuality = Room2DMatchQuality
+public sealed class OccupiedRoomEntry
+{
+    public int room;
+    public int stayQuality; // Room2DMatchQuality
+    public int guestType;   // Room2DGuestType（退房卡片头像用；旧档缺省 0 = Business）
+}
 
 [Serializable]
 public sealed class RoomsState

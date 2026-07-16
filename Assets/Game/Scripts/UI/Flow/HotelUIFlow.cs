@@ -62,6 +62,10 @@ public sealed class HotelUIFlow : MonoBehaviour
         {
             dayController.OnDaySettled += HandleDaySettled;
         }
+        if (demandLoop != null)
+        {
+            demandLoop.OnDepartureCheckedOut += HandleDepartureCheckedOut;
+        }
         if (officeEntryButton != null) officeEntryButton.onClick.AddListener(OpenManagerOffice);
         if (managerOffice != null) managerOffice.OnCloseRequested += CloseManagerOffice;
     }
@@ -89,6 +93,10 @@ public sealed class HotelUIFlow : MonoBehaviour
         if (dayController != null)
         {
             dayController.OnDaySettled -= HandleDaySettled;
+        }
+        if (demandLoop != null)
+        {
+            demandLoop.OnDepartureCheckedOut -= HandleDepartureCheckedOut;
         }
         if (officeEntryButton != null) officeEntryButton.onClick.RemoveListener(OpenManagerOffice);
         if (managerOffice != null) managerOffice.OnCloseRequested -= CloseManagerOffice;
@@ -170,12 +178,29 @@ public sealed class HotelUIFlow : MonoBehaviour
 
     private void HandleQueueCardTapped(object guestRef)
     {
+        // 退房卡（guestRef 是 Room2DEntity）：点卡即办退房，toast 由
+        // OnDepartureCheckedOut 事件统一弹（自动离开也走同一条）。
+        if (guestRef is Room2DEntity departureRoom)
+        {
+            if (demandLoop != null) demandLoop.TryCheckOutDeparture(departureRoom);
+            return;
+        }
+
         if (modalManager == null || guestDetailsModalPrefab == null) return;
         var modal = modalManager.Show(guestDetailsModalPrefab);
         modal.Setup(guestRef, null,
                     "—", "—", "Prefers: —", "Waiting: —", "Mood: —",
                     "Budget: —", "Stay: —");
         modal.OnAssignRoomClicked += HandleViewAvailableRooms;
+    }
+
+    // 退房完成（点卡或客人自行离开）：飘一条入账 toast。
+    private void HandleDepartureCheckedOut(Room2DEntity room, int amount, bool byPlayer)
+    {
+        if (toast == null || room == null) return;
+        toast.Show(amount > 0
+            ? $"Room {room.roomNumber} checked out · +${amount}"
+            : $"Room {room.roomNumber} checked out");
     }
 
     private void HandleSettingsRequested()

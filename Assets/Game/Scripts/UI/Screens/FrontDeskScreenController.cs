@@ -112,6 +112,25 @@ public sealed class FrontDeskScreenController : MonoBehaviour
     {
         if (demandLoop == null || queueCardPrefab == null || queueListRoot == null) return;
         queueInfos.Clear();
+
+        // 晨间退房卡（day-cycle v2）：排在到店客人前面，点卡即办退房；
+        // 不点的话客人到点自己离开（错峰兜底）。guestRef = Room2DEntity。
+        int departures = demandLoop.DepartureCount;
+        for (int i = 0; i < departures; i++)
+        {
+            var room = demandLoop.GetDepartureRoom(i);
+            if (room == null) continue;
+            queueInfos.Add(new GuestQueueCardInfo
+            {
+                guestRef = room,
+                portrait = PortraitFor(demandLoop.GetDepartureGuestType(i)),
+                typeLabel = "CHECKING OUT",
+                needLabel = room.roomName.ToUpperInvariant(),
+                waitText = "tap to check out",
+                mood = GuestPatienceState.Calm,
+            });
+        }
+
         int count = demandLoop.UpcomingQueueCount;
         for (int i = 0; i < count; i++)
         {
