@@ -119,7 +119,7 @@ public class ManagerPhone : MonoBehaviour
         for (int i = 0; i < _notes.Count && i < 5; i++)
         {
             var n = _notes[i];
-            float y = 76 + i * 40;
+            float y = 104 + i * 40; // 从 HUD 第四行文字（y76-98）下方开始，别叠在统计行上
             GUI.Box(new Rect(w - 316, y, 306, 36), "");
             var old = GUI.color;
             GUI.color = n.Tint;

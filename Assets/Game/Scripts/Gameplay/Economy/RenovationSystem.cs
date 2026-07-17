@@ -119,9 +119,37 @@ public sealed class RenovationSystem : MonoBehaviour
         return s;
     }
 
+    /// <summary>用场景实际房号重建楼层图：保留已有 tier，新房号=Old，幽灵房号（及其
+    /// 在修队列）剔除。修复 v2 场景房号改 2xx/3xx 后 tier 表还 key 在 101-108 的错位，
+    /// 也顺手消化跨场景存档带来的错号。</summary>
+    public void SyncRooms(IReadOnlyList<int> roomNumbers)
+    {
+        if (roomNumbers == null || roomNumbers.Count == 0) return;
+        var newTiers = new Dictionary<int, RoomTier>();
+        var newOrder = new List<int>();
+        foreach (var n in roomNumbers)
+        {
+            if (newTiers.ContainsKey(n)) continue;
+            newTiers[n] = _tiers != null && _tiers.TryGetValue(n, out var t) ? t : RoomTier.Old;
+            newOrder.Add(n);
+        }
+        var newQueue = new RenovationQueue();
+        if (_queue != null)
+            foreach (var j in _queue.Active)
+                if (newTiers.ContainsKey(j.RoomNumber))
+                    newQueue.Start(new RenovationJob(j.RoomNumber, j.TargetTier, j.DaysRemaining));
+        _tiers = newTiers;
+        _roomOrder = newOrder;
+        _queue = newQueue;
+        totalRooms = newOrder.Count;
+        startingRoomNumber = newOrder.Count > 0 ? newOrder[0] : startingRoomNumber;
+        Recount();
+    }
+
     public void RestoreState(RenovationState s)
     {
         if (s == null) return;
+        if (s.rooms.Count == 0) return; // 旧档/空档：保留 Awake 初始化的布局，别装进空表把装修锁死
         totalRooms = s.totalRooms;
         startingRoomNumber = s.startingRoomNumber;
         _tiers = new Dictionary<int, RoomTier>();

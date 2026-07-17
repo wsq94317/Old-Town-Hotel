@@ -26,6 +26,7 @@ public class DailyEventInteraction : MonoBehaviour
     private Vector3 _activeAnchor;
     private float _expireAtHour;
     private GameObject _icon;
+    private static Material _iconMat;
     private bool _panelOpen;
     private string _story = "";
     private float _storyUntil;
@@ -50,12 +51,16 @@ public class DailyEventInteraction : MonoBehaviour
     private void Update()
     {
         if (dayController == null) return;
+        if (_rng == null) _rng = new System.Random(rngSeed); // 热重载自愈
 
-        // 新一天 → 重新排程
+        // 新一天 → 重新排程（锁着的设施事件不进池——进池再跳过会白白吃掉每日事件名额）
         if (dayController.CurrentDay != _scheduledForDay)
         {
             _scheduledForDay = dayController.CurrentDay;
-            _todaysSchedule = EventScheduleLogic.ScheduleForDay(EventCatalog.All, _rng);
+            var pool = new List<HotelEventDef>();
+            foreach (var d in EventCatalog.All)
+                if (FacilityAnchorAccessible(d.Anchor)) pool.Add(d);
+            _todaysSchedule = EventScheduleLogic.ScheduleForDay(pool, _rng);
             _nextIndex = 0;
             ClearActive();
         }
@@ -107,8 +112,9 @@ public class DailyEventInteraction : MonoBehaviour
         _icon.name = "EventIcon_" + def.Id;
         _icon.transform.position = _activeAnchor + Vector3.up * 2.2f;
         _icon.transform.localScale = Vector3.one * 0.55f;
-        var shader = Shader.Find("Universal Render Pipeline/Unlit");
-        _icon.GetComponent<Renderer>().sharedMaterial = new Material(shader) { color = new Color(0.8f, 0.35f, 0.95f) };
+        if (_iconMat == null)
+            _iconMat = new Material(Shader.Find("Universal Render Pipeline/Unlit")) { color = new Color(0.8f, 0.35f, 0.95f) };
+        _icon.GetComponent<Renderer>().sharedMaterial = _iconMat; // 静态共享，别每次事件泄一份材质
         _icon.AddComponent<BillboardSprite>();
         _icon.AddComponent<EventIconPulse>();
         _icon.AddComponent<AgentFloorVisibility>(); // 设施层事件的图标别跨层穿帮
@@ -197,9 +203,7 @@ public class DailyEventInteraction : MonoBehaviour
         if (Time.time < _storyUntil)
             GUI.Box(new Rect(w * 0.5f - 230, h * 0.19f, 460, 44), _story);
 
-        // 事件提醒（未走近时右上角提示）
-        if (_activeDef != null && !_panelOpen)
-            GUI.Label(new Rect(w - 330, 10, 320, 22), "! " + _activeDef.Title + " — go take a look");
+        // （顶部事件提醒已删：与手机通知重复，且压在 HUD 第一行文字上）
 
         if (!_panelOpen || _activeDef == null) return;
         GUI.Box(new Rect(w * 0.5f - 190, h * 0.3f, 380, 128), _activeDef.Title + "\n" + _activeDef.Blurb);

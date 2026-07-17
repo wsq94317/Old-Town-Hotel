@@ -20,6 +20,7 @@ public class BreakdownSystem : MonoBehaviour
         public float NextEscalateHour;
         public GameObject Marker;
         public GameObject Puddle;
+        public Material Mat; // 一事件一份材质，升级只改色，Remove 时销毁（防泄漏）
     }
 
     [SerializeField] private Room2DDemoDayController dayController;
@@ -96,6 +97,7 @@ public class BreakdownSystem : MonoBehaviour
     private void Update()
     {
         if (dayController == null) return;
+        if (_rng == null) _rng = new System.Random(rngSeed); // 热重载自愈
         float hour = dayController.Clock.CurrentHour;
         int day = dayController.CurrentDay;
 
@@ -151,7 +153,8 @@ public class BreakdownSystem : MonoBehaviour
         else if (_panelIncident != null && manager != null)
         {
             Vector3 p = manager.transform.position;
-            if (Mathf.Abs(p.x - _panelIncident.Pos.x) > 3.2f || Mathf.Abs(p.z - _panelIncident.Pos.z) > 3.2f)
+            if (Mathf.Abs(p.x - _panelIncident.Pos.x) > 3.2f || Mathf.Abs(p.z - _panelIncident.Pos.z) > 3.2f
+                || FloorMath.FloorIndexForY(p.y) != FloorMath.FloorIndexForY(_panelIncident.Pos.y)) // 坐电梯走人也要收面板
                 _panelIncident = null;
         }
     }
@@ -229,13 +232,13 @@ public class BreakdownSystem : MonoBehaviour
 
     private void RefreshVisual(Incident inc)
     {
-        var color = BreakdownLogic.SeverityColor(inc.Severity);
-        var unlit = Shader.Find("Universal Render Pipeline/Unlit");
-        var m = new Material(unlit) { color = color };
-        if (inc.Marker != null) inc.Marker.GetComponent<Renderer>().material = m;
+        if (inc.Mat == null)
+            inc.Mat = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
+        inc.Mat.color = BreakdownLogic.SeverityColor(inc.Severity);
+        if (inc.Marker != null) inc.Marker.GetComponent<Renderer>().sharedMaterial = inc.Mat;
         if (inc.Puddle != null)
         {
-            inc.Puddle.GetComponent<Renderer>().material = m;
+            inc.Puddle.GetComponent<Renderer>().sharedMaterial = inc.Mat;
             inc.Puddle.transform.localScale = Vector3.one * (0.9f + (int)inc.Severity * 0.5f); // 越严重摊得越大
         }
     }
@@ -252,6 +255,7 @@ public class BreakdownSystem : MonoBehaviour
     {
         if (inc.Marker != null) Destroy(inc.Marker);
         if (inc.Puddle != null) Destroy(inc.Puddle);
+        if (inc.Mat != null) Destroy(inc.Mat);
         ManagerPhone.Resolve(inc.Id);
         _active.Remove(inc);
         if (_panelIncident == inc) _panelIncident = null;
@@ -280,7 +284,7 @@ public class BreakdownSystem : MonoBehaviour
 
         var o = BreakdownLogic.Resolve(fix, _rng.NextDouble(), clumsy, fast);
 
-        if (o.CashDelta > 0 && economy != null) economy.RecordCheckout(o.CashDelta, 1f);
+        if (o.CashDelta > 0 && economy != null) economy.RecordMiscIncome(o.CashDelta); // 小费不是客人评价
         if (demandLoop != null) demandLoop.prototypeSatisfactionScore += o.SatisfactionDelta;
         if (o.ManagerSlapstick && manager != null)
         {
@@ -326,13 +330,37 @@ public class BreakdownSystem : MonoBehaviour
         GUI.Box(new Rect(w * 0.5f - 180, h * 0.32f, 360, ph),
             BreakdownLogic.SeverityLabel(inc.Severity) + " — " + inc.Kind
             + (isRoom ? " (Room " + inc.Room.roomNumber + ")" : ""));
+        // 没有客房管家就不给"派人"白嫖（结果表里没人可派=必成免费，堵掉）；
+        // 在住房不给锁——锁门会把里面的客人连人带房费一起"吞"掉
+        bool hasHsk = false;
+        if (spawner != null)
+            foreach (var a in spawner.Agents)
+                if (a?.Member != null && a.Member.Role == StaffRole.Housekeeper) { hasHsk = true; break; }
+        bool canLock = isRoom && inc.Room.currentState != Room2DState.Occupied;
+
+        bool prevEnabled = GUI.enabled;
         if (GuiInput.Button(new Rect(w * 0.5f - 160, h * 0.32f + 30, 320, 24), "Fix it yourself (55%, tips or a face full of water)"))
             Choose(BreakdownFix.DIY);
-        else if (GuiInput.Button(new Rect(w * 0.5f - 160, h * 0.32f + 58, 320, 24), "Send housekeeping (traits matter)"))
-            Choose(BreakdownFix.SendStaff);
-        else if (GuiInput.Button(new Rect(w * 0.5f - 160, h * 0.32f + 86, 320, 24), "DUCT TAPE (free, definitely permanent)"))
-            Choose(BreakdownFix.DuctTape);
-        else if (isRoom && GuiInput.Button(new Rect(w * 0.5f - 160, h * 0.32f + 114, 320, 24), "Lock the room (no problem if no witnesses)"))
-            Choose(BreakdownFix.LockRoom);
+        else
+        {
+            GUI.enabled = hasHsk;
+            if (GuiInput.Button(new Rect(w * 0.5f - 160, h * 0.32f + 58, 320, 24),
+                    hasHsk ? "Send housekeeping (traits matter)" : "Send housekeeping (you have none)"))
+                Choose(BreakdownFix.SendStaff);
+            else
+            {
+                GUI.enabled = true;
+                if (GuiInput.Button(new Rect(w * 0.5f - 160, h * 0.32f + 86, 320, 24), "DUCT TAPE (free, definitely permanent)"))
+                    Choose(BreakdownFix.DuctTape);
+                else if (isRoom)
+                {
+                    GUI.enabled = canLock;
+                    if (GuiInput.Button(new Rect(w * 0.5f - 160, h * 0.32f + 114, 320, 24),
+                            canLock ? "Lock the room (no problem if no witnesses)" : "Lock the room (there's a GUEST inside)"))
+                        Choose(BreakdownFix.LockRoom);
+                }
+            }
+        }
+        GUI.enabled = prevEnabled;
     }
 }

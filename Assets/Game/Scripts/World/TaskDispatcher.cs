@@ -54,13 +54,17 @@ public class TaskDispatcher : MonoBehaviour
 
     private void HandleTaskFinished(StaffAgent agent, Room2DEntity room)
     {
-        if (room != null) _claimed.Remove(room);
+        // 无条件释放：Unity 假 null（房被销毁）时更要把 claim 摘掉，否则永久占坑
+        _claimed.Remove(room);
     }
 
     /// <summary>经理指挥插队：把某间房强塞给指定员工（抢占双方的当前任务/认领）。</summary>
     public bool ForceAssign(StaffAgent agent, Room2DEntity room)
     {
         if (agent == null || room == null || agent.Member == null) return false;
+
+        // 记仇中的员工反正会拒单——先问再拆：别把双方手头的活都撂了才发现指挥失败
+        if (agent.IsGrudging) return false;
 
         StaffTaskKind kind;
         if (room.currentState == Room2DState.Dirty && agent.Member.Role == StaffRole.Housekeeper)

@@ -39,6 +39,7 @@ public class ComplaintInteraction : MonoBehaviour
     private void Update()
     {
         if (demandLoop == null || manager == null) return;
+        if (_rng == null) _rng = new System.Random(rngSeed); // 热重载自愈：Choose 里 NRE 会杀掉整个 OnGUI
 
         bool complaintActive = demandLoop.complaintWaitingForReassignment;
 
@@ -145,9 +146,9 @@ public class ComplaintInteraction : MonoBehaviour
         GUI.Box(new Rect(w * 0.5f - 170, h * 0.32f, 340, 136), "ANGRY GUEST — your call, boss");
         if (GuiInput.Button(new Rect(w * 0.5f - 150, h * 0.32f + 36, 300, 26), "Pay them off (half the rate)"))
             Choose(ComplaintChoice.Pay);
-        if (GuiInput.Button(new Rect(w * 0.5f - 150, h * 0.32f + 66, 300, 26), "Cold shoulder (free, risky)"))
+        else if (GuiInput.Button(new Rect(w * 0.5f - 150, h * 0.32f + 66, 300, 26), "Cold shoulder (free, risky)"))
             Choose(ComplaintChoice.ColdShoulder);
-        if (GuiInput.Button(new Rect(w * 0.5f - 150, h * 0.32f + 96, 300, 26), "FIGHT 🥊 (what could go wrong)"))
+        else if (GuiInput.Button(new Rect(w * 0.5f - 150, h * 0.32f + 96, 300, 26), "FIGHT 🥊 (what could go wrong)"))
             Choose(ComplaintChoice.Fight);
     }
 }

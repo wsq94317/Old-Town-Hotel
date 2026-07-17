@@ -122,9 +122,16 @@ public class RoomDoor : MonoBehaviour
         }
     }
 
-    private void OnDestroy()
+    // OnEnable/OnDisable 对称维护静态计数：楼层显隐、销毁、域重载（统计清零而
+    // _panelOpen 字段存活）都走这对钩子，计数不会漂成负数把 AnyPanelOpen 卡死。
+    private void OnEnable()
     {
-        if (_panelOpen) { _openPanelCount--; AnyPanelOpen = _openPanelCount > 0; }
+        if (_panelOpen) { _openPanelCount++; AnyPanelOpen = true; }
+    }
+
+    private void OnDisable()
+    {
+        if (_panelOpen) { _openPanelCount = Mathf.Max(0, _openPanelCount - 1); AnyPanelOpen = _openPanelCount > 0; }
     }
 
     private bool InteriorContains(Vector3 pos) =>
@@ -175,6 +182,15 @@ public class RoomDoor : MonoBehaviour
                 _pendingDest = _managerAgent.destination;
                 _hasPendingDest = true;
                 _manager.MoveTo(DoorFrontPoint());
+            }
+
+            // 玩家改主意点了别处 → 作废滞留的原目标（否则几分钟后门被员工打开，
+            // 经理会突然自己走进这间房——可能一头撞进住客房触发查错房）
+            if (_hasPendingDest && _managerAgent != null && _managerAgent.hasPath)
+            {
+                Vector3 curDest = _managerAgent.destination;
+                if (FlatDist(curDest, DoorFrontPoint()) > 0.6f && FlatDist(curDest, _pendingDest) > 0.6f)
+                    _hasPendingDest = false;
             }
 
             // 门被别人（员工/客人）打开了 → 拦截中的原目标自动续走
@@ -238,8 +254,9 @@ public class RoomDoor : MonoBehaviour
                 if (inside) anyoneInside = true;
             }
         }
-        foreach (var g in FindObjectsByType<GuestAgent>(FindObjectsSortMode.None))
+        for (int gi = 0; gi < GuestAgent.All.Count; gi++) // 静态注册表：别每门每帧全场景扫描
         {
+            var g = GuestAgent.All[gi];
             if (g == null || !SameFloor(g.transform.position)) continue;
             float d = FlatDist(g.transform.position, transform.position);
             bool inside = InteriorContains(g.transform.position);

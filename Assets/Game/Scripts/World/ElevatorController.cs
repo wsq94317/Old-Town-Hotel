@@ -46,9 +46,26 @@ public class ElevatorController : MonoBehaviour
         }
     }
 
+    private StaffAgentSpawner _spawner;
+
     private void Update()
     {
-        if (_manager == null || _traveling) return;
+        // 热重载自愈：Start 缓存的场景引用会被域重载清空而 Start 不重跑——
+        // 不补找的话电梯从此装死，经理困在楼上
+        if (_manager == null)
+        {
+            _manager = FindFirstObjectByType<ManagerController>();
+            _managerAgent = _manager != null ? _manager.GetComponent<NavMeshAgent>() : null;
+            if (_manager == null) return;
+        }
+        if (_doorPanels == null || _doorPanels.Length != FloorMath.FloorCount) _doorPanels = new GameObject[FloorMath.FloorCount];
+        for (int f = 0; f < FloorMath.FloorCount; f++)
+        {
+            if (_doorPanels[f] != null) continue;
+            var t = transform.Find("ElevatorDoor_F" + (f + 1));
+            if (t != null) _doorPanels[f] = t.gameObject;
+        }
+        if (_traveling) return;
 
         Vector3 cab = CabWorldPos(CurrentManagerFloor());
         Vector3 p = _manager.transform.position;
@@ -82,10 +99,10 @@ public class ElevatorController : MonoBehaviour
             bool near = false;
             Vector3 cab = CabWorldPos(f);
             if (_manager != null && FlatNear(_manager.transform.position, cab, 1.6f)) near = true;
-            var spawner = FindFirstObjectByType<StaffAgentSpawner>();
-            if (!near && spawner != null)
+            if (_spawner == null) _spawner = FindFirstObjectByType<StaffAgentSpawner>(); // 缓存：原来每层每帧全场景扫
+            if (!near && _spawner != null)
             {
-                foreach (var a in spawner.Agents)
+                foreach (var a in _spawner.Agents)
                     if (a != null && FlatNear(a.transform.position, cab, 1.6f)) { near = true; break; }
             }
             // 滑门横移：基准位=建造时的世界位 (8.55, y+0.8, 0)，只在 z 轴滑动

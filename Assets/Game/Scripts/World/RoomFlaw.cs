@@ -8,6 +8,7 @@ public class RoomFlaw : MonoBehaviour
 
     private GameObject _visual;
     private FloorVisibilityController _floors;
+    private static Material _flawMat; // 颜色固定，静态共享——每个瑕疵 new 一份会泄漏
 
     public static RoomFlaw Add(Room2DEntity room, StaffMember cleaner)
     {
@@ -43,8 +44,9 @@ public class RoomFlaw : MonoBehaviour
         _visual.transform.localPosition = new Vector3(-0.9f, 0.05f, -0.9f); // 房间角落污渍
         _visual.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
         _visual.transform.localScale = Vector3.one * 0.55f;
-        var shader = Shader.Find("Universal Render Pipeline/Unlit");
-        _visual.GetComponent<Renderer>().sharedMaterial = new Material(shader) { color = new Color(0.45f, 0.3f, 0.15f) };
+        if (_flawMat == null)
+            _flawMat = new Material(Shader.Find("Universal Render Pipeline/Unlit")) { color = new Color(0.45f, 0.3f, 0.15f) };
+        _visual.GetComponent<Renderer>().sharedMaterial = _flawMat;
     }
 
     private void LateUpdate()

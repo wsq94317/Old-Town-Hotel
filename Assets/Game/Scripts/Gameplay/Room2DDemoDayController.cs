@@ -350,6 +350,12 @@ public class Room2DDemoDayController : MonoBehaviour
         OnDaySettled?.Invoke(demoDayIndex, served, LastDayLedger);
     }
 
+    /// <summary>读档后把顶栏现金对齐经济系统（否则整天显示序列化默认值 2450）。</summary>
+    public void SyncCashFromEconomy()
+    {
+        if (economy != null) playerCash = economy.Cash;
+    }
+
     [ContextMenu("Restart Demo Day")]
     public void RestartDemoDay()
     {

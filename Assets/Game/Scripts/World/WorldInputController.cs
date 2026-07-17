@@ -36,12 +36,16 @@ public class WorldInputController : MonoBehaviour
 
         if (pressed && !_pressedLastFrame)
         {
+            // 每次按压重建分类器：热重载后 _classifier 为 null（Awake 不重跑），
+            // 顺带跟上转屏/改分辨率后的 GuiScale.Factor（阈值别冻结在 Awake 时刻）
+            _classifier = new TapDragClassifier(dragThresholdPixels * GuiScale.Factor);
             _pressStartedOverUi = IsOverUi();
             if (!_pressStartedOverUi) _classifier.Press(pos);
             _lastPos = pos;
         }
         else if (pressed && _pressedLastFrame && !_pressStartedOverUi)
         {
+            if (_classifier == null) return; // 热重载发生在按压中途：这次按压作废
             _classifier.Move(pos);
             if (_classifier.IsDragging && cameraRig != null)
             {
@@ -53,7 +57,7 @@ public class WorldInputController : MonoBehaviour
         else if (!pressed && _pressedLastFrame)
         {
             if (cameraRig != null) cameraRig.SetPeeking(false);
-            if (!_pressStartedOverUi)
+            if (!_pressStartedOverUi && _classifier != null)
             {
                 var result = _classifier.Release(_lastPos);
                 TapDebug = $"release@{_lastPos} result={result}";

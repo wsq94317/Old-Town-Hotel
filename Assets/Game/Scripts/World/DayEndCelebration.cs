@@ -69,10 +69,13 @@ public class CoinRainFx : MonoBehaviour
         fx.Build(coinCount);
     }
 
+    private static Material _coinMat;
+
     private void Build(int count)
     {
-        var mat = new Material(Shader.Find("Universal Render Pipeline/Unlit"))
-        { color = new Color(1f, 0.84f, 0.15f) };
+        if (_coinMat == null)
+            _coinMat = new Material(Shader.Find("Universal Render Pipeline/Unlit")) { color = new Color(1f, 0.84f, 0.15f) };
+        var mat = _coinMat; // 静态共享：金币雨每天下一场，new 一份就漏一份
         _coins = new Transform[count];
         _fallSpeeds = new float[count];
         for (int i = 0; i < count; i++)
@@ -117,10 +120,13 @@ public class GloomCloudFx : MonoBehaviour
         fx.Build();
     }
 
+    private static Material _cloudMat;
+
     private void Build()
     {
-        var mat = new Material(Shader.Find("Universal Render Pipeline/Unlit"))
-        { color = new Color(0.25f, 0.25f, 0.3f) };
+        if (_cloudMat == null)
+            _cloudMat = new Material(Shader.Find("Universal Render Pipeline/Unlit")) { color = new Color(0.25f, 0.25f, 0.3f) };
+        var mat = _cloudMat;
         for (int i = 0; i < 7; i++)
         {
             var quad = GameObject.CreatePrimitive(PrimitiveType.Quad);

@@ -78,6 +78,15 @@ public sealed class EconomySystem : MonoBehaviour
         return amount;
     }
 
+    // ── Misc income (facilities / tips / recovered fines) ────────────────────
+    // Banked into the day's income WITHOUT feeding the star rating — reputation
+    // samples are checkout satisfaction only; a bar night is not a guest review.
+    public void RecordMiscIncome(int amount)
+    {
+        if (amount <= 0 || !EnsureInitialized()) return;
+        _pendingCheckoutIncome += amount;
+    }
+
     // How many guests today's star rating attracts (demand-loop spawn budget).
     public int DailyGuestTarget
         => config != null && Reputation != null ? config.GuestsPerDayFor(Reputation.Stars) : 0;
@@ -89,9 +98,10 @@ public sealed class EconomySystem : MonoBehaviour
     public DayLedger CloseEconomicDay(int servedGuests)
     {
         if (!EnsureInitialized()) return default;
+        // 兜底路径也要带上杂项收入（有退房记录时杂项已在 _pendingCheckoutIncome 里）
         int income = _pendingCheckoutCount > 0
             ? _pendingCheckoutIncome
-            : Mathf.Max(0, servedGuests) * config.roomRevenuePerGuest;
+            : Mathf.Max(0, servedGuests) * config.roomRevenuePerGuest + _pendingCheckoutIncome;
         _pendingCheckoutIncome = 0;
         _pendingCheckoutCount = 0;
         int interest = Loan != null ? Loan.AccrueDailyInterest() : 0;

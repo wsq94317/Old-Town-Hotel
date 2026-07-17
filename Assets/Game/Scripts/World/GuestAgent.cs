@@ -15,6 +15,12 @@ public class GuestAgent : MonoBehaviour
 
     private void Awake() => _agent = GetComponent<NavMeshAgent>();
 
+    // 活跃客人注册表：RoomDoor 等每帧轮询用，替代每门每帧 FindObjectsByType 的全场景扫描
+    private static readonly System.Collections.Generic.List<GuestAgent> _all = new System.Collections.Generic.List<GuestAgent>();
+    public static System.Collections.Generic.IReadOnlyList<GuestAgent> All => _all;
+    private void OnEnable() => _all.Add(this);
+    private void OnDisable() => _all.Remove(this);
+
     public int CurrentFloor => FloorMath.FloorIndexForY(transform.position.y);
 
     /// <summary>出发去某个世界点（自动跨层）；到达后回调（可为 null）。</summary>

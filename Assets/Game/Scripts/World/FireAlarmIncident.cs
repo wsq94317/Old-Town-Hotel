@@ -46,6 +46,7 @@ public class FireAlarmIncident : MonoBehaviour
     private void Update()
     {
         if (dayController == null) return;
+        if (_rng == null) _rng = new System.Random(rngSeed); // 热重载自愈
 
         // 每日排程
         if (dayController.CurrentDay != _scheduledDay)
@@ -80,16 +81,15 @@ public class FireAlarmIncident : MonoBehaviour
             return;
         }
 
-        // 经理进房 → 抓到烟民
-        if (!_panelOpen && manager != null)
+        // 经理进房 → 抓到烟民；开着面板走人 → 收面板（否则"开面板就走"能永远赖掉罚单）
+        if (manager != null)
         {
             Vector3 p = manager.transform.position;
-            if (FloorMath.FloorIndexForY(p.y) == FloorMath.FloorIndexForY(_room.transform.position.y)
-                && Mathf.Abs(p.x - _room.transform.position.x) < 2.4f
-                && Mathf.Abs(p.z - _room.transform.position.z) < 2.4f)
-            {
-                _panelOpen = true;
-            }
+            bool near = FloorMath.FloorIndexForY(p.y) == FloorMath.FloorIndexForY(_room.transform.position.y)
+                && Mathf.Abs(p.x - _room.transform.position.x) < (_panelOpen ? 3.4f : 2.4f)
+                && Mathf.Abs(p.z - _room.transform.position.z) < (_panelOpen ? 3.4f : 2.4f);
+            if (!_panelOpen && near) _panelOpen = true;
+            else if (_panelOpen && !near) _panelOpen = false;
         }
     }
 
@@ -135,7 +135,7 @@ public class FireAlarmIncident : MonoBehaviour
         }
         else
         {
-            if (economy != null) economy.RecordCheckout(FineAmount, 1f); // 追回计入当日收入
+            if (economy != null) economy.RecordMiscIncome(FineAmount); // 追回计入当日收入（不进星级样本）
             Say("Charged the guest $" + FineAmount + ". Justice, itemized.");
             if (manager != null)
                 FloatingTextFx.Spawn(manager.transform.position, "+$" + FineAmount, new Color(0.35f, 0.95f, 0.4f), 1.2f);

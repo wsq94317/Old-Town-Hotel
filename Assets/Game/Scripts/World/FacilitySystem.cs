@@ -23,9 +23,13 @@ public class FacilitySystem : MonoBehaviour
     // ★ 调试开关：接动画/场景期间全解锁；出正式版改回 false（用户 2026-07-17 要求）
     public const bool DebugUnlockAll = true;
 
-    public static bool GymUnlocked { get; private set; } = DebugUnlockAll;
-    public static bool CasinoUnlocked { get; private set; } = DebugUnlockAll;
-    public static bool PoolUnlocked { get; private set; } = DebugUnlockAll;
+    // "真解锁"（花钱买的）与调试放行分开存：存档只记真解锁，
+    // 调试期的临时放行不会毒化存档（翻回 false 后档案照旧上锁）。
+    private static bool _gymEarned, _casinoEarned, _poolEarned;
+
+    public static bool GymUnlocked => _gymEarned || DebugUnlockAll;
+    public static bool CasinoUnlocked => _casinoEarned || DebugUnlockAll;
+    public static bool PoolUnlocked => _poolEarned || DebugUnlockAll;
 
     public static bool FloorAccessible(int floor)
     {
@@ -38,20 +42,26 @@ public class FacilitySystem : MonoBehaviour
         }
     }
 
-    /// <summary>存档捕获（存档 v3 世界层）。</summary>
+    /// <summary>存档捕获（存档 v3 世界层）：只存真解锁，调试放行不入档。</summary>
     public static void CaptureTo(WorldState w)
     {
-        w.gymUnlocked = GymUnlocked;
-        w.casinoUnlocked = CasinoUnlocked;
-        w.poolUnlocked = PoolUnlocked;
+        w.gymUnlocked = _gymEarned;
+        w.casinoUnlocked = _casinoEarned;
+        w.poolUnlocked = _poolEarned;
     }
 
-    /// <summary>读档恢复。调试全解锁开着时 OR 上去——旧档/新档都不允许把解锁收回去。</summary>
+    /// <summary>读档恢复真解锁（调试放行由属性层 OR，恢复什么都不影响它）。</summary>
     public static void RestoreFrom(WorldState w)
     {
-        GymUnlocked = w.gymUnlocked || DebugUnlockAll;
-        CasinoUnlocked = w.casinoUnlocked || DebugUnlockAll;
-        PoolUnlocked = w.poolUnlocked || DebugUnlockAll;
+        _gymEarned = w.gymUnlocked;
+        _casinoEarned = w.casinoUnlocked;
+        _poolEarned = w.poolUnlocked;
+    }
+
+    /// <summary>新开一局：真解锁归零（静态字段跨场景/跨局存活，必须显式清）。</summary>
+    public static void ResetForNewGame()
+    {
+        _gymEarned = _casinoEarned = _poolEarned = false;
     }
 
     /// <summary>电梯面板解锁入口。返回是否解锁成功，msg 给面板显示。</summary>
@@ -61,19 +71,19 @@ public class FacilitySystem : MonoBehaviour
         {
             case GymFloor:
                 if (economy == null || !economy.TrySpend(GymCost)) { msg = "No money, no muscles. ($" + GymCost + ")"; return false; }
-                GymUnlocked = true;
+                _gymEarned = true;
                 msg = "GYM OPEN. Guests can now feel guilty on vacation.";
                 return true;
             case CasinoFloor:
                 if (ManagerReputation.Prestige < CasinoPrestigeReq) { msg = "Casino crowd doesn't know you yet. (Prestige " + ManagerReputation.Prestige + "/" + CasinoPrestigeReq + ")"; return false; }
                 if (economy == null || !economy.TrySpend(CasinoCost)) { msg = "You can't afford a casino. Ironic. ($" + CasinoCost + ")"; return false; }
-                CasinoUnlocked = true;
+                _casinoEarned = true;
                 msg = "CASINO OPEN. You are the house now. Probably.";
                 return true;
             case PoolFloor:
                 if (ManagerReputation.Prestige < PoolPrestigeReq) { msg = "The roof demands respect. (Prestige " + ManagerReputation.Prestige + "/" + PoolPrestigeReq + ")"; return false; }
                 if (economy == null || !economy.TrySpend(PoolCost)) { msg = "Water is expensive up here. ($" + PoolCost + ")"; return false; }
-                PoolUnlocked = true;
+                _poolEarned = true;
                 msg = "ROOF POOL OPEN. What could possibly go wrong at night.";
                 return true;
             default:
@@ -102,10 +112,8 @@ public class FacilitySystem : MonoBehaviour
         if (demandLoop == null) demandLoop = FindFirstObjectByType<Room2DPrototypeDemandLoop>();
         if (economy == null) economy = FindFirstObjectByType<EconomySystem>();
         foreach (var f in FloorSpots.Keys) _crowd[f] = new List<GuestAgent>();
-    }
-
-    private void Start()
-    {
+        // Awake 订阅：日结管线约定（SaveCoordinator 在 Start 订阅，捕获必须晚于加成落账，
+        // 否则健身房的日结满意度 +1 有概率存不进档）
         if (dayController != null) dayController.OnDaySettled += HandleDaySettled;
     }
 
@@ -126,6 +134,7 @@ public class FacilitySystem : MonoBehaviour
     private void Update()
     {
         if (dayController == null) return;
+        if (_rng == null) _rng = new System.Random(rngSeed); // 热重载自愈
         float hour = dayController.Clock.CurrentHour;
         int day = dayController.CurrentDay;
 
@@ -136,7 +145,8 @@ public class FacilitySystem : MonoBehaviour
             int income = OccupiedCount() * 8;
             if (income > 0 && economy != null)
             {
-                economy.RecordCheckout(income, 1f);
+                economy.RecordMiscIncome(income); // 酒吧流水不是客人评价，别喂星级
+
                 FloatingTextFx.Spawn(new Vector3(-6f, 12f, -2f), "+$" + income + " BAR", new Color(0.95f, 0.7f, 0.3f));
             }
         }
@@ -146,9 +156,21 @@ public class FacilitySystem : MonoBehaviour
         {
             _lastCasinoDay = day;
             int swing = -300 + (int)(_rng.NextDouble() * 900);
-            if (swing >= 0 && economy != null) economy.RecordCheckout(swing, 1f);
-            else if (economy != null) economy.TrySpend(-swing);
-            FloatingTextFx.Spawn(new Vector3(0f, 20f, 0f), (swing >= 0 ? "+$" : "-$") + Mathf.Abs(swing) + " CASINO",
+            string casinoText;
+            if (swing >= 0)
+            {
+                if (economy != null) economy.RecordMiscIncome(swing); // 赌场夜场不进星级样本
+                casinoText = "+$" + swing + " CASINO";
+            }
+            else if (economy != null && economy.TrySpend(-swing))
+            {
+                casinoText = "-$" + (-swing) + " CASINO";
+            }
+            else
+            {
+                casinoText = "CASINO LOSS WAIVED (too broke to lose)"; // 付不起就白嫖，但别谎报扣款
+            }
+            FloatingTextFx.Spawn(new Vector3(0f, 20f, 0f), casinoText,
                 swing >= 0 ? new Color(0.35f, 0.95f, 0.4f) : new Color(1f, 0.4f, 0.3f), 1.1f);
         }
 

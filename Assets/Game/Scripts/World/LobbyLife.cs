@@ -65,6 +65,7 @@ public class LobbyLife : MonoBehaviour
             box.transform.localScale = new Vector3(0.35f, 0.38f, 0.42f);
             box.transform.localRotation = Quaternion.Euler(0f, Random.Range(-8f, 8f), 0f);
             box.GetComponent<Renderer>().sharedMaterial = _luggageMat;
+            box.AddComponent<AgentFloorVisibility>(); // 挂在常驻 Systems 下，不在楼层树里——自管显隐
             _luggage.Add(box);
         }
         while (_luggage.Count > want)

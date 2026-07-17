@@ -53,6 +53,7 @@ public class WrongRoomDramaRunner : MonoBehaviour
         pillow.name = "Pillow";
         pillow.transform.localScale = new Vector3(0.45f, 0.16f, 0.3f);
         pillow.GetComponent<Renderer>().sharedMaterial = PillowMat();
+        pillow.AddComponent<AgentFloorVisibility>(); // 协程若中途被楼层切换杀掉，枕头至少不会全楼漂浮
 
         Vector3 from = guest.transform.position + Vector3.up * 1.1f;
         Vector3 to = manager != null ? manager.transform.position + Vector3.up * 0.9f : roomCenter;

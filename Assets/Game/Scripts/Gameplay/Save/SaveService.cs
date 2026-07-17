@@ -23,7 +23,11 @@ public static class SaveService
     public static void SaveTo(string path, GameState state)
     {
         if (state == null || string.IsNullOrEmpty(path)) return;
-        File.WriteAllText(path, JsonUtility.ToJson(state, true));
+        // 原子写：先写临时文件再替换——移动端进程被杀在写一半时，旧档还在
+        string tmp = path + ".tmp";
+        File.WriteAllText(tmp, JsonUtility.ToJson(state, true));
+        if (File.Exists(path)) File.Replace(tmp, path, null);
+        else File.Move(tmp, path);
     }
 
     public static GameState LoadFrom(string path)

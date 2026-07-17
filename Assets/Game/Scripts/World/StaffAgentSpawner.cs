@@ -17,7 +17,9 @@ public class StaffAgentSpawner : MonoBehaviour
 
     public IReadOnlyList<StaffAgent> Agents => _agents;
 
-    private void Awake()
+    // OnEnable 而非 Awake：FloorNavigator 的注册表是静态的，热重载（域重载）会清空，
+    // 而 OnEnable 在域重载后会重跑——注册幂等，放这里自愈。
+    private void OnEnable()
     {
         // 跨层传送点注册（电梯版）：员工/客人走进电梯轿厢（x9.3）后代码瞬移，
         // 出电梯落点在轿厢门外（x7.6）——视觉上就是"坐了趟货梯"。
