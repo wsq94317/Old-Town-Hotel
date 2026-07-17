@@ -84,6 +84,7 @@ public class WorldInputController : MonoBehaviour
     private ComplaintInteraction _complaint;
     private DailyEventInteraction _events;
     private HiringInteraction _hiring;
+    private FireAlarmIncident _fire;
 
     private void HandleTap(Vector2 screenPos)
     {
@@ -94,11 +95,15 @@ public class WorldInputController : MonoBehaviour
         if (_complaint == null) _complaint = FindFirstObjectByType<ComplaintInteraction>();
         if (_events == null) _events = FindFirstObjectByType<DailyEventInteraction>();
         if (_hiring == null) _hiring = FindFirstObjectByType<HiringInteraction>();
+        if (_fire == null) _fire = FindFirstObjectByType<FireAlarmIncident>();
         bool panelOpen =
             (_interaction != null && _interaction.PanelOpen) ||
             (_complaint != null && _complaint.PanelOpen) ||
             (_events != null && _events.PanelOpen) ||
-            (_hiring != null && _hiring.PanelOpen);
+            (_hiring != null && _hiring.PanelOpen) ||
+            (_fire != null && _fire.PanelOpen) ||
+            (ElevatorController.Instance != null && ElevatorController.Instance.PanelOpen) ||
+            (ManagerPhone.Instance != null && ManagerPhone.Instance.PanelOpen);
         if (panelOpen || GuiInput.IsInReservedZone(screenPos))
         {
             GuiInput.PublishTap(screenPos);

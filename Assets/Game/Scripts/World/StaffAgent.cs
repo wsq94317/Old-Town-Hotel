@@ -99,6 +99,14 @@ public class StaffAgent : MonoBehaviour
 
     private void Update()
     {
+        // 域重载防御：readonly struct 的 _task 在 Play 中热重载后会被清空（Room=null），
+        // 而 _state 可能仍是 Working——直接收尾回 Idle，防止 NRE 僵尸循环。
+        if (_state != AgentState.Idle && _task.Room == null)
+        {
+            FinishTask();
+            return;
+        }
+
         // 速度 buff 到期恢复
         if (_agent != null)
             _agent.speed = Time.time < _speedBuffUntil ? _baseSpeed * 1.35f : _baseSpeed;

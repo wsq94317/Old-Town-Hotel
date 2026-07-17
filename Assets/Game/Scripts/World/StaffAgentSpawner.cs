@@ -19,14 +19,14 @@ public class StaffAgentSpawner : MonoBehaviour
 
     private void Awake()
     {
-        // 楼梯注册表（场景约定坐标：pad x8.5 / exit x6.5，每层 z=0）。
-        // 员工跨层不走 StairZone 触发器（那是经理专用），走到点位后代码瞬移。
+        // 跨层传送点注册（电梯版）：员工/客人走进电梯轿厢（x9.3）后代码瞬移，
+        // 出电梯落点在轿厢门外（x7.6）——视觉上就是"坐了趟货梯"。
         var pads = new Vector3[FloorMath.FloorCount];
         var exits = new Vector3[FloorMath.FloorCount];
         for (int i = 0; i < FloorMath.FloorCount; i++)
         {
-            pads[i] = new Vector3(8.5f, FloorMath.BaseYFor(i), 0f);
-            exits[i] = new Vector3(6.5f, FloorMath.BaseYFor(i), 0f);
+            pads[i] = new Vector3(9.3f, FloorMath.BaseYFor(i), 0f);
+            exits[i] = new Vector3(7.6f, FloorMath.BaseYFor(i), 0f);
         }
         FloorNavigator.RegisterStairs(pads, exits);
     }

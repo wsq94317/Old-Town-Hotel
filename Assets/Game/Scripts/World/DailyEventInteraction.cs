@@ -32,6 +32,11 @@ public class DailyEventInteraction : MonoBehaviour
 
     public bool PanelOpen => _panelOpen;
 
+    // 手机通知中心轮询用
+    public bool HasActiveEvent => _activeDef != null;
+    public string ActiveEventTitle => _activeDef != null ? _activeDef.Title : "";
+    public Vector3 ActiveEventAnchor => _activeAnchor;
+
     private void Awake()
     {
         _rng = new System.Random(rngSeed);
