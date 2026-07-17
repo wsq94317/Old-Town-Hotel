@@ -29386,6 +29386,7 @@ GameObject:
   - component: {fileID: 2129138160}
   - component: {fileID: 2129138163}
   - component: {fileID: 2129138162}
+  - component: {fileID: 2129138164}
   m_Layer: 0
   m_Name: Systems
   m_TagString: Untagged
@@ -29844,6 +29845,24 @@ MonoBehaviour:
   m_EditorClassIdentifier: OldTownHotel.Game::LobbyLife
   demandLoop: {fileID: 2129138147}
   rackBase: {x: 2.4, y: 0, z: 3.3}
+--- !u!114 &2129138164
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2129138142}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4d6467fa37457b54c9c1fe2e9f64947e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: OldTownHotel.Game::BreakdownSystem
+  dayController: {fileID: 2129138148}
+  demandLoop: {fileID: 2129138147}
+  economy: {fileID: 2129138146}
+  spawner: {fileID: 2129138152}
+  manager: {fileID: 0}
+  rngSeed: 20261
 --- !u!1 &2132981060
 GameObject:
   m_ObjectHideFlags: 0

@@ -85,6 +85,7 @@ public class WorldInputController : MonoBehaviour
     private DailyEventInteraction _events;
     private HiringInteraction _hiring;
     private FireAlarmIncident _fire;
+    private BreakdownSystem _breakdowns;
 
     private void HandleTap(Vector2 screenPos)
     {
@@ -96,12 +97,14 @@ public class WorldInputController : MonoBehaviour
         if (_events == null) _events = FindFirstObjectByType<DailyEventInteraction>();
         if (_hiring == null) _hiring = FindFirstObjectByType<HiringInteraction>();
         if (_fire == null) _fire = FindFirstObjectByType<FireAlarmIncident>();
+        if (_breakdowns == null) _breakdowns = FindFirstObjectByType<BreakdownSystem>();
         bool panelOpen =
             (_interaction != null && _interaction.PanelOpen) ||
             (_complaint != null && _complaint.PanelOpen) ||
             (_events != null && _events.PanelOpen) ||
             (_hiring != null && _hiring.PanelOpen) ||
             (_fire != null && _fire.PanelOpen) ||
+            (_breakdowns != null && _breakdowns.PanelOpen) ||
             RoomDoor.AnyPanelOpen ||
             (ElevatorController.Instance != null && ElevatorController.Instance.PanelOpen) ||
             (ManagerPhone.Instance != null && ManagerPhone.Instance.PanelOpen);

@@ -20,9 +20,12 @@ public class FacilitySystem : MonoBehaviour
     [SerializeField] private EconomySystem economy;
     [SerializeField] private int rngSeed = 5150;
 
-    public static bool GymUnlocked { get; private set; }
-    public static bool CasinoUnlocked { get; private set; }
-    public static bool PoolUnlocked { get; private set; }
+    // ★ 调试开关：接动画/场景期间全解锁；出正式版改回 false（用户 2026-07-17 要求）
+    public const bool DebugUnlockAll = true;
+
+    public static bool GymUnlocked { get; private set; } = DebugUnlockAll;
+    public static bool CasinoUnlocked { get; private set; } = DebugUnlockAll;
+    public static bool PoolUnlocked { get; private set; } = DebugUnlockAll;
 
     public static bool FloorAccessible(int floor)
     {
@@ -159,6 +162,7 @@ public class FacilitySystem : MonoBehaviour
         foreach (var kv in FloorSpots)
         {
             int floor = kv.Key;
+            if (!_crowd.ContainsKey(floor)) _crowd[floor] = new List<GuestAgent>(); // 热重载自愈
             var crowd = _crowd[floor];
             crowd.RemoveAll(g => g == null);
             int want = FloorAccessible(floor) ? DayPeriodLogic.ActivityFor(floor, period) : 0;
