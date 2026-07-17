@@ -18,7 +18,6 @@ public class ManagerPhone : MonoBehaviour
     }
 
     private readonly List<Note> _notes = new List<Note>();
-    private bool _panelOpen;
 
     [SerializeField] private Room2DPrototypeDemandLoop demandLoop;
     [SerializeField] private ManagerController manager;
@@ -27,7 +26,7 @@ public class ManagerPhone : MonoBehaviour
     private string _hint = "";
     private float _hintUntil;
 
-    public bool PanelOpen => _panelOpen;
+    public bool PanelOpen => false; // 通知常驻不折叠，无全屏面板（GO 按钮走独立热区）
 
     private void Awake()
     {
@@ -91,7 +90,6 @@ public class ManagerPhone : MonoBehaviour
 
     private void Go(Note n)
     {
-        _panelOpen = false;
         if (manager == null) return;
         int mgrFloor = FloorMath.FloorIndexForY(manager.transform.position.y);
         if (mgrFloor == n.Floor)
@@ -116,35 +114,24 @@ public class ManagerPhone : MonoBehaviour
         if (Time.time < _hintUntil)
             GUI.Label(new Rect(w * 0.5f - 150, h - 132, 300, 22), _hint);
 
-        if (!_panelOpen)
-        {
-            var phoneRect = new Rect(w - 96, h - 96, 84, 60);
-            GuiInput.ReserveZone(phoneRect);
-            string badge = _notes.Count > 0 ? " (" + _notes.Count + "!)" : "";
-            if (GuiInput.Button(phoneRect, "PHONE" + badge)) _panelOpen = true;
-            return;
-        }
-
-        float panelH = 60 + Mathf.Max(1, _notes.Count) * 46;
-        GUI.Box(new Rect(w * 0.5f - 190, h * 0.3f, 380, panelH), "MANAGER PHONE — " + _notes.Count + " alerts");
-        if (_notes.Count == 0)
-            GUI.Label(new Rect(w * 0.5f - 170, h * 0.3f + 30, 340, 24), "All quiet. Suspiciously quiet.");
-
-        for (int i = 0; i < _notes.Count; i++)
+        // 通知不折叠：来了就自动挂在右侧（HIRE 下方），逐条带 GO。
+        // GO 按钮各自登记热区（触屏通道）；行本身不吃点击。
+        for (int i = 0; i < _notes.Count && i < 5; i++)
         {
             var n = _notes[i];
-            float y = h * 0.3f + 30 + i * 46;
+            float y = 76 + i * 40;
+            GUI.Box(new Rect(w - 316, y, 306, 36), "");
             var old = GUI.color;
             GUI.color = n.Tint;
-            GUI.Label(new Rect(w * 0.5f - 170, y, 250, 40), (n.Floor + 1) + "F  " + n.Title);
+            GUI.Label(new Rect(w - 308, y + 2, 210, 32), (n.Floor + 1) + "F  " + n.Title);
             GUI.color = old;
-            if (GuiInput.Button(new Rect(w * 0.5f + 96, y + 4, 80, 26), "GO"))
+            var goRect = new Rect(w - 92, y + 5, 76, 26);
+            GuiInput.ReserveZone(goRect);
+            if (GuiInput.Button(goRect, "GO"))
             {
                 Go(n);
                 break;
             }
         }
-        if (GuiInput.Button(new Rect(w * 0.5f - 190, h * 0.3f + panelH - 30, 380, 24), "Close"))
-            _panelOpen = false;
     }
 }
