@@ -184,6 +184,15 @@ public class RoomDoor : MonoBehaviour
                 _manager.MoveTo(_pendingDest);
             }
 
+            // 从屋里出来不用刷卡：人在房内且朝房外走 → 门立即开始滑开
+            // （门板纯视觉不挡寻路，不提前开就会穿模；早开无害，2 秒后照旧自动关）
+            if (managerInside && !_targetOpen && _managerAgent != null && _managerAgent.hasPath
+                && !InteriorContains(_managerAgent.destination))
+            {
+                OpenNow();
+            }
+            if (managerInside && dDoor < 1.4f) anyoneAtDoor = true; // 穿门途中别关门
+
             // 到门口 && 门关着 && 没刚拒绝过 → 弹面板
             if (!IsOpen && !_swiping && !managerInside && dDoor < doorSenseRadius && !_panelOpen && !_declined)
             {
@@ -218,23 +227,28 @@ public class RoomDoor : MonoBehaviour
             foreach (var a in _spawner.Agents)
             {
                 if (a == null || !SameFloor(a.transform.position)) continue;
-                if (FlatDist(a.transform.position, transform.position) < doorSenseRadius)
+                float d = FlatDist(a.transform.position, transform.position);
+                bool inside = InteriorContains(a.transform.position);
+                // 屋外走近刷工卡开门；屋里离门 2m 内也提前开（出门不穿模）
+                if (d < doorSenseRadius || (inside && d < 2.0f))
                 {
                     anyoneAtDoor = true;
                     OpenNow();
                 }
-                if (InteriorContains(a.transform.position)) anyoneInside = true;
+                if (inside) anyoneInside = true;
             }
         }
         foreach (var g in FindObjectsByType<GuestAgent>(FindObjectsSortMode.None))
         {
             if (g == null || !SameFloor(g.transform.position)) continue;
-            if (FlatDist(g.transform.position, transform.position) < doorSenseRadius)
+            float d = FlatDist(g.transform.position, transform.position);
+            bool inside = InteriorContains(g.transform.position);
+            if (d < doorSenseRadius || (inside && d < 2.0f))
             {
                 anyoneAtDoor = true;
                 OpenNow();
             }
-            if (InteriorContains(g.transform.position)) anyoneInside = true;
+            if (inside) anyoneInside = true;
         }
         if (managerInside) anyoneInside = true;
 
