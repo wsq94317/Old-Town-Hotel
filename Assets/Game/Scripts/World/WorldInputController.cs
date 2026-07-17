@@ -78,15 +78,23 @@ public class WorldInputController : MonoBehaviour
 
     private void HandleTap(Vector2 screenPos)
     {
-        // OnGUI 决策面板打开时吞掉世界点击（OnGUI 不走 EventSystem）。
+        // OnGUI 面板打开（或点中 HIRE 等常驻热区）时：点击不进世界，
+        // 转发给 GuiInput 做按钮命中——纯新 Input System 下 IMGUI 收不到触摸，
+        // 触屏设备全靠这条转发通道（编辑器鼠标则两条通道都通）。
         if (_interaction == null) _interaction = FindFirstObjectByType<ManagerInteraction>();
-        if (_interaction != null && _interaction.PanelOpen) return;
         if (_complaint == null) _complaint = FindFirstObjectByType<ComplaintInteraction>();
-        if (_complaint != null && _complaint.PanelOpen) return;
         if (_events == null) _events = FindFirstObjectByType<DailyEventInteraction>();
-        if (_events != null && _events.PanelOpen) return;
         if (_hiring == null) _hiring = FindFirstObjectByType<HiringInteraction>();
-        if (_hiring != null && _hiring.PanelOpen) return;
+        bool panelOpen =
+            (_interaction != null && _interaction.PanelOpen) ||
+            (_complaint != null && _complaint.PanelOpen) ||
+            (_events != null && _events.PanelOpen) ||
+            (_hiring != null && _hiring.PanelOpen);
+        if (panelOpen || GuiInput.IsInReservedZone(screenPos))
+        {
+            GuiInput.PublishTap(screenPos);
+            return;
+        }
 
         if (_cam == null) { _cam = Camera.main; if (_cam == null) return; }
         Ray ray = _cam.ScreenPointToRay(screenPos);

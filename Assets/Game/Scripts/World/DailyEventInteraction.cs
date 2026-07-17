@@ -182,7 +182,7 @@ public class DailyEventInteraction : MonoBehaviour
         GUI.Box(new Rect(w * 0.5f - 190, h * 0.3f, 380, 128), _activeDef.Title + "\n" + _activeDef.Blurb);
         for (int i = 0; i < _activeDef.Options.Length; i++)
         {
-            if (GUI.Button(new Rect(w * 0.5f - 170, h * 0.3f + 62 + i * 30, 340, 26), _activeDef.Options[i].Label))
+            if (GuiInput.Button(new Rect(w * 0.5f - 170, h * 0.3f + 62 + i * 30, 340, 26), _activeDef.Options[i].Label))
             {
                 Choose(_activeDef.Options[i]);
                 break;

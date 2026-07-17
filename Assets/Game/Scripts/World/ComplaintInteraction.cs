@@ -142,11 +142,11 @@ public class ComplaintInteraction : MonoBehaviour
 
         if (!_panelOpen) return;
         GUI.Box(new Rect(w * 0.5f - 170, h * 0.32f, 340, 136), "ANGRY GUEST — your call, boss");
-        if (GUI.Button(new Rect(w * 0.5f - 150, h * 0.32f + 36, 300, 26), "Pay them off (half the rate)"))
+        if (GuiInput.Button(new Rect(w * 0.5f - 150, h * 0.32f + 36, 300, 26), "Pay them off (half the rate)"))
             Choose(ComplaintChoice.Pay);
-        if (GUI.Button(new Rect(w * 0.5f - 150, h * 0.32f + 66, 300, 26), "Cold shoulder (free, risky)"))
+        if (GuiInput.Button(new Rect(w * 0.5f - 150, h * 0.32f + 66, 300, 26), "Cold shoulder (free, risky)"))
             Choose(ComplaintChoice.ColdShoulder);
-        if (GUI.Button(new Rect(w * 0.5f - 150, h * 0.32f + 96, 300, 26), "FIGHT 🥊 (what could go wrong)"))
+        if (GuiInput.Button(new Rect(w * 0.5f - 150, h * 0.32f + 96, 300, 26), "FIGHT 🥊 (what could go wrong)"))
             Choose(ComplaintChoice.Fight);
     }
 }

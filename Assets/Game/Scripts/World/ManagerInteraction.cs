@@ -115,11 +115,11 @@ public class ManagerInteraction : MonoBehaviour
         {
             GUI.Box(new Rect(w * 0.5f - 170, h * 0.35f, 340, 130),
                 $"CAUGHT SLACKING!  {_caughtAgent.Member?.DisplayName} ({_caughtAgent.Member?.Role})");
-            if (GUI.Button(new Rect(w * 0.5f - 150, h * 0.35f + 40, 300, 24), "Urge back to work (morale -5, speed up)"))
+            if (GuiInput.Button(new Rect(w * 0.5f - 150, h * 0.35f + 40, 300, 24), "Urge back to work (morale -5, speed up)"))
             { _caughtAgent.ApplyCatchChoice(CatchChoice.Urge); Say("Back to work!"); _caughtAgent = null; }
-            if (GUI.Button(new Rect(w * 0.5f - 150, h * 0.35f + 68, 300, 24), "Scold hard (morale -15, faster)"))
+            if (GuiInput.Button(new Rect(w * 0.5f - 150, h * 0.35f + 68, 300, 24), "Scold hard (morale -15, faster)"))
             { _caughtAgent.ApplyCatchChoice(CatchChoice.Scold); Say("Scolded."); _caughtAgent = null; }
-            if (GUI.Button(new Rect(w * 0.5f - 150, h * 0.35f + 96, 300, 24), "Look away (morale +3, slacking spreads)"))
+            if (GuiInput.Button(new Rect(w * 0.5f - 150, h * 0.35f + 96, 300, 24), "Look away (morale +3, slacking spreads)"))
             { _caughtAgent.ApplyCatchChoice(CatchChoice.Ignore); Say("You saw nothing."); _caughtAgent = null; }
             return;
         }
@@ -130,11 +130,11 @@ public class ManagerInteraction : MonoBehaviour
             var m = _panelAgent.Member;
             GUI.Box(new Rect(w * 0.5f - 150, h * 0.4f, 300, 150),
                 $"{m?.DisplayName} ({m?.Role})  morale:{m?.Morale}" + (_panelAgent.IsGrudging ? "  💢 GRUDGING" : ""));
-            if (GUI.Button(new Rect(w * 0.5f - 130, h * 0.4f + 34, 260, 24), "Hurry up! (speed up, morale -3)"))
+            if (GuiInput.Button(new Rect(w * 0.5f - 130, h * 0.4f + 34, 260, 24), "Hurry up! (speed up, morale -3)"))
             { _panelAgent.Hurry(); Say("Hurried."); _panelAgent = null; }
             bool canInterrogate = _panelAgent.HasDelayMark;
             GUI.enabled = canInterrogate;
-            if (GUI.Button(new Rect(w * 0.5f - 130, h * 0.4f + 62, 260, 24),
+            if (GuiInput.Button(new Rect(w * 0.5f - 130, h * 0.4f + 62, 260, 24),
                 canInterrogate ? "Interrogate the delay (🐌)" : "Interrogate (no delay mark)"))
             {
                 var agent = _panelAgent;
@@ -143,13 +143,13 @@ public class ManagerInteraction : MonoBehaviour
                 else Say($"WRONG ACCUSATION! {agent.Member?.DisplayName} is furious (morale {SupervisionTuning.WrongAccusationMoraleDelta}).");
             }
             GUI.enabled = true;
-            if (GUI.Button(new Rect(w * 0.5f - 130, h * 0.4f + 90, 260, 24), "Command → tap a room"))
+            if (GuiInput.Button(new Rect(w * 0.5f - 130, h * 0.4f + 90, 260, 24), "Command → tap a room"))
             {
                 _commandAgent = _panelAgent;
                 _panelAgent = null;
                 Say("Now tap the room you want them on.");
             }
-            if (GUI.Button(new Rect(w * 0.5f - 130, h * 0.4f + 118, 125, 24), "FIRE THEM"))
+            if (GuiInput.Button(new Rect(w * 0.5f - 130, h * 0.4f + 118, 125, 24), "FIRE THEM"))
             {
                 var victim = _panelAgent;
                 _panelAgent = null;
@@ -160,16 +160,18 @@ public class ManagerInteraction : MonoBehaviour
                     Say($"{victim.Member.DisplayName} is packing. The stapler goes with them.");
                 }
             }
-            if (GUI.Button(new Rect(w * 0.5f + 5, h * 0.4f + 118, 125, 24), "Close"))
+            if (GuiInput.Button(new Rect(w * 0.5f + 5, h * 0.4f + 118, 125, 24), "Close"))
                 _panelAgent = null;
             return;
         }
 
-        // ③ 附近瑕疵房 → 打回重扫
+        // ③ 附近瑕疵房 → 打回重扫（常驻按钮：登记热区吃触屏点击）
         var flawed = FlawedRoomNearby();
         if (flawed != null)
         {
-            if (GUI.Button(new Rect(w * 0.5f - 150, h - 90, 300, 30),
+            var flawRect = new Rect(w * 0.5f - 150, h - 90, 300, 30);
+            GuiInput.ReserveZone(flawRect);
+            if (GuiInput.Button(flawRect,
                 $"Room {flawed.roomNumber}: flaw found — send back to cleaning"))
             {
                 RoomFlaw.Clear(flawed);

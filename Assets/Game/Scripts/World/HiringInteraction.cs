@@ -72,7 +72,9 @@ public class HiringInteraction : MonoBehaviour
 
         if (!_panelOpen)
         {
-            if (GUI.Button(new Rect(w - 90, 40, 80, 28), "HIRE")) { EnsurePool(); _panelOpen = true; }
+            var hireRect = new Rect(w - 90, 40, 80, 28);
+            GuiInput.ReserveZone(hireRect); // 面板未开时也要吃点击（触屏通道）
+            if (GuiInput.Button(hireRect, "HIRE")) { EnsurePool(); _panelOpen = true; }
             return;
         }
 
@@ -87,13 +89,13 @@ public class HiringInteraction : MonoBehaviour
             GUI.Label(new Rect(w * 0.5f - 240, y, 380, 44),
                 $"{m.DisplayName} — {m.Role}, ${m.DailyWage}/day\n" +
                 $"SPD {m.Attributes.Speed} / QLT {m.Attributes.Quality} / STA {m.Attributes.Stamina} · {TraitsOf(m)}");
-            if (GUI.Button(new Rect(w * 0.5f + 150, y + 6, 100, 30), $"Hire -${SigningCost(m)}"))
+            if (GuiInput.Button(new Rect(w * 0.5f + 150, y + 6, 100, 30), $"Hire -${SigningCost(m)}"))
             {
                 Hire(m);
                 break;
             }
         }
-        if (GUI.Button(new Rect(w * 0.5f - 260, h * 0.28f + 40 + Mathf.Max(1, _pool.Count) * 62 + 6, 520, 26), "Close"))
+        if (GuiInput.Button(new Rect(w * 0.5f - 260, h * 0.28f + 40 + Mathf.Max(1, _pool.Count) * 62 + 6, 520, 26), "Close"))
             _panelOpen = false;
     }
 }
