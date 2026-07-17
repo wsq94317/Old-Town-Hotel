@@ -49,7 +49,7 @@ namespace OldTownHotel.Tests.EditMode
         public void ShowFloor_ClampsIndex()
         {
             _ctrl.ShowFloor(99);
-            Assert.AreEqual(2, _ctrl.CurrentFloor);
+            Assert.AreEqual(FloorMath.FloorCount - 1, _ctrl.CurrentFloor);
         }
     }
 }

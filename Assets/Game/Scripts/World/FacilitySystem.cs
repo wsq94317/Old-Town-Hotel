@@ -1,35 +1,80 @@
+using System.Collections.Generic;
 using UnityEngine;
 
-// 设施系统：
-//   餐厅/酒吧（1F 西南角，开局就有）：每晚 20:00 按在住房数结算酒水收入（$8/房）
-//   赌场（3F 南翼，解锁 $5000+威望3）：每晚 21:00 赌桌开张，收益随机 -$300~+$600
-//   健身房（3F 南翼，解锁 $3000）：日结时满意度 +1（客人爱它）
-//   屋顶泳池：v3 预告牌（不可解锁，纯挖坑）
-// 解锁：经理走近上锁区域的牌子 → 面板 → 付钱解锁。解锁状态暂不进存档（开发期假设）。
+// 设施系统（楼层版）：4F 餐厅酒吧（免费）/ 5F 健身房 $3000 / 6F 赌场 $5000+威望3 /
+// 7F 屋顶泳池 $8000+威望5。解锁在电梯面板里完成（ElevatorController 调 TryUnlock）。
+// 时段人气：按 DayPeriodLogic.ActivityFor 维持各设施层的闲逛客数量（电梯口进出）。
+// 营收/效果：
+//   酒吧 20:00 每入住房 +$8；赌场 21:00 夜场 -$300~+$600；
+//   泳池 22:00 派对：60% 满意度+3（全场狂欢），40% 满意度-2（失控）；
+//   健身房：日结满意度 +1。
 public class FacilitySystem : MonoBehaviour
 {
-    public const int CasinoCost = 5000, CasinoPrestigeReq = 3, GymCost = 3000;
+    public const int GymCost = 3000, CasinoCost = 5000, CasinoPrestigeReq = 3;
+    public const int PoolCost = 8000, PoolPrestigeReq = 5;
+
+    public const int RestaurantFloor = 3, GymFloor = 4, CasinoFloor = 5, PoolFloor = 6;
 
     [SerializeField] private Room2DDemoDayController dayController;
     [SerializeField] private Room2DPrototypeDemandLoop demandLoop;
     [SerializeField] private EconomySystem economy;
-    [SerializeField] private ManagerController manager;
     [SerializeField] private int rngSeed = 5150;
 
-    public static bool CasinoUnlocked { get; private set; }
     public static bool GymUnlocked { get; private set; }
+    public static bool CasinoUnlocked { get; private set; }
+    public static bool PoolUnlocked { get; private set; }
+
+    public static bool FloorAccessible(int floor)
+    {
+        switch (floor)
+        {
+            case GymFloor: return GymUnlocked;
+            case CasinoFloor: return CasinoUnlocked;
+            case PoolFloor: return PoolUnlocked;
+            default: return true;
+        }
+    }
+
+    /// <summary>电梯面板解锁入口。返回是否解锁成功，msg 给面板显示。</summary>
+    public static bool TryUnlock(int floor, EconomySystem economy, out string msg)
+    {
+        switch (floor)
+        {
+            case GymFloor:
+                if (economy == null || !economy.TrySpend(GymCost)) { msg = "No money, no muscles. ($" + GymCost + ")"; return false; }
+                GymUnlocked = true;
+                msg = "GYM OPEN. Guests can now feel guilty on vacation.";
+                return true;
+            case CasinoFloor:
+                if (ManagerReputation.Prestige < CasinoPrestigeReq) { msg = "Casino crowd doesn't know you yet. (Prestige " + ManagerReputation.Prestige + "/" + CasinoPrestigeReq + ")"; return false; }
+                if (economy == null || !economy.TrySpend(CasinoCost)) { msg = "You can't afford a casino. Ironic. ($" + CasinoCost + ")"; return false; }
+                CasinoUnlocked = true;
+                msg = "CASINO OPEN. You are the house now. Probably.";
+                return true;
+            case PoolFloor:
+                if (ManagerReputation.Prestige < PoolPrestigeReq) { msg = "The roof demands respect. (Prestige " + ManagerReputation.Prestige + "/" + PoolPrestigeReq + ")"; return false; }
+                if (economy == null || !economy.TrySpend(PoolCost)) { msg = "Water is expensive up here. ($" + PoolCost + ")"; return false; }
+                PoolUnlocked = true;
+                msg = "ROOF POOL OPEN. What could possibly go wrong at night.";
+                return true;
+            default:
+                msg = "";
+                return true;
+        }
+    }
 
     private System.Random _rng;
-    private int _lastBarDay = -1, _lastCasinoDay = -1, _settledGymDay = -1;
-    private string _panelFacility = null; // "casino"/"gym"/"pool" 或 null
-    private string _story = "";
-    private float _storyUntil;
+    private int _lastBarDay = -1, _lastCasinoDay = -1, _lastPoolDay = -1, _settledGymDay = -1;
+    private float _ambienceTimer;
+    private readonly Dictionary<int, List<GuestAgent>> _crowd = new Dictionary<int, List<GuestAgent>>();
 
-    private static readonly Vector3 CasinoSign = new Vector3(-6f, 8f, -3.5f);
-    private static readonly Vector3 GymSign = new Vector3(0f, 8f, -3.5f);
-    private static readonly Vector3 PoolSign = new Vector3(6f, 8f, -3.5f);
-
-    public bool PanelOpen => _panelFacility != null;
+    private static readonly Dictionary<int, Vector3[]> FloorSpots = new Dictionary<int, Vector3[]>
+    {
+        { RestaurantFloor, new[] { new Vector3(-6.5f, 12f, -2.5f), new Vector3(-5f, 12f, 2f), new Vector3(2f, 12f, 0f), new Vector3(5f, 12f, -2f) } },
+        { GymFloor,        new[] { new Vector3(-5f, 16f, 0f), new Vector3(0f, 16f, 2f), new Vector3(3f, 16f, -2f) } },
+        { CasinoFloor,     new[] { new Vector3(-4f, 20f, 1f), new Vector3(0f, 20f, -2f), new Vector3(4f, 20f, 1.5f), new Vector3(-6f, 20f, -3f) } },
+        { PoolFloor,       new[] { new Vector3(-4f, 24f, 0f), new Vector3(2f, 24f, 2f), new Vector3(5f, 24f, -2f), new Vector3(-2f, 24f, -3.5f) } },
+    };
 
     private void Awake()
     {
@@ -37,7 +82,7 @@ public class FacilitySystem : MonoBehaviour
         if (dayController == null) dayController = FindFirstObjectByType<Room2DDemoDayController>();
         if (demandLoop == null) demandLoop = FindFirstObjectByType<Room2DPrototypeDemandLoop>();
         if (economy == null) economy = FindFirstObjectByType<EconomySystem>();
-        if (manager == null) manager = FindFirstObjectByType<ManagerController>();
+        foreach (var f in FloorSpots.Keys) _crowd[f] = new List<GuestAgent>();
     }
 
     private void Start()
@@ -65,7 +110,7 @@ public class FacilitySystem : MonoBehaviour
         float hour = dayController.Clock.CurrentHour;
         int day = dayController.CurrentDay;
 
-        // 酒吧晚市：20:00 一次性结算
+        // 酒吧晚市 20:00
         if (hour >= 20f && _lastBarDay != day)
         {
             _lastBarDay = day;
@@ -73,136 +118,83 @@ public class FacilitySystem : MonoBehaviour
             if (income > 0 && economy != null)
             {
                 economy.RecordCheckout(income, 1f);
-                FloatingTextFx.Spawn(new Vector3(-7f, 0f, -2.5f), "+$" + income + " BAR", new Color(0.95f, 0.7f, 0.3f));
+                FloatingTextFx.Spawn(new Vector3(-6f, 12f, -2f), "+$" + income + " BAR", new Color(0.95f, 0.7f, 0.3f));
             }
         }
 
-        // 赌场夜场：21:00 随机浮动
+        // 赌场夜场 21:00
         if (CasinoUnlocked && hour >= 21f && _lastCasinoDay != day)
         {
             _lastCasinoDay = day;
-            int swing = -300 + (int)(_rng.NextDouble() * 900); // -300..+600
+            int swing = -300 + (int)(_rng.NextDouble() * 900);
             if (swing >= 0 && economy != null) economy.RecordCheckout(swing, 1f);
             else if (economy != null) economy.TrySpend(-swing);
-            FloatingTextFx.Spawn(CasinoSign, (swing >= 0 ? "+$" : "-$") + Mathf.Abs(swing) + " CASINO",
+            FloatingTextFx.Spawn(new Vector3(0f, 20f, 0f), (swing >= 0 ? "+$" : "-$") + Mathf.Abs(swing) + " CASINO",
                 swing >= 0 ? new Color(0.35f, 0.95f, 0.4f) : new Color(1f, 0.4f, 0.3f), 1.1f);
         }
 
-        // 走近上锁牌子 → 面板
-        if (_panelFacility == null && manager != null
-            && FloorMath.FloorIndexForY(manager.transform.position.y) == 2)
+        // 泳池派对 22:00
+        if (PoolUnlocked && hour >= 22f && _lastPoolDay != day)
         {
-            Vector3 p = manager.transform.position;
-            if (!CasinoUnlocked && Near(p, CasinoSign)) _panelFacility = "casino";
-            else if (!GymUnlocked && Near(p, GymSign)) _panelFacility = "gym";
-            else if (Near(p, PoolSign)) _panelFacility = "pool";
+            _lastPoolDay = day;
+            bool success = _rng.NextDouble() < 0.6;
+            if (demandLoop != null) demandLoop.prototypeSatisfactionScore += success ? 3 : -2;
+            FloatingTextFx.Spawn(new Vector3(0f, 24f, 0f),
+                success ? "POOL PARTY!! +3😎" : "PARTY OUT OF CONTROL -2",
+                success ? new Color(0.3f, 0.85f, 1f) : new Color(1f, 0.4f, 0.3f), 1.3f);
+            CameraShaker.Shake(success ? 0.1f : 0.25f, 0.5f);
         }
-        else if (_panelFacility != null && manager != null)
+
+        // 时段人气（每 8 秒调整一次各设施层的闲逛客）
+        _ambienceTimer -= Time.deltaTime;
+        if (_ambienceTimer <= 0f)
         {
-            Vector3 anchor = _panelFacility == "casino" ? CasinoSign : _panelFacility == "gym" ? GymSign : PoolSign;
-            if (!Near(manager.transform.position, anchor, 3.2f)) _panelFacility = null;
+            _ambienceTimer = 8f;
+            UpdateAmbience(DayPeriodLogic.PeriodFor(hour));
         }
     }
 
-    private static bool Near(Vector3 p, Vector3 anchor, float r = 2.2f)
+    private void UpdateAmbience(DayPeriod period)
     {
-        p.y = 0; anchor.y = 0;
-        return Vector3.Distance(p, anchor) < r;
+        foreach (var kv in FloorSpots)
+        {
+            int floor = kv.Key;
+            var crowd = _crowd[floor];
+            crowd.RemoveAll(g => g == null);
+            int want = FloorAccessible(floor) ? DayPeriodLogic.ActivityFor(floor, period) : 0;
+
+            while (crowd.Count < want)
+            {
+                // 从该层电梯口"到达"
+                var g = GuestAgent.Spawn(new Vector3(7.6f, FloorMath.BaseYFor(floor), 0f), "visitor_f" + floor);
+                g.TravelTo(kv.Value[_rng.Next(kv.Value.Length)], null);
+                crowd.Add(g);
+            }
+            while (crowd.Count > want)
+            {
+                var g = crowd[crowd.Count - 1];
+                crowd.RemoveAt(crowd.Count - 1);
+                if (g != null)
+                {
+                    var gg = g;
+                    gg.TravelTo(new Vector3(9.3f, FloorMath.BaseYFor(floor), 0f), () => { if (gg != null) Destroy(gg.gameObject); });
+                }
+            }
+            // 随机换位（有活人感）
+            if (crowd.Count > 0)
+            {
+                var mover = crowd[_rng.Next(crowd.Count)];
+                if (mover != null) mover.TravelTo(kv.Value[_rng.Next(kv.Value.Length)], null);
+            }
+        }
     }
 
     private void HandleDaySettled(int day, int served, DayLedger ledger)
     {
-        // 健身房：日结满意度 +1
         if (GymUnlocked && demandLoop != null && _settledGymDay != day)
         {
             _settledGymDay = day;
             demandLoop.prototypeSatisfactionScore += 1;
         }
-    }
-
-    private void Unlock(string facility)
-    {
-        if (facility == "casino")
-        {
-            if (ManagerReputation.Prestige < CasinoPrestigeReq) { Say("The casino crowd doesn't know you yet. (Prestige " + ManagerReputation.Prestige + "/" + CasinoPrestigeReq + ")"); return; }
-            if (economy == null || !economy.TrySpend(CasinoCost)) { Say("You can't afford a casino. Ironic."); return; }
-            CasinoUnlocked = true;
-            FacilityZoneVisual.Unlock("Casino");
-            Say("CASINO OPEN. The house always wins. You are the house. Probably.");
-        }
-        else if (facility == "gym")
-        {
-            if (economy == null || !economy.TrySpend(GymCost)) { Say("No money, no muscles."); return; }
-            GymUnlocked = true;
-            FacilityZoneVisual.Unlock("Gym");
-            Say("GYM OPEN. Guests can now feel guilty on vacation.");
-        }
-        _panelFacility = null;
-    }
-
-    private void Say(string msg) { _story = msg; _storyUntil = Time.time + 4f; }
-
-    private void OnGUI()
-    {
-        Vector2 v = GuiScale.Begin();
-        float w = v.x, h = v.y;
-
-        if (Time.time < _storyUntil)
-            GUI.Box(new Rect(w * 0.5f - 230, h * 0.16f, 460, 40), _story);
-
-        if (_panelFacility == null) return;
-
-        if (_panelFacility == "pool")
-        {
-            GUI.Box(new Rect(w * 0.5f - 160, h * 0.4f, 320, 70),
-                "ROOF POOL\nComing in a future update. The roof isn't ready.\nNeither are you.");
-            if (GuiInput.Button(new Rect(w * 0.5f - 60, h * 0.4f + 42, 120, 22), "Fine.")) _panelFacility = null;
-            return;
-        }
-
-        bool casino = _panelFacility == "casino";
-        string title = casino
-            ? "CASINO — unlock for $" + CasinoCost + " (needs Prestige " + CasinoPrestigeReq + ")\nNightly take: -$300 ~ +$600. Gambling!"
-            : "GYM — unlock for $" + GymCost + "\n+1 satisfaction every day. Sweat sells.";
-        GUI.Box(new Rect(w * 0.5f - 170, h * 0.38f, 340, 96), title);
-        if (GuiInput.Button(new Rect(w * 0.5f - 150, h * 0.38f + 44, 300, 24), casino ? "Open the casino" : "Open the gym"))
-            Unlock(_panelFacility);
-        if (GuiInput.Button(new Rect(w * 0.5f - 150, h * 0.38f + 70, 300, 22), "Not today"))
-            _panelFacility = null;
-    }
-}
-
-// 上锁区视觉：暗色地台+牌子；解锁后变亮色（静态注册表按名字找）。
-public class FacilityZoneVisual : MonoBehaviour
-{
-    private static readonly System.Collections.Generic.Dictionary<string, FacilityZoneVisual> _byName =
-        new System.Collections.Generic.Dictionary<string, FacilityZoneVisual>();
-
-    [SerializeField] private string facilityName;
-    private Renderer _pad;
-
-    public static void Register(string name, FacilityZoneVisual v) => _byName[name] = v;
-
-    public static void Unlock(string name)
-    {
-        if (_byName.TryGetValue(name, out var v) && v != null && v._pad != null)
-            v._pad.material.color = name == "Casino" ? new Color(0.6f, 0.2f, 0.5f) : new Color(0.3f, 0.7f, 0.5f);
-    }
-
-    public void Init(string name, Renderer pad)
-    {
-        facilityName = name;
-        _pad = pad;
-        Register(name, this);
-    }
-
-    private void Start()
-    {
-        if (_pad == null)
-        {
-            var t = transform.Find("Pad");
-            if (t != null) _pad = t.GetComponent<Renderer>();
-        }
-        Register(facilityName, this);
     }
 }

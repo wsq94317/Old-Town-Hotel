@@ -32,7 +32,7 @@ public static class CustomNavMeshBaker
         settings.agentRadius = 0.3f;
         settings.agentClimb = 0.4f;
 
-        var bounds = new Bounds(new Vector3(0f, 6f, 0f), new Vector3(60f, 30f, 40f));
+        var bounds = new Bounds(new Vector3(0f, 14f, 0f), new Vector3(60f, 36f, 40f)); // 覆盖 7 层（y 0..24+）
         NavMeshData data = NavMeshBuilder.BuildNavMeshData(
             settings, sources, bounds, Vector3.zero, Quaternion.identity);
         if (data == null)

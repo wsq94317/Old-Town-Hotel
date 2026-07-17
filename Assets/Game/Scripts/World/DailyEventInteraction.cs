@@ -62,12 +62,13 @@ public class DailyEventInteraction : MonoBehaviour
 
         float hour = dayController.Clock.CurrentHour;
 
-        // 到点浮现（一次只挂一个事件，前一个没处理完就顺延）
+        // 到点浮现（一次只挂一个；锁着的设施事件直接跳过）
         if (_activeDef == null && _nextIndex < _todaysSchedule.Count
             && hour >= _todaysSchedule[_nextIndex].TriggerHour)
         {
-            Activate(_todaysSchedule[_nextIndex].Def);
+            var def = _todaysSchedule[_nextIndex].Def;
             _nextIndex++;
+            if (FacilityAnchorAccessible(def.Anchor)) Activate(def);
         }
 
         if (_activeDef == null) return;
@@ -112,11 +113,26 @@ public class DailyEventInteraction : MonoBehaviour
         _icon.AddComponent<EventIconPulse>();
     }
 
+    private static bool FacilityAnchorAccessible(EventAnchor anchor)
+    {
+        switch (anchor)
+        {
+            case EventAnchor.Gym: return FacilitySystem.GymUnlocked;
+            case EventAnchor.Casino: return FacilitySystem.CasinoUnlocked;
+            case EventAnchor.Pool: return FacilitySystem.PoolUnlocked;
+            default: return true;
+        }
+    }
+
     private Vector3 ResolveAnchor(EventAnchor anchor)
     {
         switch (anchor)
         {
             case EventAnchor.Lounge: return loungePoint;
+            case EventAnchor.Restaurant: return new Vector3(-5f, FloorMath.BaseYFor(FacilitySystem.RestaurantFloor), -1f);
+            case EventAnchor.Gym: return new Vector3(0f, FloorMath.BaseYFor(FacilitySystem.GymFloor), 0f);
+            case EventAnchor.Casino: return new Vector3(0f, FloorMath.BaseYFor(FacilitySystem.CasinoFloor), 0f);
+            case EventAnchor.Pool: return new Vector3(0f, FloorMath.BaseYFor(FacilitySystem.PoolFloor), 0f);
             case EventAnchor.RandomOccupiedRoom:
                 if (demandLoop != null && demandLoop.rooms != null)
                 {

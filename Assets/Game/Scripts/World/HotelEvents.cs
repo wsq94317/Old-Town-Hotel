@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 // M4 事件池（纯 C#）：事件定义表 + 每日排程逻辑。
 // 用代码表而非 ScriptableObject——夜间迭代快且全可测；正式内容管线再迁 SO（假设已记录）。
-public enum EventAnchor { FrontDesk, Lounge, RandomOccupiedRoom }
+public enum EventAnchor { FrontDesk, Lounge, RandomOccupiedRoom, Restaurant, Casino, Gym, Pool }
 
 public enum EventSpecial { None, RaiseRandomStaff, RefuseRaiseRandomStaff }
 
@@ -80,6 +80,56 @@ public static class EventCatalog
                 "Out he went, mid-chorus. The lounge applauded."),
             new EventOption("Free coffee, no questions", new GameEffect(-10, +2, +2, 0),
                 "He sobered up and tipped you a full life story.")),
+
+        // ── 设施时段事件（4F 餐厅 / 5F 健身房 / 6F 赌场 / 7F 泳池，锁着不排） ──
+        new HotelEventDef("burnt_breakfast", "BREAKFAST IS ON FIRE", "The chef burned the eggs. All of them. Somehow.",
+            6f, 10f, EventAnchor.Restaurant,
+            new EventOption("Comp breakfast", new GameEffect(-30, +2, 0, 0),
+                "Free toast for everyone. The chef swears it's 'smoked'."),
+            new EventOption("Serve it anyway", new GameEffect(+10, -3, 0, 0),
+                "One guest called it 'cajun'. The others called lawyers.")),
+
+        new HotelEventDef("mystery_lunch", "MYSTERY LUNCH SPECIAL", "Nobody knows what's in today's stew. Including the chef.",
+            11f, 14f, EventAnchor.Restaurant,
+            new EventOption("Pull it from the menu", new GameEffect(-20, +1, -3, 0),
+                "The chef took it personally. The stew took it worse."),
+            new EventOption("Rebrand as 'Chef's Secret'", new GameEffect(+40, -2, +2, +1),
+                "Sold out in an hour. Two guests are missing.")),
+
+        new HotelEventDef("dealer_cheat", "DEALER CAUGHT CHEATING", "Your own dealer is palming chips. Bold.",
+            14f, 19f, EventAnchor.Casino,
+            new EventOption("Fire on the spot", new GameEffect(0, +2, -5, +1),
+                "Marched out through the lobby. The chips fell out of his sleeve."),
+            new EventOption("Take a cut", new GameEffect(+120, -1, 0, -1),
+                "You are now business partners with a criminal. Congrats.")),
+
+        new HotelEventDef("high_roller", "HIGH ROLLER AT TABLE 3", "He's betting like the money is fake. Maybe it is.",
+            19f, 23f, EventAnchor.Casino,
+            new EventOption("Comp him a suite", new GameEffect(-80, +3, 0, +2),
+                "He tipped the dealer a car. Not a toy one."),
+            new EventOption("Check the money", new GameEffect(0, -1, 0, +1),
+                "Real, offended, and leaving. At least it was real.")),
+
+        new HotelEventDef("coach_too_intense", "COACH BROKE A GUEST", "Morning bootcamp made someone cry. Publicly.",
+            6f, 10f, EventAnchor.Gym,
+            new EventOption("Comfort the guest", new GameEffect(0, +2, 0, 0),
+                "You held a grown man while he whispered 'burpees'."),
+            new EventOption("Praise the coach", new GameEffect(0, -1, +5, +1),
+                "The coach framed your quote. The guests fear Tuesdays now.")),
+
+        new HotelEventDef("muscle_contest", "IMPROMPTU FLEX-OFF", "Two guests are comparing biceps. Loudly. Shirtlessly.",
+            14f, 19f, EventAnchor.Gym,
+            new EventOption("Judge it officially", new GameEffect(+25, +2, 0, +1),
+                "You charged admission. Culture happened."),
+            new EventOption("Break it up", new GameEffect(0, -1, 0, 0),
+                "They united against you. New friendship unlocked, apparently.")),
+
+        new HotelEventDef("pool_incident", "INCIDENT IN THE POOL", "The water is... warmer in one corner. Nobody's confessing.",
+            14f, 19f, EventAnchor.Pool,
+            new EventOption("Close pool for cleaning", new GameEffect(-40, +1, -2, 0),
+                "One hour of chlorine and shame."),
+            new EventOption("Announce 'heated corner'", new GameEffect(0, -3, +3, 0),
+                "Marketing genius or health hazard. History will judge.")),
     };
 }
 

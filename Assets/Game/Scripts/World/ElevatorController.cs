@@ -133,22 +133,54 @@ public class ElevatorController : MonoBehaviour
         _traveling = false;
     }
 
+    private string _unlockMsg = "";
+    private float _unlockMsgUntil;
+
     private void OnGUI()
     {
-        if (!_panelOpen) return;
         Vector2 v = GuiScale.Begin();
         float w = v.x, h = v.y;
+
+        if (Time.time < _unlockMsgUntil)
+            GUI.Box(new Rect(w * 0.5f - 210, h * 0.2f, 420, 40), _unlockMsg);
+
+        if (!_panelOpen) return;
         int cur = CurrentManagerFloor();
-        GUI.Box(new Rect(w * 0.5f - 110, h * 0.38f, 220, 40 + FloorMath.FloorCount * 30), "ELEVATOR — pick a floor");
-        for (int f = 0; f < FloorMath.FloorCount; f++)
+        float top = h * 0.24f;
+        GUI.Box(new Rect(w * 0.5f - 150, top, 300, 44 + FloorMath.FloorCount * 30), "ELEVATOR — pick a floor");
+        // 从高层往下列（酒店习惯）
+        for (int i = 0; i < FloorMath.FloorCount; i++)
         {
-            bool enabled = f != cur;
-            bool prev = GUI.enabled;
-            GUI.enabled = enabled;
-            string label = (f + 1) + "F" + (f == cur ? " (here)" : "");
-            if (GuiInput.Button(new Rect(w * 0.5f - 90, h * 0.38f + 32 + f * 30, 180, 26), label) && enabled)
+            int f = FloorMath.FloorCount - 1 - i;
+            bool unlocked = FacilitySystem.FloorAccessible(f);
+            string label = (f + 1) + "F  " + FloorMath.FloorNames[f];
+            if (!unlocked)
             {
-                GoToFloor(f);
+                int cost = f == FacilitySystem.GymFloor ? FacilitySystem.GymCost
+                         : f == FacilitySystem.CasinoFloor ? FacilitySystem.CasinoCost
+                         : FacilitySystem.PoolCost;
+                label += "  🔒 $" + cost;
+            }
+            else if (f == cur) label += "  (here)";
+
+            bool prev = GUI.enabled;
+            GUI.enabled = f != cur;
+            if (GuiInput.Button(new Rect(w * 0.5f - 130, top + 34 + i * 30, 260, 26), label) && f != cur)
+            {
+                if (unlocked)
+                {
+                    GoToFloor(f);
+                }
+                else
+                {
+                    // 直接在电梯里解锁（付钱/威望校验在 FacilitySystem）
+                    var econ = FindFirstObjectByType<EconomySystem>();
+                    string msg;
+                    bool ok = FacilitySystem.TryUnlock(f, econ, out msg);
+                    _unlockMsg = msg;
+                    _unlockMsgUntil = Time.time + 4f;
+                    if (ok) GoToFloor(f); // 开业剪彩：直接送上去
+                }
             }
             GUI.enabled = prev;
         }

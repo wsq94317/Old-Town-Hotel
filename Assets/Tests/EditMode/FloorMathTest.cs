@@ -20,7 +20,7 @@ namespace OldTownHotel.Tests.EditMode
         public void FloorIndexForY_ClampsOutOfRange()
         {
             Assert.AreEqual(0, FloorMath.FloorIndexForY(-2f));
-            Assert.AreEqual(2, FloorMath.FloorIndexForY(99f));
+            Assert.AreEqual(FloorMath.FloorCount - 1, FloorMath.FloorIndexForY(999f));
         }
 
         [Test]
@@ -35,7 +35,13 @@ namespace OldTownHotel.Tests.EditMode
         public void BaseYFor_ClampsIndex()
         {
             Assert.AreEqual(0f, FloorMath.BaseYFor(-1), 0.0001f);
-            Assert.AreEqual(8f, FloorMath.BaseYFor(99), 0.0001f);
+            Assert.AreEqual((FloorMath.FloorCount - 1) * 4f, FloorMath.BaseYFor(99), 0.0001f);
+        }
+
+        [Test]
+        public void FloorNames_MatchCount()
+        {
+            Assert.AreEqual(FloorMath.FloorCount, FloorMath.FloorNames.Length);
         }
     }
 }

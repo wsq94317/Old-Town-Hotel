@@ -50,9 +50,9 @@ namespace OldTownHotel.Tests.EditMode
         }
 
         [Test]
-        public void Catalog_HasSixEvents_EachWithTwoOptions()
+        public void Catalog_HasEvents_EachWithTwoOptions()
         {
-            Assert.AreEqual(6, EventCatalog.All.Count);
+            Assert.GreaterOrEqual(EventCatalog.All.Count, 6);
             foreach (var e in EventCatalog.All) Assert.AreEqual(2, e.Options.Length, e.Id);
         }
     }

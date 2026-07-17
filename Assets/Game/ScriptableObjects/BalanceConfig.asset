@@ -12,11 +12,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a2749e21fa8eb4caf83bd4ffa05dd25c, type: 3}
   m_Name: BalanceConfig
   m_EditorClassIdentifier: OldTownHotel.Game::Room2DBalanceConfigSO
-  dayLengthRealSeconds: 180
-  dayStartHour: 8
+  dayLengthRealSeconds: 240
+  dayStartHour: 6
   openDoorsHour: 10
-  stopArrivalsHour: 18
-  closeHour: 22
+  stopArrivalsHour: 19
+  closeHour: 24
   upcomingQueueCapacity: 2
   guestsPerDay: 5
   impatientThresholdSeconds: 12

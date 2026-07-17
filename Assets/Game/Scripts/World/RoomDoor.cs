@@ -23,6 +23,7 @@ public class RoomDoor : MonoBehaviour
     private float _openedAt;
     private bool _swiping;
     private bool _panelOpen;
+    private bool _declined; // Never mind 后：离开感应区前不再弹（否则下一帧立刻重开=看似关不掉）
     private Vector3 _pendingDest;
     private bool _hasPendingDest;
     private float _intrusionCooldownUntil;
@@ -183,15 +184,19 @@ public class RoomDoor : MonoBehaviour
                 _manager.MoveTo(_pendingDest);
             }
 
-            // 到门口 && 门关着 → 弹面板
-            if (!IsOpen && !_swiping && !managerInside && dDoor < doorSenseRadius && !_panelOpen)
+            // 到门口 && 门关着 && 没刚拒绝过 → 弹面板
+            if (!IsOpen && !_swiping && !managerInside && dDoor < doorSenseRadius && !_panelOpen && !_declined)
             {
                 SetPanel(true);
             }
-            // 走远/门开了 → 收面板
+            // 走远/门开了 → 收面板；离开感应区解除"已拒绝"
             if (_panelOpen && (dDoor > doorSenseRadius + 0.8f || IsOpen))
             {
                 SetPanel(false);
+            }
+            if (_declined && dDoor > doorSenseRadius + 0.5f)
+            {
+                _declined = false;
             }
 
             // 查错房
@@ -282,6 +287,7 @@ public class RoomDoor : MonoBehaviour
         if (GuiInput.Button(new Rect(w * 0.5f - 110, h * 0.42f + 68, 220, 24), "Never mind"))
         {
             SetPanel(false);
+            _declined = true;
             _hasPendingDest = false;
         }
     }
