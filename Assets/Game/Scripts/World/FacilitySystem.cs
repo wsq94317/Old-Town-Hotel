@@ -38,6 +38,22 @@ public class FacilitySystem : MonoBehaviour
         }
     }
 
+    /// <summary>存档捕获（存档 v3 世界层）。</summary>
+    public static void CaptureTo(WorldState w)
+    {
+        w.gymUnlocked = GymUnlocked;
+        w.casinoUnlocked = CasinoUnlocked;
+        w.poolUnlocked = PoolUnlocked;
+    }
+
+    /// <summary>读档恢复。调试全解锁开着时 OR 上去——旧档/新档都不允许把解锁收回去。</summary>
+    public static void RestoreFrom(WorldState w)
+    {
+        GymUnlocked = w.gymUnlocked || DebugUnlockAll;
+        CasinoUnlocked = w.casinoUnlocked || DebugUnlockAll;
+        PoolUnlocked = w.poolUnlocked || DebugUnlockAll;
+    }
+
     /// <summary>电梯面板解锁入口。返回是否解锁成功，msg 给面板显示。</summary>
     public static bool TryUnlock(int floor, EconomySystem economy, out string msg)
     {

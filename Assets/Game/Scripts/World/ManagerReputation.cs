@@ -13,4 +13,11 @@ public static class ManagerReputation
     }
 
     public static void ResetForNewGame() => Prestige = 0;
+
+    /// <summary>读档恢复（负数钳 0，照常广播给 HUD）。</summary>
+    public static void Restore(int value)
+    {
+        Prestige = System.Math.Max(0, value);
+        OnChanged?.Invoke(Prestige);
+    }
 }

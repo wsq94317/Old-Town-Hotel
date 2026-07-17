@@ -111,6 +111,7 @@ public class DailyEventInteraction : MonoBehaviour
         _icon.GetComponent<Renderer>().sharedMaterial = new Material(shader) { color = new Color(0.8f, 0.35f, 0.95f) };
         _icon.AddComponent<BillboardSprite>();
         _icon.AddComponent<EventIconPulse>();
+        _icon.AddComponent<AgentFloorVisibility>(); // 设施层事件的图标别跨层穿帮
     }
 
     private static bool FacilityAnchorAccessible(EventAnchor anchor)

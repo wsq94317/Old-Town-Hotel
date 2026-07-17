@@ -67,11 +67,33 @@ public sealed class RoomsState
 }
 
 [Serializable]
+public sealed class TapedBreakdownEntry
+{
+    public int room = -1;     // roomNumber；设施层损坏无房 = -1
+    public float x, y, z;     // 复发位置
+    public string kind;
+}
+
+[Serializable]
+public sealed class WorldState
+{
+    // v2 世界层（经理模式）跨日状态：设施解锁 / 威望 / 胶带明日复发 / 昨日锁房。
+    // 当日进行中的损坏不存——存档只发生在日结，损坏每天清场重掷。
+    public bool gymUnlocked;
+    public bool casinoUnlocked;
+    public bool poolUnlocked;
+    public int prestige;
+    public List<TapedBreakdownEntry> tapedBreakdowns = new List<TapedBreakdownEntry>();
+    public List<int> lockedRooms = new List<int>(); // 次晨自动转 Dirty
+}
+
+[Serializable]
 public sealed class GameState
 {
-    public int version = 2;   // v2: + rooms（过夜占用）
+    public int version = 3;   // v2: + rooms（过夜占用）；v3: + world（经理模式世界层）
     public EconomyState economy = new EconomyState();
     public RenovationState renovation = new RenovationState();
     public ProgressState progress = new ProgressState();
     public RoomsState rooms = new RoomsState();
+    public WorldState world = new WorldState();
 }

@@ -42,6 +42,47 @@ public class BreakdownSystem : MonoBehaviour
 
     public bool PanelOpen => _panelIncident != null;
 
+    /// <summary>存档捕获（v3 世界层）：只有跨日的状态——胶带明日复发 + 昨日锁房。</summary>
+    public void CaptureTo(WorldState w)
+    {
+        w.tapedBreakdowns.Clear();
+        foreach (var t in _tapedForTomorrow)
+            w.tapedBreakdowns.Add(new TapedBreakdownEntry
+            {
+                room = t.room != null ? t.room.roomNumber : -1,
+                x = t.pos.x, y = t.pos.y, z = t.pos.z,
+                kind = t.kind,
+            });
+        w.lockedRooms.Clear();
+        foreach (var r in _lockedRooms)
+            if (r != null) w.lockedRooms.Add(r.roomNumber);
+    }
+
+    /// <summary>读档恢复：锁房重新 Blocked，交给首帧 Update 的新日分支照常"次晨解封转 Dirty +
+    /// 胶带复发"（存档只发生在日结，读档即是次晨）。</summary>
+    public void RestoreFrom(WorldState w)
+    {
+        _tapedForTomorrow.Clear();
+        foreach (var e in w.tapedBreakdowns)
+            _tapedForTomorrow.Add((new Vector3(e.x, e.y, e.z), FindRoomByNumber(e.room), e.kind));
+        _lockedRooms.Clear();
+        foreach (var num in w.lockedRooms)
+        {
+            var room = FindRoomByNumber(num);
+            if (room == null) continue;
+            room.SetState(Room2DState.Blocked);
+            _lockedRooms.Add(room);
+        }
+    }
+
+    private Room2DEntity FindRoomByNumber(int number)
+    {
+        if (number < 0 || demandLoop == null || demandLoop.rooms == null) return null;
+        foreach (var r in demandLoop.rooms)
+            if (r != null && r.roomNumber == number) return r;
+        return null;
+    }
+
     private void Awake()
     {
         _rng = new System.Random(rngSeed);
@@ -171,6 +212,7 @@ public class BreakdownSystem : MonoBehaviour
         inc.Marker.transform.localScale = Vector3.one * 0.5f;
         inc.Marker.AddComponent<BillboardSprite>();
         inc.Marker.AddComponent<EventIconPulse>();
+        inc.Marker.AddComponent<AgentFloorVisibility>(); // 不在楼层树里，需自管按层显隐
 
         inc.Puddle = GameObject.CreatePrimitive(PrimitiveType.Quad);
         Destroy(inc.Puddle.GetComponent<Collider>());
@@ -178,6 +220,7 @@ public class BreakdownSystem : MonoBehaviour
         inc.Puddle.transform.position = pos + Vector3.up * 0.09f;
         inc.Puddle.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
         inc.Puddle.transform.localScale = Vector3.one * 0.9f;
+        inc.Puddle.AddComponent<AgentFloorVisibility>();
 
         RefreshVisual(inc);
         _active.Add(inc);

@@ -109,6 +109,7 @@ public class FireAlarmIncident : MonoBehaviour
         _smoke = new GameObject("SmokeFx");
         _smoke.transform.position = _room.transform.position;
         _smoke.AddComponent<SmokePuffs>();
+        _smoke.AddComponent<AgentFloorVisibility>(); // 烟团在 Start 才生成，靠懒缓存收进来
         _smoker = GuestAgent.Spawn(_room.transform.position + new Vector3(-0.5f, 0f, 0.3f), "smoker");
 
         ManagerPhone.Push("fire", "FIRE ALARM — Room " + _room.roomNumber + "!!",

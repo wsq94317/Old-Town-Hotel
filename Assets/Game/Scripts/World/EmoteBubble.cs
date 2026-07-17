@@ -7,6 +7,8 @@ public class EmoteBubble : MonoBehaviour
     public enum Emote { None, Sleep, Delay, Alert, Grudge }
 
     private Renderer _renderer;
+    private Emote _current = Emote.None;
+    private FloorVisibilityController _floors;
     private static Material _matSleep, _matDelay, _matAlert, _matGrudge;
 
     public static EmoteBubble Attach(Transform parent)
@@ -26,10 +28,21 @@ public class EmoteBubble : MonoBehaviour
 
     public void Show(Emote emote)
     {
+        _current = emote;
         if (_renderer == null) return;
         if (emote == Emote.None) { _renderer.enabled = false; return; }
         _renderer.enabled = true;
         _renderer.sharedMaterial = MaterialFor(emote);
+    }
+
+    // 按层显隐自己管：气泡挂在纸片人身上但比 AgentFloorVisibility 的缓存晚出生，
+    // 且"隐藏中的气泡"不能被楼层逻辑掰回可见。
+    private void LateUpdate()
+    {
+        if (_renderer == null) return;
+        if (_floors == null) { _floors = FindFirstObjectByType<FloorVisibilityController>(); if (_floors == null) return; }
+        _renderer.enabled = _current != Emote.None
+            && FloorMath.FloorIndexForY(transform.position.y) == _floors.CurrentFloor;
     }
 
     private static Material MaterialFor(Emote e)

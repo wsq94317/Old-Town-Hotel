@@ -26,6 +26,7 @@ public class FloatingTextFx : MonoBehaviour
         var fx = go.AddComponent<FloatingTextFx>();
         fx._text = tm;
         fx._color = color;
+        go.AddComponent<AgentFloorVisibility>(); // 酒吧/赌场收入飘字发生在别的楼层时不该看见
     }
 
     private void Awake() => _cam = Camera.main;
