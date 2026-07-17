@@ -100,8 +100,9 @@ public class ManagerInteraction : MonoBehaviour
 
     private void OnGUI()
     {
-        float w = Screen.width;
-        float h = Screen.height;
+        Vector2 v = GuiScale.Begin();
+        float w = v.x;
+        float h = v.y;
 
         // 提示消息
         if (Time.time < _messageUntil)

@@ -42,6 +42,7 @@ public class DebugHudOverlay : MonoBehaviour
     private void OnGUI()
     {
         if (dayController == null) return;
+        GuiScale.Begin(); // 高 DPI 下等比放大（左上角固定坐标随矩阵缩放）
         int dirty = 0, cleaning = 0, awaiting = 0, occupied = 0;
         if (demandLoop != null && demandLoop.rooms != null)
         {

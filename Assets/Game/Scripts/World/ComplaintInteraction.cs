@@ -132,7 +132,8 @@ public class ComplaintInteraction : MonoBehaviour
 
     private void OnGUI()
     {
-        float w = Screen.width, h = Screen.height;
+        Vector2 v = GuiScale.Begin();
+        float w = v.x, h = v.y;
 
         if (Time.time < _storyUntil)
         {

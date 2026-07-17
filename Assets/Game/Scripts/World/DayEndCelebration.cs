@@ -47,7 +47,8 @@ public class DayEndCelebration : MonoBehaviour
     private void OnGUI()
     {
         if (Time.time >= _boardUntil) return;
-        float w = Screen.width, h = Screen.height;
+        Vector2 v = GuiScale.Begin();
+        float w = v.x, h = v.y;
         GUI.Box(new Rect(w * 0.5f - 210, h * 0.55f, 420, 86), _board);
     }
 }

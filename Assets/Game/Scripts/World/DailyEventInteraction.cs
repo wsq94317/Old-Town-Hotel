@@ -168,7 +168,8 @@ public class DailyEventInteraction : MonoBehaviour
 
     private void OnGUI()
     {
-        float w = Screen.width, h = Screen.height;
+        Vector2 v = GuiScale.Begin();
+        float w = v.x, h = v.y;
 
         if (Time.time < _storyUntil)
             GUI.Box(new Rect(w * 0.5f - 230, h * 0.19f, 460, 44), _story);
