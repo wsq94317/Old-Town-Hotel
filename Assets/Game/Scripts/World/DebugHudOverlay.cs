@@ -12,6 +12,19 @@ public class DebugHudOverlay : MonoBehaviour
 
     private void Awake()
     {
+        // 关掉 URP 渲染调试器的运行时面板：Device Simulator 的多指手势会误触发它，
+        // 面板一开就吞掉全部游戏输入（表现为"点不动了"+ 点走廊弹出 Display Stats）。
+        // 用反射调用（DebugManager 所在程序集未直接暴露给 Assembly-CSharp）。
+        try
+        {
+            var dmType = System.Type.GetType(
+                "UnityEngine.Rendering.DebugManager, Unity.RenderPipelines.Core.Runtime");
+            var instance = dmType?.GetProperty("instance",
+                System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)?.GetValue(null);
+            dmType?.GetProperty("enableRuntimeUI")?.SetValue(instance, false);
+        }
+        catch { /* 调试器不存在就算了 */ }
+
         if (dayController == null) dayController = FindFirstObjectByType<Room2DDemoDayController>();
         if (demandLoop == null) demandLoop = FindFirstObjectByType<Room2DPrototypeDemandLoop>();
         if (economy == null) economy = FindFirstObjectByType<EconomySystem>();

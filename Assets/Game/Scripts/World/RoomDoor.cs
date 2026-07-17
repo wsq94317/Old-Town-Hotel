@@ -11,7 +11,6 @@ public class RoomDoor : MonoBehaviour
     [SerializeField] private Room2DEntity room;
     [SerializeField] private Vector3 interiorCenter;   // 房间内部中心（世界坐标）
     [SerializeField] private float doorSenseRadius = 0.85f;
-    [SerializeField] private float interiorRadius = 1.6f;
     [SerializeField] private float autoCloseDelay = 2f;
 
     private GameObject _doorVisual;
@@ -115,7 +114,17 @@ public class RoomDoor : MonoBehaviour
         {
             _overlay = ovT.GetComponent<Renderer>();
             _overlay.material = new Material(OverlayBaseMat()); // 运行时独立实例做 alpha 动画
+            // 黑幕贴地：悬在 1.45m 会被 45° 相机视差投影到走廊/墙上（位置漂移）。
+            ovT.position = interiorCenter + Vector3.up * 0.07f;
+            ovT.rotation = Quaternion.Euler(90f, 0f, 0f);
         }
+    }
+
+    /// <summary>房间格矩形判定（半边长 2.4 覆盖 5x5 格，不外溢到走廊）。</summary>
+    private bool InteriorContains(Vector3 pos)
+    {
+        return Mathf.Abs(pos.x - interiorCenter.x) < 2.4f
+            && Mathf.Abs(pos.z - interiorCenter.z) < 2.4f;
     }
 
     private void Update()
@@ -150,15 +159,16 @@ public class RoomDoor : MonoBehaviour
         if (_manager != null && SameFloor(_manager.transform.position))
         {
             float dDoor = FlatDist(_manager.transform.position, transform.position);
-            float dInterior = FlatDist(_manager.transform.position, interiorCenter);
+            bool inside = InteriorContains(_manager.transform.position);
             if (dDoor < doorSenseRadius && !_targetOpen && !_swiping)
             {
                 StartCoroutine(SwipeAndOpen()); // 经理要刷卡
             }
-            if (dDoor < doorSenseRadius + 0.6f || dInterior < interiorRadius) anyone = true;
+            // 人在房间格内任何位置都算在场——不会被关进黑屋
+            if (dDoor < doorSenseRadius + 0.6f || inside) anyone = true;
 
-            // 查错房：闯进入住中的房间内部
-            if (dInterior < interiorRadius && room != null
+            // 查错房：闯进入住中的房间内部（整格判定）
+            if (inside && room != null
                 && room.currentState == Room2DState.Occupied
                 && Time.time >= _intrusionCooldownUntil)
             {
@@ -174,7 +184,7 @@ public class RoomDoor : MonoBehaviour
             {
                 if (a == null || !SameFloor(a.transform.position)) continue;
                 if (FlatDist(a.transform.position, transform.position) < doorSenseRadius
-                    || FlatDist(a.transform.position, interiorCenter) < interiorRadius)
+                    || InteriorContains(a.transform.position))
                 {
                     _targetOpen = true;
                     anyone = true;
@@ -185,7 +195,7 @@ public class RoomDoor : MonoBehaviour
         {
             if (g == null || !SameFloor(g.transform.position)) continue;
             if (FlatDist(g.transform.position, transform.position) < doorSenseRadius
-                || FlatDist(g.transform.position, interiorCenter) < interiorRadius)
+                || InteriorContains(g.transform.position))
             {
                 _targetOpen = true;
                 anyone = true;
