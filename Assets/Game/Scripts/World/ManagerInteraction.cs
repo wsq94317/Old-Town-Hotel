@@ -1,30 +1,24 @@
+using System.Collections.Generic;
 using UnityEngine;
 
-// M3 经理交互（OnGUI 临时面板，正式 UI 统一在 M6）：
-//   现场抓包（StaffAgent.OnAnyCaught）→ 弹 督促/训斥/无视 三选一
-//   点击员工 → 近距离弹面板：催一催 / 质询(有🐌时) / 关闭
-//   靠近带瑕疵的房间 → 底部出现"打回重扫"按钮
 public class ManagerInteraction : MonoBehaviour
 {
     [SerializeField] private ManagerController manager;
     [SerializeField] private Room2DPrototypeDemandLoop demandLoop;
     [SerializeField] private EconomySystem economy;
 
-    private StaffAgent _caughtAgent;      // 现场抓包决策中
-    private StaffAgent _panelAgent;       // 点击打开的员工面板
+    private StaffAgent _caughtAgent;
+    private StaffAgent _panelAgent;
     private string _lastMessage = "";
     private float _messageUntil;
 
-    /// <summary>有决策面板打开（OnGUI 不走 EventSystem，WorldInputController 靠它拦截穿透点击）。</summary>
-    public bool PanelOpen => _caughtAgent != null || _panelAgent != null;
-
-    // ── 指挥模式：面板选"指挥"后，下一次世界点击=指定房间插队 ────────────────
     private StaffAgent _commandAgent;
     private TaskDispatcher _dispatcher;
+    private GUIStyle _center;
 
+    public bool PanelOpen => _caughtAgent != null || _panelAgent != null;
     public bool InCommandMode => _commandAgent != null;
 
-    /// <summary>指挥模式下的世界点击：就近找房（3m 内）强制指派。</summary>
     public void CommandTarget(Vector3 worldPoint)
     {
         var agent = _commandAgent;
@@ -33,19 +27,44 @@ public class ManagerInteraction : MonoBehaviour
         if (_dispatcher == null) _dispatcher = FindFirstObjectByType<TaskDispatcher>();
         if (_dispatcher == null) return;
 
-        Room2DEntity best = null;
-        float bestDist = 3f;
-        foreach (var r in demandLoop.rooms)
+        Room2DEntity best = FindCommandRoom(demandLoop.rooms, worldPoint);
+        if (best == null)
         {
-            if (r == null) continue;
-            Vector3 d = r.transform.position - worldPoint;
-            d.y = 0f;
-            if (d.magnitude < bestDist) { bestDist = d.magnitude; best = r; }
+            Say("No room there.");
+            return;
         }
-        if (best == null) { Say("No room there."); return; }
+
         Say(_dispatcher.ForceAssign(agent, best)
-            ? $"{agent.Member?.DisplayName} → Room {best.roomNumber}. Chop chop."
+            ? $"{agent.Member?.DisplayName} -> Room {best.roomNumber}. Chop chop."
             : $"Room {best.roomNumber} doesn't need {agent.Member?.Role} right now.");
+    }
+
+    public static Room2DEntity FindCommandRoom(IReadOnlyList<Room2DEntity> rooms, Vector3 worldPoint, float maxDistance = 3f)
+    {
+        if (rooms == null) return null;
+
+        int targetFloor = FloorMath.FloorIndexForY(worldPoint.y);
+        Room2DEntity best = null;
+        float bestDistSq = maxDistance * maxDistance;
+
+        foreach (var room in rooms)
+        {
+            if (room == null) continue;
+            if (FloorMath.FloorIndexForY(room.transform.position.y) != targetFloor) continue;
+
+            Vector3 delta = room.transform.position - worldPoint;
+            delta.y = 0f;
+            float distSq = delta.sqrMagnitude;
+            if (distSq > bestDistSq) continue;
+            if (best == null || distSq < bestDistSq ||
+                (Mathf.Approximately(distSq, bestDistSq) && room.roomNumber < best.roomNumber))
+            {
+                best = room;
+                bestDistSq = distSq;
+            }
+        }
+
+        return best;
     }
 
     private void Awake()
@@ -60,20 +79,19 @@ public class ManagerInteraction : MonoBehaviour
 
     private void HandleCaught(StaffAgent agent) => _caughtAgent = agent;
 
-    /// <summary>WorldInputController 点到员工时调用。</summary>
     public void OnStaffTapped(StaffAgent agent)
     {
         if (agent == null || manager == null) return;
-        Vector3 d = agent.transform.position - manager.transform.position;
-        d.y = 0f;
+        Vector3 delta = agent.transform.position - manager.transform.position;
+        delta.y = 0f;
         if (FloorMath.FloorIndexForY(agent.transform.position.y) == FloorMath.FloorIndexForY(manager.transform.position.y)
-            && d.magnitude <= SupervisionTuning.CatchRadius + 1f)
+            && delta.magnitude <= SupervisionTuning.CatchRadius + 1f)
         {
-            _panelAgent = agent; // 够近：直接开面板
+            _panelAgent = agent;
         }
         else
         {
-            manager.MoveTo(agent.transform.position); // 太远：先走过去
+            manager.MoveTo(agent.transform.position);
         }
     }
 
@@ -86,33 +104,27 @@ public class ManagerInteraction : MonoBehaviour
     private Room2DEntity FlawedRoomNearby()
     {
         if (manager == null || demandLoop == null || demandLoop.rooms == null) return null;
-        int mgrFloor = FloorMath.FloorIndexForY(manager.transform.position.y);
-        foreach (var r in demandLoop.rooms)
+        int managerFloor = FloorMath.FloorIndexForY(manager.transform.position.y);
+        foreach (var room in demandLoop.rooms)
         {
-            if (r == null || RoomFlaw.Get(r) == null) continue;
-            if (FloorMath.FloorIndexForY(r.transform.position.y) != mgrFloor) continue;
-            Vector3 d = r.transform.position - manager.transform.position;
-            d.y = 0f;
-            if (d.magnitude < 2.2f) return r;
+            if (room == null || RoomFlaw.Get(room) == null) continue;
+            if (FloorMath.FloorIndexForY(room.transform.position.y) != managerFloor) continue;
+            Vector3 delta = room.transform.position - manager.transform.position;
+            delta.y = 0f;
+            if (delta.magnitude < 2.2f) return room;
         }
         return null;
     }
 
     private void OnGUI()
     {
-        Vector2 v = GuiScale.Begin();
-        float w = v.x;
-        float h = v.y;
+        Vector2 view = GuiScale.Begin();
+        float w = view.x;
+        float h = view.y;
 
-        // 提示消息
         if (Time.time < _messageUntil)
-        {
             GUI.Label(new Rect(w * 0.5f - 200, h * 0.15f, 400, 30), _lastMessage, CenterStyle());
-        }
 
-        // ① 现场抓包三选一
-        // 注意：按钮动作会把共享字段置空——全部先取局部变量 + else-if 链，
-        // 否则同一 OnGUI pass 后续代码读到 null 直接把整个回调炸掉（按钮全灭）。
         if (_caughtAgent != null)
         {
             var caught = _caughtAgent;
@@ -127,15 +139,12 @@ public class ManagerInteraction : MonoBehaviour
             return;
         }
 
-        // ② 员工面板
-        // 按钮动作会把 _panelAgent 置空——先取局部变量 + else-if 链，动作内绝不再读共享字段；
-        // 否则同一 OnGUI pass 后续行读到 null 抛异常，整个回调中止 → 所有按钮失效。
         if (_panelAgent != null)
         {
             var agent = _panelAgent;
-            var m = agent.Member;
+            var member = agent.Member;
             GUI.Box(new Rect(w * 0.5f - 150, h * 0.4f, 300, 150),
-                $"{m?.DisplayName} ({m?.Role})  morale:{m?.Morale}" + (agent.IsGrudging ? "  💢 GRUDGING" : ""));
+                $"{member?.DisplayName} ({member?.Role})  morale:{member?.Morale}" + (agent.IsGrudging ? "  GRUDGING" : ""));
 
             bool canInterrogate = agent.HasDelayMark;
             if (GuiInput.Button(new Rect(w * 0.5f - 130, h * 0.4f + 34, 260, 24), "Hurry up! (speed up, morale -3)"))
@@ -147,10 +156,10 @@ public class ManagerInteraction : MonoBehaviour
             else if (InterrogateButton(new Rect(w * 0.5f - 130, h * 0.4f + 62, 260, 24), canInterrogate))
             {
                 _panelAgent = null;
-                if (agent.Interrogate() == InterrogationVerdict.Caught) _caughtAgent = agent; // 坐实→三选一
+                if (agent.Interrogate() == InterrogationVerdict.Caught) _caughtAgent = agent;
                 else Say($"WRONG ACCUSATION! {agent.Member?.DisplayName} is furious (morale {SupervisionTuning.WrongAccusationMoraleDelta}).");
             }
-            else if (GuiInput.Button(new Rect(w * 0.5f - 130, h * 0.4f + 90, 260, 24), "Command → tap a room"))
+            else if (GuiInput.Button(new Rect(w * 0.5f - 130, h * 0.4f + 90, 260, 24), "Command -> tap a room"))
             {
                 _commandAgent = agent;
                 _panelAgent = null;
@@ -162,7 +171,7 @@ public class ManagerInteraction : MonoBehaviour
                 if (economy != null && agent.Member != null)
                 {
                     FloatingTextFx.Spawn(agent.transform.position, "FIRED!", new Color(1f, 0.25f, 0.2f), 1.2f);
-                    economy.FireStaff(agent.Member); // Spawner 经 OnFired 收走纸片人（含走人演出）
+                    economy.FireStaff(agent.Member);
                     Say($"{agent.Member.DisplayName} is packing. The stapler goes with them.");
                 }
             }
@@ -173,14 +182,12 @@ public class ManagerInteraction : MonoBehaviour
             return;
         }
 
-        // ③ 附近瑕疵房 → 打回重扫（常驻按钮：登记热区吃触屏点击）
         var flawed = FlawedRoomNearby();
         if (flawed != null)
         {
             var flawRect = new Rect(w * 0.5f - 150, h - 90, 300, 30);
             GuiInput.ReserveZone(flawRect);
-            if (GuiInput.Button(flawRect,
-                $"Room {flawed.roomNumber}: flaw found — send back to cleaning"))
+            if (GuiInput.Button(flawRect, $"Room {flawed.roomNumber}: flaw found -> send back to cleaning"))
             {
                 RoomFlaw.Clear(flawed);
                 flawed.SetState(Room2DState.Dirty);
@@ -189,7 +196,6 @@ public class ManagerInteraction : MonoBehaviour
         }
     }
 
-    // 抓包决策落地（幂等：同一 agent 只结算一次，防双通道同帧双触发）。
     private void ResolveCatch(StaffAgent agent, CatchChoice choice, string message)
     {
         if (agent == null || _caughtAgent != agent) return;
@@ -198,23 +204,19 @@ public class ManagerInteraction : MonoBehaviour
         Say(message);
     }
 
-    // 质询按钮：禁用态只画不响应（GuiInput.Button 已尊重 GUI.enabled）。
-    private static bool InterrogateButton(Rect r, bool enabled)
+    private static bool InterrogateButton(Rect rect, bool enabled)
     {
         bool prev = GUI.enabled;
         GUI.enabled = enabled;
-        bool clicked = GuiInput.Button(r, enabled ? "Interrogate the delay (🐌)" : "Interrogate (no delay mark)");
+        bool clicked = GuiInput.Button(rect, enabled ? "Interrogate the delay" : "Interrogate (no delay mark)");
         GUI.enabled = prev;
         return clicked;
     }
 
-    private GUIStyle _center;
     private GUIStyle CenterStyle()
     {
         if (_center == null)
-        {
             _center = new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter, fontSize = 15 };
-        }
         return _center;
     }
 }

@@ -1,26 +1,26 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-// 老旧酒店损坏系统（运行时）：
-//   生成：每时段 1-2 个，类型随时段——早晨马桶堵 / 中午水管 / 下午泳池健身房 / 晚上电路
-//   呈现：现场彩色脉冲标记 + 水渍/火花色块 + 手机通知（黄/橙/红随严重度）
-//   恶化：不处理每 3 游戏小时升一级（红色顶格），每次升级掉满意度
-//   处理（走近弹面板）：亲自上手(55%成功+小费/失败喷一脸水) / 派员工(笨手笨脚30%越修越坏) /
-//                       胶带(免费但明天同址复发更严重) / 锁房(仅客房，房间封锁到次日)
-// 视觉走位从简（派员工即时结算），走位版留给动画阶段——已记录假设。
 public class BreakdownSystem : MonoBehaviour
 {
+    private struct DeferredIncident
+    {
+        public Vector3 Pos;
+        public int RoomNumber;
+        public string Kind;
+    }
+
     private class Incident
     {
         public string Id;
         public Vector3 Pos;
-        public Room2DEntity Room;            // 可为 null（设施层）
+        public Room2DEntity Room;
         public BreakdownSeverity Severity;
         public string Kind;
         public float NextEscalateHour;
         public GameObject Marker;
         public GameObject Puddle;
-        public Material Mat; // 一事件一份材质，升级只改色，Remove 时销毁（防泄漏）
+        public Material Mat;
     }
 
     [SerializeField] private Room2DDemoDayController dayController;
@@ -32,55 +32,97 @@ public class BreakdownSystem : MonoBehaviour
 
     private System.Random _rng;
     private readonly List<Incident> _active = new List<Incident>();
-    private readonly List<(Vector3 pos, Room2DEntity room, string kind)> _tapedForTomorrow = new List<(Vector3, Room2DEntity, string)>();
-    private readonly List<Room2DEntity> _lockedRooms = new List<Room2DEntity>();
+    private readonly List<DeferredIncident> _tapedForTomorrow = new List<DeferredIncident>();
+    private readonly List<int> _lockedRoomNumbers = new List<int>();
     private int _scheduledDay = -1;
     private DayPeriod _lastPeriod = (DayPeriod)(-1);
     private Incident _panelIncident;
     private string _story = "";
     private float _storyUntil;
     private int _idCounter;
+    private bool _restoredRoomStateApplied = true;
 
     public bool PanelOpen => _panelIncident != null;
 
-    /// <summary>存档捕获（v3 世界层）：只有跨日的状态——胶带明日复发 + 昨日锁房。</summary>
     public void CaptureTo(WorldState w)
     {
         w.tapedBreakdowns.Clear();
-        foreach (var t in _tapedForTomorrow)
+        foreach (var taped in _tapedForTomorrow)
+        {
             w.tapedBreakdowns.Add(new TapedBreakdownEntry
             {
-                room = t.room != null ? t.room.roomNumber : -1,
-                x = t.pos.x, y = t.pos.y, z = t.pos.z,
-                kind = t.kind,
+                room = taped.RoomNumber,
+                x = taped.Pos.x,
+                y = taped.Pos.y,
+                z = taped.Pos.z,
+                kind = taped.Kind,
             });
+        }
+
         w.lockedRooms.Clear();
-        foreach (var r in _lockedRooms)
-            if (r != null) w.lockedRooms.Add(r.roomNumber);
+        foreach (var roomNumber in _lockedRoomNumbers)
+            w.lockedRooms.Add(roomNumber);
     }
 
-    /// <summary>读档恢复：锁房重新 Blocked，交给首帧 Update 的新日分支照常"次晨解封转 Dirty +
-    /// 胶带复发"（存档只发生在日结，读档即是次晨）。</summary>
     public void RestoreFrom(WorldState w)
     {
         _tapedForTomorrow.Clear();
-        foreach (var e in w.tapedBreakdowns)
-            _tapedForTomorrow.Add((new Vector3(e.x, e.y, e.z), FindRoomByNumber(e.room), e.kind));
-        _lockedRooms.Clear();
-        foreach (var num in w.lockedRooms)
+        foreach (var entry in w.tapedBreakdowns)
         {
-            var room = FindRoomByNumber(num);
-            if (room == null) continue;
-            room.SetState(Room2DState.Blocked);
-            _lockedRooms.Add(room);
+            _tapedForTomorrow.Add(new DeferredIncident
+            {
+                Pos = new Vector3(entry.x, entry.y, entry.z),
+                RoomNumber = entry.room,
+                Kind = entry.kind,
+            });
         }
+
+        _lockedRoomNumbers.Clear();
+        foreach (var roomNumber in w.lockedRooms)
+            _lockedRoomNumbers.Add(roomNumber);
+
+        _restoredRoomStateApplied = false;
+        ApplyRestoredWorldStateIfReady();
+    }
+
+    public bool ApplyRestoredWorldStateIfReady()
+    {
+        if (_restoredRoomStateApplied) return true;
+        if (!HasPendingRoomBoundRestore())
+        {
+            _restoredRoomStateApplied = true;
+            return true;
+        }
+
+        if (demandLoop == null) demandLoop = FindFirstObjectByType<Room2DPrototypeDemandLoop>();
+        if (demandLoop == null || demandLoop.rooms == null || demandLoop.rooms.Length == 0)
+            return false;
+
+        foreach (var roomNumber in _lockedRoomNumbers)
+        {
+            var room = FindRoomByNumber(roomNumber);
+            if (room != null)
+                room.SetState(Room2DState.Blocked);
+        }
+
+        _restoredRoomStateApplied = true;
+        return true;
+    }
+
+    private bool HasPendingRoomBoundRestore()
+    {
+        if (_lockedRoomNumbers.Count > 0) return true;
+        foreach (var taped in _tapedForTomorrow)
+            if (taped.RoomNumber >= 0) return true;
+        return false;
     }
 
     private Room2DEntity FindRoomByNumber(int number)
     {
+        if (demandLoop == null) demandLoop = FindFirstObjectByType<Room2DPrototypeDemandLoop>();
         if (number < 0 || demandLoop == null || demandLoop.rooms == null) return null;
-        foreach (var r in demandLoop.rooms)
-            if (r != null && r.roomNumber == number) return r;
+        foreach (var room in demandLoop.rooms)
+            if (room != null && room.roomNumber == number) return room;
         return null;
     }
 
@@ -97,25 +139,34 @@ public class BreakdownSystem : MonoBehaviour
     private void Update()
     {
         if (dayController == null) return;
-        if (_rng == null) _rng = new System.Random(rngSeed); // 热重载自愈
+        if (_rng == null) _rng = new System.Random(rngSeed);
+        if (!ApplyRestoredWorldStateIfReady()) return;
+
         float hour = dayController.Clock.CurrentHour;
         int day = dayController.CurrentDay;
 
-        // 新一天：清场 + 胶带复发 + 解锁昨日封的房
         if (day != _scheduledDay)
         {
             _scheduledDay = day;
-            foreach (var i in new List<Incident>(_active)) Remove(i);
-            foreach (var r in _lockedRooms)
-                if (r != null && r.currentState == Room2DState.Blocked) r.SetState(Room2DState.Dirty);
-            _lockedRooms.Clear();
-            foreach (var t in _tapedForTomorrow)
-                Spawn(t.pos, t.room, t.kind, BreakdownSeverity.Moderate); // 复发直接橙色
+
+            foreach (var incident in new List<Incident>(_active))
+                Remove(incident);
+
+            foreach (var roomNumber in _lockedRoomNumbers)
+            {
+                var room = FindRoomByNumber(roomNumber);
+                if (room != null && room.currentState == Room2DState.Blocked)
+                    room.SetState(Room2DState.Dirty);
+            }
+            _lockedRoomNumbers.Clear();
+
+            foreach (var taped in _tapedForTomorrow)
+                Spawn(taped.Pos, FindRoomByNumber(taped.RoomNumber), taped.Kind, BreakdownSeverity.Moderate);
             _tapedForTomorrow.Clear();
+
             _lastPeriod = (DayPeriod)(-1);
         }
 
-        // 时段切换：掷 1-2 个新损坏
         var period = DayPeriodLogic.PeriodFor(hour);
         if (period != _lastPeriod)
         {
@@ -124,53 +175,55 @@ public class BreakdownSystem : MonoBehaviour
             for (int i = 0; i < count; i++) SpawnForPeriod(period);
         }
 
-        // 恶化 + 经理走近弹面板
-        foreach (var inc in _active)
+        foreach (var incident in _active)
         {
-            if (hour >= inc.NextEscalateHour && inc.Severity < BreakdownSeverity.Severe)
+            if (hour >= incident.NextEscalateHour && incident.Severity < BreakdownSeverity.Severe)
             {
-                inc.Severity++;
-                inc.NextEscalateHour = hour + BreakdownLogic.EscalateGameHours;
-                if (demandLoop != null) demandLoop.prototypeSatisfactionScore -= (int)inc.Severity;
-                RefreshVisual(inc);
-                PushPhone(inc);
+                incident.Severity++;
+                incident.NextEscalateHour = hour + BreakdownLogic.EscalateGameHours;
+                if (demandLoop != null) demandLoop.prototypeSatisfactionScore -= (int)incident.Severity;
+                RefreshVisual(incident);
+                PushPhone(incident);
                 CameraShaker.Shake(0.08f, 0.25f);
             }
         }
+
         if (_panelIncident == null && manager != null)
         {
-            Vector3 p = manager.transform.position;
-            foreach (var inc in _active)
+            Vector3 managerPos = manager.transform.position;
+            foreach (var incident in _active)
             {
-                if (FloorMath.FloorIndexForY(p.y) != FloorMath.FloorIndexForY(inc.Pos.y)) continue;
-                if (Mathf.Abs(p.x - inc.Pos.x) < 2.2f && Mathf.Abs(p.z - inc.Pos.z) < 2.2f)
+                if (FloorMath.FloorIndexForY(managerPos.y) != FloorMath.FloorIndexForY(incident.Pos.y)) continue;
+                if (Mathf.Abs(managerPos.x - incident.Pos.x) < 2.2f && Mathf.Abs(managerPos.z - incident.Pos.z) < 2.2f)
                 {
-                    _panelIncident = inc;
+                    _panelIncident = incident;
                     break;
                 }
             }
         }
         else if (_panelIncident != null && manager != null)
         {
-            Vector3 p = manager.transform.position;
-            if (Mathf.Abs(p.x - _panelIncident.Pos.x) > 3.2f || Mathf.Abs(p.z - _panelIncident.Pos.z) > 3.2f
-                || FloorMath.FloorIndexForY(p.y) != FloorMath.FloorIndexForY(_panelIncident.Pos.y)) // 坐电梯走人也要收面板
+            Vector3 managerPos = manager.transform.position;
+            if (Mathf.Abs(managerPos.x - _panelIncident.Pos.x) > 3.2f
+                || Mathf.Abs(managerPos.z - _panelIncident.Pos.z) > 3.2f
+                || FloorMath.FloorIndexForY(managerPos.y) != FloorMath.FloorIndexForY(_panelIncident.Pos.y))
+            {
                 _panelIncident = null;
+            }
         }
     }
 
     private void SpawnForPeriod(DayPeriod period)
     {
-        // 时段决定类型与地点（用户设计表）
         switch (period)
         {
-            case DayPeriod.Morning: // 昨晚遗留：马桶堵，客房
+            case DayPeriod.Morning:
                 SpawnAtRandomRoom("CLOGGED TOILET", BreakdownSeverity.Minor);
                 break;
-            case DayPeriod.Midday: // 用水高峰：水管
+            case DayPeriod.Midday:
                 SpawnAtRandomRoom("LEAKY PIPE", BreakdownSeverity.Minor);
                 break;
-            case DayPeriod.Afternoon: // 泳池/健身房设施
+            case DayPeriod.Afternoon:
                 if (FacilitySystem.PoolUnlocked && _rng.NextDouble() < 0.5)
                     Spawn(new Vector3(-2f, FloorMath.BaseYFor(FacilitySystem.PoolFloor), 0.5f), null, "POOL FILTER JAM", BreakdownSeverity.Minor);
                 else if (FacilitySystem.GymUnlocked)
@@ -178,189 +231,223 @@ public class BreakdownSystem : MonoBehaviour
                 else
                     SpawnAtRandomRoom("LEAKY FAUCET", BreakdownSeverity.Minor);
                 break;
-            default: // 晚上：电路最危险，直接橙色起步
+            default:
                 Spawn(new Vector3(_rng.Next(-8, 8), FloorMath.BaseYFor(_rng.NextDouble() < 0.5 ? 0 : 3), _rng.Next(-4, 4)),
                     null, "SPARKING WIRES", BreakdownSeverity.Moderate);
                 break;
         }
     }
 
-    private void SpawnAtRandomRoom(string kind, BreakdownSeverity sev)
+    private void SpawnAtRandomRoom(string kind, BreakdownSeverity severity)
     {
         if (demandLoop == null || demandLoop.rooms == null) return;
+
         var candidates = new List<Room2DEntity>();
-        foreach (var r in demandLoop.rooms)
-            if (r != null && r.currentState != Room2DState.Blocked) candidates.Add(r);
+        foreach (var room in demandLoop.rooms)
+        {
+            if (room != null && room.currentState != Room2DState.Blocked)
+                candidates.Add(room);
+        }
+
         if (candidates.Count == 0) return;
-        var room = candidates[_rng.Next(candidates.Count)];
-        Spawn(room.transform.position, room, kind, sev);
+        var chosen = candidates[_rng.Next(candidates.Count)];
+        Spawn(chosen.transform.position, chosen, kind, severity);
     }
 
-    private void Spawn(Vector3 pos, Room2DEntity room, string kind, BreakdownSeverity sev)
+    private void Spawn(Vector3 pos, Room2DEntity room, string kind, BreakdownSeverity severity)
     {
-        var inc = new Incident
+        var incident = new Incident
         {
             Id = "bd_" + (_idCounter++),
             Pos = pos,
             Room = room,
-            Severity = sev,
+            Severity = severity,
             Kind = kind,
             NextEscalateHour = dayController.Clock.CurrentHour + BreakdownLogic.EscalateGameHours,
         };
-        // 现场标记（脉冲色块）+ 地面水渍/火花
-        inc.Marker = GameObject.CreatePrimitive(PrimitiveType.Quad);
-        Destroy(inc.Marker.GetComponent<Collider>());
-        inc.Marker.name = "BdMarker_" + inc.Id;
-        inc.Marker.transform.position = pos + Vector3.up * 1.9f;
-        inc.Marker.transform.localScale = Vector3.one * 0.5f;
-        inc.Marker.AddComponent<BillboardSprite>();
-        inc.Marker.AddComponent<EventIconPulse>();
-        inc.Marker.AddComponent<AgentFloorVisibility>(); // 不在楼层树里，需自管按层显隐
 
-        inc.Puddle = GameObject.CreatePrimitive(PrimitiveType.Quad);
-        Destroy(inc.Puddle.GetComponent<Collider>());
-        inc.Puddle.name = "BdPuddle_" + inc.Id;
-        inc.Puddle.transform.position = pos + Vector3.up * 0.09f;
-        inc.Puddle.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
-        inc.Puddle.transform.localScale = Vector3.one * 0.9f;
-        inc.Puddle.AddComponent<AgentFloorVisibility>();
+        incident.Marker = GameObject.CreatePrimitive(PrimitiveType.Quad);
+        Destroy(incident.Marker.GetComponent<Collider>());
+        incident.Marker.name = "BdMarker_" + incident.Id;
+        incident.Marker.transform.position = pos + Vector3.up * 1.9f;
+        incident.Marker.transform.localScale = Vector3.one * 0.5f;
+        incident.Marker.AddComponent<BillboardSprite>();
+        incident.Marker.AddComponent<EventIconPulse>();
+        incident.Marker.AddComponent<AgentFloorVisibility>();
 
-        RefreshVisual(inc);
-        _active.Add(inc);
-        PushPhone(inc);
+        incident.Puddle = GameObject.CreatePrimitive(PrimitiveType.Quad);
+        Destroy(incident.Puddle.GetComponent<Collider>());
+        incident.Puddle.name = "BdPuddle_" + incident.Id;
+        incident.Puddle.transform.position = pos + Vector3.up * 0.09f;
+        incident.Puddle.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
+        incident.Puddle.transform.localScale = Vector3.one * 0.9f;
+        incident.Puddle.AddComponent<AgentFloorVisibility>();
+
+        RefreshVisual(incident);
+        _active.Add(incident);
+        PushPhone(incident);
     }
 
-    private void RefreshVisual(Incident inc)
+    private void RefreshVisual(Incident incident)
     {
-        if (inc.Mat == null)
-            inc.Mat = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
-        inc.Mat.color = BreakdownLogic.SeverityColor(inc.Severity);
-        if (inc.Marker != null) inc.Marker.GetComponent<Renderer>().sharedMaterial = inc.Mat;
-        if (inc.Puddle != null)
+        if (incident.Mat == null)
+            incident.Mat = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
+        incident.Mat.color = BreakdownLogic.SeverityColor(incident.Severity);
+        if (incident.Marker != null) incident.Marker.GetComponent<Renderer>().sharedMaterial = incident.Mat;
+        if (incident.Puddle != null)
         {
-            inc.Puddle.GetComponent<Renderer>().sharedMaterial = inc.Mat;
-            inc.Puddle.transform.localScale = Vector3.one * (0.9f + (int)inc.Severity * 0.5f); // 越严重摊得越大
+            incident.Puddle.GetComponent<Renderer>().sharedMaterial = incident.Mat;
+            incident.Puddle.transform.localScale = Vector3.one * (0.9f + (int)incident.Severity * 0.5f);
         }
     }
 
-    private void PushPhone(Incident inc)
+    private void PushPhone(Incident incident)
     {
-        ManagerPhone.Push(inc.Id,
-            "🔧 " + BreakdownLogic.SeverityLabel(inc.Severity) + " " + inc.Kind
-            + (inc.Room != null ? " @ Room " + inc.Room.roomNumber : ""),
-            inc.Pos, BreakdownLogic.SeverityColor(inc.Severity));
+        ManagerPhone.Push(
+            incident.Id,
+            "ALERT " + BreakdownLogic.SeverityLabel(incident.Severity) + " " + incident.Kind
+            + (incident.Room != null ? " @ Room " + incident.Room.roomNumber : ""),
+            incident.Pos,
+            BreakdownLogic.SeverityColor(incident.Severity));
     }
 
-    private void Remove(Incident inc)
+    private void Remove(Incident incident)
     {
-        if (inc.Marker != null) Destroy(inc.Marker);
-        if (inc.Puddle != null) Destroy(inc.Puddle);
-        if (inc.Mat != null) Destroy(inc.Mat);
-        ManagerPhone.Resolve(inc.Id);
-        _active.Remove(inc);
-        if (_panelIncident == inc) _panelIncident = null;
+        if (incident.Marker != null) Destroy(incident.Marker);
+        if (incident.Puddle != null) Destroy(incident.Puddle);
+        if (incident.Mat != null) Destroy(incident.Mat);
+        ManagerPhone.Resolve(incident.Id);
+        _active.Remove(incident);
+        if (_panelIncident == incident) _panelIncident = null;
     }
 
     private void Choose(BreakdownFix fix)
     {
-        var inc = _panelIncident;
+        var incident = _panelIncident;
         _panelIncident = null;
-        if (inc == null) return;
+        if (incident == null) return;
 
-        // 派员工：取一个 HSK 的特质参与结算
-        bool clumsy = false, fast = false;
+        bool clumsy = false;
+        bool fast = false;
         if (fix == BreakdownFix.SendStaff && spawner != null)
         {
-            foreach (var a in spawner.Agents)
+            foreach (var agent in spawner.Agents)
             {
-                if (a?.Member != null && a.Member.Role == StaffRole.Housekeeper)
+                if (agent?.Member != null && agent.Member.Role == StaffRole.Housekeeper)
                 {
-                    clumsy = a.Member.HasTrait(StaffTrait.Clumsy);
-                    fast = a.Member.HasTrait(StaffTrait.FastHands);
+                    clumsy = agent.Member.HasTrait(StaffTrait.Clumsy);
+                    fast = agent.Member.HasTrait(StaffTrait.FastHands);
                     break;
                 }
             }
         }
 
-        var o = BreakdownLogic.Resolve(fix, _rng.NextDouble(), clumsy, fast);
+        var outcome = BreakdownLogic.Resolve(fix, _rng.NextDouble(), clumsy, fast);
 
-        if (o.CashDelta > 0 && economy != null) economy.RecordMiscIncome(o.CashDelta); // 小费不是客人评价
-        if (demandLoop != null) demandLoop.prototypeSatisfactionScore += o.SatisfactionDelta;
-        if (o.ManagerSlapstick && manager != null)
+        if (outcome.CashDelta > 0 && economy != null) economy.RecordMiscIncome(outcome.CashDelta);
+        if (demandLoop != null) demandLoop.prototypeSatisfactionScore += outcome.SatisfactionDelta;
+        if (outcome.ManagerSlapstick && manager != null)
         {
             CameraShaker.Shake(0.25f, 0.4f);
             FloatingTextFx.Spawn(manager.transform.position, "SPLOOSH!", new Color(0.4f, 0.7f, 1f), 1.2f);
         }
-        if (o.CashDelta > 0 && manager != null)
-            FloatingTextFx.Spawn(manager.transform.position, "+$" + o.CashDelta + " tip", new Color(0.35f, 0.95f, 0.4f));
+        if (outcome.CashDelta > 0 && manager != null)
+            FloatingTextFx.Spawn(manager.transform.position, "+$" + outcome.CashDelta + " tip", new Color(0.35f, 0.95f, 0.4f));
 
-        if (o.Fixed)
+        if (outcome.Fixed)
         {
-            if (o.TapedRecurrence) _tapedForTomorrow.Add((inc.Pos, inc.Room, inc.Kind));
-            if (o.LockedRoom && inc.Room != null)
+            if (outcome.TapedRecurrence)
             {
-                inc.Room.SetState(Room2DState.Blocked);
-                _lockedRooms.Add(inc.Room);
+                _tapedForTomorrow.Add(new DeferredIncident
+                {
+                    Pos = incident.Pos,
+                    RoomNumber = incident.Room != null ? incident.Room.roomNumber : -1,
+                    Kind = incident.Kind,
+                });
             }
-            Remove(inc);
+            if (outcome.LockedRoom && incident.Room != null)
+            {
+                incident.Room.SetState(Room2DState.Blocked);
+                _lockedRoomNumbers.Add(incident.Room.roomNumber);
+            }
+            Remove(incident);
         }
-        else if (o.SeverityDelta > 0 && inc.Severity < BreakdownSeverity.Severe)
+        else if (outcome.SeverityDelta > 0 && incident.Severity < BreakdownSeverity.Severe)
         {
-            inc.Severity += o.SeverityDelta;
-            RefreshVisual(inc);
-            PushPhone(inc);
+            incident.Severity += outcome.SeverityDelta;
+            RefreshVisual(incident);
+            PushPhone(incident);
         }
 
-        _story = o.Story;
+        _story = outcome.Story;
         _storyUntil = Time.time + 4.5f;
     }
 
     private void OnGUI()
     {
-        Vector2 v = GuiScale.Begin();
-        float w = v.x, h = v.y;
+        Vector2 view = GuiScale.Begin();
+        float w = view.x;
+        float h = view.y;
 
         if (Time.time < _storyUntil)
             GUI.Box(new Rect(w * 0.5f - 230, h * 0.13f, 460, 40), _story);
 
         if (_panelIncident == null) return;
-        var inc = _panelIncident;
-        bool isRoom = inc.Room != null;
-        float ph = isRoom ? 158 : 132;
-        GUI.Box(new Rect(w * 0.5f - 180, h * 0.32f, 360, ph),
-            BreakdownLogic.SeverityLabel(inc.Severity) + " — " + inc.Kind
-            + (isRoom ? " (Room " + inc.Room.roomNumber + ")" : ""));
-        // 没有客房管家就不给"派人"白嫖（结果表里没人可派=必成免费，堵掉）；
-        // 在住房不给锁——锁门会把里面的客人连人带房费一起"吞"掉
-        bool hasHsk = false;
-        if (spawner != null)
-            foreach (var a in spawner.Agents)
-                if (a?.Member != null && a.Member.Role == StaffRole.Housekeeper) { hasHsk = true; break; }
-        bool canLock = isRoom && inc.Room.currentState != Room2DState.Occupied;
 
+        var incident = _panelIncident;
+        bool isRoom = incident.Room != null;
+        float panelHeight = isRoom ? 158 : 132;
+        GUI.Box(new Rect(w * 0.5f - 180, h * 0.32f, 360, panelHeight),
+            BreakdownLogic.SeverityLabel(incident.Severity) + " - " + incident.Kind
+            + (isRoom ? " (Room " + incident.Room.roomNumber + ")" : ""));
+
+        bool hasHousekeeper = false;
+        if (spawner != null)
+        {
+            foreach (var agent in spawner.Agents)
+            {
+                if (agent?.Member != null && agent.Member.Role == StaffRole.Housekeeper)
+                {
+                    hasHousekeeper = true;
+                    break;
+                }
+            }
+        }
+
+        bool canLock = isRoom && incident.Room.currentState != Room2DState.Occupied;
         bool prevEnabled = GUI.enabled;
+
         if (GuiInput.Button(new Rect(w * 0.5f - 160, h * 0.32f + 30, 320, 24), "Fix it yourself (55%, tips or a face full of water)"))
+        {
             Choose(BreakdownFix.DIY);
+        }
         else
         {
-            GUI.enabled = hasHsk;
+            GUI.enabled = hasHousekeeper;
             if (GuiInput.Button(new Rect(w * 0.5f - 160, h * 0.32f + 58, 320, 24),
-                    hasHsk ? "Send housekeeping (traits matter)" : "Send housekeeping (you have none)"))
+                    hasHousekeeper ? "Send housekeeping (traits matter)" : "Send housekeeping (you have none)"))
+            {
                 Choose(BreakdownFix.SendStaff);
+            }
             else
             {
                 GUI.enabled = true;
                 if (GuiInput.Button(new Rect(w * 0.5f - 160, h * 0.32f + 86, 320, 24), "DUCT TAPE (free, definitely permanent)"))
+                {
                     Choose(BreakdownFix.DuctTape);
+                }
                 else if (isRoom)
                 {
                     GUI.enabled = canLock;
                     if (GuiInput.Button(new Rect(w * 0.5f - 160, h * 0.32f + 114, 320, 24),
                             canLock ? "Lock the room (no problem if no witnesses)" : "Lock the room (there's a GUEST inside)"))
+                    {
                         Choose(BreakdownFix.LockRoom);
+                    }
                 }
             }
         }
+
         GUI.enabled = prevEnabled;
     }
 }

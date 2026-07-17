@@ -1,5 +1,3 @@
-// 街区威望（长线系统占位计数）：打赢客人等无厘头行为累积。
-// v3 的"街区霸王"线会消费它；当前只累计并广播。
 public static class ManagerReputation
 {
     public static int Prestige { get; private set; }
@@ -12,9 +10,12 @@ public static class ManagerReputation
         OnChanged?.Invoke(Prestige);
     }
 
-    public static void ResetForNewGame() => Prestige = 0;
+    public static void ResetForNewGame()
+    {
+        Prestige = 0;
+        OnChanged?.Invoke(Prestige);
+    }
 
-    /// <summary>读档恢复（负数钳 0，照常广播给 HUD）。</summary>
     public static void Restore(int value)
     {
         Prestige = System.Math.Max(0, value);

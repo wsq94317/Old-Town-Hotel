@@ -158,5 +158,30 @@ namespace OldTownHotel.Tests.EditMode
                 ManagerReputation.Restore(before);
             }
         }
+
+        [Test]
+        public void ManagerReputation_ResetForNewGame_BroadcastsZero()
+        {
+            int before = ManagerReputation.Prestige;
+            int? observed = null;
+            void HandleChanged(int value) => observed = value;
+
+            try
+            {
+                ManagerReputation.OnChanged += HandleChanged;
+                ManagerReputation.Restore(5);
+                observed = null;
+
+                ManagerReputation.ResetForNewGame();
+
+                Assert.That(ManagerReputation.Prestige, Is.EqualTo(0));
+                Assert.That(observed, Is.EqualTo(0));
+            }
+            finally
+            {
+                ManagerReputation.OnChanged -= HandleChanged;
+                ManagerReputation.Restore(before);
+            }
+        }
     }
 }
