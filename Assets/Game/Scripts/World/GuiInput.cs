@@ -23,12 +23,20 @@ public static class GuiInput
         _consumed = false;
     }
 
+    /// <summary>消费诊断（探针）。</summary>
+    public static string ConsumeDebug = "none";
+
     private static bool ConsumeTapIn(Rect r)
     {
         // 有效期 2 帧：发布可能发生在帧边界（Update 末/外部注入），下一帧 OnGUI 才轮到消费。
         if (_consumed || Time.frameCount - _tapFrame > 1 || _tapFrame < 0) return false;
-        if (!r.Contains(_tapVirtual)) return false;
+        if (!r.Contains(_tapVirtual))
+        {
+            ConsumeDebug = $"miss: tapV={_tapVirtual:F0} rect={r}";
+            return false;
+        }
         _consumed = true;
+        ConsumeDebug = $"CONSUMED at {_tapVirtual:F0} by rect={r}";
         return true;
     }
 

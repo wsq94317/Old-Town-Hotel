@@ -18,9 +18,13 @@ public class WorldInputController : MonoBehaviour
     private bool _pressStartedOverUi;
     private Camera _cam;
 
+    /// <summary>输入管线探针：最近一次 release 的判定链（诊断用，可随时删）。</summary>
+    public static string TapDebug = "no input yet";
+
     private void Awake()
     {
-        _classifier = new TapDragClassifier(dragThresholdPixels);
+        // 阈值按 DPI 缩放：高分屏上手指点击的自然抖动远超 30 物理像素
+        _classifier = new TapDragClassifier(dragThresholdPixels * GuiScale.Factor);
         _cam = Camera.main;
         if (manager == null) manager = FindFirstObjectByType<ManagerController>();
         if (cameraRig == null) cameraRig = FindFirstObjectByType<ManagerCameraRig>();
@@ -52,7 +56,12 @@ public class WorldInputController : MonoBehaviour
             if (!_pressStartedOverUi)
             {
                 var result = _classifier.Release(_lastPos);
+                TapDebug = $"release@{_lastPos} result={result}";
                 if (result == TapDragClassifier.Result.Tap) HandleTap(_lastPos);
+            }
+            else
+            {
+                TapDebug = "release ignored: pressStartedOverUi";
             }
         }
 
@@ -93,8 +102,10 @@ public class WorldInputController : MonoBehaviour
         if (panelOpen || GuiInput.IsInReservedZone(screenPos))
         {
             GuiInput.PublishTap(screenPos);
+            TapDebug += $" -> published(panelOpen={panelOpen})";
             return;
         }
+        TapDebug += " -> world";
 
         if (_cam == null) { _cam = Camera.main; if (_cam == null) return; }
         Ray ray = _cam.ScreenPointToRay(screenPos);

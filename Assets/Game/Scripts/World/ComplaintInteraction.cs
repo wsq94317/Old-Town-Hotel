@@ -78,6 +78,7 @@ public class ComplaintInteraction : MonoBehaviour
 
     private void Choose(ComplaintChoice choice)
     {
+        if (!_panelOpen) return; // 幂等：双通道同帧双触发只结算一次
         _panelOpen = false;
         int rate = economy != null && economy.Config != null ? economy.Config.roomRevenuePerGuest : 80;
         var outcome = ComplaintDecisionLogic.Resolve(choice, rate, _rng.NextDouble());

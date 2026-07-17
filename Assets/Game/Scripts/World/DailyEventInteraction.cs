@@ -135,6 +135,7 @@ public class DailyEventInteraction : MonoBehaviour
 
     private void Choose(EventOption option)
     {
+        if (!_panelOpen || _activeDef == null) return; // 幂等：双通道双触发只结算一次
         // 效果结算
         if (option.Effect.Cash < 0 && economy != null) economy.TrySpend(-option.Effect.Cash);
         else if (option.Effect.Cash > 0 && economy != null) economy.RecordCheckout(option.Effect.Cash, 1f); // 计入当日收入

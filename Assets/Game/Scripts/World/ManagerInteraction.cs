@@ -111,57 +111,65 @@ public class ManagerInteraction : MonoBehaviour
         }
 
         // ① 现场抓包三选一
+        // 注意：按钮动作会把共享字段置空——全部先取局部变量 + else-if 链，
+        // 否则同一 OnGUI pass 后续代码读到 null 直接把整个回调炸掉（按钮全灭）。
         if (_caughtAgent != null)
         {
+            var caught = _caughtAgent;
             GUI.Box(new Rect(w * 0.5f - 170, h * 0.35f, 340, 130),
-                $"CAUGHT SLACKING!  {_caughtAgent.Member?.DisplayName} ({_caughtAgent.Member?.Role})");
+                $"CAUGHT SLACKING!  {caught.Member?.DisplayName} ({caught.Member?.Role})");
             if (GuiInput.Button(new Rect(w * 0.5f - 150, h * 0.35f + 40, 300, 24), "Urge back to work (morale -5, speed up)"))
-            { _caughtAgent.ApplyCatchChoice(CatchChoice.Urge); Say("Back to work!"); _caughtAgent = null; }
-            if (GuiInput.Button(new Rect(w * 0.5f - 150, h * 0.35f + 68, 300, 24), "Scold hard (morale -15, faster)"))
-            { _caughtAgent.ApplyCatchChoice(CatchChoice.Scold); Say("Scolded."); _caughtAgent = null; }
-            if (GuiInput.Button(new Rect(w * 0.5f - 150, h * 0.35f + 96, 300, 24), "Look away (morale +3, slacking spreads)"))
-            { _caughtAgent.ApplyCatchChoice(CatchChoice.Ignore); Say("You saw nothing."); _caughtAgent = null; }
+                ResolveCatch(caught, CatchChoice.Urge, "Back to work!");
+            else if (GuiInput.Button(new Rect(w * 0.5f - 150, h * 0.35f + 68, 300, 24), "Scold hard (morale -15, faster)"))
+                ResolveCatch(caught, CatchChoice.Scold, "Scolded.");
+            else if (GuiInput.Button(new Rect(w * 0.5f - 150, h * 0.35f + 96, 300, 24), "Look away (morale +3, slacking spreads)"))
+                ResolveCatch(caught, CatchChoice.Ignore, "You saw nothing.");
             return;
         }
 
         // ② 员工面板
+        // 按钮动作会把 _panelAgent 置空——先取局部变量 + else-if 链，动作内绝不再读共享字段；
+        // 否则同一 OnGUI pass 后续行读到 null 抛异常，整个回调中止 → 所有按钮失效。
         if (_panelAgent != null)
         {
-            var m = _panelAgent.Member;
+            var agent = _panelAgent;
+            var m = agent.Member;
             GUI.Box(new Rect(w * 0.5f - 150, h * 0.4f, 300, 150),
-                $"{m?.DisplayName} ({m?.Role})  morale:{m?.Morale}" + (_panelAgent.IsGrudging ? "  💢 GRUDGING" : ""));
+                $"{m?.DisplayName} ({m?.Role})  morale:{m?.Morale}" + (agent.IsGrudging ? "  💢 GRUDGING" : ""));
+
+            bool canInterrogate = agent.HasDelayMark;
             if (GuiInput.Button(new Rect(w * 0.5f - 130, h * 0.4f + 34, 260, 24), "Hurry up! (speed up, morale -3)"))
-            { _panelAgent.Hurry(); Say("Hurried."); _panelAgent = null; }
-            bool canInterrogate = _panelAgent.HasDelayMark;
-            GUI.enabled = canInterrogate;
-            if (GuiInput.Button(new Rect(w * 0.5f - 130, h * 0.4f + 62, 260, 24),
-                canInterrogate ? "Interrogate the delay (🐌)" : "Interrogate (no delay mark)"))
             {
-                var agent = _panelAgent;
+                agent.Hurry();
+                Say("Hurried.");
+                _panelAgent = null;
+            }
+            else if (InterrogateButton(new Rect(w * 0.5f - 130, h * 0.4f + 62, 260, 24), canInterrogate))
+            {
                 _panelAgent = null;
                 if (agent.Interrogate() == InterrogationVerdict.Caught) _caughtAgent = agent; // 坐实→三选一
                 else Say($"WRONG ACCUSATION! {agent.Member?.DisplayName} is furious (morale {SupervisionTuning.WrongAccusationMoraleDelta}).");
             }
-            GUI.enabled = true;
-            if (GuiInput.Button(new Rect(w * 0.5f - 130, h * 0.4f + 90, 260, 24), "Command → tap a room"))
+            else if (GuiInput.Button(new Rect(w * 0.5f - 130, h * 0.4f + 90, 260, 24), "Command → tap a room"))
             {
-                _commandAgent = _panelAgent;
+                _commandAgent = agent;
                 _panelAgent = null;
                 Say("Now tap the room you want them on.");
             }
-            if (GuiInput.Button(new Rect(w * 0.5f - 130, h * 0.4f + 118, 125, 24), "FIRE THEM"))
+            else if (GuiInput.Button(new Rect(w * 0.5f - 130, h * 0.4f + 118, 125, 24), "FIRE THEM"))
             {
-                var victim = _panelAgent;
                 _panelAgent = null;
-                if (economy != null && victim?.Member != null)
+                if (economy != null && agent.Member != null)
                 {
-                    FloatingTextFx.Spawn(victim.transform.position, "FIRED!", new Color(1f, 0.25f, 0.2f), 1.2f);
-                    economy.FireStaff(victim.Member); // Spawner 经 OnFired 收走纸片人（含走人演出）
-                    Say($"{victim.Member.DisplayName} is packing. The stapler goes with them.");
+                    FloatingTextFx.Spawn(agent.transform.position, "FIRED!", new Color(1f, 0.25f, 0.2f), 1.2f);
+                    economy.FireStaff(agent.Member); // Spawner 经 OnFired 收走纸片人（含走人演出）
+                    Say($"{agent.Member.DisplayName} is packing. The stapler goes with them.");
                 }
             }
-            if (GuiInput.Button(new Rect(w * 0.5f + 5, h * 0.4f + 118, 125, 24), "Close"))
+            else if (GuiInput.Button(new Rect(w * 0.5f + 5, h * 0.4f + 118, 125, 24), "Close"))
+            {
                 _panelAgent = null;
+            }
             return;
         }
 
@@ -179,6 +187,25 @@ public class ManagerInteraction : MonoBehaviour
                 Say($"Room {flawed.roomNumber} sent back to cleaning.");
             }
         }
+    }
+
+    // 抓包决策落地（幂等：同一 agent 只结算一次，防双通道同帧双触发）。
+    private void ResolveCatch(StaffAgent agent, CatchChoice choice, string message)
+    {
+        if (agent == null || _caughtAgent != agent) return;
+        _caughtAgent = null;
+        agent.ApplyCatchChoice(choice);
+        Say(message);
+    }
+
+    // 质询按钮：禁用态只画不响应（GuiInput.Button 已尊重 GUI.enabled）。
+    private static bool InterrogateButton(Rect r, bool enabled)
+    {
+        bool prev = GUI.enabled;
+        GUI.enabled = enabled;
+        bool clicked = GuiInput.Button(r, enabled ? "Interrogate the delay (🐌)" : "Interrogate (no delay mark)");
+        GUI.enabled = prev;
+        return clicked;
     }
 
     private GUIStyle _center;

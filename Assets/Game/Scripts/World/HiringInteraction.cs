@@ -37,6 +37,7 @@ public class HiringInteraction : MonoBehaviour
     private void Hire(StaffMember m)
     {
         if (economy == null) return;
+        if (!_pool.Contains(m)) return; // 幂等：双通道双触发不会雇两次
         if (economy.HireCandidate(m, SigningCost(m)))
         {
             _pool.Remove(m);
