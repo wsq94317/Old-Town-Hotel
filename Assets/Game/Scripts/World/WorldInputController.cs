@@ -109,8 +109,10 @@ public class WorldInputController : MonoBehaviour
 
         if (_cam == null) { _cam = Camera.main; if (_cam == null) return; }
         Ray ray = _cam.ScreenPointToRay(screenPos);
-        // 忽略 trigger（楼梯触发盒）；NavBlock 隐形墙在 Ignore Raycast 层，同样不拦射线。
-        if (!Physics.Raycast(ray, out RaycastHit hit, 200f, ~0, QueryTriggerInteraction.Ignore)) return;
+        // 忽略 trigger（楼梯触发盒）；layerMask 必须排除 Ignore Raycast 层（layer 2）——
+        // NavBlock 隐形墙在那层，写 ~0 会把它们重新拉回来拦点击（踩过一次的坑）。
+        int mask = ~(1 << 2);
+        if (!Physics.Raycast(ray, out RaycastHit hit, 200f, mask, QueryTriggerInteraction.Ignore)) return;
 
         // 指挥模式：这次点击=指定房间
         if (_interaction != null && _interaction.InCommandMode)
