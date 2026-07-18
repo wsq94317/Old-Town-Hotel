@@ -30,9 +30,37 @@ public class WorldInputController : MonoBehaviour
         if (cameraRig == null) cameraRig = FindFirstObjectByType<ManagerCameraRig>();
     }
 
+    private float _heldStillSeconds;
+    private Vector2 _heldStillPos = new Vector2(-9999f, -9999f);
+    private bool _ignoreTouchUntilRelease;
+
     private void Update()
     {
         (bool pressed, Vector2 pos) = ReadPointer();
+
+        // ── 模拟触屏"卡指"看门狗 ──
+        // Device Simulator 偶发吞掉抬起事件：primaryTouch 从此永远 isPressed，
+        // 新点击不再产生按下事件，点击+拖动全聋（2026-07-18 实测抓到 phase=Moved 卡死）。
+        // 按住且指针纹丝不动超过 3 秒判定卡指：强制取消本次按压（不判 Tap），
+        // 并忽略触屏直到它真的报告松开。真人按住 3 秒不动的场景几乎不存在，误伤=白点一下。
+        if (pressed)
+        {
+            if ((pos - _heldStillPos).sqrMagnitude > 25f) { _heldStillPos = pos; _heldStillSeconds = 0f; }
+            else _heldStillSeconds += Time.unscaledDeltaTime;
+            if (_heldStillSeconds >= 3f)
+            {
+                _heldStillSeconds = 0f;
+                _ignoreTouchUntilRelease = true;
+                if (cameraRig != null) cameraRig.SetPeeking(false);
+                _pressedLastFrame = false;
+                TapDebug = "stuck touch force-cancelled";
+                return;
+            }
+        }
+        else
+        {
+            _heldStillSeconds = 0f;
+        }
 
         if (pressed && !_pressedLastFrame)
         {
@@ -75,7 +103,15 @@ public class WorldInputController : MonoBehaviour
     private (bool, Vector2) ReadPointer()
     {
         if (Touchscreen.current != null && Touchscreen.current.primaryTouch.press.isPressed)
-            return (true, Touchscreen.current.primaryTouch.position.ReadValue());
+        {
+            if (!_ignoreTouchUntilRelease)
+                return (true, Touchscreen.current.primaryTouch.position.ReadValue());
+            // 卡指隔离中：无视这根"僵尸手指"，鼠标通道照常可用
+        }
+        else
+        {
+            _ignoreTouchUntilRelease = false; // 触屏真松开了，恢复采信
+        }
         if (Mouse.current != null && Mouse.current.leftButton.isPressed)
             return (true, Mouse.current.position.ReadValue());
         return (false, _lastPos);
