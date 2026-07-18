@@ -25,6 +25,17 @@ public class LobbyLife : MonoBehaviour
     private void Start()
     {
         if (demandLoop == null) demandLoop = FindFirstObjectByType<Room2DPrototypeDemandLoop>();
+        // 行李架位置跟随场景锚点（一楼分区由锚点驱动，序列化默认值只是兜底）
+        var world = GameObject.Find("World");
+        if (world != null)
+        {
+            foreach (var t in world.GetComponentsInChildren<Transform>(true))
+            {
+                if (t.name != "LuggageStorageAnchor") continue;
+                rackBase = t.position + new Vector3(-0.35f, 0f, -0.1f); // 架子中心偏进区域内
+                break;
+            }
+        }
         if (_luggageMat == null)
         {
             _luggageMat = new Material(Shader.Find("Universal Render Pipeline/Lit"))
