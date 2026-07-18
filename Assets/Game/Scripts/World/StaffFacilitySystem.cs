@@ -35,7 +35,12 @@ public readonly struct ToiletInspectionResult
 public sealed class StaffFacilityNode : MonoBehaviour
 {
     public StaffFacilityKind Kind { get; private set; }
-    public Vector3 Anchor => transform.TransformPoint(new Vector3(0f, 0f, -0.75f));
+
+    // 站位锚点在"开口侧"的空地上（Configure 按贴墙方向算出）。
+    // 教训：写死朝南时，贴南墙的厕所站位点被挤进设施与外墙的缝里——那是南墙的
+    // 点击死区（0.8 墙在 35° 俯角下遮挡身后 ~1.1m 的地面射线），玩家点不出去。
+    private Vector3 _anchorLocal = new Vector3(0f, 0f, -0.75f);
+    public Vector3 Anchor => transform.TransformPoint(_anchorLocal);
 
     private string _signText;
 
@@ -69,8 +74,12 @@ public sealed class StaffFacilityNode : MonoBehaviour
 
         Material material = NewMaterial(color);
         BuildBlock("Floor", new Vector3(0f, 0.03f, 0f), new Vector3(size.x, 0.06f, size.z), material);
-        // 墙高对齐大堂灰盒（0.8）：之前 1.7 的高墙在 45° 视角里像悬空的"二楼盒子"
-        BuildBlock("BackWall", new Vector3(0f, 0.42f, size.z * 0.48f), new Vector3(size.x, 0.85f, 0.1f), material);
+        // 墙高对齐大堂灰盒（0.8）：之前 1.7 的高墙在 45° 视角里像悬空的"二楼盒子"。
+        // 背墙贴向最近的外墙侧（南半场贴南墙），开口朝向房间开阔面；
+        // 站位锚点放在开口侧、地台外 0.3m 的空地上——可见、可点击、不进墙缝。
+        float backSign = transform.position.z >= 0f ? 1f : -1f;
+        BuildBlock("BackWall", new Vector3(0f, 0.42f, backSign * size.z * 0.48f), new Vector3(size.x, 0.85f, 0.1f), material);
+        _anchorLocal = new Vector3(0f, 0f, -backSign * (size.z * 0.5f + 0.3f));
         // 侧墙贴靠外墙一侧：相机从西南 45° 看，东半场的设施侧墙放东侧才不会挡住内部
         float sideSign = transform.position.x >= 0f ? 1f : -1f;
         BuildBlock("SideWall", new Vector3(sideSign * size.x * 0.48f, 0.42f, 0f), new Vector3(0.1f, 0.85f, size.z), material);
