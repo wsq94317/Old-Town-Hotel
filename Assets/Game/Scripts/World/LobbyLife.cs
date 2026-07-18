@@ -18,7 +18,7 @@ public class LobbyLife : MonoBehaviour
         new Vector3(-3f, 0f, 1f),
         new Vector3(3.5f, 0f, -2f),
         new Vector3(-5f, 0f, 1.5f),
-        new Vector3(-7f, 0f, -2f),
+        new Vector3(-3.5f, 0f, -2.5f), // 原(-7,-2)：西南角现在是员工休息室，客人别往里钻
         new Vector3(1.5f, 0f, 0f),
     };
 

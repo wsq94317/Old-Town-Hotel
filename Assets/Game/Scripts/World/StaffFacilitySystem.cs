@@ -37,6 +37,12 @@ public sealed class StaffFacilityNode : MonoBehaviour
     public StaffFacilityKind Kind { get; private set; }
     public Vector3 Anchor => transform.TransformPoint(new Vector3(0f, 0f, -0.75f));
 
+    private string _signText;
+
+    // 招牌延迟到楼层第一次显示时再建：节点现在挂在楼层树里，未激活层级上
+    // 对 TMP 设 outline 会 NRE（材质在 Awake 前不存在，隔离复现过）。
+    private void OnEnable() => BuildSignIfNeeded();
+
     public void Configure(StaffFacilityKind kind, string displayName, Vector3 worldPosition, Vector3 size, Color color)
     {
         Kind = kind;
@@ -48,8 +54,9 @@ public sealed class StaffFacilityNode : MonoBehaviour
         collider.center = new Vector3(0f, 0.8f, 0f);
         collider.size = new Vector3(Mathf.Max(1.2f, size.x), 1.8f, Mathf.Max(1.2f, size.z));
 
-        if (gameObject.GetComponent<AgentFloorVisibility>() == null)
-            gameObject.AddComponent<AgentFloorVisibility>();
+        // 节点挂在楼层树里（由 StaffFacilitySystem 指定 parent）：楼层 SetActive
+        // 统一管显隐 + 碰撞体——不再需要 AgentFloorVisibility，也不会出现
+        // "楼上设施的隐形碰撞体拦截楼下点击"（旧版根级节点的坑）。
 
         BuildPlaceholder(displayName, size, color);
     }
@@ -61,14 +68,25 @@ public sealed class StaffFacilityNode : MonoBehaviour
         Material material = NewMaterial(color);
         BuildBlock("Floor", new Vector3(0f, 0.03f, 0f), new Vector3(size.x, 0.06f, size.z), material);
         BuildBlock("BackWall", new Vector3(0f, 0.85f, size.z * 0.48f), new Vector3(size.x, 1.7f, 0.1f), material);
-        BuildBlock("SideWall", new Vector3(-size.x * 0.48f, 0.85f, 0f), new Vector3(0.1f, 1.7f, size.z), material);
+        // 侧墙贴靠外墙一侧：相机从西南 45° 看，东半场的设施侧墙放东侧才不会挡住内部
+        float sideSign = transform.position.x >= 0f ? 1f : -1f;
+        BuildBlock("SideWall", new Vector3(sideSign * size.x * 0.48f, 0.85f, 0f), new Vector3(0.1f, 1.7f, size.z), material);
+
+        _signText = displayName;
+        BuildSignIfNeeded();
+    }
+
+    private void BuildSignIfNeeded()
+    {
+        if (string.IsNullOrEmpty(_signText) || !gameObject.activeInHierarchy) return;
+        if (transform.Find("Sign") != null) return;
 
         var sign = new GameObject("Sign");
         sign.transform.SetParent(transform, false);
         sign.transform.localPosition = new Vector3(0f, 1.95f, 0f);
         sign.transform.localScale = Vector3.one * 0.22f;
         var text = sign.AddComponent<TextMeshPro>();
-        text.text = displayName;
+        text.text = _signText;
         text.alignment = TextAlignmentOptions.Center;
         text.fontSize = 4.5f;
         text.fontStyle = FontStyles.Bold;
@@ -106,7 +124,7 @@ public sealed class StaffFacilitySystem : MonoBehaviour
     private static readonly Vector3 MapExit = new Vector3(0f, 0f, -5.2f);
     private static StaffFacilitySystem _instance;
 
-    private readonly List<StaffFacilityNode> _supportNodes = new List<StaffFacilityNode>();
+    private readonly Dictionary<int, StaffFacilityNode> _supportByFloor = new Dictionary<int, StaffFacilityNode>();
     private StaffAgentSpawner _spawner;
     private Room2DDemoDayController _dayController;
     private Room2DPrototypeDemandLoop _demandLoop;
@@ -170,11 +188,14 @@ public sealed class StaffFacilitySystem : MonoBehaviour
 
     public Vector3 SupportAnchorForFloor(int floor, int index)
     {
-        if (floor <= 0 || _supportNodes.Count == 0) return BreakRoomAnchor;
-        int safeFloor = Mathf.Clamp(floor - 1, 0, _supportNodes.Count - 1);
-        Vector3 baseAnchor = _supportNodes[safeFloor].Anchor;
-        float offset = ((Mathf.Abs(index) % 3) - 1) * 0.55f;
-        return baseAnchor + new Vector3(offset, 0f, 0f);
+        // 只有放了后勤锚点的客房层（2F/3F）有本层休息点；设施层(4-7F)不摆员工设施，
+        // 员工下楼回一楼休息室（用户要求：员工设施不进客人活动区）。
+        if (_supportByFloor.TryGetValue(floor, out var node) && node != null)
+        {
+            float offset = ((Mathf.Abs(index) % 3) - 1) * 0.55f;
+            return node.Anchor + new Vector3(offset, 0f, 0f);
+        }
+        return BreakRoomAnchor;
     }
 
     public Vector3 PatrolAnchor(int floor, int index)
@@ -224,49 +245,83 @@ public sealed class StaffFacilitySystem : MonoBehaviour
         TickPendingInspection();
     }
 
+    // 布局全部由场景锚点驱动（不再写死坐标）。锚点是 World/FloorN 下的空 Transform：
+    //   Floor1: LobbyStaffBreakRoomAnchor / PublicToiletAnchor / KitchenAnchor
+    //           (+ ManagerOfficeReservedAnchor 纯场景预留，不在这里消费)
+    //   Floor2: Floor2HskSupportAnchor（走廊西端 Linen 隔间）
+    //   Floor3: Floor3HskSupportAnchor（南侧空带 HSK 休息+布草）
+    // 锚点缺失 = 响亮警告 + 不建该设施（绝不回退到拍脑袋坐标塞进客房/前台）。
     private void BuildFacilities()
     {
+        var breakAnchor = FindSceneAnchor("LobbyStaffBreakRoomAnchor");
         var breakRoom = StaffBreakRoom.EnsureInScene();
-        BreakRoomAnchor = breakRoom != null ? breakRoom.transform.position : new Vector3(-6f, 0f, 1.25f);
+        if (breakAnchor != null && breakRoom != null)
+        {
+            breakRoom.transform.SetParent(breakAnchor.parent, true); // 进楼层树，跟层显隐
+            breakRoom.transform.position = breakAnchor.position;
+        }
+        else if (breakAnchor == null)
+        {
+            Debug.LogWarning("StaffFacilitySystem: 场景缺少 LobbyStaffBreakRoomAnchor——休息室停留在 StaffBreakRoom 自带位置。");
+        }
+        BreakRoomAnchor = breakRoom != null ? breakRoom.transform.position
+                        : breakAnchor != null ? breakAnchor.position
+                        : new Vector3(-7.4f, 0f, -3.7f);
 
-        PublicToilet = CreateNode(
-            StaffFacilityKind.PublicToilet,
-            "PUBLIC TOILET",
-            new Vector3(-7.1f, FloorMath.BaseYFor(0), -2.25f),
-            new Vector3(2.4f, 0.1f, 2.1f),
-            new Color(0.25f, 0.48f, 0.55f));
+        PublicToilet = CreateNodeAtAnchor(
+            "PublicToiletAnchor", StaffFacilityKind.PublicToilet, "PUBLIC TOILET",
+            new Vector3(2.6f, 0.1f, 2.2f), new Color(0.25f, 0.48f, 0.55f));
 
-        Kitchen = CreateNode(
-            StaffFacilityKind.Kitchen,
-            "KITCHEN",
-            new Vector3(-3.8f, FloorMath.BaseYFor(0), -2.45f),
-            new Vector3(3.2f, 0.1f, 2.2f),
-            new Color(0.52f, 0.36f, 0.24f));
+        Kitchen = CreateNodeAtAnchor(
+            "KitchenAnchor", StaffFacilityKind.Kitchen, "KITCHEN",
+            new Vector3(3.2f, 0.1f, 2.4f), new Color(0.52f, 0.36f, 0.24f));
 
+        _supportByFloor.Clear();
         for (int floor = 1; floor < FloorMath.FloorCount; floor++)
         {
+            string anchorName = "Floor" + (floor + 1) + "HskSupportAnchor";
+            var anchor = FindSceneAnchor(anchorName);
+            if (anchor == null) continue; // 没放锚点的楼层（设施层）不生成员工设施
             var node = CreateNode(
                 StaffFacilityKind.FloorSupport,
-                floor == 1 ? "HSK LOUNGE / STORAGE" : "LINEN / STAFF SUPPORT",
-                new Vector3(-5.7f, FloorMath.BaseYFor(floor), -2.15f),
-                new Vector3(2.5f, 0.1f, 1.8f),
+                floor == 1 ? "LINEN" : "HSK LOUNGE / LINEN",
+                anchor,
+                floor == 1 ? new Vector3(1.3f, 0.1f, 1.6f) : new Vector3(2.6f, 0.1f, 2.0f),
                 new Color(0.33f, 0.42f, 0.31f));
-            _supportNodes.Add(node);
+            _supportByFloor[floor] = node;
         }
     }
 
-    private StaffFacilityNode CreateNode(
-        StaffFacilityKind kind,
-        string displayName,
-        Vector3 position,
-        Vector3 size,
-        Color color)
+    private StaffFacilityNode CreateNodeAtAnchor(
+        string anchorName, StaffFacilityKind kind, string displayName, Vector3 size, Color color)
+    {
+        var anchor = FindSceneAnchor(anchorName);
+        if (anchor == null)
+        {
+            Debug.LogWarning("StaffFacilitySystem: 场景缺少锚点 " + anchorName + "——设施 " + kind + " 不生成。");
+            return null;
+        }
+        return CreateNode(kind, displayName, anchor, size, color);
+    }
+
+    private static StaffFacilityNode CreateNode(
+        StaffFacilityKind kind, string displayName, Transform anchor, Vector3 size, Color color)
     {
         var go = new GameObject("Facility_" + kind);
-        go.transform.SetParent(transform, true);
+        go.transform.SetParent(anchor.parent, true); // 挂进楼层根：SetActive 连碰撞体一起管
         var node = go.AddComponent<StaffFacilityNode>();
-        node.Configure(kind, displayName, position, size, color);
+        node.Configure(kind, displayName, anchor.position, size, color);
         return node;
+    }
+
+    /// <summary>在 World 楼层树里找功能区锚点（含未激活楼层）。</summary>
+    private static Transform FindSceneAnchor(string anchorName)
+    {
+        var world = GameObject.Find("World");
+        if (world == null) return null;
+        foreach (var t in world.GetComponentsInChildren<Transform>(true))
+            if (t.name == anchorName) return t;
+        return null;
     }
 
     private void ResolveReferences()
@@ -328,6 +383,7 @@ public sealed class StaffFacilitySystem : MonoBehaviour
 
     private void TickGuestUse()
     {
+        if (PublicToilet == null) return; // 锚点缺失时厕所不存在，客人流程整体停摆（有警告）
         if (_toiletGuest != null)
         {
             if (Time.time < _guestUseUntil) return;

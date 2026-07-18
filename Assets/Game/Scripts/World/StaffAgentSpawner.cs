@@ -249,11 +249,19 @@ public sealed class StaffBreakRoom : MonoBehaviour
 
     public static StaffBreakRoom EnsureInScene()
     {
-        var existing = FindFirstObjectByType<StaffBreakRoom>();
+        // Include inactive：休息室挂在楼层树里，玩家在楼上时 Floor1 是隐藏的——
+        // 不带这个参数会找不到然后重复造一间
+        var existing = FindFirstObjectByType<StaffBreakRoom>(FindObjectsInactive.Include);
         if (existing != null) return existing;
 
         var go = new GameObject("StaffBreakRoom");
-        go.transform.position = new Vector3(-6f, FloorMath.BaseYFor(0), 1.25f);
+        // 出生位置优先读场景锚点（布局由锚点驱动；StaffFacilitySystem 还会再对齐一次）
+        var world = GameObject.Find("World");
+        Transform anchor = null;
+        if (world != null)
+            foreach (var t in world.GetComponentsInChildren<Transform>(true))
+                if (t.name == "LobbyStaffBreakRoomAnchor") { anchor = t; break; }
+        go.transform.position = anchor != null ? anchor.position : new Vector3(-7.4f, FloorMath.BaseYFor(0), -3.7f);
         return go.AddComponent<StaffBreakRoom>();
     }
 
