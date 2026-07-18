@@ -15,6 +15,7 @@ public class StaffAgentSpawner : MonoBehaviour
     private static Material _matInsp;
     private static Material _matReception;
     private StaffBreakRoom _breakRoom;
+    private StaffFacilitySystem _facilities;
 
     public IReadOnlyList<StaffAgent> Agents => _agents;
 
@@ -37,6 +38,7 @@ public class StaffAgentSpawner : MonoBehaviour
         if (economy == null || economy.Payroll == null) return;
 
         _breakRoom = StaffBreakRoom.EnsureInScene();
+        _facilities = StaffFacilitySystem.EnsureInScene();
         GeneratedPlaceholderArt.EnsureLobbyDecor();
 
         bool hasInspector = false;

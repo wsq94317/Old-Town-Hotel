@@ -49,6 +49,24 @@ public class DebugHudOverlay : MonoBehaviour
     private IEnumerator AutoContinue()
     {
         yield return new WaitForSeconds(autoContinueDelaySeconds);
+
+        float deadline = Time.time + 12f;
+        while (Time.time < deadline)
+        {
+            bool everyoneOffMap = true;
+            foreach (var staff in FindObjectsByType<StaffAgent>(FindObjectsSortMode.None))
+            {
+                if (staff != null && staff.ShiftState != StaffShiftState.OffShift)
+                {
+                    everyoneOffMap = false;
+                    break;
+                }
+            }
+
+            if (everyoneOffMap) break;
+            yield return null;
+        }
+
         if (dayController != null) dayController.RestartDemoDay();
     }
 

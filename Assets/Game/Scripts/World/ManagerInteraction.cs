@@ -13,12 +13,13 @@ public class ManagerInteraction : MonoBehaviour
     private float _messageUntil;
 
     private StaffAgent _commandAgent;
+    private bool _angryToiletGuest;
     private TaskDispatcher _dispatcher;
     private GUIStyle _center;
     private GUIStyle _wrappedLabel;
     private Vector2 _commandRoomScroll;
 
-    public bool PanelOpen => _caughtAgent != null || _panelAgent != null || _commandAgent != null;
+    public bool PanelOpen => _caughtAgent != null || _panelAgent != null || _commandAgent != null || _angryToiletGuest;
     public bool InCommandMode => _commandAgent != null;
 
     public void CommandTarget(Vector3 worldPoint)
@@ -118,6 +119,25 @@ public class ManagerInteraction : MonoBehaviour
 
     private void HandleCaught(StaffAgent agent) => _caughtAgent = agent;
 
+    public void HandleToiletInspection(ToiletInspectionResult result)
+    {
+        switch (result.Kind)
+        {
+            case ToiletInspectionKind.StaffHiding:
+                Say($"Caught {result.Staff?.Member?.DisplayName} hiding in the public toilet.");
+                break;
+            case ToiletInspectionKind.StaffLegitimate:
+                Say($"Wrong door. {result.Staff?.Member?.DisplayName} was using the toilet normally (morale -4).");
+                break;
+            case ToiletInspectionKind.Guest:
+                _angryToiletGuest = true;
+                break;
+            default:
+                Say("The public toilet is empty.");
+                break;
+        }
+    }
+
     public void OnStaffTapped(StaffAgent agent)
     {
         if (agent == null || manager == null) return;
@@ -166,6 +186,25 @@ public class ManagerInteraction : MonoBehaviour
 
         DrawRoleLegend(view);
 
+        if (_angryToiletGuest)
+        {
+            var guestRect = new Rect(w * 0.5f - 190f, h * 0.32f, 380f, 170f);
+            GuiInput.ReserveZone(guestRect);
+            GUI.Box(guestRect, "FURIOUS GUEST - You barged into the public toilet");
+            GUI.Label(new Rect(guestRect.x + 18f, guestRect.y + 28f, guestRect.width - 36f, 40f),
+                "The guest demands an apology. How do you handle it?", WrappedLabelStyle());
+            if (GuiInput.Button(new Rect(guestRect.x + 18f, guestRect.y + 72f, guestRect.width - 36f, 26f),
+                "Sincere apology + $30 compensation"))
+                ResolveToiletGuestIncident(30, 2, 0, "Guest accepts the apology and compensation.");
+            else if (GuiInput.Button(new Rect(guestRect.x + 18f, guestRect.y + 102f, guestRect.width - 36f, 26f),
+                "Apologize without compensation"))
+                ResolveToiletGuestIncident(0, -1, 0, "Guest leaves annoyed.");
+            else if (GuiInput.Button(new Rect(guestRect.x + 18f, guestRect.y + 132f, guestRect.width - 36f, 26f),
+                "Argue that managers must inspect"))
+                ResolveToiletGuestIncident(0, -5, -2, "The argument becomes a terrible review.");
+            return;
+        }
+
         if (_caughtAgent != null)
         {
             var caught = _caughtAgent;
@@ -185,7 +224,8 @@ public class ManagerInteraction : MonoBehaviour
             var agent = _panelAgent;
             var member = agent.Member;
             GUI.Box(new Rect(w * 0.5f - 150, h * 0.4f, 300, 150),
-                $"{member?.DisplayName} ({member?.Role})  morale:{member?.Morale}" + (agent.IsGrudging ? "  GRUDGING" : ""));
+                $"{member?.DisplayName} ({member?.Role})  morale:{member?.Morale}\n{agent.ShiftState} / {agent.ActivityState}"
+                + (agent.IsGrudging ? "  GRUDGING" : ""));
 
             bool canInterrogate = agent.HasDelayMark;
             if (GuiInput.Button(new Rect(w * 0.5f - 130, h * 0.4f + 34, 260, 24), "Hurry up! (speed up, morale -3)"))
@@ -248,6 +288,22 @@ public class ManagerInteraction : MonoBehaviour
         if (agent == null || _caughtAgent != agent) return;
         _caughtAgent = null;
         agent.ApplyCatchChoice(choice);
+        Say(message);
+    }
+
+    private void ResolveToiletGuestIncident(int compensation, int satisfaction, int prestige, string message)
+    {
+        if (!_angryToiletGuest) return;
+
+        if (compensation > 0 && (economy == null || !economy.TrySpend(compensation)))
+        {
+            Say("You cannot afford the promised compensation.");
+            return;
+        }
+
+        _angryToiletGuest = false;
+        demandLoop?.ApplyExternalSatisfaction(satisfaction, "Public toilet privacy incident");
+        ManagerReputation.Add(prestige);
         Say(message);
     }
 

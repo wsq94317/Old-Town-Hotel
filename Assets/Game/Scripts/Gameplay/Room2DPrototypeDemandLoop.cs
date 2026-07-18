@@ -2892,6 +2892,15 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
         }
     }
 
+    public void ApplyExternalSatisfaction(int scoreDelta, string reason)
+    {
+        if (scoreDelta == 0) return;
+        RecordOutcome(
+            scoreDelta > 0 ? Room2DOutcomeResult.Positive : Room2DOutcomeResult.Negative,
+            scoreDelta);
+        if (!string.IsNullOrWhiteSpace(reason)) lastOutcomeLabel = reason;
+    }
+
     private string GetOutcomeDisplayName(Room2DOutcomeResult outcomeResult)
     {
         switch (outcomeResult)

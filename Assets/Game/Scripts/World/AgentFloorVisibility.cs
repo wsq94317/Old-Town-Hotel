@@ -10,19 +10,41 @@ public class AgentFloorVisibility : MonoBehaviour
 {
     private FloorVisibilityController _floors;
     private Renderer[] _renderers;
+    private Collider[] _colliders;
+    private bool _forceHidden;
 
     private void Awake() => _floors = FindFirstObjectByType<FloorVisibilityController>();
 
-    private void OnTransformChildrenChanged() => _renderers = null;
+    private void OnTransformChildrenChanged()
+    {
+        _renderers = null;
+        _colliders = null;
+    }
+
+    public void SetForceHidden(bool hidden)
+    {
+        _forceHidden = hidden;
+        ApplyVisibility();
+    }
 
     private void LateUpdate()
     {
-        if (_floors == null) return;
+        ApplyVisibility();
+    }
+
+    private void ApplyVisibility()
+    {
         if (_renderers == null) _renderers = Collect();
-        bool visible = FloorMath.FloorIndexForY(transform.position.y) == _floors.CurrentFloor;
+        if (_colliders == null) _colliders = GetComponentsInChildren<Collider>(true);
+        bool visible = !_forceHidden
+            && (_floors == null || FloorMath.FloorIndexForY(transform.position.y) == _floors.CurrentFloor);
         for (int i = 0; i < _renderers.Length; i++)
         {
             if (_renderers[i] != null) _renderers[i].enabled = visible;
+        }
+        for (int i = 0; i < _colliders.Length; i++)
+        {
+            if (_colliders[i] != null) _colliders[i].enabled = visible;
         }
     }
 

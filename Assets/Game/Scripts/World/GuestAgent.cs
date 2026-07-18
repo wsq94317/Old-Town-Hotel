@@ -26,9 +26,11 @@ public class GuestAgent : MonoBehaviour
     /// <summary>出发去某个世界点（自动跨层）；到达后回调（可为 null）。</summary>
     public void TravelTo(Vector3 worldPos, System.Action onArrived)
     {
-        _finalTarget = worldPos;
+        _finalTarget = NavMesh.SamplePosition(worldPos, out NavMeshHit navHit, 2.5f, NavMesh.AllAreas)
+            ? navHit.position
+            : worldPos;
         _onArrived = onArrived;
-        int targetFloor = FloorMath.FloorIndexForY(worldPos.y);
+        int targetFloor = FloorMath.FloorIndexForY(_finalTarget.y);
         _hops = FloorNavigator.PlanHops(CurrentFloor, targetFloor);
         _hopIndex = 0;
         _traveling = true;

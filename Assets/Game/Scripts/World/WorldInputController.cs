@@ -147,6 +147,14 @@ public class WorldInputController : MonoBehaviour
         }
 
         // 点到员工 → 交给监督交互（近=开面板，远=走过去）
+        var facility = hit.collider.GetComponentInParent<StaffFacilityNode>();
+        if (facility != null)
+        {
+            StaffFacilitySystem.EnsureInScene().OnFacilityTapped(facility, manager);
+            ClickMarkerFx.Spawn(facility.Anchor);
+            return;
+        }
+
         var staff = hit.collider.GetComponentInParent<StaffAgent>();
         if (staff != null)
         {
