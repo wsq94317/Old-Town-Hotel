@@ -4,10 +4,11 @@ using UnityEngine;
 internal sealed class UISpriteImportPostprocessor : AssetPostprocessor
 {
     private const string UiSpriteRoot = "Assets/Game/UI/Sprites/";
+    private const string GeneratedPlaceholderRoot = "Assets/Game/Resources/GeneratedPlaceholders/";
 
     private void OnPreprocessTexture()
     {
-        if (!assetPath.StartsWith(UiSpriteRoot)) return;
+        if (!assetPath.StartsWith(UiSpriteRoot) && !assetPath.StartsWith(GeneratedPlaceholderRoot)) return;
 
         var importer = (TextureImporter)assetImporter;
         if (importer == null) return;

@@ -1,8 +1,10 @@
 using System.Collections.Generic;
+using System.Text;
 using UnityEngine;
 
-// M5 雇佣：右上角 HIRE 按钮 → 3 张候选卡（CandidateGenerator 生成，按天换池）→
-// 点雇佣付签约费（2×日薪）→ 入册（Spawner 经 OnHired 自动生成纸片人上岗）。
+// Daily hiring board: top-right HIRE button opens today's candidates, each
+// candidate costs a 2x-daily-wage signing fee, and successful hires spawn via
+// StaffAgentSpawner immediately.
 public class HiringInteraction : MonoBehaviour
 {
     [SerializeField] private EconomySystem economy;
@@ -10,10 +12,13 @@ public class HiringInteraction : MonoBehaviour
     [SerializeField] private StaffArchetypeSO[] archetypes;
 
     private bool _panelOpen;
-    private List<StaffMember> _pool = new List<StaffMember>();
+    private readonly List<StaffMember> _pool = new List<StaffMember>();
     private int _poolDay = -1;
     private string _story = "";
     private float _storyUntil;
+    private Vector2 _poolScroll;
+    private GUIStyle _candidateBodyStyle;
+    private GUIStyle _candidateHeaderStyle;
 
     public bool PanelOpen => _panelOpen;
 
@@ -27,76 +32,156 @@ public class HiringInteraction : MonoBehaviour
     {
         int day = dayController != null ? dayController.CurrentDay : 1;
         if (day == _poolDay && _pool.Count > 0) return;
+
         _poolDay = day;
-        // 每日刷新候选池（种子=天数，可复现）
-        _pool = CandidateGenerator.GeneratePool(archetypes, 3, 1000 + day);
+        _pool.Clear();
+        _pool.AddRange(CandidateGenerator.GeneratePool(archetypes, 3, 1000 + day));
+        _poolScroll = Vector2.zero;
     }
 
-    private int SigningCost(StaffMember m) => m.DailyWage * 2;
+    private int SigningCost(StaffMember member) => member.DailyWage * 2;
 
-    private void Hire(StaffMember m)
+    private void Hire(StaffMember member)
     {
-        if (economy == null) return;
-        if (!_pool.Contains(m)) return; // 幂等：双通道双触发不会雇两次
-        if (economy.HireCandidate(m, SigningCost(m)))
+        if (economy == null || member == null) return;
+        if (!_pool.Contains(member)) return;
+
+        if (economy.HireCandidate(member, SigningCost(member)))
         {
-            _pool.Remove(m);
-            _story = m.DisplayName + " joins tomorrow— no wait, immediately. We're short-staffed.";
-            FloatingTextFx.Spawn(new Vector3(0f, 0f, 2f), "-$" + SigningCost(m), new Color(1f, 0.4f, 0.3f));
+            _pool.Remove(member);
+            _story = member.DisplayName + " joins immediately. You're clearly desperate.";
+            FloatingTextFx.Spawn(new Vector3(0f, 0f, 2f), "-$" + SigningCost(member), new Color(1f, 0.4f, 0.3f));
         }
         else
         {
-            _story = "You can't afford " + m.DisplayName + ". Awkward for everyone.";
+            _story = "You can't afford " + member.DisplayName + ". Awkward for everyone.";
         }
+
         _storyUntil = Time.time + 4f;
     }
 
-    private static string TraitsOf(StaffMember m)
+    private static string TraitsOf(StaffMember member)
     {
-        if (m.Traits.Count == 0) return "no traits";
-        var sb = new System.Text.StringBuilder();
-        for (int i = 0; i < m.Traits.Count; i++)
+        if (member == null || member.Traits.Count == 0) return "no traits";
+
+        var builder = new StringBuilder();
+        for (int i = 0; i < member.Traits.Count; i++)
         {
-            if (i > 0) sb.Append(", ");
-            sb.Append(m.Traits[i]);
+            if (i > 0) builder.Append(", ");
+            builder.Append(member.Traits[i]);
         }
-        return sb.ToString();
+
+        return builder.ToString();
+    }
+
+    private GUIStyle CandidateBodyStyle()
+    {
+        if (_candidateBodyStyle == null)
+        {
+            _candidateBodyStyle = new GUIStyle(GUI.skin.label)
+            {
+                wordWrap = true,
+                richText = true,
+                fontSize = 15
+            };
+        }
+
+        return _candidateBodyStyle;
+    }
+
+    private GUIStyle CandidateHeaderStyle()
+    {
+        if (_candidateHeaderStyle == null)
+        {
+            _candidateHeaderStyle = new GUIStyle(GUI.skin.label)
+            {
+                fontSize = 13,
+                alignment = TextAnchor.MiddleCenter
+            };
+        }
+
+        return _candidateHeaderStyle;
     }
 
     private void OnGUI()
     {
-        Vector2 v = GuiScale.Begin();
-        float w = v.x, h = v.y;
+        Vector2 view = GuiScale.Begin();
+        float width = view.x;
+        float height = view.y;
 
         if (Time.time < _storyUntil)
-            GUI.Box(new Rect(w * 0.5f - 230, h * 0.26f, 460, 40), _story);
+            GUI.Box(new Rect(width * 0.5f - 230f, height * 0.26f, 460f, 40f), _story);
 
         if (!_panelOpen)
         {
-            var hireRect = new Rect(w - 90, 40, 80, 28);
-            GuiInput.ReserveZone(hireRect); // 面板未开时也要吃点击（触屏通道）
-            if (GuiInput.Button(hireRect, "HIRE")) { EnsurePool(); _panelOpen = true; }
+            var hireRect = new Rect(width - 90f, 40f, 80f, 28f);
+            GuiInput.ReserveZone(hireRect);
+            if (GuiInput.Button(hireRect, "HIRE"))
+            {
+                EnsurePool();
+                _panelOpen = true;
+            }
             return;
         }
 
-        GUI.Box(new Rect(w * 0.5f - 260, h * 0.28f, 520, 40 + Mathf.Max(1, _pool.Count) * 62), "TODAY'S CANDIDATES (signing fee = 2x daily wage)");
-        if (_pool.Count == 0)
-            GUI.Label(new Rect(w * 0.5f - 240, h * 0.28f + 34, 480, 24), "Pool's empty. Word got out about the fighting.");
+        float margin = Mathf.Max(14f, width * 0.035f);
+        float panelWidth = Mathf.Min(720f, width - margin * 2f);
+        float panelX = (width - panelWidth) * 0.5f;
+        float panelY = Mathf.Clamp(height * 0.12f, 20f, height * 0.22f);
+        float panelHeight = Mathf.Min(460f, height - panelY - 20f);
+        float headerHeight = 44f;
+        float footerHeight = 38f;
+        float viewportHeight = Mathf.Max(96f, panelHeight - headerHeight - footerHeight - 20f);
+        float rowHeight = 76f;
+        float rowGap = 8f;
+        float contentHeight = _pool.Count == 0 ? viewportHeight : _pool.Count * (rowHeight + rowGap);
 
-        for (int i = 0; i < _pool.Count; i++)
+        var panelRect = new Rect(panelX, panelY, panelWidth, panelHeight);
+        var viewportRect = new Rect(panelX + 12f, panelY + headerHeight + 6f, panelWidth - 24f, viewportHeight);
+        var contentRect = new Rect(0f, 0f, viewportRect.width - 18f, contentHeight);
+
+        GuiInput.ReserveZone(panelRect);
+        GUI.Box(panelRect, GUIContent.none);
+        GUI.Label(
+            new Rect(panelX + 12f, panelY + 8f, panelWidth - 24f, 24f),
+            "TODAY'S CANDIDATES (signing fee = 2x daily wage)",
+            CandidateHeaderStyle());
+
+        _poolScroll = GUI.BeginScrollView(viewportRect, _poolScroll, contentRect, false, contentHeight > viewportHeight);
+        if (_pool.Count == 0)
         {
-            var m = _pool[i];
-            float y = h * 0.28f + 34 + i * 62;
-            GUI.Label(new Rect(w * 0.5f - 240, y, 380, 44),
-                $"{m.DisplayName} — {m.Role}, ${m.DailyWage}/day\n" +
-                $"SPD {m.Attributes.Speed} / QLT {m.Attributes.Quality} / STA {m.Attributes.Stamina} · {TraitsOf(m)}");
-            if (GuiInput.Button(new Rect(w * 0.5f + 150, y + 6, 100, 30), $"Hire -${SigningCost(m)}"))
+            GUI.Label(
+                new Rect(8f, 10f, contentRect.width - 16f, 24f),
+                "Pool's empty. Word got out about the fighting.",
+                CandidateBodyStyle());
+        }
+        else
+        {
+            for (int i = 0; i < _pool.Count; i++)
             {
-                Hire(m);
-                break;
+                StaffMember member = _pool[i];
+                float y = i * (rowHeight + rowGap);
+                GUI.Box(new Rect(0f, y, contentRect.width, rowHeight), GUIContent.none);
+
+                string body =
+                    $"<b>{member.DisplayName}</b> - {member.Role}, ${member.DailyWage}/day\n" +
+                    $"SPD {member.Attributes.Speed} / QLT {member.Attributes.Quality} / STA {member.Attributes.Stamina} - {TraitsOf(member)}";
+                GUI.Label(
+                    new Rect(12f, y + 10f, contentRect.width - 144f, rowHeight - 20f),
+                    body,
+                    CandidateBodyStyle());
+
+                if (GUI.Button(new Rect(contentRect.width - 118f, y + 20f, 106f, 32f), $"Hire -${SigningCost(member)}"))
+                {
+                    Hire(member);
+                    GUI.EndScrollView();
+                    return;
+                }
             }
         }
-        if (GuiInput.Button(new Rect(w * 0.5f - 260, h * 0.28f + 40 + Mathf.Max(1, _pool.Count) * 62 + 6, 520, 26), "Close"))
+        GUI.EndScrollView();
+
+        if (GuiInput.Button(new Rect(panelX + 12f, panelY + panelHeight - footerHeight, panelWidth - 24f, 28f), "Close"))
             _panelOpen = false;
     }
 }

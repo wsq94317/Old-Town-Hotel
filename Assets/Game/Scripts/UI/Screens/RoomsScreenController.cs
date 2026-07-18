@@ -38,6 +38,7 @@ public sealed class RoomsScreenController : MonoBehaviour
 
     private void Awake()
     {
+        ApplyGeneratedPortraits();
         if (hskCard != null) hskCard.OnDetailsClicked += HandleHskDetails;
         if (inspCard != null) inspCard.OnDetailsClicked += HandleInspDetails;
         if (topBar != null) topBar.OnSettingsClicked += HandleSettingsClicked;
@@ -152,6 +153,12 @@ public sealed class RoomsScreenController : MonoBehaviour
                           inspector.RemainingSeconds,
                           inspector.IsBusy);
         }
+    }
+
+    private void ApplyGeneratedPortraits()
+    {
+        hskPortrait = GeneratedPlaceholderArt.WorkerPortrait(StaffRole.Housekeeper) ?? hskPortrait;
+        inspPortrait = GeneratedPlaceholderArt.WorkerPortrait(StaffRole.Inspector) ?? inspPortrait;
     }
 
     private void HandleTileTapped(RoomTileView tile) => OnRoomTileTapped?.Invoke(tile.BoundRoom);

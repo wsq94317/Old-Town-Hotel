@@ -38,6 +38,13 @@ public class RoomDoor : MonoBehaviour
     public static bool AnyPanelOpen { get; private set; }
     private static int _openPanelCount;
 
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetPanelTracking()
+    {
+        _openPanelCount = 0;
+        AnyPanelOpen = false;
+    }
+
     public Room2DEntity Room => room;
     public Vector3 InteriorCenter => interiorCenter;
     public bool IsOpen => _openness > 0.7f;
@@ -75,13 +82,18 @@ public class RoomDoor : MonoBehaviour
         var shader = Shader.Find("Universal Render Pipeline/Lit");
         if (_doorMat == null) _doorMat = new Material(shader) { color = new Color(0.5f, 0.33f, 0.18f) };
 
-        var panel = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        var panel = GameObject.CreatePrimitive(PrimitiveType.Quad);
         KillCollider(panel);
         panel.name = "DoorPanel";
         panel.transform.SetParent(transform);
-        panel.transform.localPosition = Vector3.up * 0.55f;
-        panel.transform.localScale = new Vector3(1.8f, 1.1f, 0.12f);
-        panel.GetComponent<Renderer>().sharedMaterial = _doorMat;
+        panel.transform.localPosition = Vector3.up * 0.86f;
+        var panelRenderer = panel.GetComponent<Renderer>();
+        if (!GeneratedPlaceholderArt.ApplyNamedWorldSprite(panel.transform, panelRenderer, "env_doorway", 1.8f))
+        {
+            panel.transform.localScale = new Vector3(1.8f, 1.1f, 1f);
+            panelRenderer.sharedMaterial = _doorMat;
+        }
+        panel.AddComponent<BillboardSprite>();
 
         var ov = GameObject.CreatePrimitive(PrimitiveType.Quad);
         KillCollider(ov);
@@ -157,7 +169,7 @@ public class RoomDoor : MonoBehaviour
     {
         if (_panelOpen == open) return;
         _panelOpen = open;
-        _openPanelCount += open ? 1 : -1;
+        _openPanelCount = Mathf.Max(0, _openPanelCount + (open ? 1 : -1));
         AnyPanelOpen = _openPanelCount > 0;
     }
 

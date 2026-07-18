@@ -236,26 +236,37 @@ public class ElevatorController : MonoBehaviour
             BuildWall(parent, new Vector3(10.02f, y + 0.9f, 0f), new Vector3(0.12f, 1.8f, 1.6f), shaftMat);
 
             // 滑门（西面，向北滑开）——挂电梯控制器下便于找回
-            var door = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            var door = GameObject.CreatePrimitive(PrimitiveType.Quad);
             KillColliderStatic(door);
             door.name = "ElevatorDoor_F" + (f + 1);
             door.transform.SetParent(go.transform);
             door.transform.position = new Vector3(8.55f, y + 0.8f, 0f);
-            door.transform.localScale = new Vector3(0.1f, 1.6f, 1.6f);
-            door.GetComponent<Renderer>().sharedMaterial = _doorMat;
+            var doorRenderer = door.GetComponent<Renderer>();
+            if (!GeneratedPlaceholderArt.ApplyNamedWorldSprite(door.transform, doorRenderer, "env_elevator", 1.95f))
+            {
+                door.transform.localScale = new Vector3(0.1f, 1.6f, 1f);
+                doorRenderer.sharedMaterial = _doorMat;
+            }
+            door.AddComponent<BillboardSprite>();
         }
         return ctrl;
     }
 
     private static void BuildWall(Transform parent, Vector3 pos, Vector3 scale, Material mat)
     {
-        var wall = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        var wall = GameObject.CreatePrimitive(PrimitiveType.Quad);
         KillColliderStatic(wall);
         wall.name = "ElevatorShaft";
         wall.transform.SetParent(parent);
         wall.transform.position = pos;
-        wall.transform.localScale = scale;
-        wall.GetComponent<Renderer>().sharedMaterial = mat;
+        var wallRenderer = wall.GetComponent<Renderer>();
+        string spriteName = scale.x >= scale.z ? "env_wall_long" : "env_wall_short";
+        if (!GeneratedPlaceholderArt.ApplyNamedWorldSprite(wall.transform, wallRenderer, spriteName, scale.y * 1.1f))
+        {
+            wall.transform.localScale = new Vector3(scale.x, scale.y, 1f);
+            wallRenderer.sharedMaterial = mat;
+        }
+        wall.AddComponent<BillboardSprite>();
     }
 
     private static void KillColliderStatic(GameObject g)

@@ -35,6 +35,7 @@ public sealed class FrontDeskScreenController : MonoBehaviour
 
     private void Awake()
     {
+        ApplyGeneratedPortraits();
         if (activeGuestCard != null) activeGuestCard.OnCtaClicked += HandleCtaClicked;
         if (topBar != null) topBar.OnSettingsClicked += HandleSettingsClicked;
         // Mockup-era placeholder cards are baked into the scene under the queue
@@ -152,12 +153,22 @@ public sealed class FrontDeskScreenController : MonoBehaviour
 
     private Sprite PortraitFor(Room2DGuestType type)
     {
+        Sprite generated = GeneratedPlaceholderArt.GuestPortrait(type);
+        if (generated != null) return generated;
+
         switch (type)
         {
             case Room2DGuestType.Family: return portraitFamily;
             case Room2DGuestType.VIP:    return portraitVip;
             default:                     return portraitBusiness;
         }
+    }
+
+    private void ApplyGeneratedPortraits()
+    {
+        portraitBusiness = GeneratedPlaceholderArt.GuestPortrait(Room2DGuestType.Business) ?? portraitBusiness;
+        portraitFamily = GeneratedPlaceholderArt.GuestPortrait(Room2DGuestType.Family) ?? portraitFamily;
+        portraitVip = GeneratedPlaceholderArt.GuestPortrait(Room2DGuestType.VIP) ?? portraitVip;
     }
 
     private string BuildPreferenceText()

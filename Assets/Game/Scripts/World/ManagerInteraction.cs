@@ -15,8 +15,10 @@ public class ManagerInteraction : MonoBehaviour
     private StaffAgent _commandAgent;
     private TaskDispatcher _dispatcher;
     private GUIStyle _center;
+    private GUIStyle _wrappedLabel;
+    private Vector2 _commandRoomScroll;
 
-    public bool PanelOpen => _caughtAgent != null || _panelAgent != null;
+    public bool PanelOpen => _caughtAgent != null || _panelAgent != null || _commandAgent != null;
     public bool InCommandMode => _commandAgent != null;
 
     public void CommandTarget(Vector3 worldPoint)
@@ -65,6 +67,43 @@ public class ManagerInteraction : MonoBehaviour
         }
 
         return best;
+    }
+
+    public static List<Room2DEntity> GetCommandRoomCandidates(IReadOnlyList<Room2DEntity> rooms, StaffRole role)
+    {
+        var candidates = new List<Room2DEntity>();
+        if (rooms == null) return candidates;
+
+        foreach (var room in rooms)
+        {
+            if (room == null || !CanCommandRoleToRoom(role, room)) continue;
+            candidates.Add(room);
+        }
+
+        candidates.Sort((left, right) =>
+        {
+            int floorCompare = FloorMath.FloorIndexForY(left.transform.position.y)
+                .CompareTo(FloorMath.FloorIndexForY(right.transform.position.y));
+            if (floorCompare != 0) return floorCompare;
+            return left.roomNumber.CompareTo(right.roomNumber);
+        });
+
+        return candidates;
+    }
+
+    private static bool CanCommandRoleToRoom(StaffRole role, Room2DEntity room)
+    {
+        if (room == null) return false;
+
+        switch (role)
+        {
+            case StaffRole.Housekeeper:
+                return room.currentState == Room2DState.Dirty;
+            case StaffRole.Inspector:
+                return room.currentState == Room2DState.AwaitingInspection;
+            default:
+                return false;
+        }
     }
 
     private void Awake()
@@ -125,6 +164,8 @@ public class ManagerInteraction : MonoBehaviour
         if (Time.time < _messageUntil)
             GUI.Label(new Rect(w * 0.5f - 200, h * 0.15f, 400, 30), _lastMessage, CenterStyle());
 
+        DrawRoleLegend(view);
+
         if (_caughtAgent != null)
         {
             var caught = _caughtAgent;
@@ -159,11 +200,11 @@ public class ManagerInteraction : MonoBehaviour
                 if (agent.Interrogate() == InterrogationVerdict.Caught) _caughtAgent = agent;
                 else Say($"WRONG ACCUSATION! {agent.Member?.DisplayName} is furious (morale {SupervisionTuning.WrongAccusationMoraleDelta}).");
             }
-            else if (GuiInput.Button(new Rect(w * 0.5f - 130, h * 0.4f + 90, 260, 24), "Command -> tap a room"))
+            else if (GuiInput.Button(new Rect(w * 0.5f - 130, h * 0.4f + 90, 260, 24), "Assign room..."))
             {
                 _commandAgent = agent;
                 _panelAgent = null;
-                Say("Now tap the room you want them on.");
+                Say("Pick a room from the list.");
             }
             else if (GuiInput.Button(new Rect(w * 0.5f - 130, h * 0.4f + 118, 125, 24), "FIRE THEM"))
             {
@@ -179,6 +220,12 @@ public class ManagerInteraction : MonoBehaviour
             {
                 _panelAgent = null;
             }
+            return;
+        }
+
+        if (_commandAgent != null)
+        {
+            DrawCommandRoomPicker(view, _commandAgent);
             return;
         }
 
@@ -218,5 +265,107 @@ public class ManagerInteraction : MonoBehaviour
         if (_center == null)
             _center = new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter, fontSize = 15 };
         return _center;
+    }
+
+    private GUIStyle WrappedLabelStyle()
+    {
+        if (_wrappedLabel == null)
+        {
+            _wrappedLabel = new GUIStyle(GUI.skin.label)
+            {
+                wordWrap = true,
+                richText = true,
+                fontSize = 14
+            };
+        }
+        return _wrappedLabel;
+    }
+
+    private void DrawCommandRoomPicker(Vector2 view, StaffAgent agent)
+    {
+        var member = agent != null ? agent.Member : null;
+        var role = member != null ? member.Role : StaffRole.Manager;
+        var candidates = GetCommandRoomCandidates(demandLoop != null ? demandLoop.rooms : null, role);
+        float width = Mathf.Min(560f, view.x - 40f);
+        float height = Mathf.Min(420f, view.y - 120f);
+        var panelRect = new Rect((view.x - width) * 0.5f, Mathf.Max(48f, view.y * 0.16f), width, height);
+        var listRect = new Rect(panelRect.x + 16f, panelRect.y + 54f, panelRect.width - 32f, panelRect.height - 108f);
+        float rowHeight = 54f;
+        float contentHeight = Mathf.Max(listRect.height - 4f, candidates.Count * (rowHeight + 8f));
+        var contentRect = new Rect(0f, 0f, listRect.width - 18f, contentHeight);
+
+        GuiInput.ReserveZone(panelRect);
+        GUI.Box(panelRect, $"Assign Room - {member?.DisplayName ?? "Staff"} ({role})");
+
+        string helperText = candidates.Count > 0
+            ? "Pick a room from the live list. This no longer depends on clicking the right floor in the world."
+            : $"No rooms currently need {role}.";
+        GUI.Label(
+            new Rect(panelRect.x + 16f, panelRect.y + 24f, panelRect.width - 32f, 28f),
+            helperText,
+            WrappedLabelStyle());
+
+        _commandRoomScroll = GUI.BeginScrollView(listRect, _commandRoomScroll, contentRect, false, contentHeight > listRect.height);
+        for (int i = 0; i < candidates.Count; i++)
+        {
+            Room2DEntity room = candidates[i];
+            float rowY = i * (rowHeight + 8f);
+            var rowRect = new Rect(0f, rowY, contentRect.width, rowHeight);
+            GUI.Box(rowRect, GUIContent.none);
+
+            int floor = FloorMath.FloorIndexForY(room.transform.position.y) + 1;
+            string label = $"Room {room.roomNumber}  |  F{floor}  |  {room.GetStateDisplayName()}";
+            if (room.markedCleaningPriority) label += "  |  CLEAN PRIO";
+            if (room.markedInspectionPriority) label += "  |  INSP PRIO";
+            GUI.Label(new Rect(12f, rowY + 7f, contentRect.width - 144f, rowHeight - 14f), label, WrappedLabelStyle());
+
+            if (GuiInput.Button(new Rect(contentRect.width - 116f, rowY + 10f, 104f, 32f), "Assign"))
+            {
+                CommandRoom(agent, room);
+                GUI.EndScrollView();
+                return;
+            }
+        }
+        GUI.EndScrollView();
+
+        if (GuiInput.Button(new Rect(panelRect.x + 16f, panelRect.y + panelRect.height - 40f, panelRect.width - 32f, 28f), "Cancel"))
+        {
+            _commandAgent = null;
+        }
+    }
+
+    private void CommandRoom(StaffAgent agent, Room2DEntity room)
+    {
+        _commandAgent = null;
+        if (agent == null || room == null) return;
+        if (_dispatcher == null) _dispatcher = FindFirstObjectByType<TaskDispatcher>();
+        if (_dispatcher == null) return;
+
+        Say(_dispatcher.ForceAssign(agent, room)
+            ? $"{agent.Member?.DisplayName} -> Room {room.roomNumber}. Chop chop."
+            : $"Room {room.roomNumber} doesn't need {agent.Member?.Role} right now.");
+    }
+
+    private void DrawRoleLegend(Vector2 view)
+    {
+        float width = Mathf.Min(260f, view.x * 0.42f);
+        float height = 108f;
+        var legendRect = new Rect(18f, view.y - height - 18f, width, height);
+        GUI.Box(legendRect, "Role Legend");
+        GUI.Label(new Rect(legendRect.x + 12f, legendRect.y + 12f, legendRect.width - 24f, 16f), "Colored tall blocks in the scene = staff roles.");
+
+        DrawLegendRow(legendRect, 0, StaffAgentSpawner.RoleColor(StaffRole.Housekeeper), "Green block = Housekeeper");
+        DrawLegendRow(legendRect, 1, StaffAgentSpawner.RoleColor(StaffRole.Inspector), "Blue block = Inspector");
+        DrawLegendRow(legendRect, 2, StaffAgentSpawner.RoleColor(StaffRole.Reception), "Purple block = Reception");
+    }
+
+    private void DrawLegendRow(Rect legendRect, int rowIndex, Color color, string text)
+    {
+        float y = legendRect.y + 34f + rowIndex * 22f;
+        Color previous = GUI.color;
+        GUI.color = color;
+        GUI.Box(new Rect(legendRect.x + 12f, y, 18f, 18f), GUIContent.none);
+        GUI.color = previous;
+        GUI.Label(new Rect(legendRect.x + 38f, y - 1f, legendRect.width - 50f, 20f), text);
     }
 }

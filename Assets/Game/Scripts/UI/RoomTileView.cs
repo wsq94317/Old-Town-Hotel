@@ -85,6 +85,9 @@ public sealed class RoomTileView : MonoBehaviour
 
     private Sprite PickInteriorSprite(Room2DRoomCategory category)
     {
+        Sprite generated = GeneratedPlaceholderArt.RoomInterior(category);
+        if (generated != null) return generated;
+
         switch (category)
         {
             case Room2DRoomCategory.Single: return interiorSingle;

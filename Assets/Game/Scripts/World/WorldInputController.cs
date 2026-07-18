@@ -81,8 +81,20 @@ public class WorldInputController : MonoBehaviour
         return (false, _lastPos);
     }
 
-    private static bool IsOverUi() =>
-        EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
+    private static bool IsOverUi()
+    {
+        if (EventSystem.current == null) return false;
+
+        if (Touchscreen.current != null && Touchscreen.current.primaryTouch.press.isPressed)
+        {
+            int touchId = Touchscreen.current.primaryTouch.touchId.ReadValue();
+            if (touchId >= 0) return EventSystem.current.IsPointerOverGameObject(touchId);
+        }
+
+        return Mouse.current != null &&
+               Mouse.current.leftButton.isPressed &&
+               EventSystem.current.IsPointerOverGameObject();
+    }
 
     private ManagerInteraction _interaction;
     private ComplaintInteraction _complaint;

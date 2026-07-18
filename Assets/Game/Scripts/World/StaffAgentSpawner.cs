@@ -1,10 +1,8 @@
 using System.Collections.Generic;
+using TMPro;
 using UnityEngine;
 using UnityEngine.AI;
 
-// 花名册 → 场景纸片人：按 Payroll.Roster 生成员工 agent（Manager=玩家自己，跳过；
-// Reception 站前台固定岗）。订阅 OnHired/OnFired 同步增删。
-// v1 初始 roster 没有 Inspector——没有验房员整个房态循环会卡死，boot 时补雇一名。
 public class StaffAgentSpawner : MonoBehaviour
 {
     [SerializeField] private EconomySystem economy;
@@ -13,16 +11,15 @@ public class StaffAgentSpawner : MonoBehaviour
 
     private readonly List<StaffAgent> _agents = new List<StaffAgent>();
     private readonly Dictionary<StaffMember, GameObject> _byMember = new Dictionary<StaffMember, GameObject>();
-    private static Material _matHsk, _matInsp, _matReception;
+    private static Material _matHsk;
+    private static Material _matInsp;
+    private static Material _matReception;
+    private StaffBreakRoom _breakRoom;
 
     public IReadOnlyList<StaffAgent> Agents => _agents;
 
-    // OnEnable 而非 Awake：FloorNavigator 的注册表是静态的，热重载（域重载）会清空，
-    // 而 OnEnable 在域重载后会重跑——注册幂等，放这里自愈。
     private void OnEnable()
     {
-        // 跨层传送点注册（电梯版）：员工/客人走进电梯轿厢（x9.3）后代码瞬移，
-        // 出电梯落点在轿厢门外（x7.6）——视觉上就是"坐了趟货梯"。
         var pads = new Vector3[FloorMath.FloorCount];
         var exits = new Vector3[FloorMath.FloorCount];
         for (int i = 0; i < FloorMath.FloorCount; i++)
@@ -30,6 +27,7 @@ public class StaffAgentSpawner : MonoBehaviour
             pads[i] = new Vector3(9.3f, FloorMath.BaseYFor(i), 0f);
             exits[i] = new Vector3(7.6f, FloorMath.BaseYFor(i), 0f);
         }
+
         FloorNavigator.RegisterStairs(pads, exits);
     }
 
@@ -38,18 +36,25 @@ public class StaffAgentSpawner : MonoBehaviour
         if (economy == null) economy = FindFirstObjectByType<EconomySystem>();
         if (economy == null || economy.Payroll == null) return;
 
-        // 补雇 Inspector（v1 星标阵容缺口）
+        _breakRoom = StaffBreakRoom.EnsureInScene();
+        GeneratedPlaceholderArt.EnsureLobbyDecor();
+
         bool hasInspector = false;
-        foreach (var m in economy.Payroll.Roster)
+        foreach (var member in economy.Payroll.Roster)
         {
-            if (m.Role == StaffRole.Inspector) { hasInspector = true; break; }
-        }
-        if (!hasInspector && economy.Config != null)
-        {
-            economy.HireCandidate(new StaffMember(StaffRole.Inspector, "Inspector", economy.Config.WageFor(StaffRole.Inspector)));
+            if (member.Role == StaffRole.Inspector)
+            {
+                hasInspector = true;
+                break;
+            }
         }
 
-        foreach (var m in economy.Payroll.Roster) SpawnFor(m);
+        if (!hasInspector && economy.Config != null)
+            economy.HireCandidate(new StaffMember(StaffRole.Inspector, "Inspector", economy.Config.WageFor(StaffRole.Inspector)));
+
+        foreach (var member in economy.Payroll.Roster)
+            SpawnFor(member);
+
         economy.Payroll.OnHired += SpawnFor;
         economy.Payroll.OnFired += DespawnFor;
     }
@@ -65,10 +70,12 @@ public class StaffAgentSpawner : MonoBehaviour
 
     private void SpawnFor(StaffMember member)
     {
-        if (member == null || member.Role == StaffRole.Manager) return; // 经理=玩家
+        if (member == null || member.Role == StaffRole.Manager) return;
         if (_byMember.ContainsKey(member)) return;
 
         Vector3 spawnPos = member.Role == StaffRole.Reception ? receptionPost : lobbySpawn;
+        Vector3 idleAnchor = IdleAnchorFor(member);
+
         var go = new GameObject("Staff_" + member.Role + "_" + member.DisplayName);
         go.transform.position = spawnPos;
 
@@ -79,25 +86,30 @@ public class StaffAgentSpawner : MonoBehaviour
         nav.angularSpeed = 720f;
         nav.acceleration = 16f;
 
-        // 点击选中用（M3 监督交互）
         var cap = go.AddComponent<CapsuleCollider>();
         cap.height = 1.6f;
         cap.radius = 0.35f;
-        cap.center = new Vector3(0, 0.8f, 0);
+        cap.center = new Vector3(0f, 0.8f, 0f);
 
-        // 纸片视觉（颜色按角色）
         var quad = GameObject.CreatePrimitive(PrimitiveType.Quad);
         Destroy(quad.GetComponent<Collider>());
         quad.name = "Visual";
         quad.transform.SetParent(go.transform);
-        quad.transform.localPosition = new Vector3(0, 0.8f, 0);
+        quad.transform.localPosition = new Vector3(0f, 0.8f, 0f);
+        var quadRenderer = quad.GetComponent<Renderer>();
         quad.transform.localScale = new Vector3(0.7f, 1.5f, 1f);
-        quad.GetComponent<Renderer>().sharedMaterial = MaterialFor(member.Role);
+        if (!GeneratedPlaceholderArt.ApplyStaffSprite(quad.transform, quadRenderer, member.Role))
+            quadRenderer.sharedMaterial = MaterialFor(member.Role);
         quad.AddComponent<BillboardSprite>();
 
+        var label = new GameObject("Label");
+        label.transform.SetParent(go.transform, false);
+        var worldLabel = label.AddComponent<StaffAgentWorldLabel>();
+        worldLabel.SetLabel(BuildWorldLabel(member), Color.white);
+
         var agent = go.AddComponent<StaffAgent>();
-        // 每人独立种子（可复现），避免全员同帧同结果
         agent.Init(member, new System.Random(_agents.Count * 7919 + 12345));
+        agent.SetIdleAnchor(idleAnchor);
         go.AddComponent<AgentFloorVisibility>();
 
         _agents.Add(agent);
@@ -107,19 +119,48 @@ public class StaffAgentSpawner : MonoBehaviour
     private void DespawnFor(StaffMember member)
     {
         if (member == null || !_byMember.TryGetValue(member, out GameObject go)) return;
+
         _byMember.Remove(member);
         var agent = go.GetComponent<StaffAgent>();
         if (agent != null)
         {
             _agents.Remove(agent);
-            agent.AbortTask();          // 撂下手头活（半途房回 Dirty）
-            Destroy(agent);             // 不再接单
+            agent.AbortTask();
+            Destroy(agent);
         }
-        // 走人小演出：收拾好心情走向大门，出门即消失
+
         var walker = go.GetComponent<GuestAgent>();
         if (walker == null) walker = go.AddComponent<GuestAgent>();
         var walkerRef = walker;
         walker.TravelTo(new Vector3(0f, 0f, -5.2f), () => Destroy(walkerRef.gameObject));
+    }
+
+    private Vector3 IdleAnchorFor(StaffMember member)
+    {
+        if (member == null) return lobbySpawn;
+        if (member.Role == StaffRole.Reception) return receptionPost;
+
+        if (member.Role == StaffRole.Housekeeper || member.Role == StaffRole.Inspector)
+        {
+            if (_breakRoom == null) _breakRoom = StaffBreakRoom.EnsureInScene();
+            if (_breakRoom != null)
+                return _breakRoom.GetIdleAnchorForRole(member.Role, ExistingRoleCount(member.Role));
+        }
+
+        return lobbySpawn;
+    }
+
+    private int ExistingRoleCount(StaffRole role)
+    {
+        int count = 0;
+        for (int i = 0; i < _agents.Count; i++)
+        {
+            var agent = _agents[i];
+            if (agent != null && agent.Member != null && agent.Member.Role == role)
+                count++;
+        }
+
+        return count;
     }
 
     private static Material MaterialFor(StaffRole role)
@@ -128,14 +169,397 @@ public class StaffAgentSpawner : MonoBehaviour
         switch (role)
         {
             case StaffRole.Housekeeper:
-                if (_matHsk == null) _matHsk = new Material(shader) { color = new Color(0.25f, 0.75f, 0.3f) };
+                if (_matHsk == null) _matHsk = new Material(shader) { color = RoleColor(role) };
                 return _matHsk;
             case StaffRole.Inspector:
-                if (_matInsp == null) _matInsp = new Material(shader) { color = new Color(0.25f, 0.45f, 0.9f) };
+                if (_matInsp == null) _matInsp = new Material(shader) { color = RoleColor(role) };
                 return _matInsp;
             default:
-                if (_matReception == null) _matReception = new Material(shader) { color = new Color(0.7f, 0.4f, 0.85f) };
+                if (_matReception == null) _matReception = new Material(shader) { color = RoleColor(role) };
                 return _matReception;
         }
     }
+
+    public static Color RoleColor(StaffRole role)
+    {
+        switch (role)
+        {
+            case StaffRole.Housekeeper:
+                return new Color(0.25f, 0.75f, 0.3f);
+            case StaffRole.Inspector:
+                return new Color(0.25f, 0.45f, 0.9f);
+            case StaffRole.Reception:
+                return new Color(0.7f, 0.4f, 0.85f);
+            default:
+                return new Color(0.75f, 0.65f, 0.3f);
+        }
+    }
+
+    public static string RoleDisplayName(StaffRole role)
+    {
+        switch (role)
+        {
+            case StaffRole.Housekeeper:
+                return "Housekeeper";
+            case StaffRole.Inspector:
+                return "Inspector";
+            case StaffRole.Reception:
+                return "Reception";
+            case StaffRole.Manager:
+                return "Manager";
+            default:
+                return role.ToString();
+        }
+    }
+
+    public static string BuildWorldLabel(StaffMember member)
+    {
+        if (member == null) return "Unknown\nStaff";
+        return $"{member.DisplayName}\n{RoleDisplayName(member.Role)}";
+    }
+}
+
+[DisallowMultipleComponent]
+public sealed class StaffBreakRoom : MonoBehaviour
+{
+    [SerializeField] private bool autoBuildVisuals = true;
+
+    private static readonly Vector3[] HousekeeperOffsets =
+    {
+        new Vector3(-0.95f, 0f, -0.45f),
+        new Vector3(-0.35f, 0f, 0.1f),
+        new Vector3(-1.1f, 0f, 0.75f),
+        new Vector3(-0.2f, 0f, 0.85f),
+    };
+
+    private static readonly Vector3[] InspectorOffsets =
+    {
+        new Vector3(0.45f, 0f, -0.45f),
+        new Vector3(1.05f, 0f, 0.1f),
+        new Vector3(0.3f, 0f, 0.75f),
+        new Vector3(1.2f, 0f, 0.85f),
+    };
+
+    private static Material _floorMat;
+    private static Material _trimMat;
+    private static Material _tableMat;
+    private static Material _seatMat;
+
+    public static StaffBreakRoom EnsureInScene()
+    {
+        var existing = FindFirstObjectByType<StaffBreakRoom>();
+        if (existing != null) return existing;
+
+        var go = new GameObject("StaffBreakRoom");
+        go.transform.position = new Vector3(-6f, FloorMath.BaseYFor(0), 1.25f);
+        return go.AddComponent<StaffBreakRoom>();
+    }
+
+    public Vector3 GetIdleAnchorForRole(StaffRole role, int roleIndex)
+    {
+        switch (role)
+        {
+            case StaffRole.Housekeeper:
+                return AnchorFromOffsets(HousekeeperOffsets, roleIndex);
+            case StaffRole.Inspector:
+                return AnchorFromOffsets(InspectorOffsets, roleIndex);
+            default:
+                return transform.position;
+        }
+    }
+
+    private void Awake()
+    {
+        if (GetComponent<AgentFloorVisibility>() == null)
+            gameObject.AddComponent<AgentFloorVisibility>();
+
+        if (autoBuildVisuals)
+            BuildVisualsIfNeeded();
+    }
+
+    private Vector3 AnchorFromOffsets(Vector3[] offsets, int roleIndex)
+    {
+        if (offsets == null || offsets.Length == 0) return transform.position;
+        int safeIndex = Mathf.Abs(roleIndex) % offsets.Length;
+        return transform.TransformPoint(offsets[safeIndex]);
+    }
+
+    private void BuildVisualsIfNeeded()
+    {
+        if (transform.Find("Floor") != null) return;
+        if (GeneratedPlaceholderArt.TryDecorateBreakRoom(transform)) return;
+
+        BuildBlock("Floor", new Vector3(0f, 0.03f, 0.2f), new Vector3(4.2f, 0.06f, 3f), FloorMaterial());
+        BuildBlock("BackWall", new Vector3(0f, 0.95f, 1.55f), new Vector3(4.2f, 1.9f, 0.12f), TrimMaterial());
+        BuildBlock("SideWall", new Vector3(-2.05f, 0.95f, 0.15f), new Vector3(0.12f, 1.9f, 2.75f), TrimMaterial());
+        BuildBlock("Table", new Vector3(0.25f, 0.42f, 0.2f), new Vector3(1.25f, 0.84f, 0.7f), TableMaterial());
+        BuildBlock("Bench_Left", new Vector3(-1.1f, 0.3f, 0.2f), new Vector3(0.75f, 0.6f, 1.35f), SeatMaterial());
+        BuildBlock("Bench_Right", new Vector3(1.35f, 0.3f, 0.2f), new Vector3(0.75f, 0.6f, 1.35f), SeatMaterial());
+        BuildBlock("Locker", new Vector3(1.65f, 0.7f, 1.05f), new Vector3(0.45f, 1.4f, 0.45f), TableMaterial());
+
+        var sign = new GameObject("Sign");
+        sign.transform.SetParent(transform, false);
+        sign.transform.localPosition = new Vector3(0f, 2.35f, 0.65f);
+        sign.transform.localScale = Vector3.one * 0.24f;
+
+        var text = sign.AddComponent<TextMeshPro>();
+        text.text = "STAFF\nBREAK ROOM";
+        text.alignment = TextAlignmentOptions.Center;
+        text.fontSize = 4.8f;
+        text.fontStyle = FontStyles.Bold;
+        text.lineSpacing = -8f;
+        text.color = new Color(0.97f, 0.95f, 0.86f);
+        text.outlineWidth = 0.28f;
+        text.outlineColor = new Color(0.08f, 0.06f, 0.04f, 0.9f);
+        text.textWrappingMode = TextWrappingModes.NoWrap;
+        text.overflowMode = TextOverflowModes.Overflow;
+        if (text.font == null && TMP_Settings.defaultFontAsset != null)
+            text.font = TMP_Settings.defaultFontAsset;
+
+        sign.AddComponent<BillboardSprite>();
+    }
+
+    private void BuildBlock(string name, Vector3 localPosition, Vector3 localScale, Material material)
+    {
+        var block = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        var collider = block.GetComponent<Collider>();
+        if (collider != null) Object.Destroy(collider);
+
+        block.name = name;
+        block.transform.SetParent(transform, false);
+        block.transform.localPosition = localPosition;
+        block.transform.localScale = localScale;
+        block.GetComponent<Renderer>().sharedMaterial = material;
+    }
+
+    private static Material FloorMaterial()
+    {
+        if (_floorMat != null) return _floorMat;
+        _floorMat = NewMaterial(new Color(0.36f, 0.23f, 0.18f));
+        return _floorMat;
+    }
+
+    private static Material TrimMaterial()
+    {
+        if (_trimMat != null) return _trimMat;
+        _trimMat = NewMaterial(new Color(0.19f, 0.16f, 0.15f));
+        return _trimMat;
+    }
+
+    private static Material TableMaterial()
+    {
+        if (_tableMat != null) return _tableMat;
+        _tableMat = NewMaterial(new Color(0.55f, 0.40f, 0.29f));
+        return _tableMat;
+    }
+
+    private static Material SeatMaterial()
+    {
+        if (_seatMat != null) return _seatMat;
+        _seatMat = NewMaterial(new Color(0.28f, 0.48f, 0.33f));
+        return _seatMat;
+    }
+
+    private static Material NewMaterial(Color color)
+    {
+        Shader shader = Shader.Find("Universal Render Pipeline/Lit");
+        if (shader == null) shader = Shader.Find("Standard");
+        return new Material(shader) { color = color };
+    }
+}
+
+public static class GeneratedPlaceholderArt
+{
+    private const string UiRoot = "GeneratedPlaceholders/UI/";
+    private const string WorldRoot = "GeneratedPlaceholders/World/";
+
+    private static readonly Dictionary<string, Sprite> SpriteCache = new Dictionary<string, Sprite>();
+    private static readonly Dictionary<string, Material> MaterialCache = new Dictionary<string, Material>();
+
+    public static Sprite LoadUiSprite(string name) => LoadSprite(UiRoot + name);
+    public static Sprite LoadWorldSprite(string name) => LoadSprite(WorldRoot + name);
+
+    public static Sprite GuestPortrait(Room2DGuestType type)
+    {
+        switch (type)
+        {
+            case Room2DGuestType.Family:
+                return LoadUiSprite("guest_family");
+            case Room2DGuestType.VIP:
+                return LoadUiSprite("guest_vip");
+            default:
+                return LoadUiSprite("guest_business");
+        }
+    }
+
+    public static Sprite WorkerPortrait(StaffRole role)
+    {
+        switch (role)
+        {
+            case StaffRole.Housekeeper:
+                return LoadUiSprite("worker_housekeeper");
+            case StaffRole.Inspector:
+                return LoadUiSprite("worker_inspector");
+            case StaffRole.Reception:
+                return LoadUiSprite("worker_reception");
+            case StaffRole.Manager:
+                return LoadUiSprite("worker_manager");
+            default:
+                return null;
+        }
+    }
+
+    public static Sprite RoomInterior(Room2DRoomCategory category)
+    {
+        switch (category)
+        {
+            case Room2DRoomCategory.Single:
+                return LoadUiSprite("room_single");
+            case Room2DRoomCategory.Twin:
+                return LoadUiSprite("room_twin");
+            case Room2DRoomCategory.Family:
+                return LoadUiSprite("room_family");
+            default:
+                return LoadUiSprite("room_king") ?? LoadUiSprite("room_single");
+        }
+    }
+
+    public static bool ApplyStaffSprite(Transform quadTransform, Renderer renderer, StaffRole role)
+    {
+        string spriteName;
+        switch (role)
+        {
+            case StaffRole.Housekeeper:
+                spriteName = "staff_housekeeper";
+                break;
+            case StaffRole.Inspector:
+                spriteName = "staff_inspector";
+                break;
+            case StaffRole.Reception:
+                spriteName = "staff_reception";
+                break;
+            default:
+                return false;
+        }
+
+        return ApplySpriteToQuad(quadTransform, renderer, LoadWorldSprite(spriteName), 1.75f);
+    }
+
+    public static bool ApplyGuestSprite(Transform quadTransform, Renderer renderer, string label)
+    {
+        string spriteName = StableHash(label) % 2 == 0 ? "guest_male" : "guest_female";
+        return ApplySpriteToQuad(quadTransform, renderer, LoadWorldSprite(spriteName), 1.7f);
+    }
+
+    public static bool ApplyLuggageSprite(Transform quadTransform, Renderer renderer, int index)
+    {
+        string spriteName = index % 2 == 0 ? "furniture_luggage_beige" : "furniture_luggage_blue";
+        return ApplyNamedWorldSprite(quadTransform, renderer, spriteName, 0.72f);
+    }
+
+    public static bool ApplyNamedWorldSprite(Transform quadTransform, Renderer renderer, string spriteName, float targetHeight)
+    {
+        return ApplySpriteToQuad(quadTransform, renderer, LoadWorldSprite(spriteName), targetHeight);
+    }
+
+    public static bool TryDecorateBreakRoom(Transform root)
+    {
+        if (root == null) return false;
+        var roomSprite = LoadWorldSprite("env_break_room");
+        if (roomSprite == null) return false;
+
+        CreateDecorQuad(root, "Backdrop", roomSprite, new Vector3(0f, 0.92f, 0.28f), 2.6f, false);
+        CreateDecorQuad(root, "Sign", LoadWorldSprite("env_wall_short"), new Vector3(0f, 1.55f, 1.3f), 1.2f, true);
+        return true;
+    }
+
+    public static void EnsureLobbyDecor()
+    {
+        if (Object.FindFirstObjectByType<GeneratedPlaceholderDecorTag>() != null) return;
+
+        var root = new GameObject("GeneratedPlaceholderDecor");
+        root.AddComponent<GeneratedPlaceholderDecorTag>();
+        root.AddComponent<AgentFloorVisibility>();
+        root.transform.position = Vector3.zero;
+
+        CreateDecorQuad(root.transform, "FrontDeskCounter", LoadWorldSprite("furniture_reception_counter"), new Vector3(0.9f, 0.82f, 3.25f), 1.35f, true);
+        CreateDecorQuad(root.transform, "QueueRope", LoadWorldSprite("prop_queue_rope"), new Vector3(-0.15f, 0.32f, 1.95f), 0.85f, true);
+        CreateDecorQuad(root.transform, "LobbySofa", LoadWorldSprite("furniture_sofa_ornate"), new Vector3(-4.8f, 0.85f, 2.35f), 1.45f, true);
+        CreateDecorQuad(root.transform, "CoffeeTable", LoadWorldSprite("furniture_coffee_table"), new Vector3(-3.85f, 0.42f, 2.1f), 0.7f, true);
+        CreateDecorQuad(root.transform, "Armchair", LoadWorldSprite("furniture_armchair"), new Vector3(-2.8f, 0.72f, 2.55f), 1.15f, true);
+        CreateDecorQuad(root.transform, "Plant", LoadWorldSprite("furniture_plant"), new Vector3(-1.45f, 0.7f, 2.95f), 1.15f, true);
+        CreateDecorQuad(root.transform, "LuggageCart", LoadWorldSprite("furniture_luggage_cart"), new Vector3(1.95f, 0.78f, 1.25f), 1.3f, true);
+        CreateDecorQuad(root.transform, "VendingMachine", LoadWorldSprite("furniture_vending_machine"), new Vector3(-7.55f, 0.88f, 0.95f), 1.4f, true);
+    }
+
+    private static void CreateDecorQuad(Transform parent, string name, Sprite sprite, Vector3 localPosition, float targetHeight, bool billboard)
+    {
+        if (parent == null || sprite == null) return;
+
+        var quad = GameObject.CreatePrimitive(PrimitiveType.Quad);
+        var collider = quad.GetComponent<Collider>();
+        if (collider != null) Object.Destroy(collider);
+
+        quad.name = name;
+        quad.transform.SetParent(parent, false);
+        quad.transform.localPosition = localPosition;
+        if (billboard) quad.AddComponent<BillboardSprite>();
+
+        var renderer = quad.GetComponent<Renderer>();
+        ApplySpriteToQuad(quad.transform, renderer, sprite, targetHeight);
+    }
+
+    private static bool ApplySpriteToQuad(Transform quadTransform, Renderer renderer, Sprite sprite, float targetHeight)
+    {
+        if (quadTransform == null || renderer == null || sprite == null) return false;
+
+        renderer.sharedMaterial = MaterialForSprite(sprite);
+        float aspect = Mathf.Max(0.01f, sprite.rect.width / sprite.rect.height);
+        quadTransform.localScale = new Vector3(targetHeight * aspect, targetHeight, 1f);
+        return true;
+    }
+
+    private static Material MaterialForSprite(Sprite sprite)
+    {
+        string key = sprite.name;
+        if (MaterialCache.TryGetValue(key, out Material cached) && cached != null) return cached;
+
+        Shader shader = Shader.Find("Sprites/Default");
+        if (shader == null) shader = Shader.Find("Universal Render Pipeline/Unlit");
+        if (shader == null) shader = Shader.Find("Unlit/Transparent");
+        if (shader == null) shader = Shader.Find("Standard");
+
+        var material = new Material(shader) { color = Color.white };
+        if (material.HasProperty("_MainTex")) material.SetTexture("_MainTex", sprite.texture);
+        if (material.HasProperty("_BaseMap")) material.SetTexture("_BaseMap", sprite.texture);
+        if (material.HasProperty("_BaseColor")) material.SetColor("_BaseColor", Color.white);
+        MaterialCache[key] = material;
+        return material;
+    }
+
+    private static Sprite LoadSprite(string path)
+    {
+        if (string.IsNullOrEmpty(path)) return null;
+        if (SpriteCache.TryGetValue(path, out Sprite cached)) return cached;
+
+        var sprite = Resources.Load<Sprite>(path);
+        SpriteCache[path] = sprite;
+        return sprite;
+    }
+
+    private static int StableHash(string value)
+    {
+        if (string.IsNullOrEmpty(value)) return 0;
+        unchecked
+        {
+            int hash = 23;
+            for (int i = 0; i < value.Length; i++)
+                hash = hash * 31 + value[i];
+            return Mathf.Abs(hash);
+        }
+    }
+}
+
+public sealed class GeneratedPlaceholderDecorTag : MonoBehaviour
+{
 }
