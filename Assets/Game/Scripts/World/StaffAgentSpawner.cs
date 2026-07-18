@@ -299,17 +299,18 @@ public sealed class StaffBreakRoom : MonoBehaviour
         if (transform.Find("Floor") != null) return;
         if (GeneratedPlaceholderArt.TryDecorateBreakRoom(transform)) return;
 
+        // 墙高/家具高对齐大堂灰盒（外墙 0.8）：1.9 的近黑高墙在 45° 视角里像悬空二层
         BuildBlock("Floor", new Vector3(0f, 0.03f, 0.2f), new Vector3(4.2f, 0.06f, 3f), FloorMaterial());
-        BuildBlock("BackWall", new Vector3(0f, 0.95f, 1.55f), new Vector3(4.2f, 1.9f, 0.12f), TrimMaterial());
-        BuildBlock("SideWall", new Vector3(-2.05f, 0.95f, 0.15f), new Vector3(0.12f, 1.9f, 2.75f), TrimMaterial());
-        BuildBlock("Table", new Vector3(0.25f, 0.42f, 0.2f), new Vector3(1.25f, 0.84f, 0.7f), TableMaterial());
-        BuildBlock("Bench_Left", new Vector3(-1.1f, 0.3f, 0.2f), new Vector3(0.75f, 0.6f, 1.35f), SeatMaterial());
-        BuildBlock("Bench_Right", new Vector3(1.35f, 0.3f, 0.2f), new Vector3(0.75f, 0.6f, 1.35f), SeatMaterial());
-        BuildBlock("Locker", new Vector3(1.65f, 0.7f, 1.05f), new Vector3(0.45f, 1.4f, 0.45f), TableMaterial());
+        BuildBlock("BackWall", new Vector3(0f, 0.45f, 1.55f), new Vector3(4.2f, 0.9f, 0.12f), TrimMaterial());
+        BuildBlock("SideWall", new Vector3(-2.05f, 0.45f, 0.15f), new Vector3(0.12f, 0.9f, 2.75f), TrimMaterial());
+        BuildBlock("Table", new Vector3(0.25f, 0.32f, 0.2f), new Vector3(1.25f, 0.64f, 0.7f), TableMaterial());
+        BuildBlock("Bench_Left", new Vector3(-1.1f, 0.22f, 0.2f), new Vector3(0.75f, 0.44f, 1.35f), SeatMaterial());
+        BuildBlock("Bench_Right", new Vector3(1.35f, 0.22f, 0.2f), new Vector3(0.75f, 0.44f, 1.35f), SeatMaterial());
+        BuildBlock("Locker", new Vector3(1.65f, 0.45f, 1.05f), new Vector3(0.45f, 0.9f, 0.45f), TableMaterial());
 
         var sign = new GameObject("Sign");
         sign.transform.SetParent(transform, false);
-        sign.transform.localPosition = new Vector3(0f, 2.35f, 0.65f);
+        sign.transform.localPosition = new Vector3(0f, 1.5f, 0.65f);
         sign.transform.localScale = Vector3.one * 0.24f;
 
         var text = sign.AddComponent<TextMeshPro>();
@@ -352,7 +353,8 @@ public sealed class StaffBreakRoom : MonoBehaviour
     private static Material TrimMaterial()
     {
         if (_trimMat != null) return _trimMat;
-        _trimMat = NewMaterial(new Color(0.19f, 0.16f, 0.15f));
+        // 近黑(0.19)读起来像黑洞/别的楼层，调亮到暖灰棕
+        _trimMat = NewMaterial(new Color(0.42f, 0.36f, 0.32f));
         return _trimMat;
     }
 

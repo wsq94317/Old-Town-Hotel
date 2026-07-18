@@ -49,10 +49,12 @@ public sealed class StaffFacilityNode : MonoBehaviour
         name = "Facility_" + kind;
         transform.position = worldPosition;
 
+        // tap 碰撞体做小做矮：之前 1.8 高全尺寸大箱子把经理站位点包在里面，
+        // 走到设施后屏幕中央点哪都命中它 → 每次都触发"走向设施"，玩家像被黏死
         var collider = gameObject.GetComponent<BoxCollider>();
         if (collider == null) collider = gameObject.AddComponent<BoxCollider>();
-        collider.center = new Vector3(0f, 0.8f, 0f);
-        collider.size = new Vector3(Mathf.Max(1.2f, size.x), 1.8f, Mathf.Max(1.2f, size.z));
+        collider.center = new Vector3(0f, 0.45f, 0.15f);
+        collider.size = new Vector3(Mathf.Max(1.0f, size.x * 0.7f), 0.9f, Mathf.Max(1.0f, size.z * 0.7f));
 
         // 节点挂在楼层树里（由 StaffFacilitySystem 指定 parent）：楼层 SetActive
         // 统一管显隐 + 碰撞体——不再需要 AgentFloorVisibility，也不会出现
@@ -67,10 +69,11 @@ public sealed class StaffFacilityNode : MonoBehaviour
 
         Material material = NewMaterial(color);
         BuildBlock("Floor", new Vector3(0f, 0.03f, 0f), new Vector3(size.x, 0.06f, size.z), material);
-        BuildBlock("BackWall", new Vector3(0f, 0.85f, size.z * 0.48f), new Vector3(size.x, 1.7f, 0.1f), material);
+        // 墙高对齐大堂灰盒（0.8）：之前 1.7 的高墙在 45° 视角里像悬空的"二楼盒子"
+        BuildBlock("BackWall", new Vector3(0f, 0.42f, size.z * 0.48f), new Vector3(size.x, 0.85f, 0.1f), material);
         // 侧墙贴靠外墙一侧：相机从西南 45° 看，东半场的设施侧墙放东侧才不会挡住内部
         float sideSign = transform.position.x >= 0f ? 1f : -1f;
-        BuildBlock("SideWall", new Vector3(sideSign * size.x * 0.48f, 0.85f, 0f), new Vector3(0.1f, 1.7f, size.z), material);
+        BuildBlock("SideWall", new Vector3(sideSign * size.x * 0.48f, 0.42f, 0f), new Vector3(0.1f, 0.85f, size.z), material);
 
         _signText = displayName;
         BuildSignIfNeeded();
@@ -83,7 +86,7 @@ public sealed class StaffFacilityNode : MonoBehaviour
 
         var sign = new GameObject("Sign");
         sign.transform.SetParent(transform, false);
-        sign.transform.localPosition = new Vector3(0f, 1.95f, 0f);
+        sign.transform.localPosition = new Vector3(0f, 1.35f, 0f);
         sign.transform.localScale = Vector3.one * 0.22f;
         var text = sign.AddComponent<TextMeshPro>();
         text.text = _signText;
@@ -234,14 +237,18 @@ public sealed class StaffFacilitySystem : MonoBehaviour
     public void OnFacilityTapped(StaffFacilityNode node, ManagerController manager)
     {
         if (node == null || manager == null) return;
+        Vector3 delta = manager.transform.position - node.Anchor;
+        delta.y = 0f;
+        bool alreadyThere = delta.sqrMagnitude < 1.6f * 1.6f;
+
         if (node.Kind != StaffFacilityKind.PublicToilet)
         {
-            manager.MoveTo(node.Anchor);
+            if (!alreadyThere) manager.MoveTo(node.Anchor); // 已经站在旁边就别再下指令（防黏住）
             return;
         }
 
         _pendingInspector = manager;
-        manager.MoveTo(node.Anchor);
+        if (!alreadyThere) manager.MoveTo(node.Anchor);
         TickPendingInspection();
     }
 
