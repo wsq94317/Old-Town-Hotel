@@ -18,11 +18,15 @@ public sealed class HotelSim
         public int nightlyRate;
         public GuestSegment segment;
         public float priceRatio;
+        public int waitMinutes;   // 前台排队时长（商务客最恨这个）
+        public bool flawedRoom;   // 没验房就上架的房：有概率带瑕疵
     }
 
     private readonly Random _rng;
     private readonly Dictionary<int, Stay> _stays = new Dictionary<int, Stay>();
     private double _arrivalCredit;
+    private int _deskQueue;          // 排在前台等办入住的人数
+    private double _deskCredit;      // 前台处理进度
     private int _grossIncomeToday;
     private int _commissionToday;
     private int _checkoutsToday;
@@ -37,6 +41,17 @@ public sealed class HotelSim
     public ReputationLedger Reputation { get; }
     public SimPipeline Pipeline { get; }
     public DemandConfig DemandCfg { get; }
+    public SimRenovationQueue Renovations { get; }
+    public MaterialStore Materials { get; }
+
+    /// <summary>今日前台排队最长时长（分钟）。注意：前台无人时会顶到哨兵值，
+    /// 做强弱对比请用 TotalCheckInWaitToday（客人实际承受的等待总量）。</summary>
+    public int PeakCheckInWaitToday { get; private set; }
+
+    /// <summary>今日所有入住客承受的等待分钟总和——满意度实际吃的就是它。</summary>
+    public int TotalCheckInWaitToday { get; private set; }
+
+    public int FlawedStaysToday { get; private set; }
 
     /// <summary>可支配现金：只能靠收保险箱补充，主动支出（装修/还款/招聘）只花它。</summary>
     public int Cash { get; private set; }
@@ -70,6 +85,70 @@ public sealed class HotelSim
         Cash = startingCash;
         _rng = new Random(rngSeed);
         Pipeline = new SimPipeline(Clock, rooms, staff, rngSeed);
+        Renovations = new SimRenovationQueue();
+        Materials = new MaterialStore();
+    }
+
+    // ── 装修（核心长线玩法） ──────────────────────────────────────────────────
+
+    /// <summary>某批房按某方案装修的报价（UI 展示批量折扣）。</summary>
+    public int QuoteRenovation(RenovationPlanKind kind, int roomCount) =>
+        RenovationPricing.CashCostFor(RenovationPlan.For(kind), roomCount);
+
+    /// <summary>下装修单。房间立刻 Block（当期不可售——这才是装修的真代价）。
+    /// 现金或材料不够则整单失败，不做部分成交。</summary>
+    public bool TryStartRenovation(RenovationPlanKind kind, IList<int> roomNumbers, out string reason)
+    {
+        reason = "";
+        if (roomNumbers == null || roomNumbers.Count == 0) { reason = "Pick some rooms first."; return false; }
+
+        var plan = RenovationPlan.For(kind);
+        var eligible = new List<int>();
+        foreach (int number in roomNumbers)
+        {
+            if (!Rooms.Contains(number)) continue;
+            RoomRecord room = Rooms.At(number);
+            if (room.state == RoomSimState.Ruined) continue;      // 破败房要先解锁
+            if (room.state == RoomSimState.Occupied) continue;    // 有人住着不能开工
+            if (Renovations.IsRenovating(number)) continue;
+            if ((int)room.tier >= (int)plan.targetTier) continue; // 已经达标
+            eligible.Add(number);
+        }
+        if (eligible.Count == 0) { reason = "None of those rooms can take this plan right now."; return false; }
+
+        int cash = RenovationPricing.CashCostFor(plan, eligible.Count);
+        int materials = RenovationPricing.MaterialCostFor(plan, eligible.Count);
+
+        if (Materials.Stock < materials)
+        {
+            reason = "Not enough materials (" + Materials.Stock + "/" + materials + "). Buy some first.";
+            return false;
+        }
+        if (Cash < cash)
+        {
+            reason = "That costs $" + cash + " and you have $" + Cash + ".";
+            return false;
+        }
+
+        Cash -= cash;
+        Materials.TryConsume(materials);
+        Renovations.Enqueue(plan, eligible);
+        foreach (int number in eligible)
+        {
+            Rooms.SetState(number, RoomSimState.Blocked);
+            Rooms.AddFlags(number, RoomFlags.Renovating);
+        }
+        return true;
+    }
+
+    /// <summary>买材料。</summary>
+    public bool TryBuyMaterials(int units)
+    {
+        if (units <= 0) return true;
+        int price = Materials.PriceFor(units);
+        if (!TrySpendCash(price)) return false;
+        Materials.Add(units);
+        return true;
     }
 
     // ── 一天开始 ─────────────────────────────────────────────────────────────
@@ -86,6 +165,11 @@ public sealed class HotelSim
         ArrivalsCheckedInToday = 0;
         ArrivalsTurnedAwayToday = 0;
         _arrivalCredit = 0d;
+        _deskQueue = 0;
+        _deskCredit = 0d;
+        PeakCheckInWaitToday = 0;
+        TotalCheckInWaitToday = 0;
+        FlawedStaysToday = 0;
 
         RunCheckoutWave();
 
@@ -132,10 +216,17 @@ public sealed class HotelSim
     {
         float sat = 1f
                   - DemandModel.ExpectationPenalty(stay.priceRatio)
-                  - DemandModel.TierDisappointment(stay.segment, tier);
-        // M-B 还没有前台排队模型，等待惩罚留给 M-C（WaitSatisfactionPenalty 已就位）
+                  - DemandModel.TierDisappointment(stay.segment, tier)
+                  - DemandModel.WaitSatisfactionPenalty(stay.segment, stay.waitMinutes);
+        if (stay.flawedRoom) sat -= FlawedRoomPenalty;   // 没验房就上架的代价
         return SimMath.Clamp(sat, ReputationLedger.MinSatisfaction, ReputationLedger.MaxSatisfaction);
     }
+
+    /// <summary>住进带瑕疵的房间（没经验房就上架）扣的满意度。</summary>
+    public const float FlawedRoomPenalty = 0.22f;
+
+    /// <summary>没有验房员时，清洁完直接上架的房有多大概率带瑕疵。</summary>
+    public const double UninspectedFlawChance = 0.35d;
 
     // ── 每分钟 ───────────────────────────────────────────────────────────────
 
@@ -144,6 +235,7 @@ public sealed class HotelSim
     {
         Pipeline.StepMinute();
         StepArrivals();
+        StepFrontDesk();
     }
 
     /// <summary>到店客按阶段权重滴入：入住高峰吃掉大头（PhaseScheduler.ArrivalWeightOf）。</summary>
@@ -163,9 +255,46 @@ public sealed class HotelSim
         while (_arrivalCredit >= 1d && remaining > 0)
         {
             _arrivalCredit -= 1d;
-            AdmitOneGuest();
+            _deskQueue++;              // 到店先排队，不是瞬移进房
             remaining--;
         }
+    }
+
+    /// <summary>前台每分钟消化队列。人手不足 → 队伍变长 → 等待时间变长 →
+    /// 商务客满意度掉得最狠（服务压力咬客流压力的另一条边）。</summary>
+    private void StepFrontDesk()
+    {
+        if (_deskQueue <= 0)
+        {
+            _deskCredit = 0d;
+            return;
+        }
+
+        float perHour = ServiceCapacityModel.CheckInsPerHour(Staff);
+        if (perHour <= 0f)
+        {
+            // 前台无人：队伍只会变长（前台空岗惩罚已在 v2 的 StaffFacilitySystem 里有先例）
+            PeakCheckInWaitToday = Math.Max(PeakCheckInWaitToday, EstimatedWaitMinutes(perHour));
+            return;
+        }
+
+        _deskCredit += perHour / 60d;
+        while (_deskCredit >= 1d && _deskQueue > 0)
+        {
+            _deskCredit -= 1d;
+            int wait = EstimatedWaitMinutes(perHour);
+            _deskQueue--;
+            AdmitOneGuest(wait);
+        }
+        PeakCheckInWaitToday = Math.Max(PeakCheckInWaitToday, EstimatedWaitMinutes(perHour));
+    }
+
+    /// <summary>队列长度 ÷ 处理速率 = 队尾那位大概要等多久。</summary>
+    private int EstimatedWaitMinutes(float checkInsPerHour)
+    {
+        if (_deskQueue <= 0) return 0;
+        if (checkInsPerHour <= 0f) return 60;   // 无人值守：按一小时算（够狠）
+        return SimMath.RoundToInt(_deskQueue / checkInsPerHour * 60f);
     }
 
     private static int PhaseMinutesOf(SimDayPhase phase)
@@ -180,7 +309,7 @@ public sealed class HotelSim
         }
     }
 
-    private void AdmitOneGuest()
+    private void AdmitOneGuest(int waitMinutes)
     {
         if (!Rooms.TryFindFirstInState(RoomSimState.Ready, out int roomNumber))
         {
@@ -195,12 +324,20 @@ public sealed class HotelSim
         GuestSegment segment = mix.Pick(_rng.NextDouble());
         RoomTier tier = Rooms.At(roomNumber).tier;
 
+        // 没有验房员在班时清洁完直接上架 → 这间房有概率带瑕疵（"快"的代价）
+        bool flawed = !ServiceCapacityModel.HasInspectorOnDuty(Staff)
+                      && _rng.NextDouble() < UninspectedFlawChance;
+        if (flawed) FlawedStaysToday++;
+        TotalCheckInWaitToday += waitMinutes;
+
         Rooms.SetState(roomNumber, RoomSimState.Occupied);
         _stays[roomNumber] = new Stay
         {
             nightlyRate = Pricing.PriceFor(day, tier),
             segment = segment,
             priceRatio = ratio,
+            waitMinutes = waitMinutes,
+            flawedRoom = flawed,
         };
         ArrivalsCheckedInToday++;
     }
@@ -240,12 +377,34 @@ public sealed class HotelSim
         Overflow.RollTheft(_rng.NextDouble());
         Cash = result.cashAfter;
 
+        // 顺序要紧：先算当晚磨损，再让装修完工——反过来会让"翻新重置磨损"当场被覆盖
         ApplyNightlyWear();
+        AdvanceRenovations();
         Staff.SettleDay(result.wagesPaid);
         Pipeline.SettleDay(result.wagesPaid);
 
         LastSettlement = result;
         return result;
+    }
+
+    /// <summary>装修推进一天。完工的房档位提升，但装修完也是要打扫的（灰尘）。</summary>
+    private void AdvanceRenovations()
+    {
+        var finished = Renovations.TickDay();
+        for (int i = 0; i < finished.Count; i++)
+        {
+            var job = finished[i];
+            for (int r = 0; r < job.roomNumbers.Count; r++)
+            {
+                int number = job.roomNumbers[r];
+                if (!Rooms.Contains(number)) continue;
+                ref RoomRecord room = ref Rooms.At(number);
+                room.tier = job.targetTier;
+                room.wear = 0f;                 // 翻新过的房重置磨损
+                Rooms.RemoveFlags(number, RoomFlags.Renovating);
+                Rooms.SetState(number, RoomSimState.Dirty); // 收工要清一遍才能卖
+            }
+        }
     }
 
     /// <summary>过夜磨损：住过的房磨损更快（满房加速磨损 → 损坏概率升）。</summary>

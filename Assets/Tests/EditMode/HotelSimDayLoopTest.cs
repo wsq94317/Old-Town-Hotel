@@ -12,7 +12,7 @@ namespace OldTownHotel.Tests.EditMode
         private const int Seed = 90210;
 
         private static HotelSim BuildHotel(int rooms = 12, int housekeepers = 2, int inspectors = 1,
-                                           int startingCash = 2000, int seed = Seed)
+                                           int startingCash = 2000, int seed = Seed, int receptionists = 2)
         {
             var defs = new List<RoomDefinition>();
             for (int i = 0; i < rooms; i++)
@@ -25,6 +25,9 @@ namespace OldTownHotel.Tests.EditMode
                                                new StaffAttributes(55, 55, 55), 1, null));
             for (int i = 0; i < inspectors; i++)
                 staff.Register(new StaffMember(StaffRole.Inspector, "INSP" + i, 70,
+                                               new StaffAttributes(55, 55, 55), 1, null));
+            for (int i = 0; i < receptionists; i++)
+                staff.Register(new StaffMember(StaffRole.Reception, "RCP" + i, 65,
                                                new StaffAttributes(55, 55, 55), 1, null));
 
             return new HotelSim(new RoomLedger(defs), staff, RoomRateTable.Default,

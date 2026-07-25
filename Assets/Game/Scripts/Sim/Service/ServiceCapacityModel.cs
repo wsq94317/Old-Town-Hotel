@@ -47,6 +47,28 @@ public static class ServiceCapacityModel
         return total;
     }
 
+    /// <summary>一名前台每小时能办多少入住。</summary>
+    public const float BaseCheckInsPerHour = 6f;
+
+    /// <summary>全酒店每小时办入住能力。前台无人=0，队伍只会越排越长。</summary>
+    public static float CheckInsPerHour(StaffRoster roster)
+    {
+        if (roster == null) return 0f;
+        float total = 0f;
+        var entries = roster.Entries;
+        for (int i = 0; i < entries.Count; i++)
+        {
+            var e = entries[i];
+            if (!e.IsProductive || e.member == null) continue;
+            if (e.member.Role != StaffRole.Reception) continue;
+            float speedNorm = SimMath.Clamp(e.member.Attributes.Speed, 1, 100) / 50f;
+            total += BaseCheckInsPerHour * speedNorm
+                   * StaffDayModel.MoraleFactor(e.member.Morale)
+                   * StaffDayModel.FatigueFactor(e.fatigue);
+        }
+        return total;
+    }
+
     /// <summary>是否有 Inspector 在班（决定清洁完的房走不走质量闸门）。</summary>
     public static bool HasInspectorOnDuty(StaffRoster roster) =>
         roster != null && roster.OnDutyCountOfRole(StaffRole.Inspector) > 0;
