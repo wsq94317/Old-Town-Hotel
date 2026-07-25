@@ -9,7 +9,7 @@ using UnityEngine;
 // 这个场景不碰 v2 巡查层，风险为零；模拟内核是同一套（Sim/），所以调参结论直接可用。
 public class V3PrototypeSession : MonoBehaviour
 {
-    private enum Tab { Report, Pricing, Staff, Renovation }
+    private enum Tab { Report, Pricing, Staff, Renovation, Rooms }
 
     [SerializeField] private int totalRooms = 100;
     [SerializeField] private int openRoomsAtStart = 12;
@@ -61,6 +61,7 @@ public class V3PrototypeSession : MonoBehaviour
                             DemandConfig.Default, startingCash, rngSeed);
         _loan = new LoanAccount(startingLoan, dailyInterestRate);
         _sim.Materials.Add(6); // 开局送几份材料，省得第一天什么都干不了
+        _sim.FurnishInheritedRooms();  // 继承的破家具：崭新度 5-15%，天天出故障
     }
 
     private void Update()
@@ -112,6 +113,7 @@ public class V3PrototypeSession : MonoBehaviour
             case Tab.Pricing: DrawPricing(w, h); break;
             case Tab.Staff: DrawStaff(w, h); break;
             case Tab.Renovation: DrawRenovation(w, h); break;
+            case Tab.Rooms: DrawRooms(w, h); break;
             default: DrawLiveStatus(w, h); break;
         }
 
@@ -137,11 +139,12 @@ public class V3PrototypeSession : MonoBehaviour
 
     private void DrawTabs(float w)
     {
-        float bw = (w - 20) / 4f;
+        float bw = (w - 20) / 5f;
         if (GUI.Button(new Rect(10, 74, bw, 26), "STATUS")) _tab = Tab.Report;
         if (GUI.Button(new Rect(10 + bw, 74, bw, 26), "PRICING")) _tab = Tab.Pricing;
         if (GUI.Button(new Rect(10 + bw * 2, 74, bw, 26), "STAFF")) _tab = Tab.Staff;
         if (GUI.Button(new Rect(10 + bw * 3, 74, bw, 26), "RENOVATE")) _tab = Tab.Renovation;
+        if (GUI.Button(new Rect(10 + bw * 4, 74, bw, 26), "ROOMS")) _tab = Tab.Rooms;
 
         // 时间控制
         if (GUI.Button(new Rect(10, 104, 52, 24), "0.25x")) _sim.Clock.SpeedMultiplier = 0.25f;
@@ -178,6 +181,25 @@ public class V3PrototypeSession : MonoBehaviour
         if (_sim.Overflow.Balance > 0 &&
             GUI.Button(new Rect(30 + (w - 50) / 2f, y, (w - 50) / 2f, 26), $"SALVAGE ${_sim.Overflow.Balance} (65%)"))
             Say($"Salvaged ${_sim.RecoverOverflow()} of the cash that wouldn't fit.");
+
+        // 退款申请（虚报价的代价）——批准/拒绝就在晨报上做
+        var refunds = _sim.PendingRefunds;
+        if (refunds.Count > 0)
+        {
+            GUI.Box(new Rect(10, 288, w - 20, 26 + refunds.Count * 40), "REFUND DEMANDS (" + refunds.Count + ")");
+            float ry = 310;
+            for (int i = 0; i < refunds.Count && i < 3; i++)
+            {
+                var r = refunds[i];
+                GUI.Label(new Rect(20, ry, w - 40, 20), "R" + r.roomNumber + " $" + r.amount + ": " + r.line);
+                if (GUI.Button(new Rect(20, ry + 18, (w - 50) / 2f, 20), "REFUND $" + r.amount))
+                { _sim.ApproveRefund(r.requestId); Say("Refunded. Reputation intact."); break; }
+                if (GUI.Button(new Rect(30 + (w - 50) / 2f, ry + 18, (w - 50) / 2f, 20), "REFUSE"))
+                { _sim.RejectRefund(r.requestId); Say("Refused. They are writing a review as we speak."); break; }
+                ry += 40;
+            }
+            return;   // 先处理完退款再开门
+        }
 
         if (GUI.Button(new Rect(10, 296, w - 20, 34), "OPEN THE DOORS"))
         {
@@ -272,6 +294,73 @@ public class V3PrototypeSession : MonoBehaviour
 
     private static ShiftTier NextTier(ShiftTier tier) =>
         tier == ShiftTier.Full ? ShiftTier.Skeleton : (ShiftTier)((int)tier + 1);
+
+    /// <summary>房间/家具面板：挂牌档（你声称多好）vs 交付（家具实际多好）+ 维修。</summary>
+    private void DrawRooms(float w, float h)
+    {
+        GUI.Box(new Rect(10, 134, w - 20, 240), "ROOMS - what you charge vs what you deliver");
+        float y = 158;
+
+        GUI.Label(new Rect(20, y, w - 40, 20), "Price band for the whole hotel (what you claim it is):");
+        y += 22;
+        float bw = (w - 50) / 3f;
+        int i = 0;
+        foreach (RoomTier band in System.Enum.GetValues(typeof(RoomTier)))
+        {
+            if (GUI.Button(new Rect(20 + i * (bw + 5), y, bw, 24),
+                           band + " $" + _sim.Pricing.PriceFor(_sim.Clock.CurrentDay, band)))
+            {
+                for (int f = 0; f < FloorMath.FloorCount; f++) _sim.SetPriceBandForFloor(f, band);
+                Say("Every room is now listed as " + band + ". Guests will judge.");
+            }
+            i++;
+        }
+        y += 30;
+
+        float delivered = _sim.AverageDeliveredQuality();
+        RoomTier currentBand = _sim.Rooms.Count > 0 ? _sim.Rooms.Peek(0).tier : RoomTier.Old;
+        float expected = DemandModel.ExpectedQualityOf(currentBand);
+        float gap = delivered - expected;
+        GUI.Label(new Rect(20, y, w - 40, 20),
+            $"Delivered {delivered:0.00}  vs  promised {expected:0.00}   gap {gap:+0.00;-0.00}"); y += 20;
+        GUI.Label(new Rect(20, y, w - 40, 20),
+            gap >= 0f ? "Guests are getting more than they paid for. Good reviews, less cash."
+                      : gap > -0.2f ? "Slightly oversold. Tolerable."
+                      : "OVERSOLD. Expect refund demands."); y += 24;
+
+        int faulted = _sim.Furniture.FaultedItems().Count;
+        GUI.Label(new Rect(20, y, w - 40, 20),
+            $"Furniture: {_sim.Furniture.Count} pieces, avg newness " +
+            $"{AverageNewnessAllRooms():0.00}, {faulted} broken"); y += 24;
+
+        var broken = _sim.Furniture.FaultedItems();
+        for (int b = 0; b < broken.Count && b < 3; b++)
+        {
+            var item = broken[b];
+            FurnitureKind kind = FurnitureCatalog.Get(item.kindId);
+            string status = item.IsUnderRepair ? " [being fixed, " + item.repairDaysRemaining + "d]" : "";
+            GUI.Label(new Rect(20, y, w - 150, 20), "R" + item.roomNumber + ": " + FurnitureLedger.FaultLineOf(item) + status);
+            if (!item.IsUnderRepair &&
+                GUI.Button(new Rect(w - 128, y - 2, 108, 22), "FIX $" + kind.repairCost))
+            {
+                if (_sim.TryRepairFurniture(item.instanceId, out string reason))
+                    Say(kind.name + " in room " + item.roomNumber + ": " + kind.repairDays + " day(s) of work.");
+                else Say(reason);
+            }
+            y += 22;
+        }
+
+        if (broken.Count > 3) GUI.Label(new Rect(20, y, w - 40, 20), "...and " + (broken.Count - 3) + " more");
+    }
+
+    private float AverageNewnessAllRooms()
+    {
+        var all = _sim.Furniture.All;
+        if (all.Count == 0) return 1f;
+        float sum = 0f;
+        for (int i = 0; i < all.Count; i++) sum += all[i].newness;
+        return sum / all.Count;
+    }
 
     private void DrawRenovation(float w, float h)
     {

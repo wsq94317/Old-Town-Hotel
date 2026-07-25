@@ -108,6 +108,23 @@ public sealed class StaffSimState
 }
 
 [Serializable]
+public sealed class FurnitureSaveEntry
+{
+    public int instanceId;
+    public int kindId;
+    public int roomNumber;
+    public float posX, posY;
+    public float newness = 1f;
+    public float health = 1f;
+    public int faultLineIndex = -1;
+    public int repairDaysRemaining;
+}
+
+/// <summary>每间房的挂牌档（RoomTier = "你声称它有多好"，玩家设定）。</summary>
+[Serializable]
+public sealed class RoomBandEntry { public int room; public int band; }
+
+[Serializable]
 public sealed class SimState
 {
     // 时钟（离线连续时间制需要它们全部）
@@ -131,13 +148,20 @@ public sealed class SimState
     // 员工模拟状态（士气/工资在 EconomyState.staff，这里只放 Sim 侧运营状态）
     public int nextStaffId;
     public List<StaffSimState> staff = new List<StaffSimState>();
+
+    // v5：家具（崭新度/健康度/故障/维修工期）+ 材料库存 + 每房挂牌档
+    public int materialStock;
+    public int nextFurnitureId;
+    public List<FurnitureSaveEntry> furniture = new List<FurnitureSaveEntry>();
+    public List<RoomBandEntry> roomBands = new List<RoomBandEntry>();
 }
 
 [Serializable]
 public sealed class GameState
 {
     // v2: + rooms（过夜占用）；v3: + world（经理模式世界层）；v4: + sim（模拟内核）
-    public const int CurrentVersion = 4;
+    // v5: + 家具（崭新度/健康度）、材料库存、每房挂牌档
+    public const int CurrentVersion = 5;
 
     public int version = CurrentVersion;
     public EconomyState economy = new EconomyState();
@@ -161,6 +185,8 @@ public sealed class GameState
         if (sim.priceOverrides == null) sim.priceOverrides = new List<PriceOverrideEntry>();
         if (sim.shiftTiers == null) sim.shiftTiers = new List<ShiftTierEntry>();
         if (sim.staff == null) sim.staff = new List<StaffSimState>();
+        if (sim.furniture == null) sim.furniture = new List<FurnitureSaveEntry>();
+        if (sim.roomBands == null) sim.roomBands = new List<RoomBandEntry>();
 
         // v3 及更早：Sim 尚未存在，用进度里的日号对齐钟面（读档即是那天早上）
         if (version < 4 && sim.day <= 1 && progress.day > 0) sim.day = progress.day;

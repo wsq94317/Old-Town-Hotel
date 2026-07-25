@@ -337,5 +337,46 @@ namespace OldTownHotel.Tests.EditMode
             Assert.That(actuallyNice.ArrivalsPlannedToday, Is.GreaterThan(relabelled.ArrivalsPlannedToday),
                         "真装修才拉来客人；把全店改标 Better 不会凭空变多");
         }
+
+        // ── 三档挂牌必须各自对得上一个投资阶段 ────────────────────────────────
+        //
+        // M-C2 试玩发现的真 bug：期待值原本 0.10/0.55/0.90，而标准装修完的房只交付
+        // 0.35，于是**连翻新过的房都不能诚实地按 Basic 卖**，装完也只配老房价——
+        // 装修在玩家眼里就纯亏。期待值必须落在家具真能提供的范围内，否则档位是骗局。
+        // 这个测试锁的是"档位 ↔ 投资阶段"的对应关系本身，不是具体数字：
+        // 以后调家具装饰度，只要还满足这三条对应，随便调。
+        [Test]
+        public void EachPriceBand_HasAnInvestmentStageThatHonestlyDeliversIt()
+        {
+            var sim = BuildHotel(rooms: 1, startingCash: 200000, seed: 4242);
+            sim.TryBuyMaterials(200);
+            var one = new List<int> { 201 };
+
+            // 阶段 1：继承的破家具 ⇒ 只配 Old
+            float derelict = sim.DeliveredQualityOf(201);
+            Assert.That(derelict, Is.GreaterThanOrEqualTo(DemandModel.ExpectedQualityOf(RoomTier.Old)),
+                        "开局的破房按 Old 卖必须是诚实的，不然玩家第一天就吃退款");
+            Assert.That(derelict, Is.LessThan(DemandModel.ExpectedQualityOf(RoomTier.Basic)),
+                        "破房不该白得 Basic 的资格");
+
+            // 阶段 2：标准装修（必备升一档 + 崭新度回满）⇒ 刚好够 Basic
+            Assert.That(sim.TryStartRenovation(RenovationPlanKind.Standard, one, out string why), Is.True, why);
+            for (int d = 0; d < 6; d++) RunOneDay(sim);
+            float renovated = sim.DeliveredQualityOf(201);
+            Assume.That(sim.Rooms.At(201).state, Is.Not.EqualTo(RoomSimState.Blocked), "装修得完工");
+            Assert.That(renovated, Is.GreaterThanOrEqualTo(DemandModel.ExpectedQualityOf(RoomTier.Basic) - 0.02f),
+                        "装修完就该能诚实挂 Basic——这是玩家掏 $1300 买到的东西");
+            Assert.That(renovated, Is.LessThan(DemandModel.ExpectedQualityOf(RoomTier.Better)),
+                        "光换必备家具不该直通 Better，Better 得靠可选装饰位");
+
+            // 阶段 3：补齐可选装饰位 ⇒ 够 Better
+            foreach (int kind in new[] { FurnitureCatalog.BigFlatTv, FurnitureCatalog.Sofa,
+                                         FurnitureCatalog.WorkDesk, FurnitureCatalog.Rug })
+                Assert.That(sim.TryBuyFurniture(201, kind, out string reason), Is.True, reason);
+
+            Assert.That(sim.DeliveredQualityOf(201),
+                        Is.GreaterThanOrEqualTo(DemandModel.ExpectedQualityOf(RoomTier.Better)),
+                        "装修 + 摆满可选家具才够 Better；这是装饰度投资的出口");
+        }
     }
 }

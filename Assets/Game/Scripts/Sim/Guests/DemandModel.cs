@@ -42,20 +42,21 @@ public readonly struct GuestSegmentProfile
     {
         switch (segment)
         {
+            // tierExpectation 与 ExpectedQualityOf 同一把尺（交付水平 0~1），M-C2 一起下调
             case GuestSegment.Budget:
-                return new GuestSegmentProfile(segment, tierExpectation: 0.15f, waitPenaltyMultiplier: 0.6f,
+                return new GuestSegmentProfile(segment, tierExpectation: 0.08f, waitPenaltyMultiplier: 0.6f,
                                                extraCleaningLoad: 1.35f, incidentMultiplier: 1.1f,
                                                satisfactionWeight: 0.8f, spendMultiplier: 0.6f);
             case GuestSegment.Business:
-                return new GuestSegmentProfile(segment, tierExpectation: 0.55f, waitPenaltyMultiplier: 2.0f,
+                return new GuestSegmentProfile(segment, tierExpectation: 0.35f, waitPenaltyMultiplier: 2.0f,
                                                extraCleaningLoad: 0.9f, incidentMultiplier: 0.7f,
                                                satisfactionWeight: 1.0f, spendMultiplier: 1.0f);
             case GuestSegment.Party:
-                return new GuestSegmentProfile(segment, tierExpectation: 0.3f, waitPenaltyMultiplier: 0.5f,
+                return new GuestSegmentProfile(segment, tierExpectation: 0.20f, waitPenaltyMultiplier: 0.5f,
                                                extraCleaningLoad: 1.6f, incidentMultiplier: 2.2f,
                                                satisfactionWeight: 0.7f, spendMultiplier: 1.8f);
             default: // Vip
-                return new GuestSegmentProfile(segment, tierExpectation: 0.9f, waitPenaltyMultiplier: 1.6f,
+                return new GuestSegmentProfile(segment, tierExpectation: 0.70f, waitPenaltyMultiplier: 1.6f,
                                                extraCleaningLoad: 1.0f, incidentMultiplier: 0.8f,
                                                satisfactionWeight: 2.0f, spendMultiplier: 1.6f);
         }
@@ -204,14 +205,21 @@ public static class DemandModel
     }
 
     /// <summary>挂牌档承诺的品质水平。RoomTier 现在表示"你声称它有多好"，
-    /// 实际交付由家具装饰度决定（家具系统设计 §2）。</summary>
+    /// 实际交付由家具装饰度决定（家具系统设计 §2）。
+    ///
+    /// **M-C2 调参**：期待值必须落在家具真能提供的范围内，否则档位就是骗局。
+    /// 三段刚好对应三个投资阶段，玩家一看就懂：
+    ///   Old   0.05 ← 继承的破家具（床+卫浴，崭新度 10%）交付约 0.05
+    ///   Basic 0.35 ← 标准装修（必备升一档 + 崭新度回满）交付约 0.35
+    ///   Better 0.70 ← 装修 + 摆两三件可选家具
+    /// 早期版本用 0.10/0.55/0.90，结果连翻新过的房都够不上 Basic，装完也只能按老房价卖。</summary>
     public static float ExpectedQualityOf(RoomTier band)
     {
         switch (band)
         {
-            case RoomTier.Better: return 0.90f;
-            case RoomTier.Basic: return 0.55f;
-            default: return 0.10f;
+            case RoomTier.Better: return 0.70f;
+            case RoomTier.Basic: return 0.35f;
+            default: return 0.05f;
         }
     }
 

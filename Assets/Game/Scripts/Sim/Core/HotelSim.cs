@@ -856,6 +856,34 @@ public sealed class HotelSim
         foreach (StaffRole role in System.Enum.GetValues(typeof(StaffRole)))
             state.shiftTiers.Add(new ShiftTierEntry { role = (int)role, tier = (int)Shifts.TierOf(role) });
 
+        // v5：家具 + 材料 + 挂牌档
+        state.materialStock = Materials.Stock;
+        state.nextFurnitureId = Furniture.NextIdSeed;
+        state.furniture.Clear();
+        var items = Furniture.All;
+        for (int i = 0; i < items.Count; i++)
+        {
+            var f = items[i];
+            state.furniture.Add(new FurnitureSaveEntry
+            {
+                instanceId = f.instanceId,
+                kindId = f.kindId,
+                roomNumber = f.roomNumber,
+                posX = f.posX,
+                posY = f.posY,
+                newness = f.newness,
+                health = f.health,
+                faultLineIndex = f.faultLineIndex,
+                repairDaysRemaining = f.repairDaysRemaining,
+            });
+        }
+        state.roomBands.Clear();
+        for (int i = 0; i < Rooms.Count; i++)
+        {
+            RoomRecord room = Rooms.Peek(i);
+            state.roomBands.Add(new RoomBandEntry { room = room.number, band = (int)room.tier });
+        }
+
         state.nextStaffId = Staff.NextIdSeed;
         state.staff.Clear();
         var entries = Staff.Entries;
@@ -893,6 +921,21 @@ public sealed class HotelSim
         if (state.shiftTiers != null)
             foreach (var entry in state.shiftTiers)
                 Shifts.SetTier((StaffRole)entry.role, (ShiftTier)entry.tier);
+
+        // v5：家具 + 材料 + 挂牌档（旧档这些段为空 → 沿用当前场景状态，不覆盖）
+        Materials.RestoreFromSave(state.materialStock);
+        if (state.furniture != null && state.furniture.Count > 0)
+        {
+            Furniture.Clear();
+            foreach (var f in state.furniture)
+                Furniture.RestoreInstance(f.instanceId, f.kindId, f.roomNumber, f.posX, f.posY,
+                                          f.newness, f.health, f.faultLineIndex)
+                         .repairDaysRemaining = f.repairDaysRemaining;
+            Furniture.RestoreIdSeed(state.nextFurnitureId);
+        }
+        if (state.roomBands != null)
+            foreach (var entry in state.roomBands)
+                SetPriceBand(entry.room, (RoomTier)entry.band);
 
         Staff.RestoreIdSeed(state.nextStaffId);
         if (state.staff != null)

@@ -180,6 +180,68 @@ namespace OldTownHotel.Tests.EditMode
         }
 
         [Test]
+        public void V5_FurnitureAndPriceBands_RoundTrip()
+        {
+            var original = BuildHotel();
+            original.FurnishInheritedRooms();
+            original.SetPriceBand(203, RoomTier.Better);
+            original.TryBuyMaterials(0);
+            original.Materials.Add(17);
+            original.TryBuyFurniture(201, FurnitureCatalog.BigFlatTv, out _);
+            var tv = original.Furniture.InRoom(201)[original.Furniture.InRoom(201).Count - 1];
+            tv.newness = 0.37f;
+            tv.health = 0.11f;
+            tv.faultLineIndex = 1;
+            tv.repairDaysRemaining = 2;
+
+            var state = new SimState();
+            original.CaptureTo(state);
+
+            Assert.That(state.furniture.Count, Is.EqualTo(original.Furniture.Count));
+            Assert.That(state.materialStock, Is.EqualTo(17));
+            Assert.That(state.roomBands.Count, Is.EqualTo(original.Rooms.Count));
+
+            // 过一遍 JSON，确认 DTO 真能序列化
+            var back = JsonUtility.FromJson<GameState>(JsonUtility.ToJson(new GameState { sim = state }));
+            var restored = BuildHotel();
+            restored.RestoreFrom(back.sim);
+
+            Assert.That(restored.Materials.Stock, Is.EqualTo(17));
+            Assert.That(restored.Rooms.At(203).tier, Is.EqualTo(RoomTier.Better), "挂牌档要存下来");
+            Assert.That(restored.Furniture.Count, Is.EqualTo(original.Furniture.Count));
+            Assert.That(restored.Furniture.TryGet(tv.instanceId, out FurnitureInstance backTv), Is.True);
+            Assert.That(backTv.newness, Is.EqualTo(0.37f).Within(1e-3f), "崭新度");
+            Assert.That(backTv.health, Is.EqualTo(0.11f).Within(1e-3f), "健康度");
+            Assert.That(backTv.IsFaulted, Is.True, "故障状态");
+            Assert.That(backTv.repairDaysRemaining, Is.EqualTo(2), "维修工期");
+
+            var fresh = restored.Furniture.Place(201, FurnitureCatalog.Rug);
+            Assert.That(fresh.instanceId, Is.GreaterThan(tv.instanceId), "读档后新买的家具不能撞历史 id");
+        }
+
+        [Test]
+        public void V4Save_LoadsWithFurnitureDefaults()
+        {
+            string v4 = "{\"version\":4," +
+                "\"economy\":{\"cash\":700,\"loanBalance\":100,\"loanRate\":0,\"staff\":[],\"reputationSamples\":[]}," +
+                "\"renovation\":{\"totalRooms\":12,\"startingRoomNumber\":201,\"rooms\":[],\"jobs\":[]}," +
+                "\"progress\":{\"day\":5,\"satisfaction\":20}," +
+                "\"rooms\":{\"occupied\":[]}," +
+                "\"world\":{\"prestige\":3,\"tapedBreakdowns\":[],\"lockedRooms\":[]}," +
+                "\"sim\":{\"day\":5,\"minute\":480,\"safeboxLevel\":2,\"safeboxBalance\":150,\"cash\":700,\"staff\":[]}}";
+
+            var gs = JsonUtility.FromJson<GameState>(v4);
+            gs.MigrateToCurrentVersion();
+
+            Assert.That(gs.version, Is.EqualTo(GameState.CurrentVersion));
+            Assert.That(gs.sim.safeboxBalance, Is.EqualTo(150), "v4 的资金数据不能丢");
+            Assert.That(gs.world.prestige, Is.EqualTo(3), "v3 的世界数据也不能丢");
+            Assert.That(gs.sim.furniture, Is.Not.Null.And.Empty, "家具段补空表");
+            Assert.That(gs.sim.roomBands, Is.Not.Null.And.Empty);
+            Assert.That(gs.sim.materialStock, Is.EqualTo(0));
+        }
+
+        [Test]
         public void MigrationIsIdempotent()
         {
             var gs = new GameState();
