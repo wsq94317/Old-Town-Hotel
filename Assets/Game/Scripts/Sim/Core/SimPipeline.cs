@@ -31,6 +31,10 @@ public sealed class SimPipeline
     /// <summary>经理是否在楼上盯着（巡查层每帧上报；影响摸鱼判定）。</summary>
     public bool ManagerOnFloor { get; set; }
 
+    /// <summary>服务段开关。镜像期（M-A）关掉：房态权威还在 v1 DemandLoop 手里，
+    /// 两边同时改会互相打架。M-B 需求层迁过来后打开，Sim 成为房态权威。</summary>
+    public bool ServiceEnabled { get; set; } = true;
+
     /// <summary>累计推进的 tick 数（诊断/测试用）。</summary>
     public long TicksRun { get; private set; }
 
@@ -51,7 +55,7 @@ public sealed class SimPipeline
         RollStaffStates();
 
         // ③ 服务段：清洁 → （有 Inspector 则过质量闸门）→ 可售
-        StepService();
+        if (ServiceEnabled) StepService();
 
         // 员工分钟记账（本分钟实际干了/摸了多少）
         _staff?.TickMinute();

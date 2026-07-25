@@ -1,0 +1,212 @@
+using System.Collections.Generic;
+using UnityEngine;
+
+// v3 模拟内核的场景宿主（架构 A.2 的 HotelSimHost）。
+//
+// **绞杀者模式的接缝**：M-A 阶段这里是"影子模式"——新时钟、员工总账、tick 管线
+// 在真实场景里跑起来并可被观察，但**房态权威仍在 v1 DemandLoop 手里**
+// （ServiceEnabled=false），两边不抢方向盘。M-B 需求层迁过来后翻转权威。
+//
+// 日号与 v1 锁死：订阅 OnDaySettled 后 BeginNextDay，Sim 的 CurrentDay 永远
+// 跟 Room2DDemoDayController 一致，绝不出现两套日历。
+public class HotelSimSceneBridge : MonoBehaviour
+{
+    /// <summary>单例：调试 HUD / 战略层 UI 读它。</summary>
+    public static HotelSimSceneBridge Instance { get; private set; }
+
+    [SerializeField] private Room2DDemoDayController dayController;
+    [SerializeField] private Room2DPrototypeDemandLoop demandLoop;
+    [SerializeField] private EconomySystem economy;
+    [SerializeField] private ManagerController manager;
+    [SerializeField] private StaffAgentSpawner spawner;
+    [SerializeField] private int rngSeed = 20260720;
+
+    [Tooltip("每帧最多消化多少 tick（跳段/高倍速时分帧，防卡顿）")]
+    [SerializeField] private int maxTicksPerFrame = 120;
+
+    public SimClock Clock { get; private set; }
+    public RoomLedger Rooms { get; private set; }
+    public StaffRoster Staff { get; private set; }
+    public SimPipeline Pipeline { get; private set; }
+
+    /// <summary>镜像期：房态权威在 v1，这里只跟读。M-B 翻转。</summary>
+    public bool MirrorMode { get; private set; } = true;
+
+    private readonly Dictionary<int, int> _staffIdByRoomlessMember = new Dictionary<int, int>();
+    private readonly Dictionary<StaffMember, int> _staffIdByMember = new Dictionary<StaffMember, int>();
+    private float _mirrorTimer;
+    private bool _built;
+
+    private void Awake()
+    {
+        Instance = this;
+        if (dayController == null) dayController = FindFirstObjectByType<Room2DDemoDayController>();
+        if (demandLoop == null) demandLoop = FindFirstObjectByType<Room2DPrototypeDemandLoop>();
+        if (economy == null) economy = FindFirstObjectByType<EconomySystem>();
+        if (manager == null) manager = FindFirstObjectByType<ManagerController>();
+        if (spawner == null) spawner = FindFirstObjectByType<StaffAgentSpawner>();
+
+        Clock = new SimClock();
+        Staff = new StaffRoster();
+    }
+
+    private void OnDestroy()
+    {
+        if (dayController != null) dayController.OnDaySettled -= HandleLegacyDaySettled;
+        if (Instance == this) Instance = null;
+    }
+
+    private void Start()
+    {
+        if (dayController != null) dayController.OnDaySettled += HandleLegacyDaySettled;
+    }
+
+    private void Update()
+    {
+        // 场景里的房/员工在 Start 时可能还没建好，首帧起惰性建账（时序坑，踩过）
+        if (!_built && !TryBuild()) return;
+
+        SyncFromLegacy();
+        DriveClock();
+    }
+
+    // ── 建账 ─────────────────────────────────────────────────────────────────
+
+    private bool TryBuild()
+    {
+        if (demandLoop == null || demandLoop.rooms == null) return false;
+
+        var defs = new List<RoomDefinition>();
+        foreach (var room in demandLoop.rooms)
+        {
+            if (room == null) continue;
+            int floor = FloorMath.FloorIndexForY(room.transform.position.y);
+            defs.Add(new RoomDefinition(
+                room.roomNumber,
+                floor: floor,
+                zone: floor,                       // M-A：一层=一区；M-F 再按房型细分
+                category: room.roomCategory,
+                tier: RoomTier.Old,                // M-B 从 RenovationSystem 同步真实档位
+                state: RoomStateMapping.FromLegacy(room.currentState)));
+        }
+        if (defs.Count == 0) return false;
+
+        Rooms = new RoomLedger(defs);
+        Pipeline = new SimPipeline(Clock, Rooms, Staff, rngSeed)
+        {
+            ServiceEnabled = !MirrorMode,   // 影子模式不碰房态
+        };
+        RegisterStaffFromPayroll();
+        _built = true;
+
+        Debug.Log($"[HotelSim] 建账完成：{Rooms.Count} 间房（{Rooms.OpenRoomCount} 营业 / " +
+                  $"{Rooms.CountOf(RoomSimState.Ruined)} 破败），{Staff.Count} 名员工。" +
+                  $"影子模式={MirrorMode}，房态权威仍在 v1 DemandLoop。");
+        return true;
+    }
+
+    private void RegisterStaffFromPayroll()
+    {
+        if (economy == null || economy.Payroll == null) return;
+        foreach (var member in economy.Payroll.Roster)
+        {
+            if (member == null || member.Role == StaffRole.Manager) continue; // 经理=玩家
+            if (_staffIdByMember.ContainsKey(member)) continue;
+            int id = Staff.Register(member);
+            _staffIdByMember[member] = id;
+            Staff.StartShift(id); // M-B 由 ShiftPlan 决定谁上班
+        }
+    }
+
+    // ── 与 v1 对齐 ───────────────────────────────────────────────────────────
+
+    /// <summary>镜像期把 v1 房态跟读进总账（每 0.5 秒一次，够 HUD 用且不浪费）。</summary>
+    private void SyncFromLegacy()
+    {
+        if (!MirrorMode || Rooms == null || demandLoop == null || demandLoop.rooms == null) return;
+
+        _mirrorTimer -= Time.deltaTime;
+        if (_mirrorTimer > 0f) return;
+        _mirrorTimer = 0.5f;
+
+        foreach (var room in demandLoop.rooms)
+        {
+            if (room == null) continue;
+            Rooms.SetState(room.roomNumber, RoomStateMapping.FromLegacy(room.currentState));
+        }
+
+        // 新雇的人也要进总账（HiringInteraction 随时可能加人）
+        RegisterStaffFromPayroll();
+    }
+
+    private void DriveClock()
+    {
+        Pipeline.ManagerOnFloor = ComputeManagerOnFloor();
+
+        Clock.Advance(Time.deltaTime);
+        int budget = Mathf.Max(1, maxTicksPerFrame);
+        while (budget-- > 0 && Clock.TryConsumeTick())
+        {
+            Pipeline.StepMinute();
+        }
+    }
+
+    /// <summary>经理是否和某个在班员工同层——巡查层向 Sim 上报的"被盯着"事实。</summary>
+    private bool ComputeManagerOnFloor()
+    {
+        if (manager == null || spawner == null) return false;
+        int managerFloor = FloorMath.FloorIndexForY(manager.transform.position.y);
+        foreach (var agent in spawner.Agents)
+        {
+            if (agent == null || agent.Member == null) continue;
+            if (agent.CurrentFloor == managerFloor) return true;
+        }
+        return false;
+    }
+
+    private void HandleLegacyDaySettled(int day, int served, DayLedger ledger)
+    {
+        if (Pipeline == null) return;
+        bool wagesPaid = economy == null || economy.Cash >= 0;
+        Pipeline.SettleDay(wagesPaid);
+        Clock.BeginNextDay();
+        // 日号与 v1 对齐（v1 的 demoDayIndex 在 Continue 时才 ++，这里跟着它走）
+        Clock.JumpTo(day + 1, SimClock.DayStartMinute);
+    }
+
+    // ── 玩家操作入口（战略层顶栏将调用它们） ──────────────────────────────────
+
+    public void SetSpeed(float multiplier) => Clock.SpeedMultiplier = multiplier;
+
+    /// <summary>跳到下一关键阶段。有阻塞事件时拒绝并给出英文原因。</summary>
+    public bool TrySkipToNextPhase(out string reason)
+    {
+        int blocking = CountBlockingIncidents();
+        if (!PhaseScheduler.CanSkip(Clock.CurrentMinute, blocking, out reason)) return false;
+        Clock.FastForwardTo(PhaseScheduler.NextKeyMinuteAfter(Clock.CurrentMinute));
+        return true;
+    }
+
+    /// <summary>当前有多少"必须先处理"的事件（M-G 事件权威上收后改读 IncidentScheduler）。</summary>
+    private int CountBlockingIncidents()
+    {
+        int n = 0;
+        var fire = FindFirstObjectByType<FireAlarmIncident>();
+        if (fire != null && fire.PanelOpen) n++;
+        var complaint = FindFirstObjectByType<ComplaintInteraction>();
+        if (complaint != null && complaint.PanelOpen) n++;
+        return n;
+    }
+
+    /// <summary>调试 HUD 用的一行摘要。</summary>
+    public string DebugSummary()
+    {
+        if (!_built) return "[Sim] building...";
+        return $"[Sim] D{Clock.CurrentDay} {Clock.TimeFormatted} {PhaseScheduler.Label(PhaseScheduler.PhaseFor(Clock.CurrentMinute))}" +
+               $" x{Clock.SpeedMultiplier:0.##}" +
+               $" | rooms rdy{Rooms.SellableCount} drt{Rooms.DirtyBacklog} occ{Rooms.CountOf(RoomSimState.Occupied)}" +
+               $" | staff on{Staff.OnDutyCount} work{Staff.ProductiveCountOfRole(StaffRole.Housekeeper)}" +
+               $" slack{Staff.MaxSlackMinutesRemaining}m morale{Staff.AverageMorale:0}" +
+               (Pipeline.ManagerOnFloor ? " [WATCHED]" : "");
+    }
+}

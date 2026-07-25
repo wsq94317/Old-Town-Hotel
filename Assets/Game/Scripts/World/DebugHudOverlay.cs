@@ -94,5 +94,9 @@ public class DebugHudOverlay : MonoBehaviour
         GUI.Label(new Rect(10, 32, 600, 22), $"Cash ${(economy != null ? economy.Cash : dayController.PlayerCash)}   Prestige {ManagerReputation.Prestige}");
         GUI.Label(new Rect(10, 54, 600, 22), $"Rooms  dirty:{dirty}  cleaning:{cleaning}  inspect:{awaiting}  occupied:{occupied}");
         GUI.Label(new Rect(10, 76, 600, 22), demandLoop != null ? $"Guests  served:{demandLoop.successfulDemandCount}  queue:{demandLoop.UpcomingQueueCount}  checkouts:{demandLoop.simulatedCheckoutCount}" : "");
+
+        // v3 影子模拟内核（M-A）：新时钟/员工总账在真实场景里跑，房态权威仍在 v1
+        var sim = HotelSimSceneBridge.Instance;
+        if (sim != null) GUI.Label(new Rect(10, 98, 640, 22), sim.DebugSummary());
     }
 }

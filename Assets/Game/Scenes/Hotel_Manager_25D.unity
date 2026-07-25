@@ -19615,8 +19615,10 @@ Material:
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
   m_CustomRenderQueue: -1
-  stringTagMap: {}
-  disabledShaderPasses: []
+  stringTagMap:
+    RenderType: Opaque
+  disabledShaderPasses:
+  - MOTIONVECTORS
   m_LockedProperties: 
   m_SavedProperties:
     serializedVersion: 3
@@ -19713,7 +19715,7 @@ Material:
     - _ZWrite: 1
     m_Colors:
     - _BaseColor: {r: 0.5, g: 0.44, b: 0.36, a: 1}
-    - _Color: {r: 1, g: 1, b: 1, a: 1}
+    - _Color: {r: 0.5, g: 0.43999997, b: 0.35999998, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
   m_BuildTextureStacks: []
@@ -20418,8 +20420,10 @@ Material:
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
   m_CustomRenderQueue: -1
-  stringTagMap: {}
-  disabledShaderPasses: []
+  stringTagMap:
+    RenderType: Opaque
+  disabledShaderPasses:
+  - MOTIONVECTORS
   m_LockedProperties: 
   m_SavedProperties:
     serializedVersion: 3
@@ -20516,7 +20520,7 @@ Material:
     - _ZWrite: 1
     m_Colors:
     - _BaseColor: {r: 0.45, g: 0.38, b: 0.3, a: 1}
-    - _Color: {r: 1, g: 1, b: 1, a: 1}
+    - _Color: {r: 0.45, g: 0.37999994, b: 0.29999998, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
   m_BuildTextureStacks: []
@@ -32189,6 +32193,7 @@ GameObject:
   - component: {fileID: 2129138163}
   - component: {fileID: 2129138162}
   - component: {fileID: 2129138164}
+  - component: {fileID: 2129138165}
   m_Layer: 0
   m_Name: Systems
   m_TagString: Untagged
@@ -32665,6 +32670,25 @@ MonoBehaviour:
   spawner: {fileID: 2129138152}
   manager: {fileID: 0}
   rngSeed: 20261
+--- !u!114 &2129138165
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2129138142}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 01a8c2a2767e94d46b7fd887be5d318d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: OldTownHotel.Game::HotelSimSceneBridge
+  dayController: {fileID: 0}
+  demandLoop: {fileID: 0}
+  economy: {fileID: 0}
+  manager: {fileID: 0}
+  spawner: {fileID: 0}
+  rngSeed: 20260720
+  maxTicksPerFrame: 120
 --- !u!1 &2132981060
 GameObject:
   m_ObjectHideFlags: 0
