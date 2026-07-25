@@ -69,6 +69,10 @@ public class V3PrototypeSession : MonoBehaviour
 
     private void Update()
     {
+        // 自取触点：本场景没有 WorldInputController 转发点击，OnGUI 按钮全靠这条通道。
+        // **必须在早退之前**——晨报页正处于 _awaitingMorningReport，早退会让它永远收不到点击。
+        GuiInput.PollSelfServed();
+
         if (_sim == null || _awaitingMorningReport) return;
 
         _sim.Clock.Advance(Time.deltaTime);
@@ -146,17 +150,17 @@ public class V3PrototypeSession : MonoBehaviour
     private void DrawTabs(float w)
     {
         float bw = (w - 20) / 5f;
-        if (GUI.Button(new Rect(10, 74, bw, 26), "STATUS")) _tab = Tab.Report;
-        if (GUI.Button(new Rect(10 + bw, 74, bw, 26), "PRICING")) _tab = Tab.Pricing;
-        if (GUI.Button(new Rect(10 + bw * 2, 74, bw, 26), "STAFF")) _tab = Tab.Staff;
-        if (GUI.Button(new Rect(10 + bw * 3, 74, bw, 26), "RENOVATE")) _tab = Tab.Renovation;
-        if (GUI.Button(new Rect(10 + bw * 4, 74, bw, 26), "ROOMS")) _tab = Tab.Rooms;
+        if (GuiInput.Button(new Rect(10, 74, bw, 26), "STATUS")) _tab = Tab.Report;
+        if (GuiInput.Button(new Rect(10 + bw, 74, bw, 26), "PRICING")) _tab = Tab.Pricing;
+        if (GuiInput.Button(new Rect(10 + bw * 2, 74, bw, 26), "STAFF")) _tab = Tab.Staff;
+        if (GuiInput.Button(new Rect(10 + bw * 3, 74, bw, 26), "RENOVATE")) _tab = Tab.Renovation;
+        if (GuiInput.Button(new Rect(10 + bw * 4, 74, bw, 26), "ROOMS")) _tab = Tab.Rooms;
 
         // 时间控制
-        if (GUI.Button(new Rect(10, 104, 52, 24), "0.25x")) _sim.Clock.SpeedMultiplier = 0.25f;
-        if (GUI.Button(new Rect(66, 104, 52, 24), "1x")) _sim.Clock.SpeedMultiplier = 1f;
-        if (GUI.Button(new Rect(122, 104, 52, 24), "2x")) _sim.Clock.SpeedMultiplier = 2f;
-        if (GUI.Button(new Rect(178, 104, w - 188, 24), "SKIP TO NEXT PHASE"))
+        if (GuiInput.Button(new Rect(10, 104, 52, 24), "0.25x")) _sim.Clock.SpeedMultiplier = 0.25f;
+        if (GuiInput.Button(new Rect(66, 104, 52, 24), "1x")) _sim.Clock.SpeedMultiplier = 1f;
+        if (GuiInput.Button(new Rect(122, 104, 52, 24), "2x")) _sim.Clock.SpeedMultiplier = 2f;
+        if (GuiInput.Button(new Rect(178, 104, w - 188, 24), "SKIP TO NEXT PHASE"))
         {
             if (PhaseScheduler.CanSkip(_sim.Clock.CurrentMinute, 0, out string reason))
                 _sim.Clock.FastForwardTo(PhaseScheduler.NextKeyMinuteAfter(_sim.Clock.CurrentMinute));
@@ -182,10 +186,10 @@ public class V3PrototypeSession : MonoBehaviour
             $"queue cost {_sim.TotalCheckInWaitToday} min"); y += 20;
         GUI.Label(new Rect(20, y, w - 40, 20), $"Rating {_sim.Reputation.Stars:0.00}*   Debt ${_loan.Balance}"); y += 28;
 
-        if (_sim.Safebox.Balance > 0 && GUI.Button(new Rect(20, y, (w - 50) / 2f, 26), $"COLLECT ${_sim.Safebox.Balance}"))
+        if (_sim.Safebox.Balance > 0 && GuiInput.Button(new Rect(20, y, (w - 50) / 2f, 26), $"COLLECT ${_sim.Safebox.Balance}"))
             Say($"Collected ${_sim.CollectSafebox()}.");
         if (_sim.Overflow.Balance > 0 &&
-            GUI.Button(new Rect(30 + (w - 50) / 2f, y, (w - 50) / 2f, 26), $"SALVAGE ${_sim.Overflow.Balance} (65%)"))
+            GuiInput.Button(new Rect(30 + (w - 50) / 2f, y, (w - 50) / 2f, 26), $"SALVAGE ${_sim.Overflow.Balance} (65%)"))
             Say($"Salvaged ${_sim.RecoverOverflow()} of the cash that wouldn't fit.");
 
         // 退款申请（虚报价的代价）——批准/拒绝就在晨报上做
@@ -198,16 +202,16 @@ public class V3PrototypeSession : MonoBehaviour
             {
                 var r = refunds[i];
                 GUI.Label(new Rect(20, ry, w - 40, 20), "R" + r.roomNumber + " $" + r.amount + ": " + r.line);
-                if (GUI.Button(new Rect(20, ry + 18, (w - 50) / 2f, 20), "REFUND $" + r.amount))
+                if (GuiInput.Button(new Rect(20, ry + 18, (w - 50) / 2f, 20), "REFUND $" + r.amount))
                 { _sim.ApproveRefund(r.requestId); Say("Refunded. Reputation intact."); break; }
-                if (GUI.Button(new Rect(30 + (w - 50) / 2f, ry + 18, (w - 50) / 2f, 20), "REFUSE"))
+                if (GuiInput.Button(new Rect(30 + (w - 50) / 2f, ry + 18, (w - 50) / 2f, 20), "REFUSE"))
                 { _sim.RejectRefund(r.requestId); Say("Refused. They are writing a review as we speak."); break; }
                 ry += 40;
             }
             return;   // 先处理完退款再开门
         }
 
-        if (GUI.Button(new Rect(10, 296, w - 20, 34), "OPEN THE DOORS"))
+        if (GuiInput.Button(new Rect(10, 296, w - 20, 34), "OPEN THE DOORS"))
         {
             _sim.BeginDay();
             _awaitingMorningReport = false;
@@ -228,7 +232,7 @@ public class V3PrototypeSession : MonoBehaviour
             $"morale {_sim.Staff.AverageMorale:0}"); y += 20;
 
         if (_sim.TryFindRuinedRoom(out int ruined) &&
-            GUI.Button(new Rect(10, 296, w - 20, 30), $"CLEAR A DERELICT ROOM  (${HotelSim.RuinedRoomUnlockCost})"))
+            GuiInput.Button(new Rect(10, 296, w - 20, 30), $"CLEAR A DERELICT ROOM  (${HotelSim.RuinedRoomUnlockCost})"))
         {
             if (_sim.TryUnlockRuinedRoom(ruined, out string reason)) Say($"Room {ruined} is back in service. It needs cleaning.");
             else Say(reason);
@@ -242,7 +246,7 @@ public class V3PrototypeSession : MonoBehaviour
         foreach (PriceTemplate t in System.Enum.GetValues(typeof(PriceTemplate)))
         {
             bool active = _sim.Pricing.DefaultTemplate == t;
-            if (GUI.Button(new Rect(20, y, w - 40, 26), (active ? "> " : "  ") + PricingPolicy.LabelOf(t)))
+            if (GuiInput.Button(new Rect(20, y, w - 40, 26), (active ? "> " : "  ") + PricingPolicy.LabelOf(t)))
                 _sim.Pricing.DefaultTemplate = t;
             y += 30;
         }
@@ -262,7 +266,7 @@ public class V3PrototypeSession : MonoBehaviour
         {
             ShiftTier tier = _sim.Shifts.TierOf(role);
             GUI.Label(new Rect(20, y, 110, 22), role.ToString());
-            if (GUI.Button(new Rect(130, y, w - 150, 22), ShiftPlan.LabelOf(tier)))
+            if (GuiInput.Button(new Rect(130, y, w - 150, 22), ShiftPlan.LabelOf(tier)))
                 _sim.Shifts.SetTier(role, NextTier(tier));
             y += 26;
         }
@@ -273,7 +277,7 @@ public class V3PrototypeSession : MonoBehaviour
             $"Clean capacity {ServiceCapacityModel.CleanRoomsPerHour(_sim.Staff, 1f):0.0}/h   " +
             $"check-ins {ServiceCapacityModel.CheckInsPerHour(_sim.Staff):0.0}/h"); y += 26;
 
-        if (GUI.Button(new Rect(20, y, w - 40, 26), "HIRE A HOUSEKEEPER  ($200 signing)"))
+        if (GuiInput.Button(new Rect(20, y, w - 40, 26), "HIRE A HOUSEKEEPER  ($200 signing)"))
         {
             if (_sim.TrySpendCash(200))
             {
@@ -285,7 +289,7 @@ public class V3PrototypeSession : MonoBehaviour
             else Say("Not enough cash. Collect the safebox first.");
         }
         y += 30;
-        if (GUI.Button(new Rect(20, y, w - 40, 26), "HIRE AN INSPECTOR  ($250 signing)"))
+        if (GuiInput.Button(new Rect(20, y, w - 40, 26), "HIRE AN INSPECTOR  ($250 signing)"))
         {
             if (_sim.TrySpendCash(250))
             {
@@ -313,7 +317,7 @@ public class V3PrototypeSession : MonoBehaviour
         int i = 0;
         foreach (RoomTier band in System.Enum.GetValues(typeof(RoomTier)))
         {
-            if (GUI.Button(new Rect(20 + i * (bw + 5), y, bw, 24),
+            if (GuiInput.Button(new Rect(20 + i * (bw + 5), y, bw, 24),
                            band + " $" + _sim.Pricing.PriceFor(_sim.Clock.CurrentDay, band)))
             {
                 for (int f = 0; f < FloorMath.FloorCount; f++) _sim.SetPriceBandForFloor(f, band);
@@ -347,7 +351,7 @@ public class V3PrototypeSession : MonoBehaviour
             string status = item.IsUnderRepair ? " [being fixed, " + item.repairDaysRemaining + "d]" : "";
             GUI.Label(new Rect(20, y, w - 150, 20), "R" + item.roomNumber + ": " + FurnitureLedger.FaultLineOf(item) + status);
             if (!item.IsUnderRepair &&
-                GUI.Button(new Rect(w - 128, y - 2, 108, 22), "FIX $" + kind.repairCost))
+                GuiInput.Button(new Rect(w - 128, y - 2, 108, 22), "FIX $" + kind.repairCost))
             {
                 if (_sim.TryRepairFurniture(item.instanceId, out string reason))
                     Say(kind.name + " in room " + item.roomNumber + ": " + kind.repairDays + " day(s) of work.");
@@ -375,14 +379,14 @@ public class V3PrototypeSession : MonoBehaviour
         foreach (RenovationPlanKind kind in System.Enum.GetValues(typeof(RenovationPlanKind)))
         {
             bool active = _plan == kind;
-            if (GUI.Button(new Rect(20, y, w - 40, 26), (active ? "> " : "  ") + RenovationPlan.LabelOf(kind)))
+            if (GuiInput.Button(new Rect(20, y, w - 40, 26), (active ? "> " : "  ") + RenovationPlan.LabelOf(kind)))
                 _plan = kind;
             y += 30;
         }
 
         var plan = RenovationPlan.For(_plan);
-        if (GUI.Button(new Rect(20, y, 80, 24), "- room") && _renovationBatchSize > 1) _renovationBatchSize--;
-        if (GUI.Button(new Rect(104, y, 80, 24), "+ room")) _renovationBatchSize++;
+        if (GuiInput.Button(new Rect(20, y, 80, 24), "- room") && _renovationBatchSize > 1) _renovationBatchSize--;
+        if (GuiInput.Button(new Rect(104, y, 80, 24), "+ room")) _renovationBatchSize++;
         int quote = _sim.QuoteRenovation(_plan, _renovationBatchSize);
         int materials = RenovationPricing.MaterialCostFor(plan, _renovationBatchSize);
         int days = RenovationPricing.BlockDaysFor(plan, _renovationBatchSize);
@@ -392,12 +396,12 @@ public class V3PrototypeSession : MonoBehaviour
             $"${quote} total (${RenovationPricing.CashPerRoomFor(plan, _renovationBatchSize)}/room), " +
             $"{materials} materials, shut {days} days"); y += 24;
 
-        if (GUI.Button(new Rect(20, y, (w - 50) / 2f, 26), "BUY 10 MATERIALS"))
+        if (GuiInput.Button(new Rect(20, y, (w - 50) / 2f, 26), "BUY 10 MATERIALS"))
         {
             if (_sim.TryBuyMaterials(10)) Say("Materials delivered.");
             else Say("Can't afford materials right now.");
         }
-        if (GUI.Button(new Rect(30 + (w - 50) / 2f, y, (w - 50) / 2f, 26), "START THE WORK"))
+        if (GuiInput.Button(new Rect(30 + (w - 50) / 2f, y, (w - 50) / 2f, 26), "START THE WORK"))
         {
             var rooms = _sim.RenovatableRooms(_plan, _renovationBatchSize);
             if (_sim.TryStartRenovation(_plan, rooms, out string reason))

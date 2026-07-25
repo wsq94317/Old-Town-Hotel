@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 // OnGUI 面板的触屏输入桥：纯新 Input System 下 IMGUI 收不到（模拟）触摸，
 // 点击由 WorldInputController 捕获后经 PublishTap 转发到这里；
@@ -17,14 +18,54 @@ public static class GuiInput
     /// <summary>WorldInputController 在面板打开/点中保留区时调用，转发这次点击。</summary>
     public static void PublishTap(Vector2 screenPos)
     {
-        float f = GuiScale.Factor;
-        _tapVirtual = new Vector2(screenPos.x / f, (Screen.height - screenPos.y) / f);
+        // 换算必须与 GuiScale.Begin() 的矩阵互逆（含安全区平移），否则命中整体偏移
+        _tapVirtual = GuiScale.ScreenToVirtual(screenPos);
         _tapFrame = Time.frameCount;
         _consumed = false;
     }
 
     /// <summary>消费诊断（探针）。</summary>
     public static string ConsumeDebug = "none";
+
+    private static int _selfPollFrame = -1;
+    private static bool _wasPressed;
+
+    /// <summary>**自取通道**：没有 WorldInputController 转发点击的场景（如 v3 调参原型）
+    /// 每帧调一次，自己从 Input System 读按下沿并发布。
+    ///
+    /// 为什么需要：纯新 Input System 下 IMGUI 完全收不到触摸，`GUI.Button` 在真机/
+    /// Device Simulator 上是聋的——只有编辑器鼠标能点。原型场景没有巡查层的输入控制器，
+    /// 于是这里补一条最小的自取路径，避免为了几个调试按钮把整套世界输入搬进来。
+    /// 一帧只处理一次（同一帧被多个面板调用不会重复发布）。</summary>
+    public static void PollSelfServed()
+    {
+        if (_selfPollFrame == Time.frameCount) return;
+        _selfPollFrame = Time.frameCount;
+
+        bool pressed = false;
+        Vector2 pos = Vector2.zero;
+
+        // 触屏优先：Device Simulator 与真机走这条
+        Touchscreen touch = Touchscreen.current;
+        if (touch != null && touch.primaryTouch.press.isPressed)
+        {
+            pressed = true;
+            pos = touch.primaryTouch.position.ReadValue();
+        }
+        else
+        {
+            Mouse mouse = Mouse.current;
+            if (mouse != null && mouse.leftButton.isPressed)
+            {
+                pressed = true;
+                pos = mouse.position.ReadValue();
+            }
+        }
+
+        // 只在按下沿发布：按住不动不该每帧重复触发按钮
+        if (pressed && !_wasPressed) PublishTap(pos);
+        _wasPressed = pressed;
+    }
 
     private static bool ConsumeTapIn(Rect r)
     {
@@ -62,8 +103,7 @@ public static class GuiInput
     /// <summary>屏幕坐标是否落在（上一帧登记的）常驻热区内。</summary>
     public static bool IsInReservedZone(Vector2 screenPos)
     {
-        float f = GuiScale.Factor;
-        var v = new Vector2(screenPos.x / f, (Screen.height - screenPos.y) / f);
+        Vector2 v = GuiScale.ScreenToVirtual(screenPos);
         for (int i = 0; i < _zones.Count; i++)
         {
             if (_zones[i].Contains(v)) return true;
