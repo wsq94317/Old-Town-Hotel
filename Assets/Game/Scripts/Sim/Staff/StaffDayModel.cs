@@ -49,6 +49,16 @@ public static class StaffDayModel
         return SimMath.Clamp(basis * (0.5d + moraleSlack), 0d, 0.5d);
     }
 
+    /// <summary>一次摸鱼持续多久（分钟）。摸鱼必须有终点——否则一天下来全员永久摸鱼、酒店猝死。</summary>
+    public const int MinSlackMinutes = 5;
+    public const int MaxSlackMinutes = 20;
+
+    public static int SlackDurationMinutes(double roll)
+    {
+        double r = SimMath.Clamp01(roll);
+        return MinSlackMinutes + (int)(r * (MaxSlackMinutes - MinSlackMinutes));
+    }
+
     /// <summary>一天下来的疲劳增量（满班 +0.35，休息不足会跨日累积）。</summary>
     public static float FatigueGainFor(int workedMinutes)
     {

@@ -118,6 +118,45 @@ namespace OldTownHotel.Tests.EditMode
         }
 
         [Test]
+        public void Slacking_EndsByItself_SoTheHotelDoesNotDie()
+        {
+            // 回归测试：早期实现里摸鱼没有终点，一天下来全员永久摸鱼、酒店猝死
+            var roster = new StaffRoster();
+            int id = roster.Register(LazyHousekeeper("Slacker"));
+            roster.StartShift(id);
+            roster.SetState(id, StaffOperationalState.Working);
+            roster.RollSlackDecision(id, roll: 0.0, managerOnFloor: false, durationRoll: 0.0);
+
+            Assert.That(roster.StateOf(id), Is.EqualTo(StaffOperationalState.Slacking));
+            for (int i = 0; i < StaffDayModel.MinSlackMinutes; i++) roster.TickMinute();
+
+            Assert.That(roster.StateOf(id), Is.EqualTo(StaffOperationalState.Working),
+                        "摸够了自己回去干活");
+            Assert.That(roster.MaxSlackMinutesRemaining, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void WakeSlackers_SnapsEveryoneBackWhenManagerWalksIn()
+        {
+            var roster = new StaffRoster();
+            int a = roster.Register(LazyHousekeeper("A"));
+            int b = roster.Register(LazyHousekeeper("B"));
+            foreach (int id in new[] { a, b })
+            {
+                roster.StartShift(id);
+                roster.SetState(id, StaffOperationalState.Working);
+                roster.RollSlackDecision(id, roll: 0.0, managerOnFloor: false, durationRoll: 1.0);
+            }
+
+            int woken = roster.WakeSlackers();
+
+            Assert.That(woken, Is.EqualTo(2), "经理进场把摸鱼的全惊醒（巡查层据此播慌张装忙）");
+            Assert.That(roster.StateOf(a), Is.EqualTo(StaffOperationalState.Working));
+            Assert.That(roster.StateOf(b), Is.EqualTo(StaffOperationalState.Working));
+            Assert.That(roster.WakeSlackers(), Is.EqualTo(0), "没人摸鱼时惊醒是空操作");
+        }
+
+        [Test]
         public void ReportCaught_AppliesMoraleHitAndPutsThemBackToWork()
         {
             var roster = new StaffRoster();

@@ -28,6 +28,7 @@ public sealed class StaffSimEntry
     public int workedMinutesToday;
     public int slackMinutesToday;
     public int caughtCountToday;
+    public int slackMinutesRemaining;  // 本次摸鱼剩余时长；归零自己回去干活
 
     public bool IsOnDuty => state != StaffOperationalState.OffShift && state != StaffOperationalState.Absent;
 
@@ -71,7 +72,15 @@ public sealed class StaffRoster
 
     public void SetState(int staffId, StaffOperationalState state)
     {
-        if (_byId.TryGetValue(staffId, out StaffSimEntry e)) e.state = state;
+        if (!_byId.TryGetValue(staffId, out StaffSimEntry e)) return;
+        e.state = state;
+
+        // 防坑：不经 RollSlackDecision 直接置成 Slacking（巡查层/调试也可能这么干）时
+        // 补一个默认时长，否则 remaining=0 会让它在下一 tick 立刻过期。
+        if (state == StaffOperationalState.Slacking && e.slackMinutesRemaining <= 0)
+            e.slackMinutesRemaining = StaffDayModel.SlackDurationMinutes(0.5d);
+        else if (state != StaffOperationalState.Slacking)
+            e.slackMinutesRemaining = 0;
     }
 
     public void StartShift(int staffId) => SetState(staffId, StaffOperationalState.Available);
@@ -107,6 +116,18 @@ public sealed class StaffRoster
         return n;
     }
 
+    /// <summary>当前最长的摸鱼剩余时长（诊断/测试用）。</summary>
+    public int MaxSlackMinutesRemaining
+    {
+        get
+        {
+            int max = 0;
+            for (int i = 0; i < _entries.Count; i++)
+                if (_entries[i].slackMinutesRemaining > max) max = _entries[i].slackMinutesRemaining;
+            return max;
+        }
+    }
+
     public float AverageMorale
     {
         get
@@ -121,15 +142,43 @@ public sealed class StaffRoster
 
     // ── 每分钟推进 ───────────────────────────────────────────────────────────
 
-    /// <summary>推进一分钟：按当前状态累计工作/摸鱼分钟。由 SimPipeline 每 tick 调一次。</summary>
+    /// <summary>推进一分钟：按当前状态累计工作/摸鱼分钟，并消耗摸鱼时长。
+    /// 由 SimPipeline 每 tick 调一次。</summary>
     public void TickMinute()
     {
         for (int i = 0; i < _entries.Count; i++)
         {
             var e = _entries[i];
-            if (e.state == StaffOperationalState.Working) e.workedMinutesToday++;
-            else if (e.state == StaffOperationalState.Slacking) e.slackMinutesToday++;
+            if (e.state == StaffOperationalState.Working)
+            {
+                e.workedMinutesToday++;
+            }
+            else if (e.state == StaffOperationalState.Slacking)
+            {
+                e.slackMinutesToday++;
+                if (--e.slackMinutesRemaining <= 0)
+                {
+                    e.slackMinutesRemaining = 0;
+                    e.state = StaffOperationalState.Working; // 摸够了，自己回去干活
+                }
+            }
         }
+    }
+
+    /// <summary>经理进场：把摸鱼的人全部惊醒回去干活（v2"惊醒"语义的 Sim 版）。
+    /// 返回被惊醒的人数——巡查层可据此播慌张装忙的演出。</summary>
+    public int WakeSlackers()
+    {
+        int woken = 0;
+        for (int i = 0; i < _entries.Count; i++)
+        {
+            var e = _entries[i];
+            if (e.state != StaffOperationalState.Slacking) continue;
+            e.state = StaffOperationalState.Working;
+            e.slackMinutesRemaining = 0;
+            woken++;
+        }
+        return woken;
     }
 
     // ── 摸鱼：Sim 权威 ───────────────────────────────────────────────────────
@@ -140,14 +189,16 @@ public sealed class StaffRoster
             ? StaffDayModel.SlackChancePerMinute(e.member, managerOnFloor: false)
             : 0d;
 
-    /// <summary>掷一次摸鱼判定（roll 外部注入=可测）。只有正在干活的人才会开始摸鱼。</summary>
-    public bool RollSlackDecision(int staffId, double roll, bool managerOnFloor)
+    /// <summary>掷一次摸鱼判定（roll 外部注入=可测）。只有正在干活的人才会开始摸鱼。
+    /// durationRoll 决定这次摸多久（不传则取中位时长）。</summary>
+    public bool RollSlackDecision(int staffId, double roll, bool managerOnFloor, double durationRoll = 0.5d)
     {
         if (!_byId.TryGetValue(staffId, out StaffSimEntry e)) return false;
         if (e.state != StaffOperationalState.Working) return false;
         double chance = StaffDayModel.SlackChancePerMinute(e.member, managerOnFloor);
         if (roll >= chance) return false;
         e.state = StaffOperationalState.Slacking;
+        e.slackMinutesRemaining = StaffDayModel.SlackDurationMinutes(durationRoll);
         return true;
     }
 
@@ -162,6 +213,7 @@ public sealed class StaffRoster
             e.caughtCountToday++;
             e.member.AdjustMorale(StaffDayModel.CaughtSlackingMoralePenalty);
             e.state = StaffOperationalState.Working;
+            e.slackMinutesRemaining = 0;
             return true;
         }
 
@@ -193,6 +245,7 @@ public sealed class StaffRoster
             e.workedMinutesToday = 0;
             e.slackMinutesToday = 0;
             e.caughtCountToday = 0;
+            e.slackMinutesRemaining = 0;
             e.state = StaffOperationalState.OffShift;
         }
     }

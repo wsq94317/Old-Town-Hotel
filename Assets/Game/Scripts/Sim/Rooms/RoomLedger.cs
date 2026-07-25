@@ -111,6 +111,19 @@ public sealed class RoomLedger
         get { EnsureAggregates(); return _surfaced; }
     }
 
+    /// <summary>找一间处于某状态的房（数组序，稳定=可复现）。清洁池消化用。</summary>
+    public bool TryFindFirstInState(RoomSimState state, out int roomNumber)
+    {
+        for (int i = 0; i < _rooms.Length; i++)
+        {
+            if (_rooms[i].state != state) continue;
+            roomNumber = _rooms[i].number;
+            return true;
+        }
+        roomNumber = 0;
+        return false;
+    }
+
     /// <summary>花钱解锁一间破败房：变成脏房（还得打扫才能卖）。</summary>
     public bool TryUnlockRuinedRoom(int roomNumber)
     {
