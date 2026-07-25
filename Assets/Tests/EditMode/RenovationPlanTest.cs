@@ -33,8 +33,15 @@ namespace OldTownHotel.Tests.EditMode
 
             Assert.That(RenovationPricing.DiscountFor(1), Is.EqualTo(0f), "单间没折扣");
             Assert.That(RenovationPricing.DiscountFor(5), Is.GreaterThan(0f));
-            Assert.That(RenovationPricing.DiscountFor(50), Is.EqualTo(RenovationPricing.MaxDiscount),
-                        "折扣有上限，不能无限刷");
+            Assert.That(RenovationPricing.DiscountFor(50), Is.LessThan(RenovationPricing.MaxDiscount),
+                        "折扣有渐近上限，不能无限刷");
+
+            // 渐近曲线（§C3 杠杆 C）取代原本 6%/间、35% 封顶的线性折扣：线性版在第 7 间
+            // 就撞顶，之后多装一间一分好处都没有，与"整层翻新的规模效应"正好相反。
+            // 断言的是**规模永远还能再省一点**这条性质，不是任何一档具体数字。
+            Assert.That(RenovationPricing.DiscountFor(32),
+                        Is.GreaterThan(RenovationPricing.DiscountFor(16)),
+                        "整层之上继续加量还能再便宜——规模效应不该在中途断掉");
 
             int onePer = RenovationPricing.CashPerRoomFor(plan, 1);
             int tenPer = RenovationPricing.CashPerRoomFor(plan, 10);

@@ -19,7 +19,9 @@ public class V3PrototypeSession : MonoBehaviour
     // M-C 调参（首轮试玩发现的结构性问题）：v1 沿用的 0.0015/日 在 v3 尺度下是
     // 每天 $274 利息，而 12 间老房满住的天花板约 $650 毛收入——扣掉工资后连利息
     // 都覆盖不了，债务每天净增，玩家从第一天就在打一场赢不了的仗。
-    // 0.0004/日（约 1.2%/月）+ 每日固定还款 $150 → 本金真的会降，前期依然紧张。
+    // 0.0004/日（约 1.2%/月）→ 本金真的会降，前期依然紧张。
+    // M-C2 二轮：dailyRepayment 由"每天硬扣"改为**单日上限**，实扣走 DebtPolicy
+    // 按昨日净利分成（固定硬扣会把玩家泵到 $0 永远攒不出首付，见 DebtPolicy 注释）。
     [SerializeField] private float dailyInterestRate = 0.0004f;
     [SerializeField] private int dailyRepayment = 150;
     [SerializeField] private int rngSeed = 8675309;
@@ -32,6 +34,7 @@ public class V3PrototypeSession : MonoBehaviour
     private float _toastUntil;
     private int _renovationBatchSize = 1;
     private RenovationPlanKind _plan = RenovationPlanKind.Economy;
+    private int _yesterdayNetProfit;
 
     private void Awake()
     {
@@ -81,14 +84,17 @@ public class V3PrototypeSession : MonoBehaviour
         int repayment = ScheduledRepayment();
         var result = _sim.SettleDay(interest: interest, scheduledRepayment: repayment, supplies: 0);
         if (result.wagesPaid && repayment > 0) _loan.Repay(repayment);
+        _yesterdayNetProfit = result.netToSafebox;
 
         _sim.Clock.BeginNextDay();
         _awaitingMorningReport = true;
         _tab = Tab.Report;
     }
 
-    /// <summary>每日计划还款：自动扣（"忘按还款键"不是有趣的失败）。</summary>
-    private int ScheduledRepayment() => _loan.Balance > 0 ? dailyRepayment : 0;
+    /// <summary>每日计划还款：仍自动扣（"忘按还款键"不是有趣的失败），
+    /// 但金额按昨日净利分成、以 dailyRepayment 为单日上限——见 DebtPolicy。</summary>
+    private int ScheduledRepayment() =>
+        DebtPolicy.ScheduledRepaymentFor(_loan.Balance, _yesterdayNetProfit, _sim.Cash, dailyRepayment);
 
     private void Say(string message)
     {

@@ -6,8 +6,10 @@ using System;
 //   · tick 单位 = 1 游戏分钟。一天 8:00→22:00 = 840 tick。
 //     所有子系统按分钟推进，倍速与"跳到下一阶段"都只是"多跑几个 tick"——
 //     **不存在两套时间语义**，这是防加速 bug 的关键。
-//   · 1x = 30 真实分钟/天（默认速度就该是默认值）；0.25x 为直播/挂机档，
-//     刚好还原"2 小时 = 1 天"的宣传口径；另有 2x。
+//   · 1x = 8 真实分钟/天。原为 30 分钟，M-C2 试玩后按 §C3 杠杆 A 改：
+//     调参后一天净利只有几十块，30 分钟一天意味着玩家要熬 12 小时才翻新两间房，
+//     "商业帝国"的推进感完全立不起来。8 分钟一天 ⇒ 一小时玩 7.5 天，
+//     一次通勤就能看见装修完工、债务下降。0.25x（32 分钟/天）留作直播/挂机档，2x 快进。
 //   · 钟面不自动跨日：到 22:00 clamp 并置 DayEndReached，由宿主完成日结后
 //     调 BeginNextDay()——沿用 v1 GameClock 的语义，六个 OnDaySettled 订阅者零改动。
 //   · 离线换算锚死 1x（OfflineGameMinutesFor），与玩家在线选的倍速无关，
@@ -18,10 +20,16 @@ public sealed class SimClock
     public const int DayEndMinute = 22 * 60;    // 22:00
     public const int MinutesPerDay = DayEndMinute - DayStartMinute; // 840
 
-    /// <summary>1x 映射：30 真实分钟跑完一天。</summary>
-    public const float BaseRealSecondsPerGameMinute = 30f * 60f / MinutesPerDay; // ≈2.1429
+    /// <summary>1x 映射：8 真实分钟跑完一天。</summary>
+    public const float RealMinutesPerGameDayAt1x = 8f;
+    public const float BaseRealSecondsPerGameMinute = RealMinutesPerGameDayAt1x * 60f / MinutesPerDay; // ≈0.5714
 
-    /// <summary>离线最多补 7 天（防拨表刷收益，配合保险箱容量双重封顶）。</summary>
+    /// <summary>离线最多补 7 天（防拨表刷收益，配合保险箱容量双重封顶）。
+    ///
+    /// **M-E 必须重新拍这个数**：日长从 30 分钟改到 8 分钟后，7 游戏天只等于
+    /// 56 真实分钟——离开一小时和离开一周拿到的东西一模一样，"关掉过一夜、
+    /// 回来收两天进度"的回流钩子直接失效。这个帽子当初是按真实时长的直觉定的，
+    /// 现在那份直觉已经不成立了。改法留给 M-E 连离线报告一起设计。</summary>
     public const int MaxOfflineDays = 7;
 
     // 余量以"游戏分钟"为单位用 double 累加：float 累加在 2x 下会让 6.0 变成 5.9999

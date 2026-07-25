@@ -1,7 +1,7 @@
 using NUnit.Framework;
 
 // v3 SimClock：tick 单位=1 游戏分钟，一天 8:00-22:00（840 分钟）。
-// 1x = 30 真实分钟/天；倍速只改推进速率，不改任何游戏时间语义。
+// 1x = 8 真实分钟/天（§C3 杠杆 A，原 30 分钟）；倍速只改推进速率，不改任何游戏时间语义。
 namespace OldTownHotel.Tests.EditMode
 {
     [TestFixture]
@@ -15,9 +15,10 @@ namespace OldTownHotel.Tests.EditMode
             Assert.That(SimClock.DayStartMinute, Is.EqualTo(8 * 60));
             Assert.That(SimClock.DayEndMinute, Is.EqualTo(22 * 60));
             Assert.That(SimClock.MinutesPerDay, Is.EqualTo(840));
-            // 1x：30 真实分钟跑完 840 游戏分钟
+            // 1x：RealMinutesPerGameDayAt1x 真实分钟跑完 840 游戏分钟
+            // （断言对常量——日长是会调的设计旋钮，写死 30 会在调参时假失败）
             Assert.That(SimClock.MinutesPerDay * SimClock.BaseRealSecondsPerGameMinute,
-                        Is.EqualTo(30f * 60f).Within(0.01f));
+                        Is.EqualTo(SimClock.RealMinutesPerGameDayAt1x * 60f).Within(0.01f));
         }
 
         [Test]

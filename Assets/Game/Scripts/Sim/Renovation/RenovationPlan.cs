@@ -66,17 +66,26 @@ public readonly struct RenovationPlan
 /// <summary>批量折扣与工期规则。</summary>
 public static class RenovationPricing
 {
-    public const float DiscountPerExtraRoom = 0.06f;
-    public const float MaxDiscount = 0.35f;
+    /// <summary>折扣渐近上限（永远摸不到，只是无限接近）。</summary>
+    public const float MaxDiscount = 0.60f;
+
+    /// <summary>规模系数：越大则小批量就能拿到不错的折扣。</summary>
+    public const float ScaleCoefficient = 1f / 3f;
 
     /// <summary>每多 4 间，Block 期 +1 天（一支施工队干不完那么多房）。</summary>
     public const int RoomsPerExtraBlockDay = 4;
 
+    /// <summary>批量折扣：双曲渐近曲线，**规模永远还能再省一点**。
+    ///
+    /// 原本是线性 6%/间、35% 封顶——第 7 间就撞顶，之后多装一间一分好处都没有，
+    /// 与"整层整层翻新的帝国规模效应"正好相反（架构文档 §C3 杠杆 C）。
+    /// 现在 2 间 15% / 4 间 30% / 8 间 42% / 整层 16 间 50% / 全店 100 间 58%。
+    /// 反向制衡是 BlockDaysFor：每 4 间 +1 天工期，一次翻整层要停业一周——
+    /// 省下的钱和停掉的间夜互相咬，规模化装修才是取舍而不是免费午餐。</summary>
     public static float DiscountFor(int roomCount)
     {
         if (roomCount <= 1) return 0f;
-        float d = DiscountPerExtraRoom * (roomCount - 1);
-        return d > MaxDiscount ? MaxDiscount : d;
+        return MaxDiscount * (1f - 1f / (1f + ScaleCoefficient * (roomCount - 1)));
     }
 
     /// <summary>一批装修的现金总价（含批量折扣）。</summary>
