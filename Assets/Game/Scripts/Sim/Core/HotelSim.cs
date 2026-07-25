@@ -287,6 +287,77 @@ public sealed class HotelSim
         return true;
     }
 
+    // ── 存档（v4 增量第一批） ─────────────────────────────────────────────────
+
+    /// <summary>捕获 Sim 跨日状态。房态在 RoomsState/装修表里，这里只存内核自己的东西。</summary>
+    public void CaptureTo(SimState state)
+    {
+        if (state == null) return;
+
+        state.day = Clock.CurrentDay;
+        state.minute = Clock.CurrentMinute;
+        state.totalMinutesElapsed = Clock.TotalMinutesElapsed;
+
+        state.safeboxLevel = Safebox.Level;
+        state.safeboxBalance = Safebox.Balance;
+        state.overflowBalance = Overflow.Balance;
+        state.cash = Cash;
+
+        state.defaultPriceTemplate = (int)Pricing.DefaultTemplate;
+        state.priceOverrides.Clear();
+        foreach (var kv in Pricing.Overrides)
+            state.priceOverrides.Add(new PriceOverrideEntry { day = kv.Key, template = (int)kv.Value });
+
+        state.shiftTiers.Clear();
+        foreach (StaffRole role in System.Enum.GetValues(typeof(StaffRole)))
+            state.shiftTiers.Add(new ShiftTierEntry { role = (int)role, tier = (int)Shifts.TierOf(role) });
+
+        state.nextStaffId = Staff.NextIdSeed;
+        state.staff.Clear();
+        var entries = Staff.Entries;
+        for (int i = 0; i < entries.Count; i++)
+        {
+            var e = entries[i];
+            state.staff.Add(new StaffSimState
+            {
+                staffId = e.staffId,
+                rosterIndex = i,
+                operationalState = (int)e.state,
+                fatigue = e.fatigue,
+                slackMinutesRemaining = e.slackMinutesRemaining,
+            });
+        }
+    }
+
+    /// <summary>恢复 Sim 跨日状态。名册须已按同样顺序重建（从 Payroll 建）。</summary>
+    public void RestoreFrom(SimState state)
+    {
+        if (state == null) return;
+
+        Clock.RestoreFromSave(state.day, state.minute, state.totalMinutesElapsed);
+
+        Safebox.RestoreFromSave(state.safeboxLevel, state.safeboxBalance);
+        Overflow.RestoreFromSave(state.overflowBalance);
+        Cash = state.cash < 0 ? 0 : state.cash;
+
+        Pricing.DefaultTemplate = (PriceTemplate)state.defaultPriceTemplate;
+        Pricing.ClearAllOverrides();
+        if (state.priceOverrides != null)
+            foreach (var entry in state.priceOverrides)
+                Pricing.SetOverride(entry.day, (PriceTemplate)entry.template);
+
+        if (state.shiftTiers != null)
+            foreach (var entry in state.shiftTiers)
+                Shifts.SetTier((StaffRole)entry.role, (ShiftTier)entry.tier);
+
+        Staff.RestoreIdSeed(state.nextStaffId);
+        if (state.staff != null)
+            foreach (var s in state.staff)
+                Staff.RestoreEntryState(s.rosterIndex, s.staffId,
+                                        (StaffOperationalState)s.operationalState,
+                                        s.fatigue, s.slackMinutesRemaining);
+    }
+
     /// <summary>跑完当天剩余的所有 tick（测试与跳段用）。</summary>
     public void RunToEndOfDay()
     {

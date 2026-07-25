@@ -21,7 +21,8 @@ namespace OldTownHotel.Tests.EditMode
 
             var back = JsonUtility.FromJson<GameState>(JsonUtility.ToJson(gs));
 
-            Assert.That(back.version, Is.EqualTo(3));
+            // 断言对常量而非写死数字：存档版本会随里程碑增量演进（v3→v4→…）
+            Assert.That(back.version, Is.EqualTo(GameState.CurrentVersion));
             Assert.That(back.world.gymUnlocked, Is.True);
             Assert.That(back.world.casinoUnlocked, Is.False);
             Assert.That(back.world.poolUnlocked, Is.True);

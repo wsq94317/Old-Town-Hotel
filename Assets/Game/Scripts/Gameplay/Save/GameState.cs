@@ -87,13 +87,84 @@ public sealed class WorldState
     public List<int> lockedRooms = new List<int>(); // 次晨自动转 Dirty
 }
 
+// ── v4：Sim 内核状态（增量演进第一批） ──────────────────────────────────────
+// 存档随里程碑逐期加字段（JsonUtility 缺省值天然兼容旧档），拒绝到 M-E 一次性大爆炸
+// 迁移——本项目在存档口径上踩过坑（day+1），越晚越大越危险。
+
+[Serializable]
+public sealed class PriceOverrideEntry { public int day; public int template; }
+
+[Serializable]
+public sealed class ShiftTierEntry { public int role; public int tier; }
+
+[Serializable]
+public sealed class StaffSimState
+{
+    public int staffId;
+    public int rosterIndex;          // 对应 StaffRoster.Entries 的序（重建时顺序一致）
+    public int operationalState;     // StaffOperationalState
+    public float fatigue;
+    public int slackMinutesRemaining;
+}
+
+[Serializable]
+public sealed class SimState
+{
+    // 时钟（离线连续时间制需要它们全部）
+    public int day = 1;
+    public int minute = 8 * 60;
+    public long totalMinutesElapsed;
+    public long lastRealUtcTicks;
+    public List<int> settledDayIds = new List<int>();   // 每 dayId 至多一行 DayLedger 的幂等守卫
+
+    // 资金
+    public int safeboxLevel = 1;
+    public int safeboxBalance;
+    public int overflowBalance;
+    public int cash;
+
+    // 定价 / 排班
+    public int defaultPriceTemplate;                    // PriceTemplate
+    public List<PriceOverrideEntry> priceOverrides = new List<PriceOverrideEntry>();
+    public List<ShiftTierEntry> shiftTiers = new List<ShiftTierEntry>();
+
+    // 员工模拟状态（士气/工资在 EconomyState.staff，这里只放 Sim 侧运营状态）
+    public int nextStaffId;
+    public List<StaffSimState> staff = new List<StaffSimState>();
+}
+
 [Serializable]
 public sealed class GameState
 {
-    public int version = 3;   // v2: + rooms（过夜占用）；v3: + world（经理模式世界层）
+    // v2: + rooms（过夜占用）；v3: + world（经理模式世界层）；v4: + sim（模拟内核）
+    public const int CurrentVersion = 4;
+
+    public int version = CurrentVersion;
     public EconomyState economy = new EconomyState();
     public RenovationState renovation = new RenovationState();
     public ProgressState progress = new ProgressState();
     public RoomsState rooms = new RoomsState();
     public WorldState world = new WorldState();
+    public SimState sim = new SimState();
+
+    /// <summary>旧档补齐：JsonUtility 对缺失字段给 null，逐段兜底后升到当前版本。
+    /// 只做"补默认值"，绝不丢已有数据（v3 的 world / v2 的 rooms 原样留着）。</summary>
+    public void MigrateToCurrentVersion()
+    {
+        if (economy == null) economy = new EconomyState();
+        if (renovation == null) renovation = new RenovationState();
+        if (progress == null) progress = new ProgressState();
+        if (rooms == null) rooms = new RoomsState();
+        if (world == null) world = new WorldState();
+        if (sim == null) sim = new SimState();
+        if (sim.settledDayIds == null) sim.settledDayIds = new List<int>();
+        if (sim.priceOverrides == null) sim.priceOverrides = new List<PriceOverrideEntry>();
+        if (sim.shiftTiers == null) sim.shiftTiers = new List<ShiftTierEntry>();
+        if (sim.staff == null) sim.staff = new List<StaffSimState>();
+
+        // v3 及更早：Sim 尚未存在，用进度里的日号对齐钟面（读档即是那天早上）
+        if (version < 4 && sim.day <= 1 && progress.day > 0) sim.day = progress.day;
+
+        version = CurrentVersion;
+    }
 }

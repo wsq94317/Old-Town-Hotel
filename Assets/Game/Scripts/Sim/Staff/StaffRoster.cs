@@ -250,6 +250,36 @@ public sealed class StaffRoster
         }
     }
 
+    // ── 存档 ─────────────────────────────────────────────────────────────────
+
+    /// <summary>下一个将要分配的 id（存档要带上，否则读档后新雇员工的 id 会和旧的撞车）。</summary>
+    public int NextIdSeed => _nextId;
+
+    /// <summary>读档：恢复 id 计数器，保证新雇的人不会复用历史 id。</summary>
+    public void RestoreIdSeed(int seed)
+    {
+        if (seed > _nextId) _nextId = seed;
+    }
+
+    /// <summary>读档：按名册序恢复第 index 名员工的 Sim 侧运营状态。</summary>
+    public void RestoreEntryState(int index, int staffId, StaffOperationalState state,
+                                  float fatigue, int slackMinutesRemaining)
+    {
+        if (index < 0 || index >= _entries.Count) return;
+        var e = _entries[index];
+
+        if (staffId > 0 && staffId != e.staffId)
+        {
+            _byId.Remove(e.staffId);
+            e.staffId = staffId;
+            _byId[staffId] = e;
+            RestoreIdSeed(staffId);
+        }
+        e.state = state;
+        e.fatigue = SimMath.Clamp01(fatigue);
+        e.slackMinutesRemaining = slackMinutesRemaining < 0 ? 0 : slackMinutesRemaining;
+    }
+
     /// <summary>日结后逐人掷离职（roll 外部注入）。返回离职者 id 列表。</summary>
     public List<int> RollQuits(System.Func<int, double> rollFor)
     {

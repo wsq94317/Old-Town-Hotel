@@ -33,7 +33,13 @@ public static class SaveService
     public static GameState LoadFrom(string path)
     {
         if (string.IsNullOrEmpty(path) || !File.Exists(path)) return null;
-        try { return JsonUtility.FromJson<GameState>(File.ReadAllText(path)); }
+        try
+        {
+            var state = JsonUtility.FromJson<GameState>(File.ReadAllText(path));
+            // 旧档补齐（v2/v3 → v4）：只补默认值，不丢任何已有数据
+            state?.MigrateToCurrentVersion();
+            return state;
+        }
         catch { return null; }
     }
 }
