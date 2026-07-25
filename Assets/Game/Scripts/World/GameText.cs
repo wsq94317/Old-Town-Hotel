@@ -1,0 +1,227 @@
+using System.Collections.Generic;
+
+// 界面文案的中英切换（**测试期临时设施**）。
+//
+// 项目铁律是"游戏文本英文、代码注释中文"，所以这里不是把英文改掉，而是加一层
+// 显示边界的查表：Sim 与各系统照旧只产生英文，UI 在**显示的那一刻**过一次翻译。
+//   · 翻回英文 = 把 UseChinese 改成 false，一个字段，不用回滚任何文案
+//   · 查不到的键**原样回落英文**，所以漏译只是显示英文，绝不会显示空白或报错
+//   · Sim 层不知道有这回事（它不能引用 UnityEngine，也不该管本地化）
+//
+// 发布前：UseChinese = false。这层可以整体删掉，删掉后所有调用点只剩英文原文。
+public static class GameText
+{
+    /// <summary>测试期开中文。**发布前改回 false**。</summary>
+    public static bool UseChinese = true;
+
+    /// <summary>翻译一段文案；查不到就原样返回（漏译显示英文，不炸）。</summary>
+    public static string T(string english)
+    {
+        if (!UseChinese || string.IsNullOrEmpty(english)) return english;
+        return Zh.TryGetValue(english, out string zh) ? zh : english;
+    }
+
+    /// <summary>带参数的文案：先翻译模板再填参数。模板里的占位符是 {0}/{1}…</summary>
+    public static string F(string englishFormat, params object[] args)
+    {
+        string template = T(englishFormat);
+        return args == null || args.Length == 0 ? template : string.Format(template, args);
+    }
+
+    // 键 = 英文原文。顺序按界面分区排，方便对照着校对。
+    private static readonly Dictionary<string, string> Zh = new Dictionary<string, string>
+    {
+        // ── 顶栏 ──────────────────────────────────────────────────────────────
+        { "DAY {0}   {1}   {2}", "第 {0} 天   {1}   {2}" },
+        { "CASH ${0}   SAFEBOX ${1}/{2}", "现金 ${0}   保险箱 ${1}/{2}" },
+        { "   SPILLED ${0}", "   溢出 ${0}" },
+        { "   DEBT ${0}", "   欠款 ${0}" },
+        { "{0}*   ROOMS {1} ready / {2} dirty / {3} in use / {4} derelict   MATERIALS {5}",
+          "{0}★   客房 {1} 可售 / {2} 待清 / {3} 在住 / {4} 破败   材料 {5}" },
+
+        // ── 页签与时间控制 ────────────────────────────────────────────────────
+        { "STATUS", "概况" },
+        { "PRICING", "定价" },
+        { "STAFF", "人员" },
+        { "RENOVATE", "装修" },
+        { "ROOMS", "客房" },
+        { "SKIP TO NEXT PHASE", "跳到下一时段" },
+
+        // 时段名（PhaseScheduler.Label）
+        { "CHECKOUT RUSH", "退房高峰" },
+        { "MIDDAY - catch up on rooms", "午间 — 追清客房" },
+        { "CHECK-IN RUSH", "入住高峰" },
+        { "EVENING - winding down", "夜间 — 收尾" },
+        { "CLOSING THE BOOKS", "打烊结账" },
+
+        // ── 晨报 ──────────────────────────────────────────────────────────────
+        { "YESTERDAY  (day {0})", "昨日结算（第 {0} 天）" },
+        { "Gross taken          ${0}", "毛收入            ${0}" },
+        { "Into the safebox     ${0}", "入保险箱          ${0}" },
+        { "Spilled (65% back)   ${0}", "溢出（找回 65%）  ${0}" },
+        { "Covered from cash    ${0}", "从现金垫付        ${0}" },
+        { "Payroll: everybody got paid.", "工资：全员发清。" },
+        { "PAYROLL SHORT by ${0}. They noticed.", "欠薪 ${0}。员工都记着。" },
+        { "Checked in {0}, turned away {1}, queue cost {2} min",
+          "入住 {0} 人，劝走 {1} 人，排队共耗 {2} 分钟" },
+        { "Commission ${0}   Cancelled {1}   No-shows {2}",
+          "渠道佣金 ${0}   取消 {1} 单   未到店 {2} 人" },
+        { "TURNED DOWN {0} BOOKINGS - no rooms left to sell.",
+          "有 {0} 单接不下来 — 没房可卖了。" },
+        { "Rating {0}*   Debt ${1}", "评分 {0}★   欠款 ${1}" },
+        { "COLLECT ${0}", "收走 ${0}" },
+        { "SALVAGE ${0} (65%)", "抢救 ${0}（65%）" },
+        { "Collected ${0}.", "收走了 ${0}。" },
+        { "Salvaged ${0} of the cash that wouldn't fit.", "抢救回装不下的 ${0}。" },
+        { "OPEN THE DOORS", "开门营业" },
+
+        // 退款申请
+        { "REFUND DEMANDS ({0})", "退款申请（{0}）" },
+        { "REFUND ${0}", "退款 ${0}" },
+        { "REFUSE", "拒绝" },
+        { "Refunded. Reputation intact.", "已退款。口碑保住了。" },
+        { "Refused. They are writing a review as we speak.", "拒了。他现在就在写评价。" },
+
+        // ── 当日概况 ──────────────────────────────────────────────────────────
+        { "TODAY", "今日" },
+        { "Expected arrivals   {0}   ({1} booked + {2} walk-in)",
+          "预计到店   {0} 人（预订 {1} + 上门 {2}）" },
+        { "Checked in          {0}", "已入住     {0} 人" },
+        { "Turned away         {0}   (no clean room)", "劝走       {0} 人（无干净客房）" },
+        { "Checkouts booked    {0}   (${1})", "退房结算   {0} 间（${1}）" },
+        { "Flawed rooms sold   {0}   (no inspector on duty?)", "带瑕疵售出 {0} 间（没验房员在班？）" },
+        { "Staff working       {0} hsk, morale {1}", "在岗       {0} 名客房，士气 {1}" },
+        { "Next 7 nights sold  {0}   (cap {1})", "未来七晚已售 {0}   （容量 {1}）" },
+        { "CLEAR A DERELICT ROOM  (${0})", "清理一间破败房（${0}）" },
+        { "Room {0} is back in service. It needs cleaning.", "{0} 号房重新启用。需要打扫。" },
+
+        // ── 超售三选一 ────────────────────────────────────────────────────────
+        { "OVERBOOKED - {0} guest(s) with a room you don't have",
+          "超售 — 有 {0} 位客人订了你没有的房" },
+        { "Booked {0} at ${1}. Waited {2} min.", "订的是 {0} 档、${1}。已等 {2} 分钟。" },
+        { "UPGRADE THEM", "升级换房" },
+        { "NOTHING FREE YET", "暂无空房" },
+        { "PAY THEM OFF (${0})", "赔钱送走（${0}）" },
+        { "SEND THEM AWAY (free, they will write about it)", "直接赶走（不花钱，但他会写出去）" },
+        { "Upgraded at the old price. They are thrilled.", "按原价升级了。客人乐开了花。" },
+        { "Paid for a room down the road. Expensive apology.", "掏钱把他安排到隔街那家。道歉很贵。" },
+        { "They left. Loudly.", "他走了。走得很响。" },
+        { "Still nothing free to put them in.", "还是腾不出房安顿他。" },
+        { "Nobody's waiting on that.", "没有这位客人在等。" },
+        { "Compensation is ${0} and you have ${1}.", "赔偿要 ${0}，你只有 ${1}。" },
+
+        // ── 定价 ──────────────────────────────────────────────────────────────
+        { "PRICING - pick a strategy, not a spreadsheet", "定价 — 选策略，不填表格" },
+        { "Tonight: ${0} old / ${1} basic / ${2} better", "今晚：老房 ${0} / 标准 ${1} / 优质 ${2}" },
+        { "   (weekend)", "   （周末）" },
+        // 定价模板名（PricingPolicy.LabelOf）——键必须与源码里的英文**逐字一致**，
+        // 我第一版是凭印象写的，七条全对不上；靠"把渲染结果整屏打出来"才发现（漏译只显示英文，不报错）
+        { "CLEARANCE - fill every room, whoever shows up", "清仓价 — 有人就住，来者不拒" },
+        { "CONSERVATIVE - play it safe", "保守价 — 稳妥为上" },
+        { "MARKET - the going rate", "市场价 — 行价" },
+        { "SQUEEZE - charge what the sign says you're worth", "榨利润 — 按你挂的牌子收钱" },
+
+        // ── 人员 ──────────────────────────────────────────────────────────────
+        { "STAFF - cheap shifts show up in the reviews", "人员 — 抠班次会写在评价里" },
+        { "On duty {0}/{1}   wages today ${2}", "在班 {0}/{1}   今日工资 ${2}" },
+        { "Clean capacity {0}/h   check-ins {1}/h", "清洁能力 {0} 间/时   前台 {1} 人/时" },
+        { "HIRE A HOUSEKEEPER  ($200 signing)", "雇一名客房（签约费 $200）" },
+        { "HIRE AN INSPECTOR  ($250 signing)", "雇一名验房员（签约费 $250）" },
+        { "Hired. They start immediately.", "雇好了。马上上岗。" },
+        { "An inspector. Rooms will go on sale slower, but clean.", "验房员到位。上架变慢，但房是干净的。" },
+        { "Not enough cash. Collect the safebox first.", "现金不够。先去收保险箱。" },
+        { "Not enough cash.", "现金不够。" },
+        { "Reception", "前台" },
+        { "Housekeeper", "客房" },
+        { "Inspector", "验房员" },
+        // 排班档（ShiftPlan.LabelOf）
+        { "SKELETON - somebody has to open the door", "骨架班 — 总得有人来开门" },
+        { "LEAN - cheap, and it shows", "精简班 — 省钱，而且看得出来" },
+        { "NORMAL - the sane amount", "正常班 — 正常人手" },
+        { "FULL - everybody in", "全员班 — 所有人都在" },
+
+        // ── 客房 / 家具 ───────────────────────────────────────────────────────
+        { "ROOMS - what you charge vs what you deliver", "客房 — 你收多少 vs 你给多少" },
+        { "Price band for the whole hotel (what you claim it is):", "全店挂牌档（你声称它有多好）：" },
+        { "Every room is now listed as {0}. Guests will judge.", "全店已挂为 {0} 档。客人会自己判断。" },
+        { "Delivered {0}  vs  promised {1}   gap {2}", "实际交付 {0}  vs  挂牌承诺 {1}   差值 {2}" },
+        { "Guests are getting more than they paid for. Good reviews, less cash.",
+          "客人拿到的比付的多。好评多了，钱少了。" },
+        { "Slightly oversold. Tolerable.", "略微虚报。还能忍。" },
+        { "OVERSOLD. Expect refund demands.", "虚报过头了。等着收退款申请吧。" },
+        { "Furniture: {0} pieces, avg newness {1}, {2} broken", "家具：{0} 件，平均崭新度 {1}，{2} 件损坏" },
+        { "FIX ${0}", "维修 ${0}" },
+        { " [being fixed, {0}d]", "（维修中，还需 {0} 天）" },
+        { "{0} in room {1}: {2} day(s) of work.", "{1} 号房的{0}：需要 {2} 天工期。" },
+        { "...and {0} more", "……还有 {0} 件" },
+        { "Nothing to fix there.", "那儿没有要修的东西。" },
+        { "That one works fine.", "这件好着呢。" },
+        { "Someone's already on it.", "已经有人在修了。" },
+        { "Repair costs ${0} and you have ${1}.", "维修要 ${0}，你只有 ${1}。" },
+        // 挂牌档名
+        { "Old", "老房" },
+        { "Basic", "标准" },
+        { "Better", "优质" },
+
+        // ── 装修 ──────────────────────────────────────────────────────────────
+        { "RENOVATION - the cost is the nights you can't sell", "装修 — 代价是卖不出去的那些晚" },
+        { "ECONOMY - cheap, and the room sits shut for a while", "经济方案 — 便宜，但房要关挺久" },
+        { "STANDARD - pay extra to get it back on sale sooner", "标准方案 — 多花钱换早点上架" },
+        { "LUXURY - straight to the top tier, straight out of your pocket", "豪华方案 — 直上顶档，直掏你腰包" },
+        { "- room", "− 间" },
+        { "+ room", "+ 间" },
+        { "{0} room(s)", "{0} 间" },
+        { "${0} total (${1}/room), {2} materials, shut {3} days",
+          "共 ${0}（单间 ${1}），耗材 {2} 份，关房 {3} 天" },
+        { "BUY 10 MATERIALS", "买 10 份材料" },
+        { "START THE WORK", "开工" },
+        { "Materials delivered.", "材料到货了。" },
+        { "Can't afford materials right now.", "现在买不起材料。" },
+        { "{0} room(s) shut for {1} days. Better be worth it.", "{0} 间房关闭 {1} 天。最好值这个价。" },
+        { "Under renovation now: {0} room(s)", "正在装修：{0} 间" },
+        { "None of those rooms can take this plan right now.", "那些房现在都接不了这个方案。" },
+        { "Pick some rooms first.", "先选几间房。" },
+        { "That one's already open.", "那间已经开了。" },
+        { "The day is done. Settle up first.", "今天已经打烊，先结算。" },
+        { "No such room.", "没有这间房。" },
+        { "No such furniture.", "没有这件家具。" },
+
+        // ── 家具名 ────────────────────────────────────────────────────────────
+        { "Sagging Bed", "塌腰床" },
+        { "Proper Bed", "正经床" },
+        { "Memory Foam Bed", "记忆棉床" },
+        { "Basic Bathroom", "基础卫浴" },
+        { "Renovated Bathroom", "翻新卫浴" },
+        { "Boxy TV", "老式方电视" },
+        { "Big Flat TV", "大平板电视" },
+        { "Sofa", "沙发" },
+        { "Work Desk", "书桌" },
+        { "Rug", "地毯" },
+        { "Wall Art", "墙上挂画" },
+
+        // ── 家具故障文案（无厘头浓度靠这些撑，翻译要保住那股一本正经的荒诞）──────
+        { "THE BED HAS OPINIONS. It voiced one at 3am.", "这张床有主见。凌晨三点它表达了一条。" },
+        { "BED FRAME SNAPPED. The guest describes it as 'a controlled descent'.",
+          "床架断了。客人称之为「一次可控的下降」。" },
+        { "ONE BED LEG IS SHORTER NOW. Nobody knows which one.", "有一条床腿变短了。没人知道是哪条。" },
+        { "MATTRESS HAS DEVELOPED A CRATER.", "床垫塌出了一个坑。" },
+        { "THE FOAM REMEMBERS THE LAST GUEST. Vividly.", "这团记忆棉记得上一位客人。记得很清楚。" },
+        { "BED REFUSES TO RETURN TO SHAPE. It has given up.", "床不肯恢复原形了。它放弃了。" },
+        { "SHOWER RUNS LAVA OR ICE, NOTHING BETWEEN.", "淋浴只有岩浆和冰，中间没有。" },
+        { "THE TAP WHISTLES. It knows one song.", "水龙头会吹口哨。只会一首。" },
+        { "RAIN SHOWER NOW ONLY DRIZZLES SIDEWAYS.", "雨淋花洒现在只往旁边毛毛雨。" },
+        { "THE HEATED FLOOR PICKED A FAVOURITE TILE.", "地暖挑中了一块最爱的砖。" },
+        { "TV ONLY GETS ONE CHANNEL. It's a shopping channel.", "电视只有一个台。购物台。" },
+        { "THE TV TURNS ITSELF ON AT DAWN. Cheerfully.", "电视天亮自己开机。开得很欢快。" },
+        { "SCREEN HAS A DEAD PIXEL SHAPED LIKE A MAN.", "屏幕有个坏点，形状像个人。" },
+        { "REMOTE WORKS FOR THE ROOM NEXT DOOR INSTEAD.", "遥控器控的是隔壁房。" },
+        { "SOFA ATE A GUEST'S PHONE. It is not giving it back.", "沙发吃了客人的手机。它不打算还。" },
+        { "ONE CUSHION IS NOW STRUCTURAL. Do not remove it.", "有一块坐垫现在是承重结构。别拿走。" },
+        { "DESK DRAWER WON'T OPEN. Something inside rattles.", "书桌抽屉打不开。里面有东西在响。" },
+        { "THE DESK WOBBLES IN ONE DIRECTION ONLY.", "书桌只朝一个方向晃。" },
+        { "THE RUG HAS A SMELL WITH A PERSONALITY.", "地毯的味道颇有个性。" },
+        { "RUG EDGE HAS BECOME A TRIP HAZARD WITH AMBITION.", "地毯边缘已成为一处有野心的绊脚点。" },
+        { "THE PAINTING'S EYES FOLLOW YOU.", "画里的眼睛跟着你走。" },
+        { "THE FRAME WON'T HANG STRAIGHT. It has chosen an angle.", "画框挂不正。它自己选了个角度。" },
+    };
+}
