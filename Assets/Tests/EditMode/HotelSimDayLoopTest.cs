@@ -73,11 +73,14 @@ namespace OldTownHotel.Tests.EditMode
 
             sim.BeginDay(); // 第二天晨间退房潮
 
-            Assert.That(sim.CheckoutsToday, Is.EqualTo(stayed));
+            // M-D 起有连住单：住第二晚的人今早不退房，所以退房数 ≤ 昨晚在住数。
+            // 但**每个住过的人都要付昨夜的房费**，连住的也一样（按晚计）。
+            int stillIn = sim.Rooms.CountOf(RoomSimState.Occupied);
+            Assert.That(sim.CheckoutsToday + stillIn, Is.EqualTo(stayed),
+                        "昨晚在住的人，今早要么退房要么续住，一个都不能凭空消失");
             Assert.That(sim.GrossIncomeToday, Is.GreaterThan(0), "退房结算房费");
-            Assert.That(sim.Rooms.CountOf(RoomSimState.Dirty), Is.GreaterThanOrEqualTo(stayed),
+            Assert.That(sim.Rooms.CountOf(RoomSimState.Dirty), Is.GreaterThanOrEqualTo(sim.CheckoutsToday),
                         "退房后房间变脏，要打扫");
-            Assert.That(sim.Rooms.CountOf(RoomSimState.Occupied), Is.EqualTo(0));
         }
 
         [Test]

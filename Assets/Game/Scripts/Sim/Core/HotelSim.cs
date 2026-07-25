@@ -12,7 +12,7 @@ using System.Collections.Generic;
 //                → 现金紧 → 被迫清仓价 → 客群恶化 → 事件/清洁负担升。
 public sealed class HotelSim
 {
-    /// <summary>一次住宿（M-D 会被 BookingBook 的 Reservation 取代）。</summary>
+    /// <summary>一次住宿。身份由 BookingBook 的 Reservation 承载，这里只留结算要用的快照。</summary>
     private struct Stay
     {
         public int nightlyRate;
@@ -22,6 +22,9 @@ public sealed class HotelSim
         public bool flawedRoom;   // 没验房就上架的房：有概率带瑕疵
         public float delivered;   // 入住时的实际交付水平（家具装饰度）
         public RoomTier band;     // 当时的挂牌档
+        public int reservationId; // 0 = walk-in
+        public int channelId;     // 抽成按渠道走：直营 0%，平台 A 18%
+        public int nightsLeft;    // 还要住几晚。>0 的人早上不退房（连住占多个间夜）
     }
 
     /// <summary>退款申请（虚报价的代价）。玩家在手机上批准/拒绝。</summary>
@@ -38,8 +41,14 @@ public sealed class HotelSim
     private readonly Random _rng;
     private readonly Dictionary<int, Stay> _stays = new Dictionary<int, Stay>();
     private double _arrivalCredit;
-    private int _deskQueue;          // 排在前台等办入住的人数
     private double _deskCredit;      // 前台处理进度
+
+    // 到店"票据"：正数 = 预订单号，0 = walk-in。今日该来的人先排在 _pendingArrivals，
+    // 按阶段权重滴到 _deskQueue，前台按速率逐个消化。
+    // 用票据而不是纯计数，是因为 check-in 时要知道**这位客人订的是哪一档**——
+    // RoomMatcher 要靠它做库存保护（别把 Better 房贱卖给订 Old 的人）。
+    private readonly Queue<int> _pendingArrivals = new Queue<int>();
+    private readonly Queue<int> _deskQueue = new Queue<int>();
     private int _grossIncomeToday;
     private int _commissionToday;
     private int _checkoutsToday;
@@ -57,6 +66,8 @@ public sealed class HotelSim
     public SimRenovationQueue Renovations { get; }
     public MaterialStore Materials { get; }
     public FurnitureLedger Furniture { get; }
+    public BookingBook Bookings { get; }
+    public AvailabilityCalendar Calendar { get; }
 
     private readonly List<RefundRequest> _refunds = new List<RefundRequest>();
     private int _nextRefundId;
@@ -79,15 +90,42 @@ public sealed class HotelSim
     /// <summary>可支配现金：只能靠收保险箱补充，主动支出（装修/还款/招聘）只花它。</summary>
     public int Cash { get; private set; }
 
-    /// <summary>渠道佣金率（M-B 单渠道 A；M-G 换 ChannelPortfolio）。</summary>
+    /// <summary>历史遗留的单一佣金率。M-D 起抽成**按渠道**走（BookingChannels），
+    /// 这个属性只留给设施/杂项收入之类没有渠道概念的入账口径。</summary>
     public float CommissionRate { get; set; } = 0.18f;
 
-    /// <summary>今日排定的到店人数（晨报展示）。</summary>
+    /// <summary>今日排定的到店人数（晨报展示）= 今日预订 + walk-in。</summary>
     public int ArrivalsPlannedToday { get; private set; }
     public int ArrivalsCheckedInToday { get; private set; }
     public int ArrivalsTurnedAwayToday { get; private set; }
     public int CheckoutsToday => _checkoutsToday;
     public int GrossIncomeToday => _grossIncomeToday;
+
+    /// <summary>今日渠道佣金（晨报要列明细：保险箱只收净额）。</summary>
+    public int CommissionToday => _commissionToday;
+
+    /// <summary>今日到店里有多少是提前预订的（其余为 walk-in）。</summary>
+    public int ReservationArrivalsToday { get; private set; }
+    public int WalkInArrivalsToday { get; private set; }
+
+    /// <summary>今晨被取消的预订数（晨报"坏消息"栏）。</summary>
+    public int CancellationsToday { get; private set; }
+
+    /// <summary>没来的预订：占了一晚库存却分文未收，这是超售赌注的另一面。</summary>
+    public int NoShowsToday { get; private set; }
+
+    /// <summary>因为库存不够而没接下来的订单数——晨报据此提示"该开房了"。</summary>
+    public int BookingsDeclinedToday { get; private set; }
+
+    /// <summary>玩家设的"故意超售"档：赌渠道取消率，赌输了当天要处置超售客。</summary>
+    public int OverbookingAllowance { get; set; }
+
+    /// <summary>已了结的单在簿子里多留几天供晨报回看。</summary>
+    public const int CompletedBookingGraceDays = 3;
+
+    /// <summary>预订视野是否已铺开（第一个早晨要把 today..+13 一次填满，
+    /// 之后每晨只填刚进入视野的那一天，否则同一天会被反复下单）。</summary>
+    private bool _horizonSeeded;
 
     /// <summary>最近一次日结结果（晨报读它）。</summary>
     public DaySettlementResult LastSettlement { get; private set; }
@@ -111,6 +149,8 @@ public sealed class HotelSim
         Renovations = new SimRenovationQueue();
         Materials = new MaterialStore();
         Furniture = new FurnitureLedger();
+        Bookings = new BookingBook();
+        Calendar = new AvailabilityCalendar();
     }
 
     // ── 挂牌档：玩家声称房间有多好（家具系统设计 §2） ──────────────────────────
@@ -430,41 +470,185 @@ public sealed class HotelSim
         ArrivalsCheckedInToday = 0;
         ArrivalsTurnedAwayToday = 0;
         _arrivalCredit = 0d;
-        _deskQueue = 0;
+        _deskQueue.Clear();
+        _pendingArrivals.Clear();
         _deskCredit = 0d;
         PeakCheckInWaitToday = 0;
         TotalCheckInWaitToday = 0;
         FlawedStaysToday = 0;
+        ReservationArrivalsToday = 0;
+        WalkInArrivalsToday = 0;
+        NoShowsToday = 0;
 
         RunCheckoutWave();
 
-        bool weekend = PricingPolicy.IsWeekend(Clock.CurrentDay);
-        float ratio = Pricing.PriceRatioFor(Clock.CurrentDay);
         RefundsApprovedToday = 0;
         RefundsRejectedToday = 0;
 
-        // 需求乘数用**实际交付水平**（家具装饰度），不是挂牌档——
-        // 否则玩家把全店改标 Better 就能凭空拉来客人。
-        ArrivalsPlannedToday = DemandModel.ArrivalsFor(
-            DemandCfg, Rooms.OpenRoomCount, Reputation.Stars, ratio, weekend, _rng.NextDouble(),
-            AverageDeliveredQuality());
+        RunBookingMorning();
+        BuildTodaysArrivalQueue();
+        ArrivalsPlannedToday = _pendingArrivals.Count;
     }
 
-    /// <summary>晨间退房潮：结算房费与满意度，房间变脏（客群决定额外清洁负担）。</summary>
+    // ── 预订流（架构 §B.4） ───────────────────────────────────────────────────
+    //
+    // 晨间顺序是有讲究的，换一步就出错：
+    //   ① 按房态重算未来每天的容量（装修 Block 会让已卖出的间夜变成超售）
+    //   ② 对未来的单掷取消骰（先取消再接新单，否则刚取消腾出的位当天用不上）
+    //   ③ 生成新订单（第一个早晨铺满整个视野，之后只填刚进入视野的那天）
+    //   ④ 按簿子**全量重算**日历需求（增量维护漏一处就永久对不上账）
+
+    private void RunBookingMorning()
+    {
+        int today = Clock.CurrentDay;
+
+        Calendar.PruneBefore(today);
+        // 归档留几天缓冲：晨报要列"昨天住完的客人"，当天住完当天就删的话，
+        // 退房潮刚结算完的单在同一次 BeginDay 里就被抹掉，界面和测试都看不见它。
+        Bookings.PruneCompletedBefore(today - CompletedBookingGraceDays);
+        RefreshCapacityForHorizon();
+
+        CancellationsToday = Bookings.RollCancellations(today, _rng.NextDouble).Count;
+        Bookings.RebuildCalendarDemand(Calendar);
+
+        BookingsDeclinedToday = 0;
+        if (!_horizonSeeded)
+        {
+            // 开局：整个视野一次铺开。不铺的话第一天没人订过房 = 空店开门
+            for (int d = today; d < today + BookingGenerator.HorizonDays; d++) GenerateBookingsFor(d);
+            _horizonSeeded = true;
+        }
+        else
+        {
+            GenerateBookingsFor(today + BookingGenerator.HorizonDays - 1);
+        }
+    }
+
+    /// <summary>重算未来每天每档的可售房量。**是设置不是扣减**——
+    /// 装修中的房在完工日之前不计入容量，于是已卖出的间夜自然把 remaining 压成负数。
+    ///
+    /// 铺的天数要比预订视野多出 MaxNights：视野最后一天的连住单会伸到视野之外，
+    /// 那些天若没有容量（=0），CanAccept 会把所有连住单拒掉。</summary>
+    private void RefreshCapacityForHorizon()
+    {
+        int today = Clock.CurrentDay;
+        var perBand = new int[3];
+        int daysToCover = BookingGenerator.HorizonDays + BookingGenerator.MaxNights;
+
+        for (int offset = 0; offset < daysToCover; offset++)
+        {
+            int day = today + offset;
+            perBand[0] = perBand[1] = perBand[2] = 0;
+
+            for (int i = 0; i < Rooms.Count; i++)
+            {
+                RoomRecord room = Rooms.Peek(i);
+                if (room.state == RoomSimState.Ruined) continue;      // 没解锁的房不是库存
+
+                // 装修中的房：完工那天才回到库存（施工队还剩几天是已知的）
+                int blockedDays = Renovations.DaysRemainingFor(room.number);
+                if (blockedDays > offset) continue;
+
+                perBand[(int)room.tier]++;
+            }
+
+            Calendar.SetCapacity(day, RoomTier.Old, perBand[0]);
+            Calendar.SetCapacity(day, RoomTier.Basic, perBand[1]);
+            Calendar.SetCapacity(day, RoomTier.Better, perBand[2]);
+        }
+    }
+
+    /// <summary>酒店实际挂出来的档位（客人只能订这些）。</summary>
+    private List<RoomTier> OfferedBands()
+    {
+        var bands = new List<RoomTier>(3);
+        bool old = false, basic = false, better = false;
+        for (int i = 0; i < Rooms.Count; i++)
+        {
+            RoomRecord room = Rooms.Peek(i);
+            if (room.state == RoomSimState.Ruined) continue;
+            if (room.tier == RoomTier.Old) old = true;
+            else if (room.tier == RoomTier.Basic) basic = true;
+            else better = true;
+        }
+        if (old) bands.Add(RoomTier.Old);
+        if (basic) bands.Add(RoomTier.Basic);
+        if (better) bands.Add(RoomTier.Better);
+        return bands;
+    }
+
+    /// <summary>给某个未来日生成订单。库存不够的单直接谈崩（记进 BookingsDeclinedToday）。</summary>
+    private void GenerateBookingsFor(int targetDay)
+    {
+        bool weekend = PricingPolicy.IsWeekend(targetDay);
+        float ratio = Pricing.PriceRatioFor(targetDay);
+
+        // 需求乘数用**实际交付水平**（家具装饰度），不是挂牌档——
+        // 否则玩家把全店改标 Better 就能凭空拉来客人。
+        int demand = DemandModel.ArrivalsFor(DemandCfg, Rooms.OpenRoomCount, Reputation.Stars,
+                                             ratio, weekend, _rng.NextDouble(),
+                                             AverageDeliveredQuality());
+
+        var mix = DemandModel.SegmentMixFor(ratio, weekend);
+        var intents = BookingGenerator.IntentsFor(targetDay, BookingGenerator.AdvanceDemandFor(demand),
+                                                  mix, OfferedBands(), _rng.NextDouble);
+
+        for (int i = 0; i < intents.Count; i++)
+        {
+            BookingIntent intent = intents[i];
+            if (!Calendar.CanAccept(intent.arrivalDay, intent.nights, intent.tier, OverbookingAllowance))
+            {
+                BookingsDeclinedToday++;   // 满房 = 拒单，钱从指缝漏走（该开新房了）
+                continue;
+            }
+
+            // 房价在下单当时锁定：之后调价不影响已售出的单（这才是"提前定价"的意义）
+            int locked = Pricing.PriceFor(intent.arrivalDay, intent.tier);
+            Bookings.Add(intent.channelId, intent.arrivalDay, intent.nights, intent.tier, locked,
+                         intent.segment, bookedOnDay: Clock.CurrentDay);
+            Calendar.Reserve(intent.arrivalDay, intent.nights, intent.tier);
+        }
+    }
+
+    /// <summary>今日到店队列 = 今日预订（打乱前先按单号，稳定可复现）+ walk-in 补足。</summary>
+    private void BuildTodaysArrivalQueue()
+    {
+        int today = Clock.CurrentDay;
+        var arrivals = Bookings.ArrivalsFor(today);
+        for (int i = 0; i < arrivals.Count; i++) _pendingArrivals.Enqueue(arrivals[i].id);
+        ReservationArrivalsToday = arrivals.Count;
+
+        // walk-in 是剩余需求流：按今日总需求的 20% 折算，与预订无关地另算一次
+        bool weekend = PricingPolicy.IsWeekend(today);
+        float ratio = Pricing.PriceRatioFor(today);
+        int demandToday = DemandModel.ArrivalsFor(DemandCfg, Rooms.OpenRoomCount, Reputation.Stars,
+                                                  ratio, weekend, _rng.NextDouble(),
+                                                  AverageDeliveredQuality());
+        WalkInArrivalsToday = BookingGenerator.WalkInDemandFor(demandToday);
+        for (int i = 0; i < WalkInArrivalsToday; i++) _pendingArrivals.Enqueue(0);
+    }
+
+    /// <summary>晨间退房潮：结算房费与满意度，房间变脏（客群决定额外清洁负担）。
+    ///
+    /// **连住客不退房**：一张 n 晚的单在日历上占了 n 个间夜，房间也必须真的被占住 n 天，
+    /// 否则库存说"占着"而房态说"空着"，超售检测立刻失去意义。
+    /// 房费按晚计（住一晚收一晚），满意度与家具磨损同样按晚发生——
+    /// 派对客住三晚就把家具磨三次，这是连住的真代价。</summary>
     private void RunCheckoutWave()
     {
         _checkoutsToday = 0;
         if (_stays.Count == 0) return;
 
-        var checkingOut = new List<int>(_stays.Keys);
-        foreach (int roomNumber in checkingOut)
+        var occupied = new List<int>(_stays.Keys);
+        foreach (int roomNumber in occupied)
         {
             if (!Rooms.Contains(roomNumber)) continue;
             Stay stay = _stays[roomNumber];
 
+            // 昨夜这一晚：照收房费、照记评价、照磨家具
             float satisfaction = SatisfactionFor(stay, roomNumber);
             int paid = SimMath.RoundToInt(stay.nightlyRate * satisfaction);
-            BookRoomRevenue(paid);
+            BookRoomRevenue(paid, stay.channelId);
             MaybeRequestRefund(roomNumber, stay, paid);
 
             // VIP 的评价权重更高：多记一次样本（"差评更致命"的最简实现）
@@ -472,12 +656,21 @@ public sealed class HotelSim
             if (GuestSegmentProfile.For(stay.segment).satisfactionWeight >= 2f)
                 Reputation.RecordGuest(satisfaction);
 
+            // 家具按这一晚磨一次（客群倍率：派对客把家具用得最狠）
+            Furniture.ApplyGuestNight(roomNumber, GuestSegmentProfile.For(stay.segment).extraCleaningLoad);
+
+            stay.nightsLeft--;
+            if (stay.nightsLeft > 0)
+            {
+                // 还要续住：房间继续 Occupied，不进清洁池（今天也没有这间房可卖）
+                _stays[roomNumber] = stay;
+                continue;
+            }
+
+            if (stay.reservationId > 0) Bookings.Complete(stay.reservationId);
             Rooms.SetState(roomNumber, RoomSimState.Dirty);
             ref RoomRecord room = ref Rooms.At(roomNumber);
             room.occupantResvId = 0;
-
-            // 家具按这一晚磨一次（客群倍率：派对客把家具用得最狠）
-            Furniture.ApplyGuestNight(roomNumber, GuestSegmentProfile.For(stay.segment).extraCleaningLoad);
 
             _stays.Remove(roomNumber);
             _checkoutsToday++;
@@ -545,8 +738,7 @@ public sealed class HotelSim
     /// <summary>到店客按阶段权重滴入：入住高峰吃掉大头（PhaseScheduler.ArrivalWeightOf）。</summary>
     private void StepArrivals()
     {
-        int remaining = ArrivalsPlannedToday - ArrivalsCheckedInToday - ArrivalsTurnedAwayToday;
-        if (remaining <= 0) return;
+        if (_pendingArrivals.Count == 0) return;
 
         SimDayPhase phase = PhaseScheduler.PhaseFor(Clock.CurrentMinute);
         float weight = PhaseScheduler.ArrivalWeightOf(phase);
@@ -556,11 +748,10 @@ public sealed class HotelSim
         if (phaseMinutes <= 0) return;
 
         _arrivalCredit += ArrivalsPlannedToday * weight / phaseMinutes;
-        while (_arrivalCredit >= 1d && remaining > 0)
+        while (_arrivalCredit >= 1d && _pendingArrivals.Count > 0)
         {
             _arrivalCredit -= 1d;
-            _deskQueue++;              // 到店先排队，不是瞬移进房
-            remaining--;
+            _deskQueue.Enqueue(_pendingArrivals.Dequeue());   // 到店先排队，不是瞬移进房
         }
     }
 
@@ -568,7 +759,7 @@ public sealed class HotelSim
     /// 商务客满意度掉得最狠（服务压力咬客流压力的另一条边）。</summary>
     private void StepFrontDesk()
     {
-        if (_deskQueue <= 0)
+        if (_deskQueue.Count <= 0)
         {
             _deskCredit = 0d;
             return;
@@ -583,12 +774,11 @@ public sealed class HotelSim
         }
 
         _deskCredit += perHour / 60d;
-        while (_deskCredit >= 1d && _deskQueue > 0)
+        while (_deskCredit >= 1d && _deskQueue.Count > 0)
         {
             _deskCredit -= 1d;
             int wait = EstimatedWaitMinutes(perHour);
-            _deskQueue--;
-            AdmitOneGuest(wait);
+            AdmitOneGuest(_deskQueue.Dequeue(), wait);
         }
         PeakCheckInWaitToday = Math.Max(PeakCheckInWaitToday, EstimatedWaitMinutes(perHour));
     }
@@ -596,9 +786,9 @@ public sealed class HotelSim
     /// <summary>队列长度 ÷ 处理速率 = 队尾那位大概要等多久。</summary>
     private int EstimatedWaitMinutes(float checkInsPerHour)
     {
-        if (_deskQueue <= 0) return 0;
+        if (_deskQueue.Count <= 0) return 0;
         if (checkInsPerHour <= 0f) return 60;   // 无人值守：按一小时算（够狠）
-        return SimMath.RoundToInt(_deskQueue / checkInsPerHour * 60f);
+        return SimMath.RoundToInt(_deskQueue.Count / checkInsPerHour * 60f);
     }
 
     private static int PhaseMinutesOf(SimDayPhase phase)
@@ -613,20 +803,46 @@ public sealed class HotelSim
         }
     }
 
-    private void AdmitOneGuest(int waitMinutes)
+    /// <summary>办一位客人入住。ticket >0 = 预订单号，0 = walk-in。
+    /// **两条流在这里合并**：都经 RoomMatcher 挑房，所以永远不会漂移成两套规则。</summary>
+    private void AdmitOneGuest(int ticket, int waitMinutes)
     {
-        if (!TryFindSellableRoom(out int roomNumber))
+        int day = Clock.CurrentDay;
+        float ratio = Pricing.PriceRatioFor(day);
+
+        Reservation reservation = ticket > 0 ? Bookings.Find(ticket) : null;
+        if (ticket > 0 && (reservation == null || reservation.state != ReservationState.Booked))
+            return;   // 单子在到店前被取消/已处理，队列里的票据作废
+
+        GuestSegment segment;
+        RoomTier wantedBand;
+        if (reservation != null)
         {
-            // 没有可售房：这位客人走了（M-D 有预订簿后这里变成超售处置）
+            segment = reservation.segment;
+            wantedBand = reservation.tier;      // 订单承诺的档位
+        }
+        else
+        {
+            var mix = DemandModel.SegmentMixFor(ratio, PricingPolicy.IsWeekend(day));
+            segment = mix.Pick(_rng.NextDouble());
+            // walk-in 没订单，按客群期待去要一档（VIP 上门也会先问最好的房）
+            wantedBand = BookingGenerator.PreferredBandFor(segment, OfferedBands());
+        }
+
+        if (!TryPickRoomFor(wantedBand, segment, out int roomNumber))
+        {
+            // 没有可售房。预订客被劝走比 walk-in 严重得多——你答应过人家
+            // （三选一处置在 M-D-T5 接，这里先如实记账并扣声誉）
             ArrivalsTurnedAwayToday++;
+            if (reservation != null)
+            {
+                Bookings.MarkTurnedAway(reservation.id);
+                Reputation.RecordGuest(ReputationLedger.MinSatisfaction);
+            }
             return;
         }
 
-        int day = Clock.CurrentDay;
-        float ratio = Pricing.PriceRatioFor(day);
-        var mix = DemandModel.SegmentMixFor(ratio, PricingPolicy.IsWeekend(day));
-        GuestSegment segment = mix.Pick(_rng.NextDouble());
-        RoomTier tier = Rooms.At(roomNumber).tier;
+        RoomTier band = Rooms.At(roomNumber).tier;
 
         // 没有验房员在班时清洁完直接上架 → 这间房有概率带瑕疵（"快"的代价）
         bool flawed = !ServiceCapacityModel.HasInspectorOnDuty(Staff)
@@ -635,40 +851,71 @@ public sealed class HotelSim
         TotalCheckInWaitToday += waitMinutes;
 
         Rooms.SetState(roomNumber, RoomSimState.Occupied);
+        ref RoomRecord record = ref Rooms.At(roomNumber);
+        record.occupantResvId = reservation != null ? reservation.id : 0;
+
         _stays[roomNumber] = new Stay
         {
-            nightlyRate = Pricing.PriceFor(day, tier),   // tier = 挂牌档，决定收多少钱
+            // 预订单用下单时锁定的价；walk-in 按今天的挂牌价
+            nightlyRate = reservation != null ? reservation.lockedPrice : Pricing.PriceFor(day, band),
             segment = segment,
             priceRatio = ratio,
             waitMinutes = waitMinutes,
             flawedRoom = flawed,
             delivered = Furniture.DeliveredQuality(roomNumber), // 家具决定实际交付
-            band = tier,
+            band = band,
+            reservationId = reservation != null ? reservation.id : 0,
+            channelId = reservation != null ? reservation.channelId : BookingChannels.DirectId,
+            nightsLeft = reservation != null ? reservation.nights : 1,   // walk-in 一律一晚
         };
+
+        if (reservation != null) Bookings.CheckIn(reservation.id, roomNumber);
         ArrivalsCheckedInToday++;
     }
 
-    /// <summary>找一间真能卖的房：Ready 且必备家具可用（床塌了不能卖）。</summary>
-    private bool TryFindSellableRoom(out int roomNumber)
+    /// <summary>打烊时还没出现的今日预订 = no-show。
+    /// 不收钱、不扣声誉（人没来，怪不到服务上），但那一晚的库存已经白占了——
+    /// 这正是"故意超售"赌注的另一面：赌取消/no-show，赌赢了多赚，赌输了要处置人。</summary>
+    private void ResolveNoShows()
     {
+        var stillWaiting = Bookings.ArrivalsFor(Clock.CurrentDay);
+        for (int i = 0; i < stillWaiting.Count; i++)
+        {
+            Bookings.MarkNoShow(stillWaiting[i].id);
+            NoShowsToday++;
+        }
+    }
+
+    /// <summary>把所有能卖的房交给 RoomMatcher 打分，挑最该给这位客人的那间。</summary>
+    private bool TryPickRoomFor(RoomTier wantedBand, GuestSegment segment, out int roomNumber)
+    {
+        var candidates = new List<RoomCandidate>();
         for (int i = 0; i < Rooms.Count; i++)
         {
             RoomRecord room = Rooms.Peek(i);
             if (room.state != RoomSimState.Ready) continue;
-            if (Furniture.InRoom(room.number).Count > 0
-                && !Furniture.RequiredFurnitureWorking(room.number)) continue;
-            roomNumber = room.number;
-            return true;
+
+            bool sellable = Furniture.InRoom(room.number).Count == 0
+                            || Furniture.RequiredFurnitureWorking(room.number);
+            if (!sellable) continue;   // 床塌了不能卖
+
+            candidates.Add(new RoomCandidate(room.number, room.tier,
+                                             Furniture.DeliveredQuality(room.number),
+                                             Furniture.SegmentAppeal(room.number, segment),
+                                             flawed: false, sellable: true));
         }
-        roomNumber = 0;
-        return false;
+
+        return RoomMatcher.TryPick(new RoomRequest(wantedBand, segment), candidates, out roomNumber);
     }
 
-    private void BookRoomRevenue(int amount)
+    /// <summary>房费入账。抽成**按渠道**走：直营 0%，平台 A 18%——
+    /// 这就是"把客人从平台养成回头客"的回报，也是 CommissionRate 只作兜底的原因。</summary>
+    private void BookRoomRevenue(int amount, int channelId)
     {
         if (amount <= 0) return;
         _grossIncomeToday += amount;
-        _commissionToday += SimMath.RoundToInt(amount * SimMath.Clamp01(CommissionRate));
+        float rate = BookingChannels.Get(channelId).commission;
+        _commissionToday += SimMath.RoundToInt(amount * SimMath.Clamp01(rate));
     }
 
     /// <summary>设施/小费等杂项收入（不进星级样本）。</summary>
@@ -683,6 +930,8 @@ public sealed class HotelSim
     /// <summary>打烊结算。返回结果供晨报展示。</summary>
     public DaySettlementResult SettleDay(int interest = 0, int scheduledRepayment = 0, int supplies = 0)
     {
+        ResolveNoShows();
+
         var input = new DaySettlementInput(
             grossIncome: _grossIncomeToday,
             commission: _commissionToday,

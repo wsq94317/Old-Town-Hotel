@@ -25,6 +25,7 @@ public sealed class Reservation
 {
     public int id;
     public int channelId;
+    public int bookedOnDay;        // 下单那天。取消风险率要按**原始提前期**摊，不能按剩余
     public int arrivalDay;
     public int nights;
     public RoomTier tier;          // 订的是哪一档（= 挂牌承诺）
@@ -35,6 +36,9 @@ public sealed class Reservation
 
     /// <summary>还活着的单（会占库存 / 会来人）。</summary>
     public bool IsLive => state == ReservationState.Booked || state == ReservationState.CheckedIn;
+
+    /// <summary>下单到到店之间隔了几天（至少 1，当天单也算一次取消机会）。</summary>
+    public int LeadDays => Math.Max(1, arrivalDay - bookedOnDay);
 
     /// <summary>最后一晚是哪天（含）。</summary>
     public int LastNight => arrivalDay + (nights < 1 ? 1 : nights) - 1;
@@ -57,12 +61,13 @@ public sealed class BookingBook
     /// <summary>登记一张单。id 稳定且**永不回收**——房记录里存着 occupantResvId，
     /// 号一旦复用就会指向别人的住宿（本项目在身份口径上定的铁律）。</summary>
     public Reservation Add(int channelId, int arrivalDay, int nights, RoomTier tier,
-                           int lockedPrice, GuestSegment segment)
+                           int lockedPrice, GuestSegment segment, int bookedOnDay = 0)
     {
         var r = new Reservation
         {
             id = _nextId++,
             channelId = channelId,
+            bookedOnDay = bookedOnDay,
             arrivalDay = arrivalDay,
             nights = nights < 1 ? 1 : nights,
             tier = tier,
@@ -149,8 +154,11 @@ public sealed class BookingBook
         }
     }
 
-    /// <summary>每晨对**未来**的单掷取消骰（按渠道取消率）。返回被取消的单号。
-    /// 今天就该到店的不掷——那种情况是 no-show，走另一套处置。</summary>
+    /// <summary>每晨对**未来**的单掷取消骰。返回被取消的单号。
+    /// 今天就该到店的不掷——那种情况是 no-show，走另一套处置。
+    ///
+    /// 渠道给的是**一张单的总取消率**，这里按该单的原始提前期摊成每日风险率
+    /// （直接拿总率当每日率用，13 天提前期会复利成八成取消，见 DailyCancellationHazard）。</summary>
     public List<int> RollCancellations(int today, Func<double> roll)
     {
         var cancelled = new List<int>();
@@ -162,7 +170,10 @@ public sealed class BookingBook
             if (r.state != ReservationState.Booked) continue;
             if (r.arrivalDay <= today) continue;
 
-            if (roll() >= BookingChannels.Get(r.channelId).cancellationRate) continue;
+            // 按**原始**提前期摊：用剩余天数会每天重新摊一次，累计总率被推高两三倍
+            double hazard = BookingChannels.DailyCancellationHazard(
+                BookingChannels.Get(r.channelId).cancellationRate, r.LeadDays);
+            if (roll() >= hazard) continue;
             r.state = ReservationState.Cancelled;
             cancelled.Add(r.id);
         }
@@ -199,12 +210,14 @@ public sealed class BookingBook
     /// <summary>读档用：按存下来的字段原样恢复一张单（不重新发号）。</summary>
     public Reservation RestoreReservation(int id, int channelId, int arrivalDay, int nights,
                                           RoomTier tier, int lockedPrice, GuestSegment segment,
-                                          ReservationState state, int assignedRoomNumber)
+                                          ReservationState state, int assignedRoomNumber,
+                                          int bookedOnDay = 0)
     {
         var r = new Reservation
         {
             id = id,
             channelId = channelId,
+            bookedOnDay = bookedOnDay,
             arrivalDay = arrivalDay,
             nights = nights < 1 ? 1 : nights,
             tier = tier,

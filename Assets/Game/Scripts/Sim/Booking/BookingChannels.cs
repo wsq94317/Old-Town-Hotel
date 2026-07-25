@@ -10,7 +10,9 @@ public readonly struct BookingChannel
     public readonly string name;          // 游戏内英文
     public readonly float commission;     // 抽成比例
     public readonly float trafficWeight;  // 相对流量权重
-    public readonly float cancellationRate; // 每日取消概率
+    /// <summary>**一张单在到店前取消的总概率**（不是每日概率）。
+    /// 每日风险率由 BookingBook 按提前期换算——写成每日会在 13 天提前期下复利成八成取消。</summary>
+    public readonly float cancellationRate;
     public readonly float vipBias;        // 带来高端客群的偏置（0=不偏，1=强偏）
 
     public BookingChannel(int id, string name, float commission, float trafficWeight,
@@ -34,12 +36,26 @@ public static class BookingChannels
 
     private static readonly BookingChannel[] All =
     {
-        //                       id            name              抽成   流量  取消率  VIP偏置
+        //                       id            name              抽成   流量  总取消率 VIP偏置
         new BookingChannel(DirectId,    "Walk-in & Direct", 0f,    0.15f, 0.02f, 0.1f),
         new BookingChannel(PlatformAId, "MegaBooker",       0.18f, 1.00f, 0.12f, 0.2f),
         new BookingChannel(PlatformBId, "BizTravel Desk",   0.12f, 0.55f, 0.08f, 0.4f),
         new BookingChannel(PlatformCId, "Boutique List",    0.08f, 0.25f, 0.03f, 0.8f),
     };
+
+    /// <summary>把"一张单的总取消率"摊成每日风险率，使整个提前期累计下来正好等于总率。
+    ///
+    /// 直接把总率当每日率用会出大事：12% × 13 天提前期 ⇒ 存活率 0.88^13 ≈ 19%，
+    /// 八成订单在到店前蒸发，酒店永远只有两三成入住率，人手压力与超售玩法双双失效
+    /// （M-D 实测：56 天里 40 间房只卖出 10 间/天，抠客房部完全没有代价）。
+    /// 1 − (1 − total)^(1/leadDays) 才是对应的每日风险率。</summary>
+    public static double DailyCancellationHazard(float totalRate, int leadDays)
+    {
+        double total = SimMath.Clamp01(totalRate);
+        if (total <= 0d) return 0d;
+        if (leadDays < 1) return total;          // 明天就到店：只剩一次机会，就是总率
+        return 1d - System.Math.Pow(1d - total, 1d / leadDays);
+    }
 
     public static int Count => All.Length;
 

@@ -331,10 +331,21 @@ namespace OldTownHotel.Tests.EditMode
             for (int d = 0; d < 10; d++) RunOneDay(actuallyNice);
             Assume.That(actuallyNice.Furniture.DeliveredQuality(201), Is.GreaterThan(0.9f), "装修得完工");
 
-            relabelled.BeginDay();
-            actuallyNice.BeginDay();
+            // M-D 之后不能只比"某一天"的到店数：到店客来自**十四天前下的单**，
+            // 而装修期间全店 Block ⇒ 那些天容量为 0 ⇒ 一张单都接不下来。
+            // 于是刚完工那天的到店数必然很低——这是正确行为，不是需求模型出错。
+            // 改为让预订簿在新品质下重新铺满一个完整视野，再比**累计**入住量
+            // （同种子累计多日对比是本项目定下的口径，逐日单调断言太脆）。
+            int niceCheckIns = 0, relabelledCheckIns = 0;
+            for (int d = 0; d < BookingGenerator.HorizonDays + 7; d++)
+            {
+                RunOneDay(actuallyNice);
+                niceCheckIns += actuallyNice.ArrivalsCheckedInToday;
+                RunOneDay(relabelled);
+                relabelledCheckIns += relabelled.ArrivalsCheckedInToday;
+            }
 
-            Assert.That(actuallyNice.ArrivalsPlannedToday, Is.GreaterThan(relabelled.ArrivalsPlannedToday),
+            Assert.That(niceCheckIns, Is.GreaterThan(relabelledCheckIns),
                         "真装修才拉来客人；把全店改标 Better 不会凭空变多");
         }
 

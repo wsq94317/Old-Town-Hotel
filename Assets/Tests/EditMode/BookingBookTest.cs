@@ -137,21 +137,49 @@ namespace OldTownHotel.Tests.EditMode
         [Test]
         public void CancellationRate_FollowsTheChannel()
         {
-            // 渠道 A 取消率高（流量大但不靠谱），直营最低——roll 恰好落在两者之间
+            // 渠道 A 取消率高（流量大但不靠谱），直营最低。阈值用**同一个换算函数**算出来，
+            // 不写死数字——否则调渠道取消率或提前期换算就会让这个测试假失败。
             var profileA = BookingChannels.Get(BookingChannels.PlatformAId);
             var direct = BookingChannels.Get(BookingChannels.DirectId);
             Assume.That(profileA.cancellationRate, Is.GreaterThan(direct.cancellationRate));
 
-            double between = (profileA.cancellationRate + direct.cancellationRate) * 0.5d;
+            const int bookedOn = 5, arrival = 9;
+            int lead = arrival - bookedOn;
+            double hazardA = BookingChannels.DailyCancellationHazard(profileA.cancellationRate, lead);
+            double hazardDirect = BookingChannels.DailyCancellationHazard(direct.cancellationRate, lead);
+            double between = (hazardA + hazardDirect) * 0.5d;
 
             var book = Book();
-            int viaA = Add(book, arrivalDay: 9, channelId: BookingChannels.PlatformAId);
-            int viaDirect = Add(book, arrivalDay: 9, channelId: BookingChannels.DirectId);
+            int viaA = book.Add(BookingChannels.PlatformAId, arrival, 1, RoomTier.Basic, 130,
+                                GuestSegment.Budget, bookedOn).id;
+            int viaDirect = book.Add(BookingChannels.DirectId, arrival, 1, RoomTier.Basic, 130,
+                                     GuestSegment.Budget, bookedOn).id;
 
-            var cancelled = book.RollCancellations(today: 5, () => between);
+            var cancelled = book.RollCancellations(today: bookedOn, () => between);
 
             Assert.That(cancelled, Contains.Item(viaA), "高取消率渠道先崩");
             Assert.That(cancelled, Has.No.Member(viaDirect), "直营单更稳");
+        }
+
+        // 这条是 M-D 实测抓出来的真 bug 的回归测试：渠道给的是**一张单的总取消率**，
+        // 当成每日概率用的话，13 天提前期下存活率只剩 0.88^13 ≈ 19%——八成订单在到店前
+        // 蒸发，酒店永远两三成入住率，人手压力与超售玩法双双失效。
+        [Test]
+        public void CancellationHazard_AccumulatesToTheChannelRate_NotFarBeyondIt()
+        {
+            const float total = 0.12f;
+
+            foreach (int lead in new[] { 1, 2, 5, 13, 30 })
+            {
+                double hazard = BookingChannels.DailyCancellationHazard(total, lead);
+                double survives = System.Math.Pow(1d - hazard, lead);
+
+                Assert.That(1d - survives, Is.EqualTo(total).Within(1e-6),
+                            $"提前期 {lead} 天累计下来的取消率必须正好等于渠道标称的总率");
+            }
+
+            Assert.That(BookingChannels.DailyCancellationHazard(0f, 10), Is.EqualTo(0d),
+                        "零取消率的渠道永远不该掷出取消");
         }
 
         [Test]

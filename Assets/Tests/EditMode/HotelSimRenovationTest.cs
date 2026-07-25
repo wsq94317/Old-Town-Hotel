@@ -9,7 +9,8 @@ namespace OldTownHotel.Tests.EditMode
     public class HotelSimRenovationTest
     {
         private static HotelSim BuildHotel(int rooms = 12, int housekeepers = 2, int inspectors = 1,
-                                           int receptionists = 2, int startingCash = 20000, int seed = 31337)
+                                           int receptionists = 2, int startingCash = 20000, int seed = 31337,
+                                           bool furnish = true)
         {
             var defs = new List<RoomDefinition>();
             for (int i = 0; i < rooms; i++)
@@ -29,7 +30,8 @@ namespace OldTownHotel.Tests.EditMode
 
             var sim = new HotelSim(new RoomLedger(defs), staff, RoomRateTable.Default,
                                    DemandConfig.Default, startingCash, seed);
-            sim.FurnishInheritedRooms();   // 继承的破家具（M-C2）：没家具的房不可售
+            // 继承的破家具（M-C2）。空房也可售，所以想隔离掉家具故障这个变量时传 furnish: false
+            if (furnish) sim.FurnishInheritedRooms();
             return sim;
         }
 
@@ -200,7 +202,12 @@ namespace OldTownHotel.Tests.EditMode
                 untouched.SettleDay(); untouched.Clock.BeginNextDay();
             }
 
-            Assert.That(renovated.Furniture.DeliveredQuality(201), Is.GreaterThan(0.9f));
+            // 断言的是"翻新过的房交付水平远高于没动的房"，不是"两周后还剩几成新"——
+            // 后者是调参事实：入住率一变（M-D 接入预订流后就变了），磨损速度跟着变，
+            // 14 天后的绝对崭新度会在 0.88 上下浮动，写死 0.9 就成了假失败。
+            Assert.That(renovated.Furniture.DeliveredQuality(201),
+                        Is.GreaterThan(untouched.Furniture.DeliveredQuality(201) + 0.5f),
+                        "豪华装修后的交付水平必须远高于没动过的破房");
             Assert.That(renovatedRevenue, Is.GreaterThan(untouchedRevenue),
                         "两周之后，翻新过的房把关房损失赚回来了（长线投资成立）");
         }
@@ -280,8 +287,14 @@ namespace OldTownHotel.Tests.EditMode
         [Test]
         public void LeanStaffing_IsNoLongerFreeMoney_OverTwoWeeks()
         {
-            var baseline = BuildHotel(rooms: 40, housekeepers: 4, inspectors: 1, receptionists: 3, seed: 5150);
-            var lean = BuildHotel(rooms: 40, housekeepers: 4, inspectors: 1, receptionists: 3, seed: 5150);
+            // **不放继承的破家具**：这条测的是人手压力。带上那些家具的话，两周内
+            // 40 间房会因为故障全部封锁（实测第 14 天 38/40 封房、可售 0，之后收入完全
+            // 停在原地），两家酒店都是"被家具搞死"，利润差只是谁死得更体面——
+            // 与排班毫无关系。家具那条死亡螺旋由 HotelSimFurnitureTest 单独守。
+            var baseline = BuildHotel(rooms: 40, housekeepers: 4, inspectors: 1, receptionists: 3,
+                                      seed: 5150, furnish: false);
+            var lean = BuildHotel(rooms: 40, housekeepers: 4, inspectors: 1, receptionists: 3,
+                                  seed: 5150, furnish: false);
             lean.Shifts.SetTier(StaffRole.Housekeeper, ShiftTier.Skeleton);
             lean.Shifts.SetTier(StaffRole.Reception, ShiftTier.Skeleton);
             lean.Shifts.SetTier(StaffRole.Inspector, ShiftTier.Skeleton);
@@ -311,6 +324,13 @@ namespace OldTownHotel.Tests.EditMode
             // §C2 平衡缺口的收口断言
             Assert.That(leanProfit, Is.LessThan(baseProfit),
                         "两周下来，省的工资赔不上流失的客人与差评（§C2 平衡缺口已收口）");
+
+            // M-D 实测补充：这条平衡在**两周尺度**上成立（全员 $21k vs 骨架 $16.5k），
+            // 但把同一局跑到 56 天，骨架班会反超（$48.9k vs $45.4k）。原因不是惩罚失效，
+            // 而是 40 间房配 4 名管家本身就过剩：一名管家一班约清 19 间，而连住单把
+            // 日退房量压到 ~15 间，一个人真的够用，省下的四倍工资盖过了流失的客人。
+            // 人手压力要到房量/周转再高一档才真正咬人（与 §C2 记的"约 30 间房起显现"一致）。
+            // 所以这里断的是两周窗口——把窗口拉长会变成在断"4 名管家是否过剩"，那是另一回事。
 
             // 注意：**不断言星级更低**。M-C2 引入家具后出现一个真实但反直觉的对冲——
             // 客人少 ⇒ 家具磨损慢 ⇒ 交付水平保持得更好 ⇒ 住进来的那few个客人反而更满意。
