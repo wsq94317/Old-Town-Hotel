@@ -166,6 +166,24 @@ public sealed class RoomLedger
 
     public ZoneAggregate AggregateForZone(int zone) => AggregateForZone((byte)zone);
 
+    /// <summary>营业房的平均档位归一到 0..1（全 Old=0，全 Better=1）。喂需求乘数：
+    /// 酒店整体越好越有人来，这条耦合让装修成为成长杠杆而不是陷阱。</summary>
+    public float AverageTierNormalised
+    {
+        get
+        {
+            int open = 0;
+            float sum = 0f;
+            for (int i = 0; i < _rooms.Length; i++)
+            {
+                if (_rooms[i].state == RoomSimState.Ruined) continue;
+                open++;
+                sum += (int)_rooms[i].tier / 2f;   // Old=0, Basic=0.5, Better=1
+            }
+            return open == 0 ? 0f : sum / open;
+        }
+    }
+
     /// <summary>平均磨损（喂损坏概率：满房加速磨损 → 客流咬资产）。</summary>
     public float AverageWear
     {

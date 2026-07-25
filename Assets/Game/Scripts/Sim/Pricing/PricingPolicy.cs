@@ -31,7 +31,10 @@ public readonly struct RoomRateTable
         }
     }
 
-    public static RoomRateTable Default => new RoomRateTable(80, 110, 190);
+    /// <summary>M-C 调参：v1 的 80/110/190 让"翻新"回本要 40+ 天，装修从核心玩法变成陷阱
+    /// （首轮试玩实测：装修路线 20 天现金比什么都不干少一半）。档位差价拉开到接近现实
+    /// ——翻新过的房本就该贵得多，这样装修才是真正的成长杠杆。</summary>
+    public static RoomRateTable Default => new RoomRateTable(80, 130, 220);
 }
 
 public sealed class PricingPolicy

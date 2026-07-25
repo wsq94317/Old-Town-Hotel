@@ -39,11 +39,12 @@ public readonly struct RenovationPlan
     {
         switch (kind)
         {
+            // M-C 调参：造价压到"约 10-15 天回本"，装修才值得当核心玩法
             case RenovationPlanKind.Economy:
-                return new RenovationPlan(kind, RoomTier.Basic, cashPerRoom: 1100,
+                return new RenovationPlan(kind, RoomTier.Basic, cashPerRoom: 900,
                                           materialsPerRoom: 2, blockDays: 4);
             case RenovationPlanKind.Standard:
-                return new RenovationPlan(kind, RoomTier.Basic, cashPerRoom: 1600,
+                return new RenovationPlan(kind, RoomTier.Basic, cashPerRoom: 1300,
                                           materialsPerRoom: 3, blockDays: 2);
             default:
                 return new RenovationPlan(kind, RoomTier.Better, cashPerRoom: 3400,

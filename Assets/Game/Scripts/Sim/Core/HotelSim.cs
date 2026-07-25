@@ -141,6 +141,45 @@ public sealed class HotelSim
         return true;
     }
 
+    /// <summary>解锁一间破败房的花费（清垃圾、通水电——还没算装修）。</summary>
+    public const int RuinedRoomUnlockCost = 800;
+
+    /// <summary>花钱把一间破败房拉回营业序列（变成脏房，还得打扫）。</summary>
+    public bool TryUnlockRuinedRoom(int roomNumber, out string reason)
+    {
+        reason = "";
+        if (!Rooms.Contains(roomNumber)) { reason = "No such room."; return false; }
+        if (Rooms.At(roomNumber).state != RoomSimState.Ruined) { reason = "That one's already open."; return false; }
+        if (Cash < RuinedRoomUnlockCost)
+        {
+            reason = "Clearing a derelict room costs $" + RuinedRoomUnlockCost + ".";
+            return false;
+        }
+        Cash -= RuinedRoomUnlockCost;
+        Rooms.TryUnlockRuinedRoom(roomNumber);
+        return true;
+    }
+
+    /// <summary>找一间还没解锁的破败房（UI 的"解锁下一间"按钮用）。</summary>
+    public bool TryFindRuinedRoom(out int roomNumber) =>
+        Rooms.TryFindFirstInState(RoomSimState.Ruined, out roomNumber);
+
+    /// <summary>可以装修的房号（未占用、未在施工、档位低于目标）。</summary>
+    public List<int> RenovatableRooms(RenovationPlanKind kind, int max)
+    {
+        var result = new List<int>();
+        var plan = RenovationPlan.For(kind);
+        for (int i = 0; i < Rooms.Count && result.Count < max; i++)
+        {
+            RoomRecord room = Rooms.Peek(i);
+            if (room.state == RoomSimState.Ruined || room.state == RoomSimState.Occupied) continue;
+            if ((int)room.tier >= (int)plan.targetTier) continue;
+            if (Renovations.IsRenovating(room.number)) continue;
+            result.Add(room.number);
+        }
+        return result;
+    }
+
     /// <summary>买材料。</summary>
     public bool TryBuyMaterials(int units)
     {
@@ -176,7 +215,8 @@ public sealed class HotelSim
         bool weekend = PricingPolicy.IsWeekend(Clock.CurrentDay);
         float ratio = Pricing.PriceRatioFor(Clock.CurrentDay);
         ArrivalsPlannedToday = DemandModel.ArrivalsFor(
-            DemandCfg, Rooms.OpenRoomCount, Reputation.Stars, ratio, weekend, _rng.NextDouble());
+            DemandCfg, Rooms.OpenRoomCount, Reputation.Stars, ratio, weekend, _rng.NextDouble(),
+            Rooms.AverageTierNormalised);
     }
 
     /// <summary>晨间退房潮：结算房费与满意度，房间变脏（客群决定额外清洁负担）。</summary>

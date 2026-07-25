@@ -142,17 +142,26 @@ public static class DemandModel
     /// <summary>星级 → 需求乘数（0.6 ~ 1.6）。评分→客源的正循环。</summary>
     public static float StarsMultiplier(float stars) => 0.6f + 0.2f * SimMath.Clamp(stars, 0f, 5f);
 
+    /// <summary>酒店整体档位 → 需求乘数（1.0 ~ 1.6）。
+    /// M-C 调参发现的必要耦合：只让翻新房"每人收更多"的话，需求与房量成正比，
+    /// 解锁破房（$800 换 +0.55 客/天）永远比装修（$900 换 +$50/晚但占用率仅 55%）划算，
+    /// 装修从核心玩法变成陷阱。现实里更好的酒店本就**更有人来**，不只是更贵。</summary>
+    public static float TierMultiplier(float averageTierNormalised) =>
+        1f + 0.6f * SimMath.Clamp01(averageTierNormalised);
+
     public static float WeekendDemandMultiplier(bool weekend) => weekend ? 1.25f : 1f;
 
-    /// <summary>今日到店人数。roll 外部注入（可复现）。</summary>
+    /// <summary>今日到店人数。roll 外部注入（可复现）。
+    /// averageTierNormalised：营业房的平均档位归一到 0..1（全 Old=0，全 Better=1）。</summary>
     public static int ArrivalsFor(DemandConfig cfg, int openRooms, float stars, float priceRatio,
-                                 bool weekend, double roll)
+                                 bool weekend, double roll, float averageTierNormalised = 0f)
     {
         if (openRooms <= 0) return 0;
 
         float demand = openRooms
                      * cfg.locationBaseOccupancy
                      * StarsMultiplier(stars)
+                     * TierMultiplier(averageTierNormalised)
                      * WeekendDemandMultiplier(weekend)
                      * Elasticity(priceRatio);
 
