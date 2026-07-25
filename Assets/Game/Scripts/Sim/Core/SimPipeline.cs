@@ -94,9 +94,16 @@ public sealed class SimPipeline
         }
     }
 
+    /// <summary>客房部工作时段：08:00-16:00（退房高峰 + 白天）。
+    /// 现实里没人在晚上 9 点进房打扫；这也让人手真正成为稀缺资源——
+    /// 若全天 14 小时都能清洁，一个管家每天能清 28 间，百房酒店以下永远不缺人。</summary>
+    private bool InHousekeepingHours =>
+        _clock != null && _clock.CurrentMinute < PhaseScheduler.CheckInPeakStart;
+
     private void StepService()
     {
         if (_rooms == null || _staff == null) return;
+        if (!InHousekeepingHours) return;
 
         bool hasInspector = ServiceCapacityModel.HasInspectorOnDuty(_staff);
 
