@@ -319,6 +319,28 @@ namespace OldTownHotel.Tests.EditMode
             return n;
         }
 
+        // 每一位排定的到店客都必须有下场：入住 / 被拒 / 落成超售待处置。
+        // 少了容差的话，阶段权重之和在浮点下凑不满 1.0，**当天最后一位客人被静默吞掉**
+        // ——既没入住也没被拒，只在日结时莫名变成 no-show。
+        [Test]
+        public void EveryPlannedArrival_HasAnOutcome_NobodyIsSilentlyDropped()
+        {
+            foreach (int rooms in new[] { 1, 2, 3, 5, 8, 13 })
+            {
+                var sim = BuildHotel(rooms: rooms, housekeepers: 2, receptionists: 2, seed: 606 + rooms);
+                sim.BeginDay();
+                int planned = sim.ArrivalsPlannedToday;
+                sim.RunToEndOfDay();
+
+                int accounted = sim.ArrivalsCheckedInToday
+                              + sim.ArrivalsTurnedAwayToday
+                              + sim.PendingOverbookings.Count;
+
+                Assert.That(accounted, Is.EqualTo(planned),
+                            $"{rooms} 间房：排定 {planned} 位，只交代了 {accounted} 位——有人被静默吞掉了");
+            }
+        }
+
         // ── 长跑不发散 ────────────────────────────────────────────────────────
 
         [Test]

@@ -86,7 +86,7 @@ public static class PhaseScheduler
         }
     }
 
-    /// <summary>阶段权重：离线闭式结算按阶段分摊到店/清洁负载时用（在线逐 tick 无需它）。</summary>
+    /// <summary>阶段权重：到店客按此在一天里分布（离线闭式结算也用同一张表）。</summary>
     public static float ArrivalWeightOf(SimDayPhase phase)
     {
         switch (phase)
@@ -97,5 +97,56 @@ public static class PhaseScheduler
             case SimDayPhase.Evening: return 0.10f;
             default: return 0f;
         }
+    }
+
+    private static int PhaseStartOf(SimDayPhase phase)
+    {
+        switch (phase)
+        {
+            case SimDayPhase.CheckoutPeak: return CheckoutPeakStart;
+            case SimDayPhase.Midday: return MiddayStart;
+            case SimDayPhase.CheckInPeak: return CheckInPeakStart;
+            case SimDayPhase.Evening: return EveningStart;
+            default: return SettleStart;
+        }
+    }
+
+    private static int PhaseEndOf(SimDayPhase phase)
+    {
+        switch (phase)
+        {
+            case SimDayPhase.CheckoutPeak: return MiddayStart;
+            case SimDayPhase.Midday: return CheckInPeakStart;
+            case SimDayPhase.CheckInPeak: return EveningStart;
+            case SimDayPhase.Evening: return SettleStart;
+            default: return SimClock.DayEndMinute;
+        }
+    }
+
+    /// <summary>到某一分钟为止，今日到店客**累计**应该来了几成（0~1）。
+    ///
+    /// 宿主用"累计目标"而不是"每分钟加一点信用额"来放人：后者要靠各阶段的
+    /// 权重÷分钟数再乘回来恰好凑满 1.0，而实际走过的分钟数与名义长度差一两分钟
+    /// （相位在分钟自增之后读），一天下来停在 0.9997——最后一位客人永远放不出来，
+    /// 既不入住也不算拒客。累计式在日终**构造上就等于 1**，不依赖任何容差。</summary>
+    public static float CumulativeArrivalFractionAt(int minute)
+    {
+        if (minute <= CheckoutPeakStart) return 0f;
+        if (minute >= SimClock.DayEndMinute) return 1f;
+
+        float done = 0f;
+        foreach (SimDayPhase phase in new[] { SimDayPhase.CheckoutPeak, SimDayPhase.Midday,
+                                              SimDayPhase.CheckInPeak, SimDayPhase.Evening })
+        {
+            int start = PhaseStartOf(phase);
+            int end = PhaseEndOf(phase);
+            float weight = ArrivalWeightOf(phase);
+
+            if (minute >= end) { done += weight; continue; }
+            if (minute <= start || end <= start) break;
+            done += weight * (minute - start) / (float)(end - start);
+            break;
+        }
+        return SimMath.Clamp01(done);
     }
 }

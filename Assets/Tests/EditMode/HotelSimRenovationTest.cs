@@ -244,15 +244,24 @@ namespace OldTownHotel.Tests.EditMode
         [Test]
         public void QueueWait_DragsSatisfactionDown()
         {
-            var thin = BuildHotel(rooms: 40, receptionists: 1, seed: 8080);
-            var staffed = BuildHotel(rooms: 40, receptionists: 3, seed: 8080);
+            // 场景要选在**前台真的是瓶颈**的地方，两个坑都得避开：
+            // ① 不放继承的破家具（理由见 LeanStaffing 那条）：带上它的话，人手足的酒店
+            //    住进更多客人 ⇒ 家具磨损更快 ⇒ 封房更多 ⇒ 满意度反而更低，断言直接翻转。
+            // ② 房量要够大。40 间房时累计等待确实有差（1063 vs 579 分钟），但摊到每位
+            //    客人约 10 分钟，正好卡在 WaitGraceMinutes 的宽容窗口上，满意度分毫不动
+            //    ——那是宽容窗口在正常工作，不是因果断了。80 间房时每人等约 32 分钟，
+            //    惩罚才真正咬下去（实测 0.757 vs 0.896）。
+            var thin = BuildHotel(rooms: 80, receptionists: 1, seed: 8080, furnish: false);
+            var staffed = BuildHotel(rooms: 80, receptionists: 2, seed: 8080, furnish: false);
 
+            int thinWait = 0, staffedWait = 0;
             for (int day = 1; day <= 4; day++)
             {
-                RunOneDay(thin);
-                RunOneDay(staffed);
+                RunOneDay(thin); thinWait += thin.TotalCheckInWaitToday;
+                RunOneDay(staffed); staffedWait += staffed.TotalCheckInWaitToday;
             }
 
+            Assert.That(thinWait, Is.GreaterThan(staffedWait), "前台越薄，客人累计等得越久");
             Assert.That(thin.Reputation.AverageSatisfaction,
                         Is.LessThan(staffed.Reputation.AverageSatisfaction),
                         "排队扣满意度 → 星级 → 明天的客量（服务压力咬客流压力）");

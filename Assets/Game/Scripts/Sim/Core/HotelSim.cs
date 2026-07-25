@@ -40,7 +40,7 @@ public sealed class HotelSim
 
     private readonly Random _rng;
     private readonly Dictionary<int, Stay> _stays = new Dictionary<int, Stay>();
-    private double _arrivalCredit;
+    private int _arrivalsReleasedToday;   // 今日已放进前台队列的人数（累计目标制的游标）
     private double _deskCredit;      // 前台处理进度
 
     // 到店"票据"：正数 = 预订单号，0 = walk-in。今日该来的人先排在 _pendingArrivals，
@@ -69,14 +69,39 @@ public sealed class HotelSim
     public BookingBook Bookings { get; }
     public AvailabilityCalendar Calendar { get; }
 
+    /// <summary>一位有预订却没房的客人。玩家在手机上三选一（升级/赔钱/硬赶）。</summary>
+    public sealed class OverbookingIncident
+    {
+        public int incidentId;
+        public int reservationId;
+        public RoomTier bookedBand;
+        public int lockedPrice;
+        public GuestSegment segment;
+        public int waitMinutes;
+
+        /// <summary>赔钱送走要花多少现金。</summary>
+        public int CompensationCost => OverbookingPolicy.CompensationFor(lockedPrice);
+    }
+
     private readonly List<RefundRequest> _refunds = new List<RefundRequest>();
     private int _nextRefundId;
+    private readonly List<OverbookingIncident> _overbookings = new List<OverbookingIncident>();
+    private int _nextOverbookingId;
 
     /// <summary>待处理的退款申请（进手机通知）。</summary>
     public IReadOnlyList<RefundRequest> PendingRefunds => _refunds;
 
     public int RefundsApprovedToday { get; private set; }
     public int RefundsRejectedToday { get; private set; }
+
+    /// <summary>待处置的超售客（进手机通知，三选一）。</summary>
+    public IReadOnlyList<OverbookingIncident> PendingOverbookings => _overbookings;
+
+    /// <summary>今日超售了几位客人（赌输了的账单）。</summary>
+    public int OverbookingsToday { get; private set; }
+    public int OverbookingsUpgradedToday { get; private set; }
+    public int OverbookingsCompensatedToday { get; private set; }
+    public int OverbookingsWalkedToday { get; private set; }
 
     /// <summary>今日前台排队最长时长（分钟）。注意：前台无人时会顶到哨兵值，
     /// 做强弱对比请用 TotalCheckInWaitToday（客人实际承受的等待总量）。</summary>
@@ -320,6 +345,121 @@ public sealed class HotelSim
         return null;
     }
 
+    // ── 超售处置（三选一，架构 §B.4） ────────────────────────────────────────
+
+    private OverbookingIncident FindOverbooking(int incidentId)
+    {
+        for (int i = 0; i < _overbookings.Count; i++)
+            if (_overbookings[i].incidentId == incidentId) return _overbookings[i];
+        return null;
+    }
+
+    /// <summary>这位超售客现在能不能升级安顿下来（要有房才行；房可能是刚打扫好的）。</summary>
+    public bool CanUpgradeOverbooking(int incidentId)
+    {
+        OverbookingIncident incident = FindOverbooking(incidentId);
+        if (incident == null) return false;
+        return TryPickRoomFor(incident.bookedBand, incident.segment, out _);
+    }
+
+    /// <summary>处置一位超售客。升级要有房、赔钱要有现金，硬赶永远可行（代价是声誉）。</summary>
+    public bool TryResolveOverbooking(int incidentId, OverbookingResolution resolution, out string reason)
+    {
+        reason = "";
+        OverbookingIncident incident = FindOverbooking(incidentId);
+        if (incident == null) { reason = "Nobody's waiting on that."; return false; }
+
+        Reservation reservation = Bookings.Find(incident.reservationId);
+
+        switch (resolution)
+        {
+            case OverbookingResolution.Upgrade:
+            {
+                if (!TryPickRoomFor(incident.bookedBand, incident.segment, out int roomNumber))
+                {
+                    reason = "Still nothing free to put them in.";
+                    return false;
+                }
+                // 按**原价**收——升级是你的赔礼，不是加价的机会
+                CheckInResolvedGuest(incident, reservation, roomNumber);
+                OverbookingsUpgradedToday++;
+                break;
+            }
+
+            case OverbookingResolution.Compensate:
+            {
+                int cost = incident.CompensationCost;
+                if (!TrySpendCash(cost))
+                {
+                    reason = "Compensation is $" + cost + " and you have $" + Cash + ".";
+                    return false;
+                }
+                if (reservation != null) Bookings.MarkTurnedAway(reservation.id);
+                ArrivalsTurnedAwayToday++;
+                OverbookingsCompensatedToday++;
+                break;
+            }
+
+            default:   // WalkAway
+            {
+                if (reservation != null) Bookings.MarkTurnedAway(reservation.id);
+                ArrivalsTurnedAwayToday++;
+                OverbookingsWalkedToday++;
+                break;
+            }
+        }
+
+        Reputation.RecordGuest(OverbookingPolicy.SatisfactionFor(resolution));
+        _overbookings.Remove(incident);
+        return true;
+    }
+
+    /// <summary>升级换房安顿下来：与正常入住走同一套记账，只是房价用原来锁定的。</summary>
+    private void CheckInResolvedGuest(OverbookingIncident incident, Reservation reservation, int roomNumber)
+    {
+        RoomTier band = Rooms.At(roomNumber).tier;
+        TotalCheckInWaitToday += incident.waitMinutes;
+
+        Rooms.SetState(roomNumber, RoomSimState.Occupied);
+        ref RoomRecord record = ref Rooms.At(roomNumber);
+        record.occupantResvId = incident.reservationId;
+
+        _stays[roomNumber] = new Stay
+        {
+            nightlyRate = incident.lockedPrice,
+            segment = incident.segment,
+            priceRatio = Pricing.PriceRatioFor(Clock.CurrentDay),
+            waitMinutes = incident.waitMinutes,
+            flawedRoom = false,
+            delivered = Furniture.DeliveredQuality(roomNumber),
+            band = band,
+            reservationId = incident.reservationId,
+            channelId = reservation != null ? reservation.channelId : BookingChannels.DirectId,
+            nightsLeft = reservation != null ? reservation.nights : 1,
+        };
+
+        if (reservation != null) Bookings.CheckIn(reservation.id, roomNumber);
+        ArrivalsCheckedInToday++;
+    }
+
+    /// <summary>无视到日结的超售客：按硬赶处理，并额外扣声誉——拖着不处理绝不能划算。</summary>
+    private void AutoResolveIgnoredOverbookings()
+    {
+        for (int i = 0; i < _overbookings.Count; i++)
+        {
+            OverbookingIncident incident = _overbookings[i];
+            if (Bookings.Find(incident.reservationId) != null)
+                Bookings.MarkTurnedAway(incident.reservationId);
+            ArrivalsTurnedAwayToday++;
+            OverbookingsWalkedToday++;
+
+            Reputation.RecordGuest(OverbookingPolicy.SatisfactionFor(OverbookingResolution.WalkAway));
+            for (int k = 0; k < OverbookingPolicy.IgnoredExtraReputationSamples; k++)
+                Reputation.RecordGuest(ReputationLedger.MinSatisfaction);
+        }
+        _overbookings.Clear();
+    }
+
     /// <summary>无视到日结：按拒绝处理，且额外掉一记声誉（比主动拒绝更亏）。</summary>
     private void AutoResolveIgnoredRefunds()
     {
@@ -469,7 +609,7 @@ public sealed class HotelSim
         _commissionToday = 0;
         ArrivalsCheckedInToday = 0;
         ArrivalsTurnedAwayToday = 0;
-        _arrivalCredit = 0d;
+        _arrivalsReleasedToday = 0;
         _deskQueue.Clear();
         _pendingArrivals.Clear();
         _deskCredit = 0d;
@@ -479,6 +619,10 @@ public sealed class HotelSim
         ReservationArrivalsToday = 0;
         WalkInArrivalsToday = 0;
         NoShowsToday = 0;
+        OverbookingsToday = 0;
+        OverbookingsUpgradedToday = 0;
+        OverbookingsCompensatedToday = 0;
+        OverbookingsWalkedToday = 0;
 
         RunCheckoutWave();
 
@@ -740,18 +884,17 @@ public sealed class HotelSim
     {
         if (_pendingArrivals.Count == 0) return;
 
-        SimDayPhase phase = PhaseScheduler.PhaseFor(Clock.CurrentMinute);
-        float weight = PhaseScheduler.ArrivalWeightOf(phase);
-        if (weight <= 0f) return;
+        // 按**累计目标**放人，不用逐分钟累加信用额：
+        // 到这一分钟为止该来的人数 = 排定人数 × 累计比例，还差几个就放几个。
+        // 累计式在日终构造上等于 100%，不依赖任何浮点容差——
+        // 逐分钟累加的写法会停在 99.97%，把当天最后一位客人静默吞掉（实测踩到）。
+        float fraction = PhaseScheduler.CumulativeArrivalFractionAt(Clock.CurrentMinute);
+        int shouldHaveArrived = SimMath.RoundToInt(ArrivalsPlannedToday * fraction);
 
-        int phaseMinutes = PhaseMinutesOf(phase);
-        if (phaseMinutes <= 0) return;
-
-        _arrivalCredit += ArrivalsPlannedToday * weight / phaseMinutes;
-        while (_arrivalCredit >= 1d && _pendingArrivals.Count > 0)
+        while (_arrivalsReleasedToday < shouldHaveArrived && _pendingArrivals.Count > 0)
         {
-            _arrivalCredit -= 1d;
             _deskQueue.Enqueue(_pendingArrivals.Dequeue());   // 到店先排队，不是瞬移进房
+            _arrivalsReleasedToday++;
         }
     }
 
@@ -831,14 +974,25 @@ public sealed class HotelSim
 
         if (!TryPickRoomFor(wantedBand, segment, out int roomNumber))
         {
-            // 没有可售房。预订客被劝走比 walk-in 严重得多——你答应过人家
-            // （三选一处置在 M-D-T5 接，这里先如实记账并扣声誉）
-            ArrivalsTurnedAwayToday++;
-            if (reservation != null)
+            if (reservation == null)
             {
-                Bookings.MarkTurnedAway(reservation.id);
-                Reputation.RecordGuest(ReputationLedger.MinSatisfaction);
+                // walk-in 没房就只能走：他没有预订，你也没承诺过什么
+                ArrivalsTurnedAwayToday++;
+                return;
             }
+
+            // 有预订却没房 = 超售落地。**不当场赶人**，挂成待处置事件让玩家三选一。
+            // 拖着不管到日结按"硬赶"处理并额外扣声誉（与退款链同一个规矩）。
+            _overbookings.Add(new OverbookingIncident
+            {
+                incidentId = ++_nextOverbookingId,
+                reservationId = reservation.id,
+                bookedBand = reservation.tier,
+                lockedPrice = reservation.lockedPrice,
+                segment = segment,
+                waitMinutes = waitMinutes,
+            });
+            OverbookingsToday++;
             return;
         }
 
@@ -930,6 +1084,9 @@ public sealed class HotelSim
     /// <summary>打烊结算。返回结果供晨报展示。</summary>
     public DaySettlementResult SettleDay(int interest = 0, int scheduledRepayment = 0, int supplies = 0)
     {
+        // 顺序要紧：超售客的单在待处置期间仍是 Booked，
+        // 先跑 no-show 会把"人来了、是你没房"错记成"人没来"。
+        AutoResolveIgnoredOverbookings();
         ResolveNoShows();
 
         var input = new DaySettlementInput(
