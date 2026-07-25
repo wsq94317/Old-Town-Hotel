@@ -1290,6 +1290,31 @@ public sealed class HotelSim
             state.roomBands.Add(new RoomBandEntry { room = room.number, band = (int)room.tier });
         }
 
+        // v6：预订簿逐单入档。**日历不存**——容量每晨按房态重算、需求由簿子全量重算，
+        // 存一份派生数据只会多出一个会对不上账的地方。
+        state.nextReservationId = Bookings.NextIdSeed;
+        state.overbookingAllowance = OverbookingAllowance;
+        state.bookingHorizonSeeded = _horizonSeeded;
+        state.reservations.Clear();
+        var book = Bookings.All;
+        for (int i = 0; i < book.Count; i++)
+        {
+            Reservation r = book[i];
+            state.reservations.Add(new ReservationSaveEntry
+            {
+                id = r.id,
+                channelId = r.channelId,
+                bookedOnDay = r.bookedOnDay,
+                arrivalDay = r.arrivalDay,
+                nights = r.nights,
+                tier = (int)r.tier,
+                lockedPrice = r.lockedPrice,
+                segment = (int)r.segment,
+                state = (int)r.state,
+                assignedRoomNumber = r.assignedRoomNumber,
+            });
+        }
+
         state.nextStaffId = Staff.NextIdSeed;
         state.staff.Clear();
         var entries = Staff.Entries;
@@ -1342,6 +1367,21 @@ public sealed class HotelSim
         if (state.roomBands != null)
             foreach (var entry in state.roomBands)
                 SetPriceBand(entry.room, (RoomTier)entry.band);
+
+        // v6：预订簿。日历不读档——次晨 BeginDay 会按房态重算容量、按簿子重算需求。
+        OverbookingAllowance = state.overbookingAllowance;
+        _horizonSeeded = state.bookingHorizonSeeded;
+        Bookings.Clear();
+        if (state.reservations != null)
+        {
+            foreach (var r in state.reservations)
+                Bookings.RestoreReservation(r.id, r.channelId, r.arrivalDay, r.nights,
+                                            (RoomTier)r.tier, r.lockedPrice, (GuestSegment)r.segment,
+                                            (ReservationState)r.state, r.assignedRoomNumber,
+                                            r.bookedOnDay);
+            Bookings.RestoreIdSeed(state.nextReservationId);
+            Bookings.RebuildCalendarDemand(Calendar);
+        }
 
         Staff.RestoreIdSeed(state.nextStaffId);
         if (state.staff != null)

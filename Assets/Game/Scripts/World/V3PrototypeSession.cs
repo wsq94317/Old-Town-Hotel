@@ -184,6 +184,14 @@ public class V3PrototypeSession : MonoBehaviour
         GUI.Label(new Rect(20, y, w - 40, 20),
             $"Checked in {_sim.ArrivalsCheckedInToday}, turned away {_sim.ArrivalsTurnedAwayToday}, " +
             $"queue cost {_sim.TotalCheckInWaitToday} min"); y += 20;
+        GUI.Label(new Rect(20, y, w - 40, 20),
+            $"Commission ${_sim.CommissionToday}   Cancelled {_sim.CancellationsToday}   " +
+            $"No-shows {_sim.NoShowsToday}"); y += 20;
+        if (_sim.BookingsDeclinedToday > 0)
+        {
+            GUI.Label(new Rect(20, y, w - 40, 20),
+                $"TURNED DOWN {_sim.BookingsDeclinedToday} BOOKINGS - no rooms left to sell."); y += 20;
+        }
         GUI.Label(new Rect(20, y, w - 40, 20), $"Rating {_sim.Reputation.Stars:0.00}*   Debt ${_loan.Balance}"); y += 28;
 
         if (_sim.Safebox.Balance > 0 && GuiInput.Button(new Rect(20, y, (w - 50) / 2f, 26), $"COLLECT ${_sim.Safebox.Balance}"))
@@ -221,22 +229,75 @@ public class V3PrototypeSession : MonoBehaviour
 
     private void DrawLiveStatus(float w, float h)
     {
-        GUI.Box(new Rect(10, 134, w - 20, 150), "TODAY");
+        GUI.Box(new Rect(10, 134, w - 20, 170), "TODAY");
         float y = 158;
-        GUI.Label(new Rect(20, y, w - 40, 20), $"Expected arrivals   {_sim.ArrivalsPlannedToday}"); y += 20;
+        GUI.Label(new Rect(20, y, w - 40, 20),
+            $"Expected arrivals   {_sim.ArrivalsPlannedToday}   " +
+            $"({_sim.ReservationArrivalsToday} booked + {_sim.WalkInArrivalsToday} walk-in)"); y += 20;
         GUI.Label(new Rect(20, y, w - 40, 20), $"Checked in          {_sim.ArrivalsCheckedInToday}"); y += 20;
         GUI.Label(new Rect(20, y, w - 40, 20), $"Turned away         {_sim.ArrivalsTurnedAwayToday}   (no clean room)"); y += 20;
         GUI.Label(new Rect(20, y, w - 40, 20), $"Checkouts booked    {_sim.CheckoutsToday}   (${_sim.GrossIncomeToday})"); y += 20;
         GUI.Label(new Rect(20, y, w - 40, 20), $"Flawed rooms sold   {_sim.FlawedStaysToday}   (no inspector on duty?)"); y += 20;
         GUI.Label(new Rect(20, y, w - 40, 20), $"Staff working       {_sim.Staff.ProductiveCountOfRole(StaffRole.Housekeeper)} hsk, " +
             $"morale {_sim.Staff.AverageMorale:0}"); y += 20;
+        GUI.Label(new Rect(20, y, w - 40, 20),
+            $"Next 7 nights sold  {SoldNightsPreview()}   (cap {_sim.Rooms.OpenRoomCount})"); y += 20;
+
+        // 超售客站在前台等你拍板。拖到打烊 = 按硬赶处理还要额外掉声誉，所以要显眼
+        var waiting = _sim.PendingOverbookings;
+        if (waiting.Count > 0)
+        {
+            var incident = waiting[0];
+            GUI.Box(new Rect(10, 310, w - 20, 96),
+                $"OVERBOOKED - {waiting.Count} guest(s) with a room you don't have");
+            GUI.Label(new Rect(20, 332, w - 40, 20),
+                $"Booked {incident.bookedBand} at ${incident.lockedPrice}. Waited {incident.waitMinutes} min.");
+
+            bool canUpgrade = _sim.CanUpgradeOverbooking(incident.incidentId);
+            GUI.enabled = canUpgrade;
+            if (GuiInput.Button(new Rect(20, 354, (w - 50) / 2f, 22),
+                                canUpgrade ? "UPGRADE THEM" : "NOTHING FREE YET"))
+                Resolve(incident.incidentId, OverbookingResolution.Upgrade,
+                        "Upgraded at the old price. They are thrilled.");
+            GUI.enabled = true;
+
+            if (GuiInput.Button(new Rect(30 + (w - 50) / 2f, 354, (w - 50) / 2f, 22),
+                                $"PAY THEM OFF (${incident.CompensationCost})"))
+                Resolve(incident.incidentId, OverbookingResolution.Compensate,
+                        "Paid for a room down the road. Expensive apology.");
+
+            if (GuiInput.Button(new Rect(20, 380, w - 40, 22), "SEND THEM AWAY (free, they will write about it)"))
+                Resolve(incident.incidentId, OverbookingResolution.WalkAway,
+                        "They left. Loudly.");
+            return;   // 有人等着就先处置，别让玩家分心去开破房
+        }
 
         if (_sim.TryFindRuinedRoom(out int ruined) &&
-            GuiInput.Button(new Rect(10, 296, w - 20, 30), $"CLEAR A DERELICT ROOM  (${HotelSim.RuinedRoomUnlockCost})"))
+            GuiInput.Button(new Rect(10, 316, w - 20, 30), $"CLEAR A DERELICT ROOM  (${HotelSim.RuinedRoomUnlockCost})"))
         {
             if (_sim.TryUnlockRuinedRoom(ruined, out string reason)) Say($"Room {ruined} is back in service. It needs cleaning.");
             else Say(reason);
         }
+    }
+
+    private void Resolve(int incidentId, OverbookingResolution resolution, string success)
+    {
+        Say(_sim.TryResolveOverbooking(incidentId, resolution, out string reason) ? success : reason);
+    }
+
+    /// <summary>未来七晚各卖出多少间夜——玩家据此判断"该不该现在动装修"。</summary>
+    private string SoldNightsPreview()
+    {
+        var sb = new System.Text.StringBuilder();
+        for (int k = 0; k < 7; k++)
+        {
+            int day = _sim.Clock.CurrentDay + k;
+            int sold = _sim.Calendar.DemandOn(day, RoomTier.Old)
+                     + _sim.Calendar.DemandOn(day, RoomTier.Basic)
+                     + _sim.Calendar.DemandOn(day, RoomTier.Better);
+            sb.Append(sold).Append(k == 6 ? "" : "/");
+        }
+        return sb.ToString();
     }
 
     private void DrawPricing(float w, float h)

@@ -124,6 +124,24 @@ public sealed class FurnitureSaveEntry
 [Serializable]
 public sealed class RoomBandEntry { public int room; public int band; }
 
+/// <summary>一张预订单（v6）。
+/// **日历不进存档**：容量每晨按房态重算，需求由簿子全量重算——
+/// 存一份派生数据只会多一个对不上账的地方。</summary>
+[Serializable]
+public sealed class ReservationSaveEntry
+{
+    public int id;
+    public int channelId;
+    public int bookedOnDay;
+    public int arrivalDay;
+    public int nights = 1;
+    public int tier;            // RoomTier
+    public int lockedPrice;
+    public int segment;         // GuestSegment
+    public int state;           // ReservationState
+    public int assignedRoomNumber;
+}
+
 [Serializable]
 public sealed class SimState
 {
@@ -154,6 +172,12 @@ public sealed class SimState
     public int nextFurnitureId;
     public List<FurnitureSaveEntry> furniture = new List<FurnitureSaveEntry>();
     public List<RoomBandEntry> roomBands = new List<RoomBandEntry>();
+
+    // v6：预订簿（逐单）+ 故意超售档 + 视野是否已铺开
+    public int nextReservationId;
+    public int overbookingAllowance;
+    public bool bookingHorizonSeeded;
+    public List<ReservationSaveEntry> reservations = new List<ReservationSaveEntry>();
 }
 
 [Serializable]
@@ -161,7 +185,8 @@ public sealed class GameState
 {
     // v2: + rooms（过夜占用）；v3: + world（经理模式世界层）；v4: + sim（模拟内核）
     // v5: + 家具（崭新度/健康度）、材料库存、每房挂牌档
-    public const int CurrentVersion = 5;
+    // v6: + 预订簿（逐单 Reservation）、故意超售档、预订视野已铺开标记
+    public const int CurrentVersion = 6;
 
     public int version = CurrentVersion;
     public EconomyState economy = new EconomyState();
@@ -187,6 +212,7 @@ public sealed class GameState
         if (sim.staff == null) sim.staff = new List<StaffSimState>();
         if (sim.furniture == null) sim.furniture = new List<FurnitureSaveEntry>();
         if (sim.roomBands == null) sim.roomBands = new List<RoomBandEntry>();
+        if (sim.reservations == null) sim.reservations = new List<ReservationSaveEntry>();
 
         // v3 及更早：Sim 尚未存在，用进度里的日号对齐钟面（读档即是那天早上）
         if (version < 4 && sim.day <= 1 && progress.day > 0) sim.day = progress.day;

@@ -239,6 +239,109 @@ namespace OldTownHotel.Tests.EditMode
             Assert.That(gs.sim.furniture, Is.Not.Null.And.Empty, "家具段补空表");
             Assert.That(gs.sim.roomBands, Is.Not.Null.And.Empty);
             Assert.That(gs.sim.materialStock, Is.EqualTo(0));
+            Assert.That(gs.sim.reservations, Is.Not.Null.And.Empty, "预订段也要补空表");
+        }
+
+        // ── v6：预订簿 ────────────────────────────────────────────────────────
+
+        /// <summary>带前台的酒店。共用的 BuildHotel 没有前台（CheckInsPerHour=0，没人办得进去），
+        /// 而这条测试要验的是"在住单的房号绑定"，必须真有人住进来。
+        /// 用 Assert 而不是 Assume：场景搭错了要**响亮地失败**，
+        /// 被 Assume 判成 Inconclusive 就是静默跳过，跳过的测试不是测试。</summary>
+        private static HotelSim BuildStaffedHotel(int seed = 909)
+        {
+            var defs = new List<RoomDefinition>();
+            for (int i = 0; i < 8; i++)
+                defs.Add(new RoomDefinition(201 + i, 1, 1, Room2DRoomCategory.Single,
+                                            RoomTier.Old, RoomSimState.Ready));
+            var staff = new StaffRoster();
+            staff.Register(new StaffMember(StaffRole.Reception, "Rita", 65));
+            staff.Register(new StaffMember(StaffRole.Housekeeper, "Ann", 60));
+            staff.Register(new StaffMember(StaffRole.Inspector, "Ivan", 70));
+            return new HotelSim(new RoomLedger(defs), staff, RoomRateTable.Default,
+                                DemandConfig.Default, startingCash: 1500, rngSeed: seed);
+        }
+
+        [Test]
+        public void V6_BookingLedger_RoundTrips()
+        {
+            var original = BuildStaffedHotel();
+            original.OverbookingAllowance = 2;
+            original.BeginDay();                 // 铺开视野，接一批单
+            original.RunToEndOfDay();
+            Assert.That(original.Bookings.Count, Is.GreaterThan(0), "视野铺开后该有单");
+            Assert.That(original.Bookings.InHouse().Count, Is.GreaterThan(0),
+                        "要有在住的单才测得到房号绑定");
+
+            int liveBefore = 0, inHouseBefore = original.Bookings.InHouse().Count;
+            foreach (var r in original.Bookings.All) if (r.IsLive) liveBefore++;
+            var sample = original.Bookings.InHouse()[0];
+
+            var state = new SimState();
+            original.CaptureTo(state);
+
+            Assert.That(state.reservations.Count, Is.EqualTo(original.Bookings.Count));
+            Assert.That(state.overbookingAllowance, Is.EqualTo(2));
+            Assert.That(state.bookingHorizonSeeded, Is.True);
+
+            // 过一遍 JSON，确认 DTO 真能序列化
+            var back = JsonUtility.FromJson<GameState>(JsonUtility.ToJson(new GameState { sim = state }));
+            var restored = BuildStaffedHotel();
+            restored.RestoreFrom(back.sim);
+
+            Assert.That(restored.Bookings.Count, Is.EqualTo(original.Bookings.Count), "一张单都不能丢");
+            Assert.That(restored.OverbookingAllowance, Is.EqualTo(2), "故意超售档是玩家设的，要存");
+            Assert.That(restored.Bookings.InHouse().Count, Is.EqualTo(inHouseBefore));
+
+            var backSample = restored.Bookings.Find(sample.id);
+            Assert.That(backSample, Is.Not.Null);
+            Assert.That(backSample.assignedRoomNumber, Is.EqualTo(sample.assignedRoomNumber), "分到的房号");
+            Assert.That(backSample.lockedPrice, Is.EqualTo(sample.lockedPrice), "锁定房价");
+            Assert.That(backSample.bookedOnDay, Is.EqualTo(sample.bookedOnDay), "下单日——取消风险率按它摊");
+            Assert.That(backSample.nights, Is.EqualTo(sample.nights), "住几晚");
+            Assert.That(backSample.channelId, Is.EqualTo(sample.channelId), "渠道决定抽成");
+            Assert.That(backSample.state, Is.EqualTo(sample.state));
+
+            // 日历不进存档，但读档后需求必须与簿子一致（次晨容量由房态重算）
+            int liveAfter = 0;
+            foreach (var r in restored.Bookings.All) if (r.IsLive) liveAfter++;
+            Assert.That(liveAfter, Is.EqualTo(liveBefore));
+            Assert.That(restored.Calendar.DemandOn(sample.arrivalDay, sample.tier),
+                        Is.GreaterThan(0), "读档后日历需求要按簿子重算出来");
+
+            // 新单不能撞历史单号（房记录里存着 occupantResvId）
+            var fresh = restored.Bookings.Add(BookingChannels.DirectId, 30, 1, RoomTier.Old, 80,
+                                              GuestSegment.Budget, 29);
+            Assert.That(fresh.id, Is.GreaterThan(sample.id), "读档后新接的单不能撞历史 id");
+        }
+
+        [Test]
+        public void V5Save_LoadsWithoutRebookingTheWholeHorizon()
+        {
+            // v5 旧档没有 bookingHorizonSeeded 字段，JsonUtility 给 false。
+            // 那是**正确**的默认：老档确实还没有预订簿，下一个早晨该把视野铺开一次。
+            // 反过来说，v6 存下 true 的档读回来绝不能再铺一遍（会把同一天重复下单）。
+            string v5 = "{\"version\":5," +
+                "\"economy\":{\"cash\":700,\"loanBalance\":100,\"loanRate\":0,\"staff\":[],\"reputationSamples\":[]}," +
+                "\"renovation\":{\"totalRooms\":12,\"startingRoomNumber\":201,\"rooms\":[],\"jobs\":[]}," +
+                "\"progress\":{\"day\":5,\"satisfaction\":20}," +
+                "\"rooms\":{\"occupied\":[]}," +
+                "\"world\":{\"prestige\":3,\"tapedBreakdowns\":[],\"lockedRooms\":[]}," +
+                "\"sim\":{\"day\":5,\"minute\":480,\"cash\":700,\"materialStock\":4,\"staff\":[],\"furniture\":[],\"roomBands\":[]}}";
+
+            var gs = JsonUtility.FromJson<GameState>(v5);
+            gs.MigrateToCurrentVersion();
+
+            Assert.That(gs.version, Is.EqualTo(GameState.CurrentVersion));
+            Assert.That(gs.sim.materialStock, Is.EqualTo(4), "v5 的数据不能丢");
+            Assert.That(gs.sim.reservations, Is.Not.Null.And.Empty);
+            Assert.That(gs.sim.bookingHorizonSeeded, Is.False, "老档还没预订簿，下个早晨才铺视野");
+
+            var sim = BuildStaffedHotel();
+            sim.RestoreFrom(gs.sim);
+            sim.BeginDay();
+
+            Assert.That(sim.Bookings.Count, Is.GreaterThan(0), "读了 v5 老档也要能正常开门做生意");
         }
 
         [Test]
