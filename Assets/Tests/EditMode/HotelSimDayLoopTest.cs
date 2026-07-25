@@ -30,8 +30,10 @@ namespace OldTownHotel.Tests.EditMode
                 staff.Register(new StaffMember(StaffRole.Reception, "RCP" + i, 65,
                                                new StaffAttributes(55, 55, 55), 1, null));
 
-            return new HotelSim(new RoomLedger(defs), staff, RoomRateTable.Default,
-                                DemandConfig.Default, startingCash, seed);
+            var sim = new HotelSim(new RoomLedger(defs), staff, RoomRateTable.Default,
+                                   DemandConfig.Default, startingCash, seed);
+            sim.FurnishInheritedRooms();   // 继承的破家具（M-C2）：没家具的房不可售
+            return sim;
         }
 
         private static DaySettlementResult RunOneDay(HotelSim sim, int interest = 0)

@@ -14,8 +14,10 @@ public sealed class FurnitureInstance
     public float newness = 1f;    // 只按衰减走，维修不能动
     public float health = 1f;     // 维修可回满
     public int faultLineIndex = -1; // ≥0 = 正在故障，指向文案池
+    public int repairDaysRemaining; // >0 = 师傅还在修（"花时间"的那一半，期间仍不可用）
 
     public bool IsFaulted => faultLineIndex >= 0;
+    public bool IsUnderRepair => repairDaysRemaining > 0;
 }
 
 public sealed class FurnitureLedger
@@ -210,13 +212,49 @@ public sealed class FurnitureLedger
 
     // ── 维修 / 翻新 ───────────────────────────────────────────────────────────
 
-    /// <summary>维修：健康度回满、故障清除，**崭新度一动不动**（用户明确要求）。</summary>
+    /// <summary>维修：健康度回满、故障清除，**崭新度一动不动**（用户明确要求）。
+    /// 立即生效的版本（测试/胶带式速修用）。</summary>
     public bool Repair(int instanceId)
     {
         if (!_byId.TryGetValue(instanceId, out FurnitureInstance f)) return false;
         f.health = 1f;
         f.faultLineIndex = -1;
+        f.repairDaysRemaining = 0;
         return true;
+    }
+
+    /// <summary>安排维修：占用工期，期间家具仍不可用（"花钱+花时间"的时间那一半）。</summary>
+    public bool BeginRepair(int instanceId, int days)
+    {
+        if (!_byId.TryGetValue(instanceId, out FurnitureInstance f)) return false;
+        if (!f.IsFaulted || f.IsUnderRepair) return false;
+        f.repairDaysRemaining = days < 1 ? 1 : days;
+        return true;
+    }
+
+    /// <summary>推进维修工期（日结时调）。返回本日修好的家具。</summary>
+    public List<FurnitureInstance> TickRepairs()
+    {
+        var done = new List<FurnitureInstance>();
+        for (int i = 0; i < _all.Count; i++)
+        {
+            var f = _all[i];
+            if (!f.IsUnderRepair) continue;
+            if (--f.repairDaysRemaining > 0) continue;
+            f.repairDaysRemaining = 0;
+            f.health = 1f;              // 健康度回满
+            f.faultLineIndex = -1;      // 崭新度**不动**
+            done.Add(f);
+        }
+        return done;
+    }
+
+    /// <summary>所有正在故障（含在修）的家具——手机通知/战术层列表用。</summary>
+    public List<FurnitureInstance> FaultedItems()
+    {
+        var list = new List<FurnitureInstance>();
+        for (int i = 0; i < _all.Count; i++) if (_all[i].IsFaulted) list.Add(_all[i]);
+        return list;
     }
 
     /// <summary>翻新（Economy 装修）：该房家具崭新度与健康度都回满，种类不变。

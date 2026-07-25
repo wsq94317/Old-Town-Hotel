@@ -203,12 +203,51 @@ public static class DemandModel
         return over <= 0f ? 0f : 0.2f * over;
     }
 
-    /// <summary>房间档位不达客群期待时的满意度惩罚。</summary>
-    public static float TierDisappointment(GuestSegment segment, RoomTier tier)
+    /// <summary>挂牌档承诺的品质水平。RoomTier 现在表示"你声称它有多好"，
+    /// 实际交付由家具装饰度决定（家具系统设计 §2）。</summary>
+    public static float ExpectedQualityOf(RoomTier band)
     {
-        float delivered = tier == RoomTier.Better ? 1f : tier == RoomTier.Basic ? 0.55f : 0.1f;
+        switch (band)
+        {
+            case RoomTier.Better: return 0.90f;
+            case RoomTier.Basic: return 0.55f;
+            default: return 0.10f;
+        }
+    }
+
+    /// <summary>挂牌 vs 交付的满意度增减（**双向**）。
+    /// 超预期是惊喜但有上限；虚报的失望扣得更狠——人对失望的反应比对惊喜强烈。</summary>
+    public static float PriceBandSatisfactionDelta(float deliveredQuality, RoomTier band)
+    {
+        float gap = SimMath.Clamp01(deliveredQuality) - ExpectedQualityOf(band);
+        if (gap >= 0f)
+        {
+            float bonus = gap * 0.30f;
+            return bonus > 0.25f ? 0.25f : bonus;
+        }
+        return gap * 0.50f;   // gap 为负，直接返回负值
+    }
+
+    /// <summary>客人个人标准没被满足的惩罚（VIP 对同一间房要求比预算客高）。</summary>
+    public static float SegmentDisappointment(GuestSegment segment, float deliveredQuality)
+    {
         float expected = GuestSegmentProfile.For(segment).tierExpectation;
-        float gap = expected - delivered;
+        float gap = expected - SimMath.Clamp01(deliveredQuality);
         return gap <= 0f ? 0f : 0.3f * gap;
+    }
+
+    /// <summary>家具对上客群口味的额外满意度（有上限，避免堆家具刷满分）。</summary>
+    public static float AppealBonus(float appealSum)
+    {
+        float bonus = SimMath.Clamp(appealSum, 0f, 10f) * 0.05f;
+        return bonus > 0.15f ? 0.15f : bonus;
+    }
+
+    /// <summary>虚报价触发退款申请的概率。落差超过 0.20 才开始，最高 80%。</summary>
+    public static double RefundChanceFor(float deliveredQuality, RoomTier band)
+    {
+        float gap = SimMath.Clamp01(deliveredQuality) - ExpectedQualityOf(band);
+        if (gap >= -0.20f) return 0d;
+        return SimMath.Clamp((-gap - 0.20f) * 2f, 0f, 0.8f);
     }
 }

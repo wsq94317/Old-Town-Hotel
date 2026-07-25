@@ -20,6 +20,19 @@ public sealed class HotelSim
         public float priceRatio;
         public int waitMinutes;   // 前台排队时长（商务客最恨这个）
         public bool flawedRoom;   // 没验房就上架的房：有概率带瑕疵
+        public float delivered;   // 入住时的实际交付水平（家具装饰度）
+        public RoomTier band;     // 当时的挂牌档
+    }
+
+    /// <summary>退款申请（虚报价的代价）。玩家在手机上批准/拒绝。</summary>
+    public sealed class RefundRequest
+    {
+        public int requestId;
+        public int roomNumber;
+        public int amount;
+        public GuestSegment segment;
+        public float gap;          // 负值：交付比挂牌差多少
+        public string line;        // 客人的原话（英文）
     }
 
     private readonly Random _rng;
@@ -43,6 +56,16 @@ public sealed class HotelSim
     public DemandConfig DemandCfg { get; }
     public SimRenovationQueue Renovations { get; }
     public MaterialStore Materials { get; }
+    public FurnitureLedger Furniture { get; }
+
+    private readonly List<RefundRequest> _refunds = new List<RefundRequest>();
+    private int _nextRefundId;
+
+    /// <summary>待处理的退款申请（进手机通知）。</summary>
+    public IReadOnlyList<RefundRequest> PendingRefunds => _refunds;
+
+    public int RefundsApprovedToday { get; private set; }
+    public int RefundsRejectedToday { get; private set; }
 
     /// <summary>今日前台排队最长时长（分钟）。注意：前台无人时会顶到哨兵值，
     /// 做强弱对比请用 TotalCheckInWaitToday（客人实际承受的等待总量）。</summary>
@@ -87,6 +110,185 @@ public sealed class HotelSim
         Pipeline = new SimPipeline(Clock, rooms, staff, rngSeed);
         Renovations = new SimRenovationQueue();
         Materials = new MaterialStore();
+        Furniture = new FurnitureLedger();
+    }
+
+    // ── 挂牌档：玩家声称房间有多好（家具系统设计 §2） ──────────────────────────
+    // RoomTier 不再表示品质，而是**挂出去的价格档**。品质由家具装饰度决定。
+    // 按楼层批量设 + 个别房覆盖（与区域聚合、批量装修同一交互思路，不做逐间填表）。
+
+    public bool SetPriceBand(int roomNumber, RoomTier band)
+    {
+        if (!Rooms.Contains(roomNumber)) return false;
+        ref RoomRecord room = ref Rooms.At(roomNumber);
+        room.tier = band;
+        return true;
+    }
+
+    /// <summary>整层批量设挂牌档。返回改了多少间。</summary>
+    public int SetPriceBandForFloor(int floor, RoomTier band)
+    {
+        int n = 0;
+        for (int i = 0; i < Rooms.Count; i++)
+        {
+            if (Rooms.Peek(i).floor != floor) continue;
+            ref RoomRecord room = ref Rooms.AtIndex(i);
+            room.tier = band;
+            n++;
+        }
+        return n;
+    }
+
+    /// <summary>某房的实际交付水平（家具装饰度，含崭新度折扣）。</summary>
+    public float DeliveredQualityOf(int roomNumber) => Furniture.DeliveredQuality(roomNumber);
+
+    /// <summary>全店平均交付水平——喂需求乘数（"更好的酒店更有人来"）。</summary>
+    public float AverageDeliveredQuality()
+    {
+        int open = 0;
+        float sum = 0f;
+        for (int i = 0; i < Rooms.Count; i++)
+        {
+            RoomRecord room = Rooms.Peek(i);
+            if (room.state == RoomSimState.Ruined) continue;
+            open++;
+            sum += Furniture.DeliveredQuality(room.number);
+        }
+        return open == 0 ? 0f : sum / open;
+    }
+
+    /// <summary>开局：给已开放的房配上继承来的破家具（崭新度与健康度都很低）。</summary>
+    public void FurnishInheritedRooms(float minNewness = 0.05f, float maxNewness = 0.15f)
+    {
+        for (int i = 0; i < Rooms.Count; i++)
+        {
+            RoomRecord room = Rooms.Peek(i);
+            if (room.state == RoomSimState.Ruined) continue;
+            if (Furniture.InRoom(room.number).Count > 0) continue;
+            float newness = minNewness + (float)_rng.NextDouble() * (maxNewness - minNewness);
+            float health = 0.2f + (float)_rng.NextDouble() * 0.3f;
+            Furniture.FurnishDerelictRoom(room.number, newness, health);
+        }
+    }
+
+    /// <summary>解锁破败房时也要配上破家具。</summary>
+    private void FurnishNewlyOpenedRoom(int roomNumber)
+    {
+        if (Furniture.InRoom(roomNumber).Count > 0) return;
+        float newness = 0.05f + (float)_rng.NextDouble() * 0.1f;
+        Furniture.FurnishDerelictRoom(roomNumber, newness, 0.2f + (float)_rng.NextDouble() * 0.2f);
+    }
+
+    // ── 家具买卖与维修 ────────────────────────────────────────────────────────
+
+    /// <summary>买一件家具摆进房（新买即全新）。可选位满了就失败。</summary>
+    public bool TryBuyFurniture(int roomNumber, int kindId, out string reason)
+    {
+        reason = "";
+        if (!Rooms.Contains(roomNumber)) { reason = "No such room."; return false; }
+        if (!FurnitureCatalog.TryGet(kindId, out FurnitureKind kind)) { reason = "No such furniture."; return false; }
+
+        var existing = Furniture.InRoom(roomNumber);
+        if (kind.IsRequired)
+        {
+            // 必备位是替换语义：先拆旧的（有残值）
+            for (int i = 0; i < existing.Count; i++)
+            {
+                if (FurnitureCatalog.Get(existing[i].kindId).slot != kind.slot) continue;
+                if (!TrySpendCash(kind.cashCost)) { reason = "That costs $" + kind.cashCost + "."; return false; }
+                Cash += FurnitureWearModel.SalvageValue(FurnitureCatalog.Get(existing[i].kindId).cashCost,
+                                                        existing[i].newness);
+                Furniture.Remove(existing[i].instanceId);
+                Furniture.Place(roomNumber, kindId);
+                return true;
+            }
+        }
+        else
+        {
+            int optional = 0;
+            for (int i = 0; i < existing.Count; i++)
+                if (!FurnitureCatalog.Get(existing[i].kindId).IsRequired) optional++;
+            if (optional >= FurnitureCatalog.OptionalSlotCount)
+            {
+                reason = "No free decor slot in that room (" + FurnitureCatalog.OptionalSlotCount + " max).";
+                return false;
+            }
+        }
+
+        if (!TrySpendCash(kind.cashCost)) { reason = "That costs $" + kind.cashCost + " and you have $" + Cash + "."; return false; }
+        Furniture.Place(roomNumber, kindId);
+        return true;
+    }
+
+    /// <summary>卖掉一件家具（残值很低）。必备家具卖掉会让房间不可售。</summary>
+    public int SellFurniture(int instanceId)
+    {
+        if (!Furniture.TryGet(instanceId, out FurnitureInstance f)) return 0;
+        int value = FurnitureWearModel.SalvageValue(FurnitureCatalog.Get(f.kindId).cashCost, f.newness);
+        Furniture.Remove(instanceId);
+        Cash += value;
+        return value;
+    }
+
+    /// <summary>安排维修：花钱 + 占用工期。修好只回健康度，崭新度不动。</summary>
+    public bool TryRepairFurniture(int instanceId, out string reason)
+    {
+        reason = "";
+        if (!Furniture.TryGet(instanceId, out FurnitureInstance f)) { reason = "Nothing to fix there."; return false; }
+        if (!f.IsFaulted) { reason = "That one works fine."; return false; }
+        if (f.IsUnderRepair) { reason = "Someone's already on it."; return false; }
+
+        FurnitureKind kind = FurnitureCatalog.Get(f.kindId);
+        if (!TrySpendCash(kind.repairCost))
+        {
+            reason = "Repair costs $" + kind.repairCost + " and you have $" + Cash + ".";
+            return false;
+        }
+        Furniture.BeginRepair(instanceId, kind.repairDays);
+        return true;
+    }
+
+    // ── 退款申请 ─────────────────────────────────────────────────────────────
+
+    /// <summary>批准退款：退还房费，声誉不再额外受损。</summary>
+    public bool ApproveRefund(int requestId)
+    {
+        RefundRequest request = FindRefund(requestId);
+        if (request == null) return false;
+        _grossIncomeToday -= request.amount;
+        if (_grossIncomeToday < 0) _grossIncomeToday = 0;
+        _refunds.Remove(request);
+        RefundsApprovedToday++;
+        return true;
+    }
+
+    /// <summary>拒绝退款：钱保住，但再补一记差评（且可能升级成客诉事件）。</summary>
+    public bool RejectRefund(int requestId)
+    {
+        RefundRequest request = FindRefund(requestId);
+        if (request == null) return false;
+        Reputation.RecordGuest(ReputationLedger.MinSatisfaction);
+        _refunds.Remove(request);
+        RefundsRejectedToday++;
+        return true;
+    }
+
+    private RefundRequest FindRefund(int requestId)
+    {
+        for (int i = 0; i < _refunds.Count; i++)
+            if (_refunds[i].requestId == requestId) return _refunds[i];
+        return null;
+    }
+
+    /// <summary>无视到日结：按拒绝处理，且额外掉一记声誉（比主动拒绝更亏）。</summary>
+    private void AutoResolveIgnoredRefunds()
+    {
+        for (int i = 0; i < _refunds.Count; i++)
+        {
+            Reputation.RecordGuest(ReputationLedger.MinSatisfaction);
+            Reputation.RecordGuest(ReputationLedger.MinSatisfaction);
+        }
+        _refunds.Clear();
     }
 
     // ── 装修（核心长线玩法） ──────────────────────────────────────────────────
@@ -111,7 +313,7 @@ public sealed class HotelSim
             if (room.state == RoomSimState.Ruined) continue;      // 破败房要先解锁
             if (room.state == RoomSimState.Occupied) continue;    // 有人住着不能开工
             if (Renovations.IsRenovating(number)) continue;
-            if ((int)room.tier >= (int)plan.targetTier) continue; // 已经达标
+            if (!RenovationWouldHelp(kind, number)) continue;     // 已经没什么可翻的
             eligible.Add(number);
         }
         if (eligible.Count == 0) { reason = "None of those rooms can take this plan right now."; return false; }
@@ -157,6 +359,7 @@ public sealed class HotelSim
         }
         Cash -= RuinedRoomUnlockCost;
         Rooms.TryUnlockRuinedRoom(roomNumber);
+        FurnishNewlyOpenedRoom(roomNumber);   // 清出来的房也只有一套破家具
         return true;
     }
 
@@ -178,6 +381,29 @@ public sealed class HotelSim
             result.Add(room.number);
         }
         return result;
+    }
+
+    /// <summary>这个方案对这间房还有没有意义（避免白花钱）。</summary>
+    private bool RenovationWouldHelp(RenovationPlanKind kind, int roomNumber)
+    {
+        var items = Furniture.InRoom(roomNumber);
+        if (items.Count == 0) return true;             // 空房：装了才有家具
+
+        switch (kind)
+        {
+            case RenovationPlanKind.Economy:
+                return Furniture.AverageNewness(roomNumber) < 0.95f;   // 还有崭新度可翻
+            case RenovationPlanKind.Standard:
+                for (int i = 0; i < items.Count; i++)
+                {
+                    FurnitureKind k = FurnitureCatalog.Get(items[i].kindId);
+                    if (k.IsRequired && FurnitureCatalog.UpgradedRequiredKind(items[i].kindId) != items[i].kindId)
+                        return true;                                    // 必备家具还能升
+                }
+                return Furniture.AverageNewness(roomNumber) < 0.95f;
+            default: // Luxury
+                return Furniture.DeliveredQuality(roomNumber) < 0.99f;  // 还没到顶配
+        }
     }
 
     /// <summary>买材料。</summary>
@@ -214,9 +440,14 @@ public sealed class HotelSim
 
         bool weekend = PricingPolicy.IsWeekend(Clock.CurrentDay);
         float ratio = Pricing.PriceRatioFor(Clock.CurrentDay);
+        RefundsApprovedToday = 0;
+        RefundsRejectedToday = 0;
+
+        // 需求乘数用**实际交付水平**（家具装饰度），不是挂牌档——
+        // 否则玩家把全店改标 Better 就能凭空拉来客人。
         ArrivalsPlannedToday = DemandModel.ArrivalsFor(
             DemandCfg, Rooms.OpenRoomCount, Reputation.Stars, ratio, weekend, _rng.NextDouble(),
-            Rooms.AverageTierNormalised);
+            AverageDeliveredQuality());
     }
 
     /// <summary>晨间退房潮：结算房费与满意度，房间变脏（客群决定额外清洁负担）。</summary>
@@ -230,11 +461,11 @@ public sealed class HotelSim
         {
             if (!Rooms.Contains(roomNumber)) continue;
             Stay stay = _stays[roomNumber];
-            RoomTier tier = Rooms.At(roomNumber).tier;
 
-            float satisfaction = SatisfactionFor(stay, tier);
+            float satisfaction = SatisfactionFor(stay, roomNumber);
             int paid = SimMath.RoundToInt(stay.nightlyRate * satisfaction);
             BookRoomRevenue(paid);
+            MaybeRequestRefund(roomNumber, stay, paid);
 
             // VIP 的评价权重更高：多记一次样本（"差评更致命"的最简实现）
             Reputation.RecordGuest(satisfaction);
@@ -244,22 +475,55 @@ public sealed class HotelSim
             Rooms.SetState(roomNumber, RoomSimState.Dirty);
             ref RoomRecord room = ref Rooms.At(roomNumber);
             room.occupantResvId = 0;
-            // 高周转客群把房间用得更狠 → 磨损更快（客流咬资产）
-            room.wear = SimMath.Clamp01(room.wear + 0.01f * GuestSegmentProfile.For(stay.segment).extraCleaningLoad);
+
+            // 家具按这一晚磨一次（客群倍率：派对客把家具用得最狠）
+            Furniture.ApplyGuestNight(roomNumber, GuestSegmentProfile.For(stay.segment).extraCleaningLoad);
 
             _stays.Remove(roomNumber);
             _checkoutsToday++;
         }
     }
 
-    private float SatisfactionFor(Stay stay, RoomTier tier)
+    /// <summary>满意度：每一项都是一根设计好的杠杆。</summary>
+    private float SatisfactionFor(Stay stay, int roomNumber)
     {
         float sat = 1f
-                  - DemandModel.ExpectationPenalty(stay.priceRatio)
-                  - DemandModel.TierDisappointment(stay.segment, tier)
-                  - DemandModel.WaitSatisfactionPenalty(stay.segment, stay.waitMinutes);
+                  - DemandModel.ExpectationPenalty(stay.priceRatio)                          // 定价模板高于市场
+                  + DemandModel.PriceBandSatisfactionDelta(stay.delivered, stay.band)         // 挂牌 vs 交付（双向）
+                  - DemandModel.SegmentDisappointment(stay.segment, stay.delivered)           // 客人个人标准
+                  - DemandModel.WaitSatisfactionPenalty(stay.segment, stay.waitMinutes)       // 前台排队
+                  + DemandModel.AppealBonus(Furniture.SegmentAppeal(roomNumber, stay.segment)); // 家具对口味
         if (stay.flawedRoom) sat -= FlawedRoomPenalty;   // 没验房就上架的代价
         return SimMath.Clamp(sat, ReputationLedger.MinSatisfaction, ReputationLedger.MaxSatisfaction);
+    }
+
+    /// <summary>虚报价的代价：交付远低于挂牌 → 按概率生成退款申请。</summary>
+    private void MaybeRequestRefund(int roomNumber, Stay stay, int paid)
+    {
+        double chance = DemandModel.RefundChanceFor(stay.delivered, stay.band);
+        if (chance <= 0d || _rng.NextDouble() >= chance) return;
+
+        float gap = stay.delivered - DemandModel.ExpectedQualityOf(stay.band);
+        _refunds.Add(new RefundRequest
+        {
+            requestId = ++_nextRefundId,
+            roomNumber = roomNumber,
+            amount = paid,
+            segment = stay.segment,
+            gap = gap,
+            line = RefundLineFor(stay.segment),
+        });
+    }
+
+    private static string RefundLineFor(GuestSegment segment)
+    {
+        switch (segment)
+        {
+            case GuestSegment.Business: return "I book fifty nights a year. Not here, apparently. Refund.";
+            case GuestSegment.Party: return "We've seen better. And we were not sober. Refund.";
+            case GuestSegment.Vip: return "I have told people about this place. I will tell more. Refund.";
+            default: return "I paid for a room, not an experience. Refund.";
+        }
     }
 
     /// <summary>住进带瑕疵的房间（没经验房就上架）扣的满意度。</summary>
@@ -351,7 +615,7 @@ public sealed class HotelSim
 
     private void AdmitOneGuest(int waitMinutes)
     {
-        if (!Rooms.TryFindFirstInState(RoomSimState.Ready, out int roomNumber))
+        if (!TryFindSellableRoom(out int roomNumber))
         {
             // 没有可售房：这位客人走了（M-D 有预订簿后这里变成超售处置）
             ArrivalsTurnedAwayToday++;
@@ -373,13 +637,31 @@ public sealed class HotelSim
         Rooms.SetState(roomNumber, RoomSimState.Occupied);
         _stays[roomNumber] = new Stay
         {
-            nightlyRate = Pricing.PriceFor(day, tier),
+            nightlyRate = Pricing.PriceFor(day, tier),   // tier = 挂牌档，决定收多少钱
             segment = segment,
             priceRatio = ratio,
             waitMinutes = waitMinutes,
             flawedRoom = flawed,
+            delivered = Furniture.DeliveredQuality(roomNumber), // 家具决定实际交付
+            band = tier,
         };
         ArrivalsCheckedInToday++;
+    }
+
+    /// <summary>找一间真能卖的房：Ready 且必备家具可用（床塌了不能卖）。</summary>
+    private bool TryFindSellableRoom(out int roomNumber)
+    {
+        for (int i = 0; i < Rooms.Count; i++)
+        {
+            RoomRecord room = Rooms.Peek(i);
+            if (room.state != RoomSimState.Ready) continue;
+            if (Furniture.InRoom(room.number).Count > 0
+                && !Furniture.RequiredFurnitureWorking(room.number)) continue;
+            roomNumber = room.number;
+            return true;
+        }
+        roomNumber = 0;
+        return false;
     }
 
     private void BookRoomRevenue(int amount)
@@ -417,9 +699,18 @@ public sealed class HotelSim
         Overflow.RollTheft(_rng.NextDouble());
         Cash = result.cashAfter;
 
-        // 顺序要紧：先算当晚磨损，再让装修完工——反过来会让"翻新重置磨损"当场被覆盖
+        // 无视到日结的退款申请按拒绝处理，且额外掉声誉（比主动拒绝更亏）
+        AutoResolveIgnoredRefunds();
+
+        // 顺序要紧：先算当晚老化，再让装修/维修完工——反过来会让"翻新重置"当场被覆盖
+        Furniture.ApplyIdleDay();
+        FurnitureFaultsToday = Furniture.RollDailyFaults(() => _rng.NextDouble());
+        Furniture.TickRepairs();
         ApplyNightlyWear();
         AdvanceRenovations();
+        SyncRoomWearFromFurniture();
+        SyncRoomBlocksFromFurniture();
+
         Staff.SettleDay(result.wagesPaid);
         Pipeline.SettleDay(result.wagesPaid);
 
@@ -427,7 +718,11 @@ public sealed class HotelSim
         return result;
     }
 
-    /// <summary>装修推进一天。完工的房档位提升，但装修完也是要打扫的（灰尘）。</summary>
+    /// <summary>本日新出故障的家具（交给 BreakdownSystem / 手机通知呈现）。</summary>
+    public List<FurnitureInstance> FurnitureFaultsToday { get; private set; } = new List<FurnitureInstance>();
+
+    /// <summary>装修推进一天。完工时按方案处理家具（家具系统设计 §5）——
+    /// **挂牌档 room.tier 不再被装修改动**，那是玩家自己定的价格档。</summary>
     private void AdvanceRenovations()
     {
         var finished = Renovations.TickDay();
@@ -438,11 +733,61 @@ public sealed class HotelSim
             {
                 int number = job.roomNumbers[r];
                 if (!Rooms.Contains(number)) continue;
+
+                switch (job.planKind)
+                {
+                    case RenovationPlanKind.Economy:
+                        Furniture.RefurbishRoom(number);                  // 纯翻新：崭新度回满
+                        break;
+                    case RenovationPlanKind.Standard:
+                        Furniture.RefurbishAndUpgradeRequired(number);    // 翻新 + 必备升一档
+                        break;
+                    default:
+                        Furniture.ReplaceRoomWithTopTier(number);         // 全套换顶配
+                        break;
+                }
+
                 ref RoomRecord room = ref Rooms.At(number);
-                room.tier = job.targetTier;
-                room.wear = 0f;                 // 翻新过的房重置磨损
+                room.wear = 0f;
                 Rooms.RemoveFlags(number, RoomFlags.Renovating);
                 Rooms.SetState(number, RoomSimState.Dirty); // 收工要清一遍才能卖
+            }
+        }
+    }
+
+    /// <summary>房间磨损由家具平均健康度派生（避免两套衰减系统）。</summary>
+    private void SyncRoomWearFromFurniture()
+    {
+        for (int i = 0; i < Rooms.Count; i++)
+        {
+            int number = Rooms.Peek(i).number;
+            if (Furniture.InRoom(number).Count == 0) continue;
+            ref RoomRecord room = ref Rooms.AtIndex(i);
+            room.wear = SimMath.Clamp01(1f - Furniture.AverageHealth(number));
+        }
+    }
+
+    /// <summary>必备家具坏了/在修 → 房间封锁；修好且房态是封锁 → 放回脏房待清。</summary>
+    private void SyncRoomBlocksFromFurniture()
+    {
+        for (int i = 0; i < Rooms.Count; i++)
+        {
+            RoomRecord snapshot = Rooms.Peek(i);
+            if (snapshot.state == RoomSimState.Ruined || snapshot.state == RoomSimState.Occupied) continue;
+            if (Rooms.IsSurfaced(snapshot.number) && Renovations.IsRenovating(snapshot.number)) continue;
+            if (Furniture.InRoom(snapshot.number).Count == 0) continue;
+
+            bool usable = Furniture.RequiredFurnitureWorking(snapshot.number);
+            if (!usable && snapshot.state != RoomSimState.Blocked)
+            {
+                Rooms.SetState(snapshot.number, RoomSimState.Blocked);
+                Rooms.AddFlags(snapshot.number, RoomFlags.Problem);
+            }
+            else if (usable && snapshot.state == RoomSimState.Blocked
+                     && !Renovations.IsRenovating(snapshot.number))
+            {
+                Rooms.RemoveFlags(snapshot.number, RoomFlags.Problem);
+                Rooms.SetState(snapshot.number, RoomSimState.Dirty);
             }
         }
     }

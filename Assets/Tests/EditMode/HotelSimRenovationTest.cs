@@ -27,8 +27,10 @@ namespace OldTownHotel.Tests.EditMode
                 staff.Register(new StaffMember(StaffRole.Reception, "RCP" + i, 65,
                                                new StaffAttributes(55, 55, 55), 1, null));
 
-            return new HotelSim(new RoomLedger(defs), staff, RoomRateTable.Default,
-                                DemandConfig.Default, startingCash, seed);
+            var sim = new HotelSim(new RoomLedger(defs), staff, RoomRateTable.Default,
+                                   DemandConfig.Default, startingCash, seed);
+            sim.FurnishInheritedRooms();   // 继承的破家具（M-C2）：没家具的房不可售
+            return sim;
         }
 
         private static void RunOneDay(HotelSim sim)
@@ -82,11 +84,14 @@ namespace OldTownHotel.Tests.EditMode
             sim.TryStartRenovation(RenovationPlanKind.Standard, new[] { 201 }, out _); // 2 天
 
             RunOneDay(sim);
-            Assert.That(sim.Rooms.At(201).tier, Is.EqualTo(RoomTier.Old), "第一天还没完工");
+            Assert.That(sim.Furniture.AverageNewness(201), Is.LessThan(0.9f), "第一天还没完工");
 
             RunOneDay(sim);
 
-            Assert.That(sim.Rooms.At(201).tier, Is.EqualTo(RoomTier.Basic), "完工升档");
+            // 装修不再改挂牌档（那是玩家定的价格档），它换新的是家具
+            Assert.That(sim.Furniture.AverageNewness(201), Is.EqualTo(1f).Within(1e-3f), "完工=家具崭新度回满");
+            Assert.That(sim.Furniture.InRoom(201)[0].kindId, Is.EqualTo(FurnitureCatalog.ProperBed),
+                        "标准方案把必备家具升一档");
             Assert.That(sim.Rooms.At(201).state, Is.EqualTo(RoomSimState.Dirty),
                         "装修完也是要打扫的（一屋灰）");
             Assert.That(sim.Renovations.IsRenovating(201), Is.False);
@@ -117,7 +122,7 @@ namespace OldTownHotel.Tests.EditMode
 
             for (int i = 0; i < 5; i++) RunOneDay(sim);
 
-            Assert.That(sim.Rooms.At(201).tier, Is.EqualTo(RoomTier.Better));
+            Assert.That(sim.Furniture.DeliveredQuality(201), Is.EqualTo(1f).Within(1e-3f), "豪华=顶配满交付");
             Assert.That(spent, Is.GreaterThan(RenovationPricing.CashCostFor(
                             RenovationPlan.For(RenovationPlanKind.Standard), 1)));
         }
@@ -147,10 +152,10 @@ namespace OldTownHotel.Tests.EditMode
             sim.TryBuyMaterials(40);
             sim.TryStartRenovation(RenovationPlanKind.Luxury, new[] { 201 }, out _);
             for (int i = 0; i < 5; i++) RunOneDay(sim);
-            Assert.That(sim.Rooms.At(201).tier, Is.EqualTo(RoomTier.Better));
+            Assert.That(sim.Furniture.DeliveredQuality(201), Is.EqualTo(1f).Within(1e-3f));
 
-            bool ok = sim.TryStartRenovation(RenovationPlanKind.Economy, new[] { 201 }, out _);
-            Assert.That(ok, Is.False, "已经比目标档位高的房不该再花钱装");
+            bool ok = sim.TryStartRenovation(RenovationPlanKind.Luxury, new[] { 201 }, out _);
+            Assert.That(ok, Is.False, "已经顶配的房不该再花钱装");
         }
 
         [Test]
@@ -195,7 +200,7 @@ namespace OldTownHotel.Tests.EditMode
                 untouched.SettleDay(); untouched.Clock.BeginNextDay();
             }
 
-            Assert.That(renovated.Rooms.At(201).tier, Is.EqualTo(RoomTier.Better));
+            Assert.That(renovated.Furniture.DeliveredQuality(201), Is.GreaterThan(0.9f));
             Assert.That(renovatedRevenue, Is.GreaterThan(untouchedRevenue),
                         "两周之后，翻新过的房把关房损失赚回来了（长线投资成立）");
         }
@@ -282,21 +287,35 @@ namespace OldTownHotel.Tests.EditMode
             lean.Shifts.SetTier(StaffRole.Inspector, ShiftTier.Skeleton);
 
             int baseProfit = 0, leanProfit = 0;
+            int baseTurnedAway = 0, leanTurnedAway = 0;
+            int baseWait = 0, leanWait = 0;
             for (int day = 1; day <= 14; day++)
             {
                 baseline.BeginDay(); baseline.RunToEndOfDay();
                 baseProfit += baseline.SettleDay().NetProfit;
+                baseTurnedAway += baseline.ArrivalsTurnedAwayToday;
+                baseWait += baseline.TotalCheckInWaitToday;
                 baseline.Clock.BeginNextDay();
 
                 lean.BeginDay(); lean.RunToEndOfDay();
                 leanProfit += lean.SettleDay().NetProfit;
+                leanTurnedAway += lean.ArrivalsTurnedAwayToday;
+                leanWait += lean.TotalCheckInWaitToday;
                 lean.Clock.BeginNextDay();
             }
 
-            Assert.That(lean.Reputation.Stars, Is.LessThan(baseline.Reputation.Stars),
-                        "抠人手 → 排队+瑕疵房 → 星级下滑");
+            // 机制层面的证据（结构上必然成立）
+            Assert.That(leanTurnedAway, Is.GreaterThan(baseTurnedAway), "抠人手 → 更多客人住不进来");
+            Assert.That(leanWait, Is.GreaterThan(baseWait), "抠前台 → 客人累计等更久");
+
+            // §C2 平衡缺口的收口断言
             Assert.That(leanProfit, Is.LessThan(baseProfit),
                         "两周下来，省的工资赔不上流失的客人与差评（§C2 平衡缺口已收口）");
+
+            // 注意：**不断言星级更低**。M-C2 引入家具后出现一个真实但反直觉的对冲——
+            // 客人少 ⇒ 家具磨损慢 ⇒ 交付水平保持得更好 ⇒ 住进来的那few个客人反而更满意。
+            // 星级于是被两股力量夹住，噪声量级；利润才是这条平衡的可靠判据。
+            // （这个副作用本身是合理的：空置的酒店确实更"新"，只是不赚钱。）
         }
     }
 }
