@@ -322,6 +322,12 @@ public class StaffAgent : MonoBehaviour
             duration /= speedMultiplier;
         }
 
+        // 团队规模与疲劳（v3 的 HousekeepingTeamModel）在这里变成**看得见的工时**：
+        // 一个管家独自干，每间房磨得明显更久；第二个人到位后两人都快起来。
+        // 世界场景里 agent 才是清洁模拟的本体（会走路、会摸鱼、会留瑕疵），
+        // Sim 只负责"多快"——各管一段，一个关注点只有一个权威。
+        if (_task.Kind == StaffTaskKind.Clean) duration /= HousekeepingPaceMultiplier();
+
         bool productive = true;
         if (_slack != null && _manager != null)
         {
@@ -360,6 +366,27 @@ public class StaffAgent : MonoBehaviour
         }
 
         FinishTask();
+    }
+
+    /// <summary>清洁节奏倍率：>1 表示比基准快。取自 v3 的客房部团队模型——
+    /// 独自干 ×0.75、两三人 ×1.00、人多了走廊互相挤，再乘上当班的疲劳系数。
+    /// 桥不在场（比如单独打开这个场景调试）时回落成 1，不影响原有手感。</summary>
+    private float HousekeepingPaceMultiplier()
+    {
+        var bridge = HotelSimSceneBridge.Instance;
+        if (bridge == null || bridge.Staff == null) return 1f;
+
+        int crew = bridge.Staff.ProductiveCountOfRole(StaffRole.Housekeeper);
+        if (crew <= 0) return 1f;
+
+        float pace = HousekeepingTeamModel.PerPersonFactor(crew);
+        foreach (var entry in bridge.Staff.Entries)
+        {
+            if (entry.member != Member) continue;
+            pace *= StaffDayModel.FatigueFactor(entry.fatigue);
+            break;
+        }
+        return pace < 0.2f ? 0.2f : pace;   // 再累也不能把一间房拖成无限长
     }
 
     private void FinishTask()
