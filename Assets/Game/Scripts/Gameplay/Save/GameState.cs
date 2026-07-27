@@ -142,6 +142,24 @@ public sealed class ReservationSaveEntry
     public int assignedRoomNumber;
 }
 
+/// <summary>一张在建施工单（v7）。装修与破败房复原共用。</summary>
+[Serializable]
+public sealed class BuildJobEntry
+{
+    public int jobId;
+    public int planKind;        // RenovationPlanKind
+    public int targetTier;      // RoomTier
+    public int daysRemaining;
+    public bool isReclaim;
+    public int reclaimKind;     // ReclaimPlanKind
+    public List<int> rooms = new List<int>();
+}
+
+/// <summary>一间房的运行时状态（v7）。以前只存挂牌档，房态没存——
+/// 于是装修中/破败/脏房读档后全变成默认值。</summary>
+[Serializable]
+public sealed class RoomStateEntry { public int room; public int state; }   // state = RoomSimState
+
 [Serializable]
 public sealed class SimState
 {
@@ -178,6 +196,13 @@ public sealed class SimState
     public int overbookingAllowance;
     public bool bookingHorizonSeeded;
     public List<ReservationSaveEntry> reservations = new List<ReservationSaveEntry>();
+
+    // v7：在建施工单 + 房态。
+    // **既有缺陷**：施工队列从来没进存档——玩家花了钱和材料，读档后工单凭空消失。
+    // 破败房复原工期最长 7 天（全游戏最长），不存等于直接吞钱。
+    public int nextBuildJobId;
+    public List<BuildJobEntry> buildJobs = new List<BuildJobEntry>();
+    public List<RoomStateEntry> roomStates = new List<RoomStateEntry>();
 }
 
 [Serializable]
@@ -186,7 +211,8 @@ public sealed class GameState
     // v2: + rooms（过夜占用）；v3: + world（经理模式世界层）；v4: + sim（模拟内核）
     // v5: + 家具（崭新度/健康度）、材料库存、每房挂牌档
     // v6: + 预订簿（逐单 Reservation）、故意超售档、预订视野已铺开标记
-    public const int CurrentVersion = 6;
+    // v7: + 在建施工单（装修/复原）与房态——以前工单和房态都会在读档时丢
+    public const int CurrentVersion = 7;
 
     public int version = CurrentVersion;
     public EconomyState economy = new EconomyState();
@@ -213,6 +239,8 @@ public sealed class GameState
         if (sim.furniture == null) sim.furniture = new List<FurnitureSaveEntry>();
         if (sim.roomBands == null) sim.roomBands = new List<RoomBandEntry>();
         if (sim.reservations == null) sim.reservations = new List<ReservationSaveEntry>();
+        if (sim.buildJobs == null) sim.buildJobs = new List<BuildJobEntry>();
+        if (sim.roomStates == null) sim.roomStates = new List<RoomStateEntry>();
 
         // v3 及更早：Sim 尚未存在，用进度里的日号对齐钟面（读档即是那天早上）
         if (version < 4 && sim.day <= 1 && progress.day > 0) sim.day = progress.day;

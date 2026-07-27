@@ -34,6 +34,8 @@ public class V3PrototypeSession : MonoBehaviour
     private float _toastUntil;
     private int _renovationBatchSize = 1;
     private RenovationPlanKind _plan = RenovationPlanKind.Economy;
+    private int _reclaimBatchSize = 1;
+    private ReclaimPlanKind _reclaimPlan = ReclaimPlanKind.PatchUp;
     private int _yesterdayNetProfit;
 
     private void Awake()
@@ -283,10 +285,19 @@ public class V3PrototypeSession : MonoBehaviour
             if (_sim.Renovations.IsRenovating(room.number)) renovating++;
             else broken++;
         }
+        // 复原中的房还是 Ruined 状态（施工期间依然不可售），要从破败数里单列出来，
+        // 否则玩家看不出"我已经花钱在开这几间了"
+        int reclaiming = _sim.Renovations.RoomsUnderReclaim;
+        int derelict = _sim.Rooms.CountOf(RoomSimState.Ruined) - reclaiming;
         GUI.Label(new Rect(20, y, w - 40, 20),
             GameText.F("UNSELLABLE    renovating {0}   broken {1}   derelict {2}   (sellable {3})",
-                       renovating, broken, _sim.Rooms.CountOf(RoomSimState.Ruined),
+                       renovating, broken, derelict < 0 ? 0 : derelict,
                        _sim.Rooms.SellableCount)); y += 18;
+        if (reclaiming > 0)
+        {
+            GUI.Label(new Rect(20, y, w - 40, 20),
+                GameText.F("  reclaiming {0} derelict room(s) - building work in progress", reclaiming)); y += 18;
+        }
 
         return y + 6;
     }
@@ -378,14 +389,9 @@ public class V3PrototypeSession : MonoBehaviour
             return;   // 有人等着就先处置，别让玩家分心去开破房
         }
 
-        if (_sim.TryFindRuinedRoom(out int ruined) &&
-            GuiInput.Button(new Rect(10, y, w - 20, 30),
-                            GameText.F("CLEAR A DERELICT ROOM  (${0})", HotelSim.RuinedRoomUnlockCost)))
-        {
-            if (_sim.TryUnlockRuinedRoom(ruined, out string reason))
-                Say(GameText.F("Room {0} is back in service. It needs cleaning.", ruined));
-            else Say(reason);
-        }
+        if (_sim.TryFindRuinedRoom(out int _))
+            GUI.Label(new Rect(20, y, w - 40, 20),
+                GameText.T("Derelict rooms need building work - see the RENOVATE tab."));
     }
 
     private void Resolve(int incidentId, OverbookingResolution resolution, string success)
@@ -566,7 +572,7 @@ public class V3PrototypeSession : MonoBehaviour
 
     private void DrawRenovation(float w, float h)
     {
-        GUI.Box(new Rect(10, 134, w - 20, 210),
+        GUI.Box(new Rect(10, 134, w - 20, 200),
                 GameText.T("RENOVATION - the cost is the nights you can't sell"));
         float y = 158;
         foreach (RenovationPlanKind kind in System.Enum.GetValues(typeof(RenovationPlanKind)))
@@ -606,6 +612,48 @@ public class V3PrototypeSession : MonoBehaviour
         }
         y += 30;
         GUI.Label(new Rect(20, y, w - 40, 20),
-            GameText.F("Under renovation now: {0} room(s)", _sim.Renovations.RoomsUnderRenovation));
+            GameText.F("Under renovation now: {0} room(s)", _sim.Renovations.RoomsUnderRenovation)); y += 26;
+
+        DrawReclaimSection(w, y);
+    }
+
+    /// <summary>破败房复原：**破败房不是脏，是废**，只能靠施工开出来。
+    /// 三档的差别不在档位而在家具——修旧的最省但只配挂 Old，换全套最贵但直接够 Better。</summary>
+    private void DrawReclaimSection(float w, float y)
+    {
+        var candidates = _sim.ReclaimableRooms(_reclaimBatchSize);
+        GUI.Box(new Rect(10, y, w - 20, 148),
+                GameText.F("DERELICT ROOMS - {0} left to open", _sim.Rooms.CountOf(RoomSimState.Ruined)));
+        y += 24;
+
+        foreach (ReclaimPlanKind kind in System.Enum.GetValues(typeof(ReclaimPlanKind)))
+        {
+            bool active = _reclaimPlan == kind;
+            if (GuiInput.Button(new Rect(20, y, w - 40, 24),
+                                (active ? "> " : "  ") + GameText.T(ReclaimPlan.LabelOf(kind))))
+                _reclaimPlan = kind;
+            y += 26;
+        }
+
+        var plan = ReclaimPlan.For(_reclaimPlan);
+        if (GuiInput.Button(new Rect(20, y, 70, 22), GameText.T("- room")) && _reclaimBatchSize > 1)
+            _reclaimBatchSize--;
+        if (GuiInput.Button(new Rect(94, y, 70, 22), GameText.T("+ room"))) _reclaimBatchSize++;
+        int batch = candidates.Count;
+        GUI.Label(new Rect(172, y, w - 190, 22),
+                  GameText.F("{0} room(s)", batch)); y += 24;
+
+        GUI.Label(new Rect(20, y, w - 40, 20),
+            GameText.F("${0} total, {1} materials, {2} days shut",
+                       ReclaimPricing.CashCostFor(plan, batch),
+                       ReclaimPricing.MaterialCostFor(plan, batch),
+                       ReclaimPricing.BlockDaysFor(plan, batch))); y += 22;
+
+        if (GuiInput.Button(new Rect(20, y, w - 40, 24), GameText.T("START BUILDING WORK")))
+        {
+            if (_sim.TryStartReclaim(_reclaimPlan, candidates, out string reason))
+                Say(GameText.F("{0} derelict room(s) under construction.", candidates.Count));
+            else Say(reason);
+        }
     }
 }

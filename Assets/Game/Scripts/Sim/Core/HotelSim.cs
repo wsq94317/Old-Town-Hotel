@@ -265,13 +265,6 @@ public sealed class HotelSim
         }
     }
 
-    /// <summary>解锁破败房时也要配上破家具。</summary>
-    private void FurnishNewlyOpenedRoom(int roomNumber)
-    {
-        if (Furniture.InRoom(roomNumber).Count > 0) return;
-        float newness = 0.05f + (float)_rng.NextDouble() * 0.1f;
-        Furniture.FurnishDerelictRoom(roomNumber, newness, 0.2f + (float)_rng.NextDouble() * 0.2f);
-    }
 
     // ── 家具买卖与维修 ────────────────────────────────────────────────────────
 
@@ -572,29 +565,105 @@ public sealed class HotelSim
         return true;
     }
 
-    /// <summary>解锁一间破败房的花费（清垃圾、通水电——还没算装修）。</summary>
-    public const int RuinedRoomUnlockCost = 800;
 
-    /// <summary>花钱把一间破败房拉回营业序列（变成脏房，还得打扫）。</summary>
-    public bool TryUnlockRuinedRoom(int roomNumber, out string reason)
+
+    /// <summary>找一间还没复原的破败房。</summary>
+    public bool TryFindRuinedRoom(out int roomNumber) =>
+        Rooms.TryFindFirstInState(RoomSimState.Ruined, out roomNumber);
+
+    // ── 破败房复原（用户设计：破败房不是脏，是废，只能装修） ───────────────────
+
+    /// <summary>能开工复原的破败房号。</summary>
+    public List<int> ReclaimableRooms(int max)
+    {
+        var result = new List<int>();
+        for (int i = 0; i < Rooms.Count && result.Count < max; i++)
+        {
+            RoomRecord room = Rooms.Peek(i);
+            if (room.state != RoomSimState.Ruined) continue;
+            if (Renovations.IsRenovating(room.number)) continue;
+            result.Add(room.number);
+        }
+        return result;
+    }
+
+    /// <summary>某批破败房按某方案复原的报价（UI 展示批量折扣）。</summary>
+    public int QuoteReclaim(ReclaimPlanKind kind, int roomCount) =>
+        ReclaimPricing.CashCostFor(ReclaimPlan.For(kind), roomCount);
+
+    /// <summary>开工复原破败房。房间保持 Ruined（施工中依然不可售），
+    /// 完工时才装家具、转 Dirty 交给客房部打扫。
+    /// 现金或材料不够则整单失败，不做部分成交（与装修同一规矩）。</summary>
+    public bool TryStartReclaim(ReclaimPlanKind kind, IList<int> roomNumbers, out string reason)
     {
         reason = "";
-        if (!Rooms.Contains(roomNumber)) { reason = "No such room."; return false; }
-        if (Rooms.At(roomNumber).state != RoomSimState.Ruined) { reason = "That one's already open."; return false; }
-        if (Cash < RuinedRoomUnlockCost)
+        if (roomNumbers == null || roomNumbers.Count == 0) { reason = "Pick some rooms first."; return false; }
+
+        var plan = ReclaimPlan.For(kind);
+        var eligible = new List<int>();
+        foreach (int number in roomNumbers)
         {
-            reason = "Clearing a derelict room costs $" + RuinedRoomUnlockCost + ".";
+            if (!Rooms.Contains(number)) continue;
+            if (Rooms.At(number).state != RoomSimState.Ruined) continue;   // 只有破败房能复原
+            if (Renovations.IsRenovating(number)) continue;
+            eligible.Add(number);
+        }
+        if (eligible.Count == 0) { reason = "No derelict rooms available to work on."; return false; }
+
+        int cash = ReclaimPricing.CashCostFor(plan, eligible.Count);
+        int materials = ReclaimPricing.MaterialCostFor(plan, eligible.Count);
+
+        if (Materials.Stock < materials)
+        {
+            reason = "Not enough materials (" + Materials.Stock + "/" + materials + "). Buy some first.";
             return false;
         }
-        Cash -= RuinedRoomUnlockCost;
-        Rooms.TryUnlockRuinedRoom(roomNumber);
-        FurnishNewlyOpenedRoom(roomNumber);   // 清出来的房也只有一套破家具
+        if (Cash < cash)
+        {
+            reason = "That costs $" + cash + " and you have $" + Cash + ".";
+            return false;
+        }
+
+        Cash -= cash;
+        Materials.TryConsume(materials);
+        Renovations.EnqueueReclaim(plan, eligible);
         return true;
     }
 
-    /// <summary>找一间还没解锁的破败房（UI 的"解锁下一间"按钮用）。</summary>
-    public bool TryFindRuinedRoom(out int roomNumber) =>
-        Rooms.TryFindFirstInState(RoomSimState.Ruined, out roomNumber);
+    /// <summary>复原完工：按方案装家具，然后房间变脏交给客房部——施工完总得打扫。
+    /// 于是复原会占用客房部工时，和退房脏房抢同一批人手。</summary>
+    private void CompleteReclaim(SimRenovationJob job)
+    {
+        var plan = ReclaimPlan.For(job.reclaimKind);
+        for (int r = 0; r < job.roomNumbers.Count; r++)
+        {
+            int number = job.roomNumbers[r];
+            if (!Rooms.Contains(number)) continue;
+
+            if (plan.keepsOldFurniture)
+            {
+                // 请维修工把原来的破家具修到能用：健康度回满，**崭新度一点不回**
+                // （"维修不能动崭新度"是铁律）。所以这条路交付垫底，只配挂 Old。
+                if (Furniture.InRoom(number).Count == 0)
+                    Furniture.FurnishDerelictRoom(number, DerelictNewnessFloor, health: 1f);
+                else
+                    Furniture.ReviveRoomHealth(number);
+            }
+            else if (plan.fitsOptionalSlots)
+            {
+                Furniture.ReplaceRoomWithTopTier(number);      // 全套换新，够挂 Better
+            }
+            else
+            {
+                Furniture.FurnishWithNewRequired(number);      // 新床 + 新卫浴，够挂 Basic
+            }
+
+            Rooms.TryUnlockRuinedRoom(number);   // Ruined → Dirty：施工完是脏房，不是可售
+        }
+    }
+
+    /// <summary>修旧家具那条路给出的崭新度（就是继承破家具的水平——它本来就是这个房里的旧东西）。</summary>
+    private const float DerelictNewnessFloor = 0.10f;
 
     /// <summary>可以装修的房号（未占用、未在施工、档位低于目标）。</summary>
     public List<int> RenovatableRooms(RenovationPlanKind kind, int max)
@@ -1204,6 +1273,16 @@ public sealed class HotelSim
         for (int i = 0; i < finished.Count; i++)
         {
             var job = finished[i];
+
+            // 破败房复原走另一套完工处理（装家具而不是翻新家具）
+            if (job.isReclaim)
+            {
+                CompleteReclaim(job);
+                for (int r = 0; r < job.roomNumbers.Count; r++)
+                    Rooms.RemoveFlags(job.roomNumbers[r], RoomFlags.Renovating);
+                continue;
+            }
+
             for (int r = 0; r < job.roomNumbers.Count; r++)
             {
                 int number = job.roomNumbers[r];
@@ -1384,6 +1463,34 @@ public sealed class HotelSim
             });
         }
 
+        // v7：在建施工单 + 房态。以前两者都不存——花了钱的工单读档后凭空消失，
+        // 而房态回落成默认值（装修中/破败/脏房全变可售）。
+        state.nextBuildJobId = Renovations.NextJobIdSeed;
+        state.buildJobs.Clear();
+        var jobs = Renovations.Active;
+        for (int i = 0; i < jobs.Count; i++)
+        {
+            var job = jobs[i];
+            var entry = new BuildJobEntry
+            {
+                jobId = job.jobId,
+                planKind = (int)job.planKind,
+                targetTier = (int)job.targetTier,
+                daysRemaining = job.daysRemaining,
+                isReclaim = job.isReclaim,
+                reclaimKind = (int)job.reclaimKind,
+            };
+            entry.rooms.AddRange(job.roomNumbers);
+            state.buildJobs.Add(entry);
+        }
+
+        state.roomStates.Clear();
+        for (int i = 0; i < Rooms.Count; i++)
+        {
+            RoomRecord room = Rooms.Peek(i);
+            state.roomStates.Add(new RoomStateEntry { room = room.number, state = (int)room.state });
+        }
+
         state.nextStaffId = Staff.NextIdSeed;
         state.staff.Clear();
         var entries = Staff.Entries;
@@ -1451,6 +1558,18 @@ public sealed class HotelSim
             Bookings.RestoreIdSeed(state.nextReservationId);
             Bookings.RebuildCalendarDemand(Calendar);
         }
+
+        // v7：房态先恢复，再恢复工单（工单只是记着"这几间在施工"，不改房态）
+        if (state.roomStates != null)
+            foreach (var entry in state.roomStates)
+                Rooms.SetState(entry.room, (RoomSimState)entry.state);
+
+        Renovations.Clear();
+        if (state.buildJobs != null)
+            foreach (var job in state.buildJobs)
+                Renovations.RestoreJob(job.jobId, (RenovationPlanKind)job.planKind,
+                                       (RoomTier)job.targetTier, job.daysRemaining, job.rooms,
+                                       job.isReclaim, (ReclaimPlanKind)job.reclaimKind);
 
         Staff.RestoreIdSeed(state.nextStaffId);
         if (state.staff != null)

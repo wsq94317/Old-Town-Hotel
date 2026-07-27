@@ -142,7 +142,7 @@ public sealed class MaterialStore
     public void RestoreFromSave(int stock) => Stock = stock < 0 ? 0 : stock;
 }
 
-/// <summary>一个在建的装修单。</summary>
+/// <summary>一个在建的施工单——普通装修或破败房复原，同一支施工队排同一个队列。</summary>
 public sealed class SimRenovationJob
 {
     public int jobId;
@@ -150,6 +150,13 @@ public sealed class SimRenovationJob
     public RoomTier targetTier;
     public int daysRemaining;
     public readonly List<int> roomNumbers = new List<int>();
+
+    /// <summary>true = 破败房复原单（完工后要装家具并把房交给客房部打扫），
+    /// false = 普通装修单。两者共用队列与工期规则，但完工处理完全不同。</summary>
+    public bool isReclaim;
+
+    /// <summary>复原方案（isReclaim 为 true 时有效）。</summary>
+    public ReclaimPlanKind reclaimKind;
 }
 
 /// <summary>施工队列：按天推进，完工返回受影响的房间。</summary>
@@ -184,6 +191,66 @@ public sealed class SimRenovationQueue
         _jobs.Add(job);
         return job.jobId;
     }
+
+    /// <summary>下一张破败房复原单。</summary>
+    public int EnqueueReclaim(ReclaimPlan plan, IList<int> roomNumbers)
+    {
+        if (roomNumbers == null || roomNumbers.Count == 0) return 0;
+        var job = new SimRenovationJob
+        {
+            jobId = ++_nextJobId,
+            isReclaim = true,
+            reclaimKind = plan.kind,
+            daysRemaining = ReclaimPricing.BlockDaysFor(plan, roomNumbers.Count),
+        };
+        job.roomNumbers.AddRange(roomNumbers);
+        _jobs.Add(job);
+        return job.jobId;
+    }
+
+    /// <summary>正在复原的破败房数（UI 与"不可售原因"拆分用）。</summary>
+    public int RoomsUnderReclaim
+    {
+        get
+        {
+            int n = 0;
+            for (int i = 0; i < _jobs.Count; i++)
+                if (_jobs[i].isReclaim) n += _jobs[i].roomNumbers.Count;
+            return n;
+        }
+    }
+
+    /// <summary>某间房是不是正在复原（而不是普通装修）。</summary>
+    public bool IsReclaiming(int roomNumber)
+    {
+        for (int i = 0; i < _jobs.Count; i++)
+            if (_jobs[i].isReclaim && _jobs[i].roomNumbers.Contains(roomNumber)) return true;
+        return false;
+    }
+
+    /// <summary>读档：原样恢复一张在建工单（不重新发号、不重算工期）。</summary>
+    public void RestoreJob(int jobId, RenovationPlanKind planKind, RoomTier targetTier,
+                           int daysRemaining, IList<int> roomNumbers,
+                           bool isReclaim, ReclaimPlanKind reclaimKind)
+    {
+        var job = new SimRenovationJob
+        {
+            jobId = jobId,
+            planKind = planKind,
+            targetTier = targetTier,
+            daysRemaining = daysRemaining < 1 ? 1 : daysRemaining,
+            isReclaim = isReclaim,
+            reclaimKind = reclaimKind,
+        };
+        if (roomNumbers != null) job.roomNumbers.AddRange(roomNumbers);
+        _jobs.Add(job);
+        if (jobId > _nextJobId) _nextJobId = jobId;
+    }
+
+    /// <summary>下一个将发的工单号（存档要带，否则读档后新工单会撞历史号）。</summary>
+    public int NextJobIdSeed => _nextJobId + 1;
+
+    public void Clear() => _jobs.Clear();
 
     public bool IsRenovating(int roomNumber)
     {

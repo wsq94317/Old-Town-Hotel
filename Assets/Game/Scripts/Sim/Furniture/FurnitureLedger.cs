@@ -322,6 +322,31 @@ public sealed class FurnitureLedger
         for (int i = 0; i < loadout.Length; i++) Place(roomNumber, loadout[i]);
     }
 
+    /// <summary>给一间房装上**全新的必备家具**（床 + 卫浴，中间档）。破败房复原的 Refit 用。
+    /// 房里原有的东西先清掉——复原是把废房重做，不是在旧家具上打补丁。</summary>
+    public void FurnishWithNewRequired(int roomNumber)
+    {
+        var existing = new List<FurnitureInstance>(InRoom(roomNumber));
+        for (int i = 0; i < existing.Count; i++) Remove(existing[i].instanceId);
+        Place(roomNumber, FurnitureCatalog.ProperBed);
+        Place(roomNumber, FurnitureCatalog.RenovatedBathroom);
+    }
+
+    /// <summary>把房内家具修到能用：**健康度回满、崭新度一点不动**。
+    /// 这是"请维修工修旧家具"那条路的核心——`RefurbishRoom` 会把崭新度也重置，
+    /// 那是翻新性装修的特权（崭新度只有翻新能重置，是定下的铁律）。</summary>
+    public void ReviveRoomHealth(int roomNumber)
+    {
+        var list = InRoom(roomNumber);
+        for (int i = 0; i < list.Count; i++)
+        {
+            list[i].health = 1f;
+            list[i].faultLineIndex = -1;
+            list[i].repairDaysRemaining = 0;
+            list[i].taped = false;
+        }
+    }
+
     /// <summary>开局给一间房配上继承来的破家具（崭新度与健康度都很低）。</summary>
     public void FurnishDerelictRoom(int roomNumber, float newness, float health)
     {
