@@ -243,6 +243,54 @@ public class V3PrototypeSession : MonoBehaviour
         }
     }
 
+    /// <summary>客房部进度 + "不可售的房都卡在哪"。
+    ///
+    /// 试玩时房间会成批地从可售列表里消失而玩家看不出原因（家具坏了？在装修？
+    /// 还是根本没解锁？），所以这里把不可售的房**按原因拆开**，
+    /// 并显示此刻正在打扫哪几间——`Cleaning` 状态就是为此才真正启用的。</summary>
+    private float DrawHousekeepingStatus(float w, float y)
+    {
+        var cleaningNow = _sim.Rooms.RoomNumbersInState(RoomSimState.Cleaning, 6);
+        int dirty = _sim.Rooms.CountOf(RoomSimState.Dirty);
+        int awaiting = _sim.Rooms.CountOf(RoomSimState.AwaitingInspection);
+
+        GUI.Label(new Rect(20, y, w - 40, 20),
+            GameText.F("HOUSEKEEPING  done {0}   cleaning {1}   waiting {2}   to inspect {3}",
+                       _sim.Pipeline.RoomsCleanedToday, cleaningNow.Count, dirty, awaiting)); y += 18;
+
+        if (cleaningNow.Count > 0)
+        {
+            var sb = new System.Text.StringBuilder();
+            for (int i = 0; i < cleaningNow.Count; i++)
+            {
+                if (i > 0) sb.Append(", ");
+                sb.Append(cleaningNow[i]);
+            }
+            GUI.Label(new Rect(20, y, w - 40, 20), GameText.F("  in progress: {0}", sb.ToString())); y += 18;
+        }
+        else if (dirty > 0)
+        {
+            GUI.Label(new Rect(20, y, w - 40, 20),
+                      GameText.T("  nobody is cleaning - off shift, slacking, or nobody hired")); y += 18;
+        }
+
+        // 不可售的房按原因拆开：装修中 / 家具坏了 / 没解锁
+        int renovating = 0, broken = 0;
+        for (int i = 0; i < _sim.Rooms.Count; i++)
+        {
+            RoomRecord room = _sim.Rooms.Peek(i);
+            if (room.state != RoomSimState.Blocked) continue;
+            if (_sim.Renovations.IsRenovating(room.number)) renovating++;
+            else broken++;
+        }
+        GUI.Label(new Rect(20, y, w - 40, 20),
+            GameText.F("UNSELLABLE    renovating {0}   broken {1}   derelict {2}   (sellable {3})",
+                       renovating, broken, _sim.Rooms.CountOf(RoomSimState.Ruined),
+                       _sim.Rooms.SellableCount)); y += 18;
+
+        return y + 6;
+    }
+
     /// <summary>晨报里的"今天为什么涨/为什么掉"。只列影响最大的两条正、两条负——
     /// 玩家要的是"该改什么"，不是一张完整的会计报表。</summary>
     private float DrawReputationBreakdown(float w, float y)
@@ -276,7 +324,7 @@ public class V3PrototypeSession : MonoBehaviour
 
     private void DrawLiveStatus(float w, float h)
     {
-        GUI.Box(new Rect(10, 134, w - 20, 170), GameText.T("TODAY"));
+        GUI.Box(new Rect(10, 134, w - 20, 232), GameText.T("TODAY"));
         float y = 158;
         GUI.Label(new Rect(20, y, w - 40, 20),
             GameText.F("Expected arrivals   {0}   ({1} booked + {2} walk-in)",
@@ -294,33 +342,36 @@ public class V3PrototypeSession : MonoBehaviour
                        _sim.Staff.ProductiveCountOfRole(StaffRole.Housekeeper),
                        _sim.Staff.AverageMorale.ToString("0"))); y += 20;
         GUI.Label(new Rect(20, y, w - 40, 20),
-            GameText.F("Next 7 nights sold  {0}   (cap {1})", SoldNightsPreview(), _sim.Rooms.OpenRoomCount)); y += 20;
+            GameText.F("Next 7 nights sold  {0}   (cap {1})", SoldNightsPreview(), _sim.Rooms.OpenRoomCount)); y += 24;
+
+        y = DrawHousekeepingStatus(w, y);
 
         // 超售客站在前台等你拍板。拖到打烊 = 按硬赶处理还要额外掉声誉，所以要显眼
         var waiting = _sim.PendingOverbookings;
         if (waiting.Count > 0)
         {
             var incident = waiting[0];
-            GUI.Box(new Rect(10, 310, w - 20, 96),
+            // 位置跟着 y 走，不写死：客房部那几行会把后面的内容往下推
+            GUI.Box(new Rect(10, y, w - 20, 96),
                 GameText.F("OVERBOOKED - {0} guest(s) with a room you don't have", waiting.Count));
-            GUI.Label(new Rect(20, 332, w - 40, 20),
+            GUI.Label(new Rect(20, y + 22, w - 40, 20),
                 GameText.F("Booked {0} at ${1}. Waited {2} min.",
                            GameText.T(incident.bookedBand.ToString()), incident.lockedPrice, incident.waitMinutes));
 
             bool canUpgrade = _sim.CanUpgradeOverbooking(incident.incidentId);
             GUI.enabled = canUpgrade;
-            if (GuiInput.Button(new Rect(20, 354, (w - 50) / 2f, 22),
+            if (GuiInput.Button(new Rect(20, y + 44, (w - 50) / 2f, 22),
                                 GameText.T(canUpgrade ? "UPGRADE THEM" : "NOTHING FREE YET")))
                 Resolve(incident.incidentId, OverbookingResolution.Upgrade,
                         "Upgraded at the old price. They are thrilled.");
             GUI.enabled = true;
 
-            if (GuiInput.Button(new Rect(30 + (w - 50) / 2f, 354, (w - 50) / 2f, 22),
+            if (GuiInput.Button(new Rect(30 + (w - 50) / 2f, y + 44, (w - 50) / 2f, 22),
                                 GameText.F("PAY THEM OFF (${0})", incident.CompensationCost)))
                 Resolve(incident.incidentId, OverbookingResolution.Compensate,
                         "Paid for a room down the road. Expensive apology.");
 
-            if (GuiInput.Button(new Rect(20, 380, w - 40, 22),
+            if (GuiInput.Button(new Rect(20, y + 70, w - 40, 22),
                                 GameText.T("SEND THEM AWAY (free, they will write about it)")))
                 Resolve(incident.incidentId, OverbookingResolution.WalkAway,
                         "They left. Loudly.");
@@ -328,7 +379,7 @@ public class V3PrototypeSession : MonoBehaviour
         }
 
         if (_sim.TryFindRuinedRoom(out int ruined) &&
-            GuiInput.Button(new Rect(10, 316, w - 20, 30),
+            GuiInput.Button(new Rect(10, y, w - 20, 30),
                             GameText.F("CLEAR A DERELICT ROOM  (${0})", HotelSim.RuinedRoomUnlockCost)))
         {
             if (_sim.TryUnlockRuinedRoom(ruined, out string reason))

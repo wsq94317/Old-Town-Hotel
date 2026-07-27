@@ -111,6 +111,16 @@ public sealed class RoomLedger
         get { EnsureAggregates(); return _surfaced; }
     }
 
+    /// <summary>列出处于某状态的房号（数组序，稳定）。UI 要显示"正在打扫哪几间"。
+    /// max 限制条数，避免百房酒店在界面上刷出一屏房号。</summary>
+    public List<int> RoomNumbersInState(RoomSimState state, int max = 8)
+    {
+        var list = new List<int>();
+        for (int i = 0; i < _rooms.Length && list.Count < max; i++)
+            if (_rooms[i].state == state) list.Add(_rooms[i].number);
+        return list;
+    }
+
     /// <summary>找一间处于某状态的房（数组序，稳定=可复现）。清洁池消化用。</summary>
     public bool TryFindFirstInState(RoomSimState state, out int roomNumber)
     {

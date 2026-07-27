@@ -651,6 +651,7 @@ public sealed class HotelSim
     public void BeginDay()
     {
         Shifts.ApplyTo(Staff);
+        Pipeline.BeginDay();        // 清空"今日已清洁间数"
 
         // 先清零再跑退房潮——顺序反了会把刚结算的房费当场抹掉（踩过）。
         // 语义：晨间退房收的是昨夜的房费，计入**今天**的日结。

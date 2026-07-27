@@ -107,6 +107,14 @@ public static class GameText
         { "Flawed rooms sold   {0}   (no inspector on duty?)", "带瑕疵售出 {0} 间（没验房员在班？）" },
         { "Staff working       {0} hsk, morale {1}", "在岗       {0} 名客房，士气 {1}" },
         { "Next 7 nights sold  {0}   (cap {1})", "未来七晚已售 {0}   （容量 {1}）" },
+        // 客房部进度 + 不可售房的原因拆分
+        { "HOUSEKEEPING  done {0}   cleaning {1}   waiting {2}   to inspect {3}",
+          "客房部  已清 {0}   在清 {1}   待清 {2}   待验 {3}" },
+        { "  in progress: {0}", "  正在打扫：{0}" },
+        { "  nobody is cleaning - off shift, slacking, or nobody hired",
+          "  没人在打扫 —— 下班了、在摸鱼，或者根本没雇人" },
+        { "UNSELLABLE    renovating {0}   broken {1}   derelict {2}   (sellable {3})",
+          "不可售    装修中 {0}   家具坏 {1}   破败 {2}   （可售 {3}）" },
         { "CLEAR A DERELICT ROOM  (${0})", "清理一间破败房（${0}）" },
         { "Room {0} is back in service. It needs cleaning.", "{0} 号房重新启用。需要打扫。" },
 

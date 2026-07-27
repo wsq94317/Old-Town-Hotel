@@ -38,6 +38,12 @@ public sealed class SimPipeline
     /// <summary>累计推进的 tick 数（诊断/测试用）。</summary>
     public long TicksRun { get; private set; }
 
+    /// <summary>今日已打扫完的房间数（晨报/客房部面板展示进度）。</summary>
+    public int RoomsCleanedToday { get; private set; }
+
+    /// <summary>清空当日计数（BeginDay 调）。</summary>
+    public void BeginDay() => RoomsCleanedToday = 0;
+
     public SimPipeline(SimClock clock, RoomLedger rooms, StaffRoster staff, int rngSeed)
     {
         _clock = clock;
@@ -103,24 +109,46 @@ public sealed class SimPipeline
     private void StepService()
     {
         if (_rooms == null || _staff == null) return;
-        if (!InHousekeepingHours) return;
+        if (!InHousekeepingHours)
+        {
+            ReleaseUnfinishedCleaning();
+            return;
+        }
 
         bool hasInspector = ServiceCapacityModel.HasInspectorOnDuty(_staff);
 
-        // 清洁：脏房 → 待检（有验房员）/ 直接可售（没验房员，快但瑕疵率高）
+        // 每个在岗管家同时占住一间房：Dirty → Cleaning（进场干活）→ 待检/可售。
+        //
+        // 以前是 Dirty 直接跳到待检，**Cleaning 这个状态压根没被用过**，
+        // 于是"现在正在打扫哪间房"没有任何数据可显示（试玩要求要看到这个）。
+        // 让清洁真的占住房间既能显示，也更接近现实：一个管家一次只能在一间房里。
+        int crew = _staff.ProductiveCountOfRole(StaffRole.Housekeeper);
+        while (_rooms.CountOf(RoomSimState.Cleaning) < crew
+               && _rooms.TryFindFirstInState(RoomSimState.Dirty, out int nextRoom))
+            _rooms.SetState(nextRoom, RoomSimState.Cleaning);
+
+        // 清洁：进度到了就把最早开工的那间交出去
         _cleanCredit += ServiceCapacityModel.CleanRoomsPerHour(_staff, SupplyFactor) / 60d;
         while (_cleanCredit >= 1d)
         {
-            if (!_rooms.TryFindFirstInState(RoomSimState.Dirty, out int roomNumber))
+            if (!_rooms.TryFindFirstInState(RoomSimState.Cleaning, out int roomNumber))
             {
-                // 没脏房可打扫：进度封顶在"随时能开工一间"，不囤积也不清零。
+                // 没房可打扫：进度封顶在"随时能开工一间"，不囤积也不清零。
                 // 清零会造成假延迟（下一间脏房出现后还要空等一整间的工时）。
                 _cleanCredit = 1d;
                 break;
             }
             _cleanCredit -= 1d;
             _rooms.SetState(roomNumber, hasInspector ? RoomSimState.AwaitingInspection : RoomSimState.Ready);
+            RoomsCleanedToday++;
+
+            // 腾出手了就立刻接下一间，别让管家空等到下一分钟
+            if (_rooms.CountOf(RoomSimState.Cleaning) < crew
+                && _rooms.TryFindFirstInState(RoomSimState.Dirty, out int followUp))
+                _rooms.SetState(followUp, RoomSimState.Cleaning);
         }
+
+        ReleaseIfCrewShrank(crew);
 
         // 检查：待检 → 可售
         _inspectCredit += ServiceCapacityModel.InspectRoomsPerHour(_staff) / 60d;
@@ -134,5 +162,22 @@ public sealed class SimPipeline
             _inspectCredit -= 1d;
             _rooms.SetState(roomNumber, RoomSimState.Ready);
         }
+    }
+
+    /// <summary>客房部下班（或全员摸鱼/离岗）：没干完的房退回脏房。
+    /// 不退的话它们会永远卡在 Cleaning——既不可售、也不算脏房积压，
+    /// 又成了玩家看不见的"隐形房间"（这正是这次要修掉的那类问题）。</summary>
+    private void ReleaseUnfinishedCleaning()
+    {
+        while (_rooms.TryFindFirstInState(RoomSimState.Cleaning, out int roomNumber))
+            _rooms.SetState(roomNumber, RoomSimState.Dirty);
+    }
+
+    /// <summary>在岗人数变少（下班/摸鱼/离职）时，多占的房要还回去。</summary>
+    private void ReleaseIfCrewShrank(int crew)
+    {
+        while (_rooms.CountOf(RoomSimState.Cleaning) > crew
+               && _rooms.TryFindFirstInState(RoomSimState.Cleaning, out int roomNumber))
+            _rooms.SetState(roomNumber, RoomSimState.Dirty);
     }
 }

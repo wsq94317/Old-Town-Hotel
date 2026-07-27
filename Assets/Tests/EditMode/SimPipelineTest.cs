@@ -67,7 +67,11 @@ namespace OldTownHotel.Tests.EditMode
 
             Assert.That(rig.rooms.DirtyBacklog, Is.LessThan(8), "两小时应该清掉几间");
             Assert.That(rig.rooms.SellableCount, Is.GreaterThan(4));
-            Assert.That(rig.rooms.DirtyBacklog + rig.rooms.SellableCount, Is.EqualTo(12),
+            // 守恒律要把**正在打扫**那间算进来：现在管家会真的占住一间房
+            // （Dirty → Cleaning → 可售），漏掉这个状态就等于漏掉一间房
+            Assert.That(rig.rooms.DirtyBacklog
+                        + rig.rooms.CountOf(RoomSimState.Cleaning)
+                        + rig.rooms.SellableCount, Is.EqualTo(12),
                         "没有 Inspector 时清完直接可售，房间不会消失");
         }
 
@@ -211,13 +215,15 @@ namespace OldTownHotel.Tests.EditMode
         {
             var rig = BuildRig(housekeepers: 1, dirtyRooms: 12);
             RunTicks(rig, 20); // 攒了不足一间的清洁进度
-            int backlogBefore = rig.rooms.DirtyBacklog;
+            // 用"待清 + 在清"作基准：管家此刻占着一间房，只看 DirtyBacklog 会少算它
+            int unfinishedBefore = rig.rooms.DirtyBacklog + rig.rooms.CountOf(RoomSimState.Cleaning);
 
             rig.pipeline.SettleDay(wagesPaid: true);
             rig.clock.BeginNextDay();
             RunTicks(rig, 1);
 
-            Assert.That(rig.rooms.DirtyBacklog, Is.EqualTo(backlogBefore),
+            Assert.That(rig.rooms.DirtyBacklog + rig.rooms.CountOf(RoomSimState.Cleaning),
+                        Is.EqualTo(unfinishedBefore),
                         "跨日不该把昨天的半间进度兑成今天的一间房");
         }
     }
