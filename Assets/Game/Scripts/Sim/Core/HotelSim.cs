@@ -27,6 +27,32 @@ public sealed class HotelSim
         public int nightsLeft;    // 还要住几晚。>0 的人早上不退房（连住占多个间夜）
     }
 
+    /// <summary>用胶带糊上一件坏家具：**不花钱**，房间立刻能重新开卖，
+    /// 代价是交付水平掉下去（客人看得见胶带）而且明天照坏。
+    ///
+    /// 这条出路是试玩逼出来的：现金归零时故障会把房一间间永久封死，
+    /// 玩家第 23 天有 20 间房卡在 Blocked 里、既看不见也修不动，局面实际已死。
+    /// 修理要钱，钱要靠卖房，卖房要有能用的房——这个环必须有一个零成本的缺口。</summary>
+    public bool TryTapeFurniture(int instanceId, out string reason)
+    {
+        reason = "";
+        if (!Furniture.TryGet(instanceId, out FurnitureInstance f)) { reason = "Nothing to fix there."; return false; }
+        if (!f.IsFaulted) { reason = "That one works fine."; return false; }
+        if (f.IsUnderRepair) { reason = "Someone's already on it."; return false; }
+        if (f.taped) { reason = "It's already held together with tape."; return false; }
+
+        f.taped = true;
+        TapedTodayCount++;
+        SyncRoomBlocksFromFurniture();      // 房间立刻放回可售流程
+        return true;
+    }
+
+    /// <summary>今日糊了几件（晨报提醒玩家这些明天会复发）。</summary>
+    public int TapedTodayCount { get; private set; }
+
+    /// <summary>昨夜有几件胶带失效了（晨报的"复发"提示）。</summary>
+    public int TapeExpiredToday { get; private set; }
+
     /// <summary>退款申请（虚报价的代价）。玩家在手机上批准/拒绝。</summary>
     public sealed class RefundRequest
     {
@@ -68,6 +94,9 @@ public sealed class HotelSim
     public FurnitureLedger Furniture { get; }
     public BookingBook Bookings { get; }
     public AvailabilityCalendar Calendar { get; }
+
+    /// <summary>当日声誉明细（晨报读它回答"今天为什么涨/为什么掉"）。</summary>
+    public ReputationBreakdown Breakdown { get; } = new ReputationBreakdown();
 
     /// <summary>一位有预订却没房的客人。玩家在手机上三选一（升级/赔钱/硬赶）。</summary>
     public sealed class OverbookingIncident
@@ -333,6 +362,7 @@ public sealed class HotelSim
         RefundRequest request = FindRefund(requestId);
         if (request == null) return false;
         Reputation.RecordGuest(ReputationLedger.MinSatisfaction);
+        Breakdown.Add(ReputationCause.RefundRefused, ReputationLedger.MinSatisfaction - 1f);
         _refunds.Remove(request);
         RefundsRejectedToday++;
         return true;
@@ -409,9 +439,21 @@ public sealed class HotelSim
             }
         }
 
-        Reputation.RecordGuest(OverbookingPolicy.SatisfactionFor(resolution));
+        float satisfaction = OverbookingPolicy.SatisfactionFor(resolution);
+        Reputation.RecordGuest(satisfaction);
+        Breakdown.Add(CauseOf(resolution), satisfaction - 1f);
         _overbookings.Remove(incident);
         return true;
+    }
+
+    private static ReputationCause CauseOf(OverbookingResolution resolution)
+    {
+        switch (resolution)
+        {
+            case OverbookingResolution.Upgrade: return ReputationCause.OverbookingUpgraded;
+            case OverbookingResolution.Compensate: return ReputationCause.OverbookingPaid;
+            default: return ReputationCause.OverbookingWalked;
+        }
     }
 
     /// <summary>升级换房安顿下来：与正常入住走同一套记账，只是房价用原来锁定的。</summary>
@@ -453,9 +495,15 @@ public sealed class HotelSim
             ArrivalsTurnedAwayToday++;
             OverbookingsWalkedToday++;
 
-            Reputation.RecordGuest(OverbookingPolicy.SatisfactionFor(OverbookingResolution.WalkAway));
+            float walked = OverbookingPolicy.SatisfactionFor(OverbookingResolution.WalkAway);
+            Reputation.RecordGuest(walked);
+            float logged = walked - 1f;
             for (int k = 0; k < OverbookingPolicy.IgnoredExtraReputationSamples; k++)
+            {
                 Reputation.RecordGuest(ReputationLedger.MinSatisfaction);
+                logged += ReputationLedger.MinSatisfaction - 1f;
+            }
+            Breakdown.Add(ReputationCause.OverbookingWalked, logged);
         }
         _overbookings.Clear();
     }
@@ -467,6 +515,7 @@ public sealed class HotelSim
         {
             Reputation.RecordGuest(ReputationLedger.MinSatisfaction);
             Reputation.RecordGuest(ReputationLedger.MinSatisfaction);
+            Breakdown.Add(ReputationCause.RefundIgnored, (ReputationLedger.MinSatisfaction - 1f) * 2f);
         }
         _refunds.Clear();
     }
@@ -623,6 +672,11 @@ public sealed class HotelSim
         OverbookingsUpgradedToday = 0;
         OverbookingsCompensatedToday = 0;
         OverbookingsWalkedToday = 0;
+        TapedTodayCount = 0;
+
+        // 声誉明细在退房潮**之前**清零：晨报显示的是上一次 BeginDay 到上一次 SettleDay
+        // 之间累计的账（玩家点"开门营业"才会走到这里，所以报告已经看完了）。
+        Breakdown.Reset();
 
         RunCheckoutWave();
 
@@ -822,15 +876,26 @@ public sealed class HotelSim
     }
 
     /// <summary>满意度：每一项都是一根设计好的杠杆。</summary>
+    /// <summary>满意度：每一项都是一根设计好的杠杆，**并且每一项都记进当日明细**。
+    /// 以前这些项算完就扔，玩家只看到星级上下动却不知道原因（试玩原话："没玩明白"）。</summary>
     private float SatisfactionFor(Stay stay, int roomNumber)
     {
-        float sat = 1f
-                  - DemandModel.ExpectationPenalty(stay.priceRatio)                          // 定价模板高于市场
-                  + DemandModel.PriceBandSatisfactionDelta(stay.delivered, stay.band)         // 挂牌 vs 交付（双向）
-                  - DemandModel.SegmentDisappointment(stay.segment, stay.delivered)           // 客人个人标准
-                  - DemandModel.WaitSatisfactionPenalty(stay.segment, stay.waitMinutes)       // 前台排队
-                  + DemandModel.AppealBonus(Furniture.SegmentAppeal(roomNumber, stay.segment)); // 家具对口味
-        if (stay.flawedRoom) sat -= FlawedRoomPenalty;   // 没验房就上架的代价
+        float priceExpectation = -DemandModel.ExpectationPenalty(stay.priceRatio);
+        float bandVsDelivered = DemandModel.PriceBandSatisfactionDelta(stay.delivered, stay.band);
+        float segmentStandards = -DemandModel.SegmentDisappointment(stay.segment, stay.delivered);
+        float queueWait = -DemandModel.WaitSatisfactionPenalty(stay.segment, stay.waitMinutes);
+        float appeal = DemandModel.AppealBonus(Furniture.SegmentAppeal(roomNumber, stay.segment));
+        float flawed = stay.flawedRoom ? -FlawedRoomPenalty : 0f;
+
+        Breakdown.Add(ReputationCause.PriceExpectation, priceExpectation);
+        Breakdown.Add(ReputationCause.BandVsDelivered, bandVsDelivered);
+        Breakdown.Add(ReputationCause.SegmentStandards, segmentStandards);
+        Breakdown.Add(ReputationCause.QueueWait, queueWait);
+        Breakdown.Add(ReputationCause.FurnitureAppeal, appeal);
+        if (stay.flawedRoom) Breakdown.Add(ReputationCause.FlawedRoom, flawed);
+
+        float sat = 1f + priceExpectation + bandVsDelivered + segmentStandards
+                       + queueWait + appeal + flawed;
         return SimMath.Clamp(sat, ReputationLedger.MinSatisfaction, ReputationLedger.MaxSatisfaction);
     }
 
@@ -1111,6 +1176,9 @@ public sealed class HotelSim
         // 顺序要紧：先算当晚老化，再让装修/维修完工——反过来会让"翻新重置"当场被覆盖
         Furniture.ApplyIdleDay();
         FurnitureFaultsToday = Furniture.RollDailyFaults(() => _rng.NextDouble());
+        // 胶带过夜失效（要排在 TickRepairs 之前：真修完的那件会自己撕掉胶带，
+        // 只糊没修的次晨重新封房——这才是"明日复发"）
+        TapeExpiredToday = Furniture.ExpireTape();
         Furniture.TickRepairs();
         ApplyNightlyWear();
         AdvanceRenovations();

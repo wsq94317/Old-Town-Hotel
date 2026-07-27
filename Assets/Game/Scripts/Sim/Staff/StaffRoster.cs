@@ -152,6 +152,9 @@ public sealed class StaffRoster
             if (e.state == StaffOperationalState.Working)
             {
                 e.workedMinutesToday++;
+                // 疲劳**日内**累积并即时影响吞吐：以前只在日结算一次，
+                // 于是"干到下午会变慢"完全没有建模（StaffDayModel 注释里有账）
+                e.fatigue = SimMath.Clamp01(e.fatigue + StaffDayModel.FatiguePerWorkedMinute);
             }
             else if (e.state == StaffOperationalState.Slacking)
             {
@@ -236,9 +239,9 @@ public sealed class StaffRoster
         for (int i = 0; i < _entries.Count; i++)
         {
             var e = _entries[i];
-            e.fatigue = SimMath.Clamp01(e.fatigue
-                                        + StaffDayModel.FatigueGainFor(e.workedMinutesToday)
-                                        - StaffDayModel.FatigueRecovery());
+            // 疲劳的**增加**已经在 TickMinute 里逐分钟发生了，这里只做夜间恢复；
+            // 若在这里再按当日工时加一次就是双重计数（改成日内累积时踩到的账）。
+            e.fatigue = SimMath.Clamp01(e.fatigue - StaffDayModel.FatigueRecovery());
             if (!wagesPaid && e.member != null)
                 e.member.AdjustMorale(StaffDayModel.UnpaidWageMoralePenalty);
 

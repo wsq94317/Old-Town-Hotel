@@ -16,8 +16,17 @@ public sealed class FurnitureInstance
     public int faultLineIndex = -1; // ≥0 = 正在故障，指向文案池
     public int repairDaysRemaining; // >0 = 师傅还在修（"花时间"的那一半，期间仍不可用）
 
+    /// <summary>用胶带糊上了：房间能重新开卖，但客人看得见，而且明天照坏。
+    /// 这是**给破产玩家的唯一出路**——现金归零时故障会把房一间间永久封死
+    /// （试玩实测：第 23 天 20 间房全在 Blocked，玩家看不见也修不动，局面已死）。
+    /// v2 巡查层早有"胶带明日复发"的成语，这里是它在 Sim 侧的对应物。</summary>
+    public bool taped;
+
     public bool IsFaulted => faultLineIndex >= 0;
     public bool IsUnderRepair => repairDaysRemaining > 0;
+
+    /// <summary>能不能用（糊上的也算能用——只是不体面）。</summary>
+    public bool IsUsable => !IsFaulted || taped;
 }
 
 public sealed class FurnitureLedger
@@ -91,6 +100,8 @@ public sealed class FurnitureLedger
         {
             var f = list[i];
             FurnitureKind kind = FurnitureCatalog.Get(f.kindId);
+            // 糊了胶带的按"故障"算装饰度（能用，但一点不体面）——
+            // 于是"糊上继续卖"会把交付水平压下去，虚报挂牌的人立刻吃退款
             sum += FurnitureWearModel.EffectiveDecor(kind.decorPoints, f.newness, f.IsFaulted);
         }
         return SimMath.Clamp01(sum / FurnitureCatalog.FullyFurnishedDecor);
@@ -104,7 +115,7 @@ public sealed class FurnitureLedger
         for (int i = 0; i < list.Count; i++)
         {
             var f = list[i];
-            if (f.IsFaulted) continue;
+            if (!f.IsUsable) continue;      // 糊了胶带的算可用：房间能重新开卖
             FurnitureKind kind = FurnitureCatalog.Get(f.kindId);
             if (kind.slot == FurnitureSlot.Bed) bed = true;
             else if (kind.slot == FurnitureSlot.Bathroom) bathroom = true;
@@ -244,9 +255,26 @@ public sealed class FurnitureLedger
             f.repairDaysRemaining = 0;
             f.health = 1f;              // 健康度回满
             f.faultLineIndex = -1;      // 崭新度**不动**
+            f.taped = false;            // 真修好了，胶带撕掉
             done.Add(f);
         }
         return done;
+    }
+
+    /// <summary>胶带过夜失效。返回失效的件数。
+    /// 不撕掉的话胶带就成了永久免费维修，"修理要钱"整条经济链当场失去意义——
+    /// v2 巡查层的胶带本来就是"明日复发"的语义，这里保持一致。
+    /// 注意：只清 taped 标记，faultLineIndex 原样留着，所以次晨房间会重新被封。</summary>
+    public int ExpireTape()
+    {
+        int n = 0;
+        for (int i = 0; i < _all.Count; i++)
+        {
+            if (!_all[i].taped) continue;
+            _all[i].taped = false;
+            n++;
+        }
+        return n;
     }
 
     /// <summary>所有正在故障（含在修）的家具——手机通知/战术层列表用。</summary>

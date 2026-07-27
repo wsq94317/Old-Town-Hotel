@@ -144,11 +144,13 @@ public class V3PrototypeSession : MonoBehaviour
             GameText.F("CASH ${0}   SAFEBOX ${1}/{2}", _sim.Cash, _sim.Safebox.Balance, _sim.Safebox.Capacity) +
             (_sim.Overflow.Balance > 0 ? GameText.F("   SPILLED ${0}", _sim.Overflow.Balance) : "") +
             GameText.F("   DEBT ${0}", _loan.Balance));
+        // **Blocked 必须显示**：坏家具会把房拽出可售循环，不显示的话玩家看到的是
+        // 房间凭空消失（试玩实测：20 间房卡在 Blocked 里，玩家完全不知道发生了什么）
         GUI.Label(new Rect(14, 46, w - 28, 20),
-            GameText.F("{0}*   ROOMS {1} ready / {2} dirty / {3} in use / {4} derelict   MATERIALS {5}",
+            GameText.F("{0}*   ROOMS {1} ready / {2} dirty / {3} in use / {4} BROKEN / {5} derelict   MAT {6}",
                        _sim.Reputation.Stars.ToString("0.0"), _sim.Rooms.SellableCount, _sim.Rooms.DirtyBacklog,
-                       _sim.Rooms.CountOf(RoomSimState.Occupied), _sim.Rooms.CountOf(RoomSimState.Ruined),
-                       _sim.Materials.Stock));
+                       _sim.Rooms.CountOf(RoomSimState.Occupied), _sim.Rooms.CountOf(RoomSimState.Blocked),
+                       _sim.Rooms.CountOf(RoomSimState.Ruined), _sim.Materials.Stock));
     }
 
     private void DrawTabs(float w)
@@ -199,7 +201,9 @@ public class V3PrototypeSession : MonoBehaviour
                 GameText.F("TURNED DOWN {0} BOOKINGS - no rooms left to sell.", _sim.BookingsDeclinedToday)); y += 20;
         }
         GUI.Label(new Rect(20, y, w - 40, 20),
-            GameText.F("Rating {0}*   Debt ${1}", _sim.Reputation.Stars.ToString("0.00"), _loan.Balance)); y += 28;
+            GameText.F("Rating {0}*   Debt ${1}", _sim.Reputation.Stars.ToString("0.00"), _loan.Balance)); y += 22;
+
+        y = DrawReputationBreakdown(w, y);
 
         if (_sim.Safebox.Balance > 0 &&
             GuiInput.Button(new Rect(20, y, (w - 50) / 2f, 26), GameText.F("COLLECT ${0}", _sim.Safebox.Balance)))
@@ -237,6 +241,37 @@ public class V3PrototypeSession : MonoBehaviour
             _awaitingMorningReport = false;
             _tab = Tab.Report;
         }
+    }
+
+    /// <summary>晨报里的"今天为什么涨/为什么掉"。只列影响最大的两条正、两条负——
+    /// 玩家要的是"该改什么"，不是一张完整的会计报表。</summary>
+    private float DrawReputationBreakdown(float w, float y)
+    {
+        var down = _sim.Breakdown.Ranked(positive: false);
+        var up = _sim.Breakdown.Ranked(positive: true);
+        if (down.Count == 0 && up.Count == 0)
+        {
+            GUI.Label(new Rect(20, y, w - 40, 20), GameText.T("No guests rated you yesterday.")); y += 20;
+            return y + 6;
+        }
+
+        for (int i = 0; i < down.Count && i < 2; i++)
+        {
+            var e = down[i];
+            GUI.Label(new Rect(20, y, w - 40, 20),
+                GameText.F("  DOWN  {0}   {1}  (x{2})",
+                           GameText.T(ReputationBreakdown.LabelOf(e.cause)),
+                           e.total.ToString("0.00"), e.count)); y += 18;
+        }
+        for (int i = 0; i < up.Count && i < 2; i++)
+        {
+            var e = up[i];
+            GUI.Label(new Rect(20, y, w - 40, 20),
+                GameText.F("  UP    {0}   +{1}  (x{2})",
+                           GameText.T(ReputationBreakdown.LabelOf(e.cause)),
+                           e.total.ToString("0.00"), e.count)); y += 18;
+        }
+        return y + 6;
     }
 
     private void DrawLiveStatus(float w, float h)
@@ -443,13 +478,24 @@ public class V3PrototypeSession : MonoBehaviour
                 ? GameText.F(" [being fixed, {0}d]", item.repairDaysRemaining) : "";
             GUI.Label(new Rect(20, y, w - 150, 20),
                       "R" + item.roomNumber + ": " + GameText.T(FurnitureLedger.FaultLineOf(item)) + status);
-            if (!item.IsUnderRepair &&
-                GuiInput.Button(new Rect(w - 128, y - 2, 108, 22), GameText.F("FIX ${0}", kind.repairCost)))
+            if (!item.IsUnderRepair)
             {
-                if (_sim.TryRepairFurniture(item.instanceId, out string reason))
-                    Say(GameText.F("{0} in room {1}: {2} day(s) of work.",
-                                   GameText.T(kind.name), item.roomNumber, kind.repairDays));
-                else Say(reason);
+                if (GuiInput.Button(new Rect(w - 128, y - 2, 62, 22), GameText.F("FIX ${0}", kind.repairCost)))
+                {
+                    if (_sim.TryRepairFurniture(item.instanceId, out string reason))
+                        Say(GameText.F("{0} in room {1}: {2} day(s) of work.",
+                                       GameText.T(kind.name), item.roomNumber, kind.repairDays));
+                    else Say(reason);
+                }
+                // 免费的应急路：没钱时唯一能让房间重新开卖的办法
+                if (!item.taped &&
+                    GuiInput.Button(new Rect(w - 62, y - 2, 42, 22), GameText.T("TAPE")))
+                {
+                    if (_sim.TryTapeFurniture(item.instanceId, out string reason))
+                        Say(GameText.F("Taped up room {0}. Sellable, ugly, and broken again tomorrow.",
+                                       item.roomNumber));
+                    else Say(reason);
+                }
             }
             y += 22;
         }

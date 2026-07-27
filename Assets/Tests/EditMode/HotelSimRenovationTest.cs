@@ -255,16 +255,37 @@ namespace OldTownHotel.Tests.EditMode
             var staffed = BuildHotel(rooms: 80, receptionists: 2, seed: 8080, furnish: false);
 
             int thinWait = 0, staffedWait = 0;
+            float thinQueueDamage = 0f, staffedQueueDamage = 0f;
+            int thinGuests = 0, staffedGuests = 0;
             for (int day = 1; day <= 4; day++)
             {
-                RunOneDay(thin); thinWait += thin.TotalCheckInWaitToday;
-                RunOneDay(staffed); staffedWait += staffed.TotalCheckInWaitToday;
+                RunOneDay(thin);
+                thinWait += thin.TotalCheckInWaitToday;
+                thinGuests += thin.Breakdown.CountOf(ReputationCause.QueueWait);
+                thinQueueDamage += thin.Breakdown.TotalOf(ReputationCause.QueueWait);
+
+                RunOneDay(staffed);
+                staffedWait += staffed.TotalCheckInWaitToday;
+                staffedGuests += staffed.Breakdown.CountOf(ReputationCause.QueueWait);
+                staffedQueueDamage += staffed.Breakdown.TotalOf(ReputationCause.QueueWait);
             }
 
             Assert.That(thinWait, Is.GreaterThan(staffedWait), "前台越薄，客人累计等得越久");
-            Assert.That(thin.Reputation.AverageSatisfaction,
-                        Is.LessThan(staffed.Reputation.AverageSatisfaction),
-                        "排队扣满意度 → 星级 → 明天的客量（服务压力咬客流压力）");
+
+            // 直接断**排队这一项**造成的声誉损失，不用 Reputation.AverageSatisfaction：
+            // 后者是只看最近 20 位客人的滑动窗口，80 间房一天来 50 人，窗口盖不住半天，
+            // 两家酒店很容易同时被压到满意度下限 0.5 而分不出高下（实测就是这样挂的）。
+            // 声誉明细给的是因果量本身，没有窗口噪声。
+            Assert.That(thinGuests, Is.GreaterThan(0));
+            Assert.That(staffedGuests, Is.GreaterThan(0));
+            float thinPerGuest = thinQueueDamage / thinGuests;
+            float staffedPerGuest = staffedQueueDamage / staffedGuests;
+
+            Assert.That(thinPerGuest, Is.LessThan(staffedPerGuest),
+                        $"排队扣满意度：人手薄的每位客人被排队扣 {thinPerGuest:0.000}，"
+                        + $"人手足的只扣 {staffedPerGuest:0.000}");
+            Assert.That(staffedPerGuest, Is.GreaterThan(-0.05f),
+                        "人手足够时排队几乎不该扣分——宽容窗口要真的起作用");
         }
 
         [Test]
@@ -311,24 +332,35 @@ namespace OldTownHotel.Tests.EditMode
             int baseProfit = 0, leanProfit = 0;
             int baseTurnedAway = 0, leanTurnedAway = 0;
             int baseWait = 0, leanWait = 0;
+            int baseCheckedIn = 0, leanCheckedIn = 0;
             for (int day = 1; day <= 14; day++)
             {
                 baseline.BeginDay(); baseline.RunToEndOfDay();
                 baseProfit += baseline.SettleDay().NetProfit;
                 baseTurnedAway += baseline.ArrivalsTurnedAwayToday;
                 baseWait += baseline.TotalCheckInWaitToday;
+                baseCheckedIn += baseline.ArrivalsCheckedInToday;
                 baseline.Clock.BeginNextDay();
 
                 lean.BeginDay(); lean.RunToEndOfDay();
                 leanProfit += lean.SettleDay().NetProfit;
                 leanTurnedAway += lean.ArrivalsTurnedAwayToday;
                 leanWait += lean.TotalCheckInWaitToday;
+                leanCheckedIn += lean.ArrivalsCheckedInToday;
                 lean.Clock.BeginNextDay();
             }
 
             // 机制层面的证据（结构上必然成立）
             Assert.That(leanTurnedAway, Is.GreaterThan(baseTurnedAway), "抠人手 → 更多客人住不进来");
-            Assert.That(leanWait, Is.GreaterThan(baseWait), "抠前台 → 客人累计等更久");
+            // 用**人均**等待，不用累计等待：抠人手会少住进很多客人，
+            // 累计等待反而更小（人少了当然总和小），这是聚合量的经典陷阱。
+            // 客人实际承受的是"我等了多久"，所以人均才是这条因果的正确度量。
+            Assert.That(leanCheckedIn, Is.GreaterThan(0));
+            Assert.That(baseCheckedIn, Is.GreaterThan(0));
+            float leanPerGuest = leanWait / (float)leanCheckedIn;
+            float basePerGuest = baseWait / (float)baseCheckedIn;
+            Assert.That(leanPerGuest, Is.GreaterThan(basePerGuest),
+                        $"抠前台 → 每位客人等更久（精简 {leanPerGuest:0.0} 分 vs 全员 {basePerGuest:0.0} 分）");
 
             // §C2 平衡缺口的收口断言
             Assert.That(leanProfit, Is.LessThan(baseProfit),

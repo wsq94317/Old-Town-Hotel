@@ -131,8 +131,17 @@ public static class DemandModel
     /// <summary>价格弹性指数：ε=1.8（清仓 0.7x → ×1.9；榨利润 1.25x → ×0.67）。</summary>
     public const float PriceElasticity = 1.8f;
 
-    /// <summary>等待多少分钟以内不扣满意度（宽容窗口）。</summary>
-    public const int WaitGraceMinutes = 10;
+    /// <summary>等待多少分钟以内不扣满意度（宽容窗口）。
+    ///
+    /// 从 10 分钟收紧到 5 分钟（试玩调参）：10 分钟宽容 + 每超 10 分钟只扣 0.05 的斜率，
+    /// 实测 8 位客人一共只扣 0.06（人均 0.008），等于**排队根本不影响评价**——
+    /// 而用户明确要求"CI 等待时间和酒店的评价要相关"。在酒店前台干等 10 分钟
+    /// 本来就该不高兴了。</summary>
+    public const int WaitGraceMinutes = 5;
+
+    /// <summary>超出宽容窗口后，每 10 分钟的满意度惩罚基准（再乘客群倍率）。
+    /// 商务客倍率 2.0，所以等 20 分钟对他是 −0.30，是能感觉到的一记。</summary>
+    public const float WaitPenaltyPer10Minutes = 0.10f;
 
     public static float Elasticity(float priceRatio)
     {
@@ -194,7 +203,7 @@ public static class DemandModel
         int over = waitMinutes - WaitGraceMinutes;
         if (over <= 0) return 0f;
         var profile = GuestSegmentProfile.For(segment);
-        return 0.05f * (over / 10f) * profile.waitPenaltyMultiplier;
+        return WaitPenaltyPer10Minutes * (over / 10f) * profile.waitPenaltyMultiplier;
     }
 
     /// <summary>"榨利润"抬高期待：价格越高于市场，满意度门槛越高。</summary>

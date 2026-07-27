@@ -2,8 +2,21 @@
 // 士气数值变化的**唯一出处**：谁想改士气都得走这里，否则数值来源散落就再也调不平。
 public static class StaffDayModel
 {
-    /// <summary>基础清洁吞吐（间/小时），属性 50 的普通员工。</summary>
-    public const float BaseRoomsPerHour = 2f;
+    /// <summary>基础清洁吞吐（间/小时），属性 50 的普通员工。
+    ///
+    /// 从 2.0 下调到 1.6（试玩调参）：2.0 时一个管家 8 小时能清 17 间，而 12 间房的
+    /// 酒店每天只有 7 位客人退房——人手在数学上根本不稀缺，"再雇一个人"这个决策
+    /// 毫无手感。配合 HousekeepingTeamModel 的单人折扣，现在一个人 10 间房要跑近 8 小时，
+    /// 会实实在在耽误 check-in。</summary>
+    public const float BaseRoomsPerHour = 1.6f;
+
+    /// <summary>每工作一分钟累积的疲劳。
+    ///
+    /// 以前疲劳**只在日结时**按当日工时算一次，也就是说白天干活时疲劳是恒定的——
+    /// "干到下午会变慢"这件事压根没有建模。现在逐分钟累积并即时进吞吐，
+    /// 于是"一个人硬撑一整天"和"两个人各干半天"在同样工时下结果不同。
+    /// 0.0005/分钟：满班 600 分钟累积 0.30，对应吞吐掉约 9%。</summary>
+    public const float FatiguePerWorkedMinute = 0.0005f;
 
     /// <summary>欠薪一天的士气代价（真实经营亏损才会发生，不因玩家没点收取键而发生）。</summary>
     public const int UnpaidWageMoralePenalty = -15;
@@ -59,11 +72,13 @@ public static class StaffDayModel
         return MinSlackMinutes + (int)(r * (MaxSlackMinutes - MinSlackMinutes));
     }
 
-    /// <summary>一天下来的疲劳增量（满班 +0.35，休息不足会跨日累积）。</summary>
+    /// <summary>一天下来的疲劳增量（满班约 +0.30）。
+    /// **不再用于日结**——疲劳改为 TickMinute 里逐分钟累积，日结只做恢复，
+    /// 否则同一天的疲劳会被算两遍。保留此函数供离线闭式结算按工时补算。</summary>
     public static float FatigueGainFor(int workedMinutes)
     {
         float ratio = SimMath.Clamp01(workedMinutes / (float)FullShiftMinutes);
-        return 0.35f * ratio;
+        return FatiguePerWorkedMinute * FullShiftMinutes * ratio;
     }
 
     /// <summary>夜间恢复的疲劳量（下班休息）。</summary>

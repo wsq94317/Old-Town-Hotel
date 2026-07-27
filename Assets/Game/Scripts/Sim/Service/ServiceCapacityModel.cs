@@ -14,11 +14,16 @@ public static class ServiceCapacityModel
     }
 
     /// <summary>全酒店每小时清洁吞吐（间/小时）。只算真正在干活的客房管家——
-    /// 摸鱼的、待命的、下班的都不产出。</summary>
+    /// 摸鱼的、待命的、下班的都不产出。
+    ///
+    /// **人数是非线性的**（HousekeepingTeamModel）：单人独干打折，二三人协作超线性，
+    /// 人再多则走廊/货梯拥堵递减。以前是各人速率直接相加，两个人恰好两倍，
+    /// 「再雇一个人」这个决策就没有任何取舍——试玩反馈说"没体会到人手的关键性"。</summary>
     public static float CleanRoomsPerHour(StaffRoster roster, float supplyFactor)
     {
         if (roster == null) return 0f;
         float total = 0f;
+        int teamSize = 0;
         var entries = roster.Entries;
         for (int i = 0; i < entries.Count; i++)
         {
@@ -26,8 +31,11 @@ public static class ServiceCapacityModel
             if (!e.IsProductive || e.member == null) continue;
             if (e.member.Role != StaffRole.Housekeeper) continue;
             total += StaffDayModel.CleanRoomsPerHour(e.member, e.fatigue);
+            teamSize++;
         }
-        return total * SimMath.Clamp(supplyFactor, 0f, 1f);
+        return total
+             * HousekeepingTeamModel.PerPersonFactor(teamSize)
+             * SimMath.Clamp(supplyFactor, 0f, 1f);
     }
 
     /// <summary>全酒店每小时检查吞吐（间/小时）。没有 Inspector 在班就是 0——
