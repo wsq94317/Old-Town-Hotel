@@ -102,6 +102,39 @@ public class V3PrototypeSession : MonoBehaviour
     private int ScheduledRepayment() =>
         DebtPolicy.ScheduledRepaymentFor(_loan.Balance, _yesterdayNetProfit, _sim.Cash, dailyRepayment);
 
+    /// <summary>一个会自己算高度的文本面板。
+    ///
+    /// 以前每个 GUI.Box 的高度都是写死的，而内容行数是变的（复原提示、退款申请、
+    /// 评价明细、拒单警告都是条件出现的）——结果内容溢出框外，或者被后面的按钮压住
+    /// （试玩截图里两种都出现了）。攒行再画就不用猜高度了。</summary>
+    private sealed class Panel
+    {
+        private readonly List<string> _lines = new List<string>();
+        public const float LineHeight = 19f;
+        private const float HeaderHeight = 24f;
+        private const float PaddingBottom = 8f;
+
+        public void Add(string line) => _lines.Add(line);
+
+        /// <summary>条件行的便利写法：条件不成立就不占位置。</summary>
+        public void AddIf(bool condition, string line) { if (condition) _lines.Add(line); }
+
+        public float Height => HeaderHeight + _lines.Count * LineHeight + PaddingBottom;
+
+        /// <summary>在 (x, y) 画出框与所有行，返回框底部的 y。</summary>
+        public float Draw(float x, float y, float width, string title)
+        {
+            GUI.Box(new Rect(x, y, width, Height), title);
+            float lineY = y + HeaderHeight;
+            for (int i = 0; i < _lines.Count; i++)
+            {
+                GUI.Label(new Rect(x + 10, lineY, width - 20, LineHeight), _lines[i]);
+                lineY += LineHeight;
+            }
+            return y + Height;
+        }
+    }
+
     /// <summary>提示条的唯一出口。在这里过一次翻译，Sim 返回的 reason 就自动跟着走，
     /// 不必在每个调用点包一层（查不到的原样显示英文）。</summary>
     private void Say(string message)
@@ -179,65 +212,71 @@ public class V3PrototypeSession : MonoBehaviour
     private void DrawMorningReport(float w, float h)
     {
         var last = _sim.LastSettlement;
-        GUI.Box(new Rect(10, 74, w - 20, 210), GameText.F("YESTERDAY  (day {0})", _sim.Clock.CurrentDay - 1));
-        float y = 100;
-        GUI.Label(new Rect(20, y, w - 40, 20), GameText.F("Gross taken          ${0}",
-            last.netToSafebox + last.overflowed + last.cashPaidFromReserve)); y += 20;
-        GUI.Label(new Rect(20, y, w - 40, 20), GameText.F("Into the safebox     ${0}", last.netToSafebox)); y += 20;
-        if (last.overflowed > 0)
-        { GUI.Label(new Rect(20, y, w - 40, 20), GameText.F("Spilled (65% back)   ${0}", last.overflowed)); y += 20; }
-        if (last.cashPaidFromReserve > 0)
-        { GUI.Label(new Rect(20, y, w - 40, 20), GameText.F("Covered from cash    ${0}", last.cashPaidFromReserve)); y += 20; }
-        GUI.Label(new Rect(20, y, w - 40, 20),
-            last.wagesPaid ? GameText.T("Payroll: everybody got paid.")
-                           : GameText.F("PAYROLL SHORT by ${0}. They noticed.", last.unpaidAmount)); y += 24;
-        GUI.Label(new Rect(20, y, w - 40, 20),
-            GameText.F("Checked in {0}, turned away {1}, queue cost {2} min",
-                       _sim.ArrivalsCheckedInToday, _sim.ArrivalsTurnedAwayToday, _sim.TotalCheckInWaitToday)); y += 20;
-        GUI.Label(new Rect(20, y, w - 40, 20),
-            GameText.F("Commission ${0}   Cancelled {1}   No-shows {2}",
-                       _sim.CommissionToday, _sim.CancellationsToday, _sim.NoShowsToday)); y += 20;
-        if (_sim.BookingsDeclinedToday > 0)
+
+        var report = new Panel();
+        report.Add(GameText.F("Gross taken          ${0}",
+            last.netToSafebox + last.overflowed + last.cashPaidFromReserve));
+        report.Add(GameText.F("Into the safebox     ${0}", last.netToSafebox));
+        report.AddIf(last.overflowed > 0, GameText.F("Spilled (65% back)   ${0}", last.overflowed));
+        report.AddIf(last.cashPaidFromReserve > 0,
+                     GameText.F("Covered from cash    ${0}", last.cashPaidFromReserve));
+        report.Add(last.wagesPaid ? GameText.T("Payroll: everybody got paid.")
+                                  : GameText.F("PAYROLL SHORT by ${0}. They noticed.", last.unpaidAmount));
+        report.Add(GameText.F("Checked in {0}, turned away {1}, queue cost {2} min",
+                              _sim.ArrivalsCheckedInToday, _sim.ArrivalsTurnedAwayToday,
+                              _sim.TotalCheckInWaitToday));
+        report.Add(GameText.F("Commission ${0}   Cancelled {1}   No-shows {2}",
+                              _sim.CommissionToday, _sim.CancellationsToday, _sim.NoShowsToday));
+        report.AddIf(_sim.BookingsDeclinedToday > 0,
+                     GameText.F("TURNED DOWN {0} BOOKINGS - no rooms left to sell.",
+                                _sim.BookingsDeclinedToday));
+        report.Add(GameText.F("Rating {0}*   Debt ${1}",
+                              _sim.Reputation.Stars.ToString("0.00"), _loan.Balance));
+        AddReputationBreakdown(report);
+
+        float y = report.Draw(10, 74, w - 20, GameText.F("YESTERDAY  (day {0})", _sim.Clock.CurrentDay - 1));
+        y += 8;
+
+        // 收钱按钮：有钱可收才占位置
+        bool hasSafebox = _sim.Safebox.Balance > 0, hasSpill = _sim.Overflow.Balance > 0;
+        if (hasSafebox || hasSpill)
         {
-            GUI.Label(new Rect(20, y, w - 40, 20),
-                GameText.F("TURNED DOWN {0} BOOKINGS - no rooms left to sell.", _sim.BookingsDeclinedToday)); y += 20;
+            float half = (w - 50) / 2f;
+            if (hasSafebox &&
+                GuiInput.Button(new Rect(20, y, hasSpill ? half : w - 40, 26),
+                                GameText.F("COLLECT ${0}", _sim.Safebox.Balance)))
+                Say(GameText.F("Collected ${0}.", _sim.CollectSafebox()));
+            if (hasSpill &&
+                GuiInput.Button(new Rect(hasSafebox ? 30 + half : 20, y, hasSafebox ? half : w - 40, 26),
+                                GameText.F("SALVAGE ${0} (65%)", _sim.Overflow.Balance)))
+                Say(GameText.F("Salvaged ${0} of the cash that wouldn't fit.", _sim.RecoverOverflow()));
+            y += 32;
         }
-        GUI.Label(new Rect(20, y, w - 40, 20),
-            GameText.F("Rating {0}*   Debt ${1}", _sim.Reputation.Stars.ToString("0.00"), _loan.Balance)); y += 22;
-
-        y = DrawReputationBreakdown(w, y);
-
-        if (_sim.Safebox.Balance > 0 &&
-            GuiInput.Button(new Rect(20, y, (w - 50) / 2f, 26), GameText.F("COLLECT ${0}", _sim.Safebox.Balance)))
-            Say(GameText.F("Collected ${0}.", _sim.CollectSafebox()));
-        if (_sim.Overflow.Balance > 0 &&
-            GuiInput.Button(new Rect(30 + (w - 50) / 2f, y, (w - 50) / 2f, 26),
-                            GameText.F("SALVAGE ${0} (65%)", _sim.Overflow.Balance)))
-            Say(GameText.F("Salvaged ${0} of the cash that wouldn't fit.", _sim.RecoverOverflow()));
 
         // 退款申请（虚报价的代价）——批准/拒绝就在晨报上做
         var refunds = _sim.PendingRefunds;
         if (refunds.Count > 0)
         {
-            GUI.Box(new Rect(10, 288, w - 20, 26 + refunds.Count * 40),
-                    GameText.F("REFUND DEMANDS ({0})", refunds.Count));
-            float ry = 310;
-            for (int i = 0; i < refunds.Count && i < 3; i++)
+            int shown = refunds.Count < 3 ? refunds.Count : 3;
+            GUI.Box(new Rect(10, y, w - 20, 26 + shown * 42), GameText.F("REFUND DEMANDS ({0})", refunds.Count));
+            float ry = y + 24;
+            for (int i = 0; i < shown; i++)
             {
                 var r = refunds[i];
                 // 客人原话（r.line）是无厘头文案，翻译表里没有就照原样显示
-                GUI.Label(new Rect(20, ry, w - 40, 20),
+                GUI.Label(new Rect(20, ry, w - 40, 19),
                           "R" + r.roomNumber + " $" + r.amount + ": " + GameText.T(r.line));
-                if (GuiInput.Button(new Rect(20, ry + 18, (w - 50) / 2f, 20), GameText.F("REFUND ${0}", r.amount)))
+                float half = (w - 50) / 2f;
+                if (GuiInput.Button(new Rect(20, ry + 19, half, 20), GameText.F("REFUND ${0}", r.amount)))
                 { _sim.ApproveRefund(r.requestId); Say("Refunded. Reputation intact."); break; }
-                if (GuiInput.Button(new Rect(30 + (w - 50) / 2f, ry + 18, (w - 50) / 2f, 20), GameText.T("REFUSE")))
+                if (GuiInput.Button(new Rect(30 + half, ry + 19, half, 20), GameText.T("REFUSE")))
                 { _sim.RejectRefund(r.requestId); Say("Refused. They are writing a review as we speak."); break; }
-                ry += 40;
+                ry += 42;
             }
             return;   // 先处理完退款再开门
         }
 
-        if (GuiInput.Button(new Rect(10, 296, w - 20, 34), GameText.T("OPEN THE DOORS")))
+        if (GuiInput.Button(new Rect(10, y, w - 20, 34), GameText.T("OPEN THE DOORS")))
         {
             _sim.BeginDay();
             _awaitingMorningReport = false;
@@ -245,20 +284,19 @@ public class V3PrototypeSession : MonoBehaviour
         }
     }
 
-    /// <summary>客房部进度 + "不可售的房都卡在哪"。
+    /// <summary>客房部进度 + "不可售的房都卡在哪"，加进当日面板。
     ///
     /// 试玩时房间会成批地从可售列表里消失而玩家看不出原因（家具坏了？在装修？
     /// 还是根本没解锁？），所以这里把不可售的房**按原因拆开**，
     /// 并显示此刻正在打扫哪几间——`Cleaning` 状态就是为此才真正启用的。</summary>
-    private float DrawHousekeepingStatus(float w, float y)
+    private void AddHousekeepingStatus(Panel panel)
     {
         var cleaningNow = _sim.Rooms.RoomNumbersInState(RoomSimState.Cleaning, 6);
         int dirty = _sim.Rooms.CountOf(RoomSimState.Dirty);
         int awaiting = _sim.Rooms.CountOf(RoomSimState.AwaitingInspection);
 
-        GUI.Label(new Rect(20, y, w - 40, 20),
-            GameText.F("HOUSEKEEPING  done {0}   cleaning {1}   waiting {2}   to inspect {3}",
-                       _sim.Pipeline.RoomsCleanedToday, cleaningNow.Count, dirty, awaiting)); y += 18;
+        panel.Add(GameText.F("HOUSEKEEPING  done {0}   cleaning {1}   waiting {2}   to inspect {3}",
+                             _sim.Pipeline.RoomsCleanedToday, cleaningNow.Count, dirty, awaiting));
 
         if (cleaningNow.Count > 0)
         {
@@ -268,12 +306,11 @@ public class V3PrototypeSession : MonoBehaviour
                 if (i > 0) sb.Append(", ");
                 sb.Append(cleaningNow[i]);
             }
-            GUI.Label(new Rect(20, y, w - 40, 20), GameText.F("  in progress: {0}", sb.ToString())); y += 18;
+            panel.Add(GameText.F("  in progress: {0}", sb.ToString()));
         }
         else if (dirty > 0)
         {
-            GUI.Label(new Rect(20, y, w - 40, 20),
-                      GameText.T("  nobody is cleaning - off shift, slacking, or nobody hired")); y += 18;
+            panel.Add(GameText.T("  nobody is cleaning - off shift, slacking, or nobody hired"));
         }
 
         // 不可售的房按原因拆开：装修中 / 家具坏了 / 没解锁
@@ -289,100 +326,86 @@ public class V3PrototypeSession : MonoBehaviour
         // 否则玩家看不出"我已经花钱在开这几间了"
         int reclaiming = _sim.Renovations.RoomsUnderReclaim;
         int derelict = _sim.Rooms.CountOf(RoomSimState.Ruined) - reclaiming;
-        GUI.Label(new Rect(20, y, w - 40, 20),
-            GameText.F("UNSELLABLE    renovating {0}   broken {1}   derelict {2}   (sellable {3})",
-                       renovating, broken, derelict < 0 ? 0 : derelict,
-                       _sim.Rooms.SellableCount)); y += 18;
-        if (reclaiming > 0)
-        {
-            GUI.Label(new Rect(20, y, w - 40, 20),
-                GameText.F("  reclaiming {0} derelict room(s) - building work in progress", reclaiming)); y += 18;
-        }
-
-        return y + 6;
+        panel.Add(GameText.F("UNSELLABLE    renovating {0}   broken {1}   derelict {2}   (sellable {3})",
+                             renovating, broken, derelict < 0 ? 0 : derelict, _sim.Rooms.SellableCount));
+        panel.AddIf(reclaiming > 0,
+                    GameText.F("  reclaiming {0} derelict room(s) - building work in progress", reclaiming));
     }
 
-    /// <summary>晨报里的"今天为什么涨/为什么掉"。只列影响最大的两条正、两条负——
+    /// <summary>把"今天为什么涨/为什么掉"加进晨报面板。只列影响最大的两条正、两条负——
     /// 玩家要的是"该改什么"，不是一张完整的会计报表。</summary>
-    private float DrawReputationBreakdown(float w, float y)
+    private void AddReputationBreakdown(Panel panel)
     {
         var down = _sim.Breakdown.Ranked(positive: false);
         var up = _sim.Breakdown.Ranked(positive: true);
         if (down.Count == 0 && up.Count == 0)
         {
-            GUI.Label(new Rect(20, y, w - 40, 20), GameText.T("No guests rated you yesterday.")); y += 20;
-            return y + 6;
+            panel.Add(GameText.T("No guests rated you yesterday."));
+            return;
         }
 
         for (int i = 0; i < down.Count && i < 2; i++)
         {
             var e = down[i];
-            GUI.Label(new Rect(20, y, w - 40, 20),
-                GameText.F("  DOWN  {0}   {1}  (x{2})",
-                           GameText.T(ReputationBreakdown.LabelOf(e.cause)),
-                           e.total.ToString("0.00"), e.count)); y += 18;
+            panel.Add(GameText.F("  DOWN  {0}   {1}  (x{2})",
+                                 GameText.T(ReputationBreakdown.LabelOf(e.cause)),
+                                 e.total.ToString("0.00"), e.count));
         }
         for (int i = 0; i < up.Count && i < 2; i++)
         {
             var e = up[i];
-            GUI.Label(new Rect(20, y, w - 40, 20),
-                GameText.F("  UP    {0}   +{1}  (x{2})",
-                           GameText.T(ReputationBreakdown.LabelOf(e.cause)),
-                           e.total.ToString("0.00"), e.count)); y += 18;
+            panel.Add(GameText.F("  UP    {0}   +{1}  (x{2})",
+                                 GameText.T(ReputationBreakdown.LabelOf(e.cause)),
+                                 e.total.ToString("0.00"), e.count));
         }
-        return y + 6;
     }
 
     private void DrawLiveStatus(float w, float h)
     {
-        GUI.Box(new Rect(10, 134, w - 20, 232), GameText.T("TODAY"));
-        float y = 158;
-        GUI.Label(new Rect(20, y, w - 40, 20),
-            GameText.F("Expected arrivals   {0}   ({1} booked + {2} walk-in)",
-                       _sim.ArrivalsPlannedToday, _sim.ReservationArrivalsToday, _sim.WalkInArrivalsToday)); y += 20;
-        GUI.Label(new Rect(20, y, w - 40, 20),
-            GameText.F("Checked in          {0}", _sim.ArrivalsCheckedInToday)); y += 20;
-        GUI.Label(new Rect(20, y, w - 40, 20),
-            GameText.F("Turned away         {0}   (no clean room)", _sim.ArrivalsTurnedAwayToday)); y += 20;
-        GUI.Label(new Rect(20, y, w - 40, 20),
-            GameText.F("Checkouts booked    {0}   (${1})", _sim.CheckoutsToday, _sim.GrossIncomeToday)); y += 20;
-        GUI.Label(new Rect(20, y, w - 40, 20),
-            GameText.F("Flawed rooms sold   {0}   (no inspector on duty?)", _sim.FlawedStaysToday)); y += 20;
-        GUI.Label(new Rect(20, y, w - 40, 20),
-            GameText.F("Staff working       {0} hsk, morale {1}",
-                       _sim.Staff.ProductiveCountOfRole(StaffRole.Housekeeper),
-                       _sim.Staff.AverageMorale.ToString("0"))); y += 20;
-        GUI.Label(new Rect(20, y, w - 40, 20),
-            GameText.F("Next 7 nights sold  {0}   (cap {1})", SoldNightsPreview(), _sim.Rooms.OpenRoomCount)); y += 24;
+        var today = new Panel();
+        today.Add(GameText.F("Expected arrivals   {0}   ({1} booked + {2} walk-in)",
+                             _sim.ArrivalsPlannedToday, _sim.ReservationArrivalsToday,
+                             _sim.WalkInArrivalsToday));
+        today.Add(GameText.F("Checked in          {0}", _sim.ArrivalsCheckedInToday));
+        today.Add(GameText.F("Turned away         {0}   (no clean room)", _sim.ArrivalsTurnedAwayToday));
+        today.Add(GameText.F("Checkouts booked    {0}   (${1})", _sim.CheckoutsToday, _sim.GrossIncomeToday));
+        today.Add(GameText.F("Flawed rooms sold   {0}   (no inspector on duty?)", _sim.FlawedStaysToday));
+        today.Add(GameText.F("Staff working       {0} hsk, morale {1}",
+                             _sim.Staff.ProductiveCountOfRole(StaffRole.Housekeeper),
+                             _sim.Staff.AverageMorale.ToString("0")));
+        today.Add(GameText.F("Next 7 nights sold  {0}   (cap {1})",
+                             SoldNightsPreview(), _sim.Rooms.OpenRoomCount));
+        AddHousekeepingStatus(today);
 
-        y = DrawHousekeepingStatus(w, y);
+        float y = today.Draw(10, 134, w - 20, GameText.T("TODAY")) + 8;
 
         // 超售客站在前台等你拍板。拖到打烊 = 按硬赶处理还要额外掉声誉，所以要显眼
         var waiting = _sim.PendingOverbookings;
         if (waiting.Count > 0)
         {
             var incident = waiting[0];
-            // 位置跟着 y 走，不写死：客房部那几行会把后面的内容往下推
-            GUI.Box(new Rect(10, y, w - 20, 96),
+            GUI.Box(new Rect(10, y, w - 20, 100),
                 GameText.F("OVERBOOKED - {0} guest(s) with a room you don't have", waiting.Count));
-            GUI.Label(new Rect(20, y + 22, w - 40, 20),
+            GUI.Label(new Rect(20, y + 24, w - 40, 19),
                 GameText.F("Booked {0} at ${1}. Waited {2} min.",
-                           GameText.T(incident.bookedBand.ToString()), incident.lockedPrice, incident.waitMinutes));
+                           GameText.T(incident.bookedBand.ToString()), incident.lockedPrice,
+                           incident.waitMinutes));
 
+            float half = (w - 50) / 2f;
             bool canUpgrade = _sim.CanUpgradeOverbooking(incident.incidentId);
             GUI.enabled = canUpgrade;
-            if (GuiInput.Button(new Rect(20, y + 44, (w - 50) / 2f, 22),
+            if (GuiInput.Button(new Rect(20, y + 46, half, 22),
                                 GameText.T(canUpgrade ? "UPGRADE THEM" : "NOTHING FREE YET")))
                 Resolve(incident.incidentId, OverbookingResolution.Upgrade,
                         "Upgraded at the old price. They are thrilled.");
             GUI.enabled = true;
 
-            if (GuiInput.Button(new Rect(30 + (w - 50) / 2f, y + 44, (w - 50) / 2f, 22),
+            if (GuiInput.Button(new Rect(30 + half, y + 46, half, 22),
                                 GameText.F("PAY THEM OFF (${0})", incident.CompensationCost)))
                 Resolve(incident.incidentId, OverbookingResolution.Compensate,
                         "Paid for a room down the road. Expensive apology.");
 
-            if (GuiInput.Button(new Rect(20, y + 70, w - 40, 22),
+            if (GuiInput.Button(new Rect(20, y + 72, w - 40, 22),
                                 GameText.T("SEND THEM AWAY (free, they will write about it)")))
                 Resolve(incident.incidentId, OverbookingResolution.WalkAway,
                         "They left. Loudly.");
@@ -390,7 +413,7 @@ public class V3PrototypeSession : MonoBehaviour
         }
 
         if (_sim.TryFindRuinedRoom(out int _))
-            GUI.Label(new Rect(20, y, w - 40, 20),
+            GUI.Label(new Rect(20, y, w - 40, 19),
                 GameText.T("Derelict rooms need building work - see the RENOVATE tab."));
     }
 
