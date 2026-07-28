@@ -52,7 +52,10 @@ public class DayEndCelebration : MonoBehaviour
         if (Time.time >= _boardUntil) return;
         Vector2 v = GuiScale.Begin();
         float w = v.x, h = v.y;
-        GUI.Box(new Rect(w * 0.5f - 210, h * 0.55f, 420, 86), _board);
+        // 结算板不是决策面板（没有按钮），归提示带而不是模态位——
+        // 占着模态令牌会把真正需要玩家点的面板挡在门外
+        Rect boardRect = UiLayout.NextToast(w, h);
+        GUI.Box(new Rect(boardRect.x, boardRect.y, boardRect.width, 86f), _board);
     }
 }
 

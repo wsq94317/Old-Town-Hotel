@@ -25,6 +25,7 @@ public sealed class HotelSim
         public int reservationId; // 0 = walk-in
         public int channelId;     // 抽成按渠道走：直营 0%，平台 A 18%
         public int nightsLeft;    // 还要住几晚。>0 的人早上不退房（连住占多个间夜）
+        public int checkInMinute; // 入住时刻（表现层排外出行程的起点：放好行李才出门）
     }
 
     /// <summary>用胶带糊上一件坏家具：**不花钱**，房间立刻能重新开卖，
@@ -1156,6 +1157,7 @@ public sealed class HotelSim
             reservationId = reservation != null ? reservation.id : 0,
             channelId = reservation != null ? reservation.channelId : BookingChannels.DirectId,
             nightsLeft = reservation != null ? reservation.nights : 1,   // walk-in 一律一晚
+            checkInMinute = Clock.CurrentMinute,
         };
 
         if (reservation != null) Bookings.CheckIn(reservation.id, roomNumber);
@@ -1208,6 +1210,32 @@ public sealed class HotelSim
 
     /// <summary>台账里在住的间数（守恒律测试用：入住数 = 退房数 + 在住数）。</summary>
     public int ActiveStayCount => _stays.Count;
+
+    /// <summary>一位在住客人的对外快照（表现层用，改不回来）。</summary>
+    public struct StayView
+    {
+        public int roomNumber;
+        public GuestSegment segment;
+        public int checkInMinute;
+        public int nightsLeft;
+    }
+
+    /// <summary>当前所有在住客人。**表现层唯一的客人来源**——
+    /// 世界场景里走路的客人必须来自台账，不能自己发明（B1b 定的规矩：
+    /// 两套账同时收客会互相抢房，而且钱对不上）。</summary>
+    public List<StayView> ActiveStays()
+    {
+        var list = new List<StayView>(_stays.Count);
+        foreach (var pair in _stays)
+            list.Add(new StayView
+            {
+                roomNumber = pair.Key,
+                segment = pair.Value.segment,
+                checkInMinute = pair.Value.checkInMinute,
+                nightsLeft = pair.Value.nightsLeft,
+            });
+        return list;
+    }
 
     /// <summary>房费入账。抽成**按渠道**走：直营 0%，平台 A 18%——
     /// 这就是"把客人从平台养成回头客"的回报，也是 CommissionRate 只作兜底的原因。</summary>

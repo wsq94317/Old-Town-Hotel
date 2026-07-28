@@ -89,7 +89,7 @@ public class FireAlarmIncident : MonoBehaviour
                 && Mathf.Abs(p.x - _room.transform.position.x) < (_panelOpen ? 3.4f : 2.4f)
                 && Mathf.Abs(p.z - _room.transform.position.z) < (_panelOpen ? 3.4f : 2.4f);
             if (!_panelOpen && near) _panelOpen = true;
-            else if (_panelOpen && !near) _panelOpen = false;
+            else if (_panelOpen && !near) { _panelOpen = false; GuiModal.End(this); }
         }
     }
 
@@ -146,6 +146,7 @@ public class FireAlarmIncident : MonoBehaviour
     {
         if (!_panelOpen) return; // 幂等
         _panelOpen = false;
+        GuiModal.End(this);
 
         if (beatThemOut)
         {
@@ -176,6 +177,7 @@ public class FireAlarmIncident : MonoBehaviour
         if (_smoker != null) { Destroy(_smoker.gameObject); _smoker = null; }
         _room = null;
         _panelOpen = false;
+        GuiModal.End(this);
         ManagerPhone.Resolve("fire");
     }
 
@@ -190,14 +192,17 @@ public class FireAlarmIncident : MonoBehaviour
         float w = v.x, h = v.y;
 
         if (Time.time < _storyUntil)
-            GUI.Box(new Rect(w * 0.5f - 230, h * 0.22f, 460, 40), _story);
+            GUI.Box(UiLayout.NextToast(w, h), _story);
 
         if (!_panelOpen || _room == null) return;
-        GUI.Box(new Rect(w * 0.5f - 190, h * 0.32f, 380, 118),
-            "ROOM " + _room.roomNumber + " — he's SMOKING in bed.\nThe fire dept is already writing the $" + FineAmount + " fine.");
-        if (GuiInput.Button(new Rect(w * 0.5f - 170, h * 0.32f + 56, 340, 26), "Beat him out 🥊 (+prestige, room needs cleaning)"))
+        if (!GuiModal.Begin(this, w, h, 118f, out Rect box)) return;
+        GUI.Box(box, GameText.F("ROOM {0} — he's SMOKING in bed.", _room.roomNumber) + "\n"
+                     + GameText.F("The fire dept is already writing the ${0} fine.", FineAmount));
+        if (GuiInput.Button(GuiModal.Row(box, 0, top: 56f),
+                            GameText.T("Beat him out 🥊 (+prestige, room needs cleaning)")))
             Choose(true);
-        if (GuiInput.Button(new Rect(w * 0.5f - 170, h * 0.32f + 86, 340, 26), "Let it slide (he'll tell his friends you're cool)"))
+        if (GuiInput.Button(GuiModal.Row(box, 1, top: 56f),
+                            GameText.T("Let it slide (he'll tell his friends you're cool)")))
             Choose(false);
     }
 }

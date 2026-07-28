@@ -32195,6 +32195,7 @@ GameObject:
   - component: {fileID: 2129138164}
   - component: {fileID: 2129138165}
   - component: {fileID: 2129138166}
+  - component: {fileID: 2129138167}
   m_Layer: 0
   m_Name: Systems
   m_TagString: Untagged
@@ -32702,7 +32703,22 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: decacb398ed14294bb013cae9f7ee010, type: 3}
   m_Name: 
   m_EditorClassIdentifier: OldTownHotel.Game::WorldOperationsPanel
-  sheetHeight: 0.46
+--- !u!114 &2129138167
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2129138142}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d1470501a5c779d45a3ad5cad115ad06, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: OldTownHotel.Game::GuestLifeDirector
+  demandLoop: {fileID: 0}
+  doorPoint: {x: 0, y: 0, z: -5.2}
+  deskPoint: {x: 0.9, y: 0, z: 2.2}
+  deskDwellSeconds: 1.6
 --- !u!1 &2132981060
 GameObject:
   m_ObjectHideFlags: 0

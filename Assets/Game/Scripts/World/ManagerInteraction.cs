@@ -175,6 +175,13 @@ public class ManagerInteraction : MonoBehaviour
         return null;
     }
 
+    /// <summary>把一行拆成左右两个半宽按钮（"解雇 / 关闭"这种成对操作）。</summary>
+    private static Rect HalfRow(Rect row, bool left)
+    {
+        float half = (row.width - 6f) / 2f;
+        return new Rect(left ? row.x : row.x + half + 6f, row.y, half, row.height);
+    }
+
     private void OnGUI()
     {
         // 全屏晨报期间全体让位：IMGUI 没有 z 序，谁画谁上；报告必须是唯一的画手，
@@ -211,13 +218,14 @@ public class ManagerInteraction : MonoBehaviour
         if (_caughtAgent != null)
         {
             var caught = _caughtAgent;
-            GUI.Box(new Rect(w * 0.5f - 170, h * 0.35f, 340, 130),
+            if (!GuiModal.Begin(this, w, h, 130f, out Rect caughtBox)) return;
+            GUI.Box(caughtBox,
                 $"CAUGHT SLACKING!  {caught.Member?.DisplayName} ({caught.Member?.Role})");
-            if (GuiInput.Button(new Rect(w * 0.5f - 150, h * 0.35f + 40, 300, 24), "Urge back to work (morale -5, speed up)"))
+            if (GuiInput.Button(GuiModal.Row(caughtBox, 0, top: 40f, rowHeight: 24f), "Urge back to work (morale -5, speed up)"))
                 ResolveCatch(caught, CatchChoice.Urge, "Back to work!");
-            else if (GuiInput.Button(new Rect(w * 0.5f - 150, h * 0.35f + 68, 300, 24), "Scold hard (morale -15, faster)"))
+            else if (GuiInput.Button(GuiModal.Row(caughtBox, 1, top: 40f, rowHeight: 24f), "Scold hard (morale -15, faster)"))
                 ResolveCatch(caught, CatchChoice.Scold, "Scolded.");
-            else if (GuiInput.Button(new Rect(w * 0.5f - 150, h * 0.35f + 96, 300, 24), "Look away (morale +3, slacking spreads)"))
+            else if (GuiInput.Button(GuiModal.Row(caughtBox, 2, top: 40f, rowHeight: 24f), "Look away (morale +3, slacking spreads)"))
                 ResolveCatch(caught, CatchChoice.Ignore, "You saw nothing.");
             return;
         }
@@ -226,32 +234,37 @@ public class ManagerInteraction : MonoBehaviour
         {
             var agent = _panelAgent;
             var member = agent.Member;
-            GUI.Box(new Rect(w * 0.5f - 150, h * 0.4f, 300, 150),
+            if (!GuiModal.Begin(this, w, h, 150f, out Rect agentBox)) return;
+            GUI.Box(agentBox,
                 $"{member?.DisplayName} ({member?.Role})  morale:{member?.Morale}\n{agent.ShiftState} / {agent.ActivityState}"
                 + (agent.IsGrudging ? "  GRUDGING" : ""));
 
             bool canInterrogate = agent.HasDelayMark;
-            if (GuiInput.Button(new Rect(w * 0.5f - 130, h * 0.4f + 34, 260, 24), "Hurry up! (speed up, morale -3)"))
+            if (GuiInput.Button(GuiModal.Row(agentBox, 0, top: 34f, rowHeight: 24f), "Hurry up! (speed up, morale -3)"))
             {
                 agent.Hurry();
                 Say("Hurried.");
                 _panelAgent = null;
+                GuiModal.End(this);
             }
-            else if (InterrogateButton(new Rect(w * 0.5f - 130, h * 0.4f + 62, 260, 24), canInterrogate))
+            else if (InterrogateButton(GuiModal.Row(agentBox, 1, top: 34f, rowHeight: 24f), canInterrogate))
             {
                 _panelAgent = null;
+                GuiModal.End(this);
                 if (agent.Interrogate() == InterrogationVerdict.Caught) _caughtAgent = agent;
                 else Say($"WRONG ACCUSATION! {agent.Member?.DisplayName} is furious (morale {SupervisionTuning.WrongAccusationMoraleDelta}).");
             }
-            else if (GuiInput.Button(new Rect(w * 0.5f - 130, h * 0.4f + 90, 260, 24), "Assign room..."))
+            else if (GuiInput.Button(GuiModal.Row(agentBox, 2, top: 34f, rowHeight: 24f), "Assign room..."))
             {
                 _commandAgent = agent;
                 _panelAgent = null;
+                GuiModal.End(this);
                 Say("Pick a room from the list.");
             }
-            else if (GuiInput.Button(new Rect(w * 0.5f - 130, h * 0.4f + 118, 125, 24), "FIRE THEM"))
+            else if (GuiInput.Button(HalfRow(GuiModal.Row(agentBox, 3, top: 34f, rowHeight: 24f), left: true), "FIRE THEM"))
             {
                 _panelAgent = null;
+                GuiModal.End(this);
                 if (economy != null && agent.Member != null)
                 {
                     FloatingTextFx.Spawn(agent.transform.position, "FIRED!", new Color(1f, 0.25f, 0.2f), 1.2f);
@@ -259,9 +272,10 @@ public class ManagerInteraction : MonoBehaviour
                     Say($"{agent.Member.DisplayName} is packing. The stapler goes with them.");
                 }
             }
-            else if (GuiInput.Button(new Rect(w * 0.5f + 5, h * 0.4f + 118, 125, 24), "Close"))
+            else if (GuiInput.Button(HalfRow(GuiModal.Row(agentBox, 3, top: 34f, rowHeight: 24f), left: false), "Close"))
             {
                 _panelAgent = null;
+                GuiModal.End(this);
             }
             return;
         }
@@ -290,6 +304,7 @@ public class ManagerInteraction : MonoBehaviour
     {
         if (agent == null || _caughtAgent != agent) return;
         _caughtAgent = null;
+        GuiModal.End(this);
         agent.ApplyCatchChoice(choice);
         Say(message);
     }

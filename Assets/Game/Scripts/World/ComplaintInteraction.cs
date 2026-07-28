@@ -81,6 +81,7 @@ public class ComplaintInteraction : MonoBehaviour
     {
         if (!_panelOpen) return; // 幂等：双通道同帧双触发只结算一次
         _panelOpen = false;
+        GuiModal.End(this);
         int rate = economy != null && economy.Config != null ? economy.Config.roomRevenuePerGuest : 80;
         var outcome = ComplaintDecisionLogic.Resolve(choice, rate, _rng.NextDouble());
 
@@ -142,16 +143,18 @@ public class ComplaintInteraction : MonoBehaviour
 
         if (Time.time < _storyUntil)
         {
-            GUI.Box(new Rect(w * 0.5f - 230, h * 0.12f, 460, 44), _story);
+            GUI.Box(UiLayout.NextToast(w, h), _story);
         }
 
         if (!_panelOpen) return;
-        GUI.Box(new Rect(w * 0.5f - 170, h * 0.32f, 340, 136), "ANGRY GUEST — your call, boss");
-        if (GuiInput.Button(new Rect(w * 0.5f - 150, h * 0.32f + 36, 300, 26), "Pay them off (half the rate)"))
+        // B1c：走布局契约的模态位（拿不到令牌就这帧别画，避免两个决策面板叠着吃点击）
+        if (!GuiModal.Begin(this, w, h, 136f, out Rect box)) return;
+        GUI.Box(box, GameText.T("ANGRY GUEST — your call, boss"));
+        if (GuiInput.Button(GuiModal.Row(box, 0), GameText.T("Pay them off (half the rate)")))
             Choose(ComplaintChoice.Pay);
-        else if (GuiInput.Button(new Rect(w * 0.5f - 150, h * 0.32f + 66, 300, 26), "Cold shoulder (free, risky)"))
+        else if (GuiInput.Button(GuiModal.Row(box, 1), GameText.T("Cold shoulder (free, risky)")))
             Choose(ComplaintChoice.ColdShoulder);
-        else if (GuiInput.Button(new Rect(w * 0.5f - 150, h * 0.32f + 96, 300, 26), "FIGHT 🥊 (what could go wrong)"))
+        else if (GuiInput.Button(GuiModal.Row(box, 2), GameText.T("FIGHT 🥊 (what could go wrong)")))
             Choose(ComplaintChoice.Fight);
     }
 }

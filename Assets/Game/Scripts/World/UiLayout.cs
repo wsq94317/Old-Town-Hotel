@@ -58,6 +58,31 @@ public static class UiLayout
         return new Rect((w - width) / 2f, (h - height) / 2.4f, width, height);
     }
 
+    // ── 提示条：一条带里排队，不许互相压 ──────────────────────────────────────
+    // 六个面板各自在 h*0.12/0.13/0.19/0.22/0.26 处画"结果文案"，两条同时出现时
+    // 后画的把先画的压掉一半，玩家读到的是两句话的碎片。改成同一条带里往下排。
+
+    public const float ToastHeight = 40f;
+    private const float ToastGap = 4f;
+    private static int _toastSlotsUsedThisFrame;
+    private static int _toastFrame = -1;
+
+    /// <summary>要一个提示条的位置（同一帧里依次往下排，跨帧自动归零）。</summary>
+    public static Rect NextToast(float w, float h)
+    {
+        if (_toastFrame != Time.frameCount)
+        {
+            _toastFrame = Time.frameCount;
+            _toastSlotsUsedThisFrame = 0;
+        }
+
+        // 从顶栏下方开始往下排（世界区上沿），别压住通知右栏的宽度
+        float top = TopBarHeight + 10f + _toastSlotsUsedThisFrame * (ToastHeight + ToastGap);
+        _toastSlotsUsedThisFrame++;
+        float width = w - 12f - NotificationRail(w, h).width;
+        return new Rect(6f, top, Mathf.Max(200f, width), ToastHeight);
+    }
+
     // ── 模态令牌：一次只开一个 ────────────────────────────────────────────────
     // IMGUI 没有 z 序，两个模态叠着画时点击会落进看不见的那个——所以从源头禁掉。
 

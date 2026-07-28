@@ -209,6 +209,7 @@ public class BreakdownSystem : MonoBehaviour
                 || FloorMath.FloorIndexForY(managerPos.y) != FloorMath.FloorIndexForY(_panelIncident.Pos.y))
             {
                 _panelIncident = null;
+                GuiModal.End(this);
             }
         }
     }
@@ -318,13 +319,14 @@ public class BreakdownSystem : MonoBehaviour
         if (incident.Mat != null) Destroy(incident.Mat);
         ManagerPhone.Resolve(incident.Id);
         _active.Remove(incident);
-        if (_panelIncident == incident) _panelIncident = null;
+        if (_panelIncident == incident) { _panelIncident = null; GuiModal.End(this); }
     }
 
     private void Choose(BreakdownFix fix)
     {
         var incident = _panelIncident;
         _panelIncident = null;
+        GuiModal.End(this);
         if (incident == null) return;
 
         bool clumsy = false;
@@ -393,14 +395,15 @@ public class BreakdownSystem : MonoBehaviour
         float h = view.y;
 
         if (Time.time < _storyUntil)
-            GUI.Box(new Rect(w * 0.5f - 230, h * 0.13f, 460, 40), _story);
+            GUI.Box(UiLayout.NextToast(w, h), _story);
 
         if (_panelIncident == null) return;
 
         var incident = _panelIncident;
         bool isRoom = incident.Room != null;
         float panelHeight = isRoom ? 158 : 132;
-        GUI.Box(new Rect(w * 0.5f - 180, h * 0.32f, 360, panelHeight),
+        if (!GuiModal.Begin(this, w, h, panelHeight, out Rect box)) return;
+        GUI.Box(box,
             BreakdownLogic.SeverityLabel(incident.Severity) + " - " + incident.Kind
             + (isRoom ? " (Room " + incident.Room.roomNumber + ")" : ""));
 
@@ -420,14 +423,14 @@ public class BreakdownSystem : MonoBehaviour
         bool canLock = isRoom && incident.Room.currentState != Room2DState.Occupied;
         bool prevEnabled = GUI.enabled;
 
-        if (GuiInput.Button(new Rect(w * 0.5f - 160, h * 0.32f + 30, 320, 24), "Fix it yourself (55%, tips or a face full of water)"))
+        if (GuiInput.Button(GuiModal.Row(box, 0, top: 30f, rowHeight: 24f, gap: 4f), "Fix it yourself (55%, tips or a face full of water)"))
         {
             Choose(BreakdownFix.DIY);
         }
         else
         {
             GUI.enabled = hasHousekeeper;
-            if (GuiInput.Button(new Rect(w * 0.5f - 160, h * 0.32f + 58, 320, 24),
+            if (GuiInput.Button(GuiModal.Row(box, 1, top: 30f, rowHeight: 24f, gap: 4f),
                     hasHousekeeper ? "Send housekeeping (traits matter)" : "Send housekeeping (you have none)"))
             {
                 Choose(BreakdownFix.SendStaff);
@@ -435,14 +438,14 @@ public class BreakdownSystem : MonoBehaviour
             else
             {
                 GUI.enabled = true;
-                if (GuiInput.Button(new Rect(w * 0.5f - 160, h * 0.32f + 86, 320, 24), "DUCT TAPE (free, definitely permanent)"))
+                if (GuiInput.Button(GuiModal.Row(box, 2, top: 30f, rowHeight: 24f, gap: 4f), "DUCT TAPE (free, definitely permanent)"))
                 {
                     Choose(BreakdownFix.DuctTape);
                 }
                 else if (isRoom)
                 {
                     GUI.enabled = canLock;
-                    if (GuiInput.Button(new Rect(w * 0.5f - 160, h * 0.32f + 114, 320, 24),
+                    if (GuiInput.Button(GuiModal.Row(box, 3, top: 30f, rowHeight: 24f, gap: 4f),
                             canLock ? "Lock the room (no problem if no witnesses)" : "Lock the room (there's a GUEST inside)"))
                     {
                         Choose(BreakdownFix.LockRoom);

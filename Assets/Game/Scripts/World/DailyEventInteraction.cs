@@ -158,6 +158,7 @@ public class DailyEventInteraction : MonoBehaviour
     {
         _activeDef = null;
         _panelOpen = false;
+        GuiModal.End(this);
         if (_icon != null) Destroy(_icon);
     }
 
@@ -204,15 +205,17 @@ public class DailyEventInteraction : MonoBehaviour
         float w = v.x, h = v.y;
 
         if (Time.time < _storyUntil)
-            GUI.Box(new Rect(w * 0.5f - 230, h * 0.19f, 460, 44), _story);
+            GUI.Box(UiLayout.NextToast(w, h), _story);
 
         // （顶部事件提醒已删：与手机通知重复，且压在 HUD 第一行文字上）
 
         if (!_panelOpen || _activeDef == null) return;
-        GUI.Box(new Rect(w * 0.5f - 190, h * 0.3f, 380, 128), _activeDef.Title + "\n" + _activeDef.Blurb);
+        if (!GuiModal.Begin(this, w, h, 128f, out Rect box)) return;
+        GUI.Box(box, GameText.T(_activeDef.Title) + "\n" + GameText.T(_activeDef.Blurb));
         for (int i = 0; i < _activeDef.Options.Length; i++)
         {
-            if (GuiInput.Button(new Rect(w * 0.5f - 170, h * 0.3f + 62 + i * 30, 340, 26), _activeDef.Options[i].Label))
+            // 标题+说明占两行，按钮从第 62 虚拟像素起排
+            if (GuiInput.Button(GuiModal.Row(box, i, top: 62f), GameText.T(_activeDef.Options[i].Label)))
             {
                 Choose(_activeDef.Options[i]);
                 break;

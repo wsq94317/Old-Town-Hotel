@@ -1,7 +1,12 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-// 客人关键节点可视化（M2 简化版）：
+// 客人关键节点可视化（M2 简化版）。
+//
+// **B1b 之后在世界场景里退役**：客人的唯一来源是 Sim 台账，由 GuestLifeDirector
+// 演出（入住/外出/回来/退房一整天）。这个类只服务纯 v1 原型场景——两个都在跑
+// 的话同一批客人会被演两遍（大门口冒出双份纸片人）。
+//
 //   ① 前台有活跃需求 → 大门生成客人走到前台排队点
 //   ② 需求被办理（served 计数变化）→ 排队客人走向刚分配的房间 → 到房销毁
 //   ③ 退房事件（OnDepartureCheckedOut）→ 房门口生成客人 → 走到大门销毁
@@ -35,6 +40,8 @@ public class GuestFlowVisualizer : MonoBehaviour
     private void Update()
     {
         if (demandLoop == null) return;
+        // Sim 接管收客后让位给 GuestLifeDirector（否则客人演两遍）
+        if (demandLoop.guestFlowOwnedBySim) return;
 
         // ① 活跃需求出现 → 生成排队客人
         if (demandLoop.activeDemandWaitingForManualAssignment && !_waitingSpawned)
@@ -78,6 +85,7 @@ public class GuestFlowVisualizer : MonoBehaviour
     private void HandleDeparture(Room2DEntity room, int amount, bool byPlayer)
     {
         if (room == null) return;
+        if (demandLoop != null && demandLoop.guestFlowOwnedBySim) return;
         var guest = GuestAgent.Spawn(room.transform.position, "departing_" + room.roomNumber);
         guest.TravelTo(doorPoint, () => Destroy(guest.gameObject));
     }
