@@ -145,7 +145,9 @@ public static class EventScheduleLogic
 {
     public static List<ScheduledEvent> ScheduleForDay(IReadOnlyList<HotelEventDef> catalog, Random rng)
     {
-        int count = 2 + rng.Next(2); // 2 或 3
+        // 每天 1-2 件。原为 2-3 件，试玩反馈"忙不过来"：随机事件会叠在
+        // 投诉、家具故障警报和前台队列上面，事件应该是调剂不是第二份全职工作。
+        int count = 1 + rng.Next(2); // 1 或 2
         var pool = new List<HotelEventDef>(catalog);
         var result = new List<ScheduledEvent>();
         for (int i = 0; i < count && pool.Count > 0; i++)

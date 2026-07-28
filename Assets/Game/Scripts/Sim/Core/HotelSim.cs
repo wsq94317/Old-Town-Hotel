@@ -1183,6 +1183,11 @@ public sealed class HotelSim
         {
             RoomRecord room = Rooms.Peek(i);
             if (room.state != RoomSimState.Ready) continue;
+            // **有人住着的房绝不再卖**——桥的镜像模式会用 v1 房态覆写这里的状态，
+            // 光看 state 会把住着人的房当 Ready 再卖一次，_stays 一覆盖，前一位
+            // 客人的房费凭空蒸发（试玩晨报：入住 7 人只结出 2 人的钱）。
+            // 台账是占用事实的唯一权威，state 只是它的影子。
+            if (_stays.ContainsKey(room.number)) continue;
 
             bool sellable = Furniture.InRoom(room.number).Count == 0
                             || Furniture.RequiredFurnitureWorking(room.number);
@@ -1196,6 +1201,13 @@ public sealed class HotelSim
 
         return RoomMatcher.TryPick(new RoomRequest(wantedBand, segment), candidates, out roomNumber);
     }
+
+    /// <summary>这间房当前有客人住着（台账事实，与 state 无关）。
+    /// 桥的镜像模式据此跳过覆写：Sim 持有 stay 的房，房态归 Sim 管到退房为止。</summary>
+    public bool HasActiveStay(int roomNumber) => _stays.ContainsKey(roomNumber);
+
+    /// <summary>台账里在住的间数（守恒律测试用：入住数 = 退房数 + 在住数）。</summary>
+    public int ActiveStayCount => _stays.Count;
 
     /// <summary>房费入账。抽成**按渠道**走：直营 0%，平台 A 18%——
     /// 这就是"把客人从平台养成回头客"的回报，也是 CommissionRate 只作兜底的原因。</summary>

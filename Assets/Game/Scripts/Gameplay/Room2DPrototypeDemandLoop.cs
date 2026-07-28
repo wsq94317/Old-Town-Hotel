@@ -1932,6 +1932,14 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
             cleared++;
         }
 
+        // 还在酝酿的投诉种子也要清：计时器过夜活着，房间又整晚 Occupied，
+        // 第二天一开门就爆成愤怒客人——玩家看到的是"新的一天凭空继承了
+        // 昨天的火气"（试玩原话）。种子还没变成站在前台的人，不计入 cleared。
+        if (pendingComplaintRoom != null)
+        {
+            ClearPendingComplaint();
+        }
+
         lastClosingClearedGuestCount = cleared;
     }
 

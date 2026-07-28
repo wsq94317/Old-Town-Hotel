@@ -168,26 +168,30 @@ namespace OldTownHotel.Tests.EditMode
         [Test]
         public void Upgrading_WorksOnceARoomFrees_AndCountsAsAProperCheckIn()
         {
-            // 两间房、三张单：第三位超售。手动腾出一间，验证升级能安顿下来
+            // 两间可卖房、三张单：第三位超售。那间 Better 房开局是脏的（卖不出去），
+            // "打扫好了"之后升级才能安顿下来。注意不能拿住着人的房来模拟腾房——
+            // 台账权威下把 Occupied 写回 Ready 属于非法状态，分房点会正确地无视它。
             var defs = new List<RoomDefinition>
             {
                 new RoomDefinition(201, 1, 1, Room2DRoomCategory.Single, RoomTier.Old, RoomSimState.Ready),
-                new RoomDefinition(202, 1, 1, Room2DRoomCategory.Single, RoomTier.Better, RoomSimState.Ready),
+                new RoomDefinition(202, 1, 1, Room2DRoomCategory.Single, RoomTier.Better, RoomSimState.Dirty),
+                new RoomDefinition(203, 1, 1, Room2DRoomCategory.Single, RoomTier.Old, RoomSimState.Ready),
             };
+            // **不雇管家**：雇了的话那间 Dirty 房白天就被打扫好，第三位客人自己
+            // 住进去，超售根本不会发生——这间脏房必须等测试亲手"打扫"
             var staff = new StaffRoster();
             staff.Register(new StaffMember(StaffRole.Reception, "R", 65, new StaffAttributes(55, 55, 55), 1, null));
-            staff.Register(new StaffMember(StaffRole.Housekeeper, "H", 60, new StaffAttributes(55, 55, 55), 1, null));
             var sim = new HotelSim(new RoomLedger(defs), staff, RoomRateTable.Default,
                                    DemandConfig.Default, 20000, 8888);
             for (int i = 0; i < 3; i++)
                 sim.Bookings.Add(BookingChannels.DirectId, 1, 1, RoomTier.Old, 80, GuestSegment.Budget, 1);
 
             sim.BeginDay(); sim.RunToEndOfDay();
-            Assume.That(sim.PendingOverbookings.Count, Is.GreaterThan(0), "第三位该落到超售");
+            Assert.That(sim.PendingOverbookings.Count, Is.GreaterThan(0), "第三位该落到超售");
             var incident = sim.PendingOverbookings[0];
             int checkedInBefore = sim.ArrivalsCheckedInToday;
 
-            // 腾出那间 Better 房（模拟"刚打扫好一间"）
+            // 那间 Better 脏房打扫好了（真正合法的"腾房"：它没有在住客人）
             sim.Rooms.SetState(202, RoomSimState.Ready);
 
             Assert.That(sim.CanUpgradeOverbooking(incident.incidentId), Is.True, "现在有房了");

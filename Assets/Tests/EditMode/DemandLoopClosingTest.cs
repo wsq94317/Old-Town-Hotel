@@ -65,6 +65,23 @@ namespace OldTownHotel.Tests.EditMode
         }
 
         [Test]
+        public void ClearWaitingGuests_AlsoKillsBrewingComplaintSeed()
+        {
+            // 种子（计时器阶段）过夜会在次日清晨爆成愤怒客人——打烊必须连根拔
+            var roomGo = new GameObject("room");
+            roomGo.transform.SetParent(_root.transform);
+            _loop.pendingComplaintRoom = roomGo.AddComponent<Room2DEntity>();
+            _loop.pendingComplaintTimerSeconds = 55f;
+
+            _loop.ClearWaitingGuestsForClosing();
+
+            Assert.IsNull(_loop.pendingComplaintRoom, "投诉种子必须清掉");
+            Assert.AreEqual(0f, _loop.pendingComplaintTimerSeconds);
+            Assert.AreEqual(0, _loop.lastClosingClearedGuestCount,
+                            "种子还没变成站在前台的人，不计入送走数");
+        }
+
+        [Test]
         public void ClearWaitingGuests_EmptyStateIsNoOp()
         {
             _loop.ClearWaitingGuestsForClosing();

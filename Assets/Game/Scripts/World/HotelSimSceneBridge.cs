@@ -177,6 +177,9 @@ public class HotelSimSceneBridge : MonoBehaviour
         foreach (var room in demandLoop.rooms)
         {
             if (room == null) continue;
+            // Sim 台账里住着人的房不许覆写：v1 不知道这位客人的存在，会把状态
+            // 写回 Ready，让分房点把同一间房再卖一次（房费凭空蒸发的元凶）。
+            if (Sim != null && Sim.HasActiveStay(room.roomNumber)) continue;
             Rooms.SetState(room.roomNumber, RoomStateMapping.FromLegacy(room.currentState));
         }
 

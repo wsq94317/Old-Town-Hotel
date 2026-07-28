@@ -1,19 +1,20 @@
 using System;
 using NUnit.Framework;
 
-// M4 事件排程：2-3 个不重复、时窗内定时、按时间排序、种子确定。
+// M4 事件排程：1-2 个不重复、时窗内定时、按时间排序、种子确定。
 namespace OldTownHotel.Tests.EditMode
 {
     [TestFixture]
     public class EventScheduleTest
     {
         [Test]
-        public void Schedules_TwoOrThree_DistinctEvents()
+        public void Schedules_OneOrTwo_DistinctEvents()
         {
+            // 降频决定（2026-07-28 试玩）：事件是调剂不是第二份全职工作
             for (int seed = 0; seed < 30; seed++)
             {
                 var list = EventScheduleLogic.ScheduleForDay(EventCatalog.All, new Random(seed));
-                Assert.That(list.Count, Is.InRange(2, 3), "seed " + seed);
+                Assert.That(list.Count, Is.InRange(1, 2), "seed " + seed);
                 var ids = new System.Collections.Generic.HashSet<string>();
                 foreach (var s in list) Assert.IsTrue(ids.Add(s.Def.Id), "duplicate in seed " + seed);
             }

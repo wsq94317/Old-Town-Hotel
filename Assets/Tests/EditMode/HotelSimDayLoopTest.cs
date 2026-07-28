@@ -85,6 +85,38 @@ namespace OldTownHotel.Tests.EditMode
         }
 
         [Test]
+        public void ExternalRoomStateStomp_DoesNotDoubleSellOccupiedRooms()
+        {
+            // 世界场景的镜像模式会用 v1 房态覆写 Sim 房态（Rooms.SetState 是公开的）。
+            // 就算有人把住着客人的房写回 Ready，分房点也必须跳过它——台账是占用
+            // 事实的唯一权威。否则同一间房被卖两次，前一位客人的房费凭空蒸发。
+            var sim = BuildHotel();
+            sim.BeginDay();
+
+            // 逐分钟推进（StepMinute 之前必须先让时钟走，否则到店比例停在 0），
+            // 每小时模拟一次"镜像覆写"：所有房一律写成 Ready
+            sim.Clock.FastForwardTo(SimClock.DayEndMinute);
+            int minute = 0;
+            while (sim.Clock.TryConsumeTick())
+            {
+                sim.StepMinute();
+                if (++minute % 60 == 0)
+                    for (int i = 0; i < sim.Rooms.Count; i++)
+                        sim.Rooms.SetState(sim.Rooms.Peek(i).number, RoomSimState.Ready);
+            }
+
+            int checkedIn = sim.ArrivalsCheckedInToday;
+            Assert.That(checkedIn, Is.GreaterThan(0), "得先有人住进来，这条对照才有意义");
+            Assert.That(sim.ActiveStayCount, Is.EqualTo(checkedIn),
+                        "台账里的在住数必须等于入住数——被覆盖就是双卖");
+
+            sim.SettleDay();
+            Assert.That(sim.CheckoutsToday + sim.ActiveStayCount, Is.EqualTo(checkedIn),
+                        "打烊时人人都在：要么结账走人，要么续住，一个都不能蒸发");
+            Assert.That(sim.GrossIncomeToday, Is.GreaterThan(0), "每个住过的人都付了钱");
+        }
+
+        [Test]
         public void Income_ReachesSafeboxNotCashDirectly()
         {
             var sim = BuildHotel(startingCash: 1000);
