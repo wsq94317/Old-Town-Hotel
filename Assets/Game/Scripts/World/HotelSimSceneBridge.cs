@@ -24,12 +24,23 @@ public class HotelSimSceneBridge : MonoBehaviour
     [Tooltip("每帧最多消化多少 tick（跳段/高倍速时分帧，防卡顿）")]
     [SerializeField] private int maxTicksPerFrame = 120;
 
-    public SimClock Clock { get; private set; }
-    public RoomLedger Rooms { get; private set; }
-    public StaffRoster Staff { get; private set; }
-    public SimPipeline Pipeline { get; private set; }
+    /// <summary>完整的 v3 内核（B1a 起：世界场景里真的托管一个 HotelSim，
+    /// 预订簿/家具/挂牌档/声誉/债务全在里面）。UI 与战略层都读它。</summary>
+    public HotelSim Sim { get; private set; }
 
-    /// <summary>镜像期：房态权威在 v1，这里只跟读。M-B 翻转。</summary>
+    public SimClock Clock => Sim != null ? Sim.Clock : _bootClock;
+    public RoomLedger Rooms => Sim != null ? Sim.Rooms : null;
+    public StaffRoster Staff => Sim != null ? Sim.Staff : _bootStaff;
+    public SimPipeline Pipeline => Sim != null ? Sim.Pipeline : null;
+
+    private SimClock _bootClock;
+    private StaffRoster _bootStaff;
+
+    /// <summary>房态权威是否仍在 v1。
+    ///
+    /// **B1a 阶段刻意保持 true**：世界场景里的 StaffAgent 才是清洁模拟的本体
+    /// （会走路、会摸鱼、会被抓、会留瑕疵），比 Sim 的信用额模型好，所以房态归它。
+    /// Sim 负责经济那一半。B1b 会把收客与收入也接过来。</summary>
     public bool MirrorMode { get; private set; } = true;
 
     private readonly Dictionary<int, int> _staffIdByRoomlessMember = new Dictionary<int, int>();
@@ -46,8 +57,8 @@ public class HotelSimSceneBridge : MonoBehaviour
         if (manager == null) manager = FindFirstObjectByType<ManagerController>();
         if (spawner == null) spawner = FindFirstObjectByType<StaffAgentSpawner>();
 
-        Clock = new SimClock();
-        Staff = new StaffRoster();
+        _bootClock = new SimClock();
+        _bootStaff = new StaffRoster();
     }
 
     private void OnDestroy()
@@ -91,17 +102,28 @@ public class HotelSimSceneBridge : MonoBehaviour
         }
         if (defs.Count == 0) return false;
 
-        Rooms = new RoomLedger(defs);
-        Pipeline = new SimPipeline(Clock, Rooms, Staff, rngSeed)
-        {
-            ServiceEnabled = !MirrorMode,   // 影子模式不碰房态
-        };
+        // 用**场景里真实的房**建完整内核（不是另造一套 100 间的假房）
+        int startingCash = economy != null ? economy.Cash : 4000;
+        Sim = new HotelSim(new RoomLedger(defs), _bootStaff, RoomRateTable.Default,
+                           DemandConfig.Default, startingCash, rngSeed);
+
+        // 房态权威留在 v1 的 StaffAgent 手里（它是实体化的清洁模拟，比信用额模型好）。
+        // Sim 只跑经济那一半——ServiceEnabled=false 让它不去动房态。
+        Sim.Pipeline.ServiceEnabled = !MirrorMode;
+
+        // 钟面与 v1 的日号对齐，绝不出现两套日历
+        Sim.Clock.JumpTo(_bootClock.CurrentDay, _bootClock.CurrentMinute);
+
+        Sim.FurnishInheritedRooms();   // 继承的破家具：这家酒店本来就是这么破
+        Sim.Materials.Add(6);
+
         RegisterStaffFromPayroll();
         _built = true;
 
         Debug.Log($"[HotelSim] 建账完成：{Rooms.Count} 间房（{Rooms.OpenRoomCount} 营业 / " +
-                  $"{Rooms.CountOf(RoomSimState.Ruined)} 破败），{Staff.Count} 名员工。" +
-                  $"影子模式={MirrorMode}，房态权威仍在 v1 DemandLoop。");
+                  $"{Rooms.CountOf(RoomSimState.Ruined)} 破败），{Staff.Count} 名员工，" +
+                  $"家具 {Sim.Furniture.Count} 件。房态权威仍在 v1（MirrorMode={MirrorMode}），" +
+                  $"Sim 负责经济。");
         return true;
     }
 
@@ -141,13 +163,19 @@ public class HotelSimSceneBridge : MonoBehaviour
 
     private void DriveClock()
     {
+        if (_needsBeginDay)
+        {
+            Sim.BeginDay();
+            _needsBeginDay = false;
+        }
+
         Pipeline.ManagerOnFloor = ComputeManagerOnFloor();
 
         Clock.Advance(Time.deltaTime);
         int budget = Mathf.Max(1, maxTicksPerFrame);
         while (budget-- > 0 && Clock.TryConsumeTick())
         {
-            Pipeline.StepMinute();
+            Sim.StepMinute();
         }
     }
 
@@ -166,13 +194,20 @@ public class HotelSimSceneBridge : MonoBehaviour
 
     private void HandleLegacyDaySettled(int day, int served, DayLedger ledger)
     {
-        if (Pipeline == null) return;
-        bool wagesPaid = economy == null || economy.Cash >= 0;
-        Pipeline.SettleDay(wagesPaid);
-        Clock.BeginNextDay();
+        if (Sim == null) return;
+
+        // 走 Sim 的完整日结（固定成本前置、家具老化、故障判定、装修推进、声誉收口），
+        // 而不只是推一下管线——世界场景里现在跑的是同一套经济。
+        Sim.SettleDay();
+        Sim.Clock.BeginNextDay();
         // 日号与 v1 对齐（v1 的 demoDayIndex 在 Continue 时才 ++，这里跟着它走）
-        Clock.JumpTo(day + 1, SimClock.DayStartMinute);
+        Sim.Clock.JumpTo(day + 1, SimClock.DayStartMinute);
+        _needsBeginDay = true;
     }
+
+    /// <summary>次晨要不要跑 Sim 的 BeginDay（退房潮 + 预订晨间流程）。
+    /// 放到下一帧做，避免在 v1 的日结回调里嵌套一整套晨间逻辑。</summary>
+    private bool _needsBeginDay = true;
 
     // ── 玩家操作入口（战略层顶栏将调用它们） ──────────────────────────────────
 

@@ -102,39 +102,6 @@ public class V3PrototypeSession : MonoBehaviour
     private int ScheduledRepayment() =>
         DebtPolicy.ScheduledRepaymentFor(_loan.Balance, _yesterdayNetProfit, _sim.Cash, dailyRepayment);
 
-    /// <summary>一个会自己算高度的文本面板。
-    ///
-    /// 以前每个 GUI.Box 的高度都是写死的，而内容行数是变的（复原提示、退款申请、
-    /// 评价明细、拒单警告都是条件出现的）——结果内容溢出框外，或者被后面的按钮压住
-    /// （试玩截图里两种都出现了）。攒行再画就不用猜高度了。</summary>
-    private sealed class Panel
-    {
-        private readonly List<string> _lines = new List<string>();
-        public const float LineHeight = 19f;
-        private const float HeaderHeight = 24f;
-        private const float PaddingBottom = 8f;
-
-        public void Add(string line) => _lines.Add(line);
-
-        /// <summary>条件行的便利写法：条件不成立就不占位置。</summary>
-        public void AddIf(bool condition, string line) { if (condition) _lines.Add(line); }
-
-        public float Height => HeaderHeight + _lines.Count * LineHeight + PaddingBottom;
-
-        /// <summary>在 (x, y) 画出框与所有行，返回框底部的 y。</summary>
-        public float Draw(float x, float y, float width, string title)
-        {
-            GUI.Box(new Rect(x, y, width, Height), title);
-            float lineY = y + HeaderHeight;
-            for (int i = 0; i < _lines.Count; i++)
-            {
-                GUI.Label(new Rect(x + 10, lineY, width - 20, LineHeight), _lines[i]);
-                lineY += LineHeight;
-            }
-            return y + Height;
-        }
-    }
-
     /// <summary>提示条的唯一出口。在这里过一次翻译，Sim 返回的 reason 就自动跟着走，
     /// 不必在每个调用点包一层（查不到的原样显示英文）。</summary>
     private void Say(string message)
@@ -213,7 +180,7 @@ public class V3PrototypeSession : MonoBehaviour
     {
         var last = _sim.LastSettlement;
 
-        var report = new Panel();
+        var report = new GuiPanel();
         report.Add(GameText.F("Gross taken          ${0}",
             last.netToSafebox + last.overflowed + last.cashPaidFromReserve));
         report.Add(GameText.F("Into the safebox     ${0}", last.netToSafebox));
@@ -289,7 +256,7 @@ public class V3PrototypeSession : MonoBehaviour
     /// 试玩时房间会成批地从可售列表里消失而玩家看不出原因（家具坏了？在装修？
     /// 还是根本没解锁？），所以这里把不可售的房**按原因拆开**，
     /// 并显示此刻正在打扫哪几间——`Cleaning` 状态就是为此才真正启用的。</summary>
-    private void AddHousekeepingStatus(Panel panel)
+    private void AddHousekeepingStatus(GuiPanel panel)
     {
         var cleaningNow = _sim.Rooms.RoomNumbersInState(RoomSimState.Cleaning, 6);
         int dirty = _sim.Rooms.CountOf(RoomSimState.Dirty);
@@ -334,7 +301,7 @@ public class V3PrototypeSession : MonoBehaviour
 
     /// <summary>把"今天为什么涨/为什么掉"加进晨报面板。只列影响最大的两条正、两条负——
     /// 玩家要的是"该改什么"，不是一张完整的会计报表。</summary>
-    private void AddReputationBreakdown(Panel panel)
+    private void AddReputationBreakdown(GuiPanel panel)
     {
         var down = _sim.Breakdown.Ranked(positive: false);
         var up = _sim.Breakdown.Ranked(positive: true);
@@ -362,7 +329,7 @@ public class V3PrototypeSession : MonoBehaviour
 
     private void DrawLiveStatus(float w, float h)
     {
-        var today = new Panel();
+        var today = new GuiPanel();
         today.Add(GameText.F("Expected arrivals   {0}   ({1} booked + {2} walk-in)",
                              _sim.ArrivalsPlannedToday, _sim.ReservationArrivalsToday,
                              _sim.WalkInArrivalsToday));
