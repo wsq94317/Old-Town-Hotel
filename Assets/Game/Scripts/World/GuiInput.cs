@@ -62,10 +62,15 @@ public static class GuiInput
             }
         }
 
-        // 只在按下沿发布：按住不动不该每帧重复触发按钮
-        if (pressed && !_wasPressed) PublishTap(pos);
+        // 在**松手沿**发布，不是按下沿：IMGUI 原生按钮在松手时触发，
+        // 两条通道对齐到同一帧，Button 的吞并守卫才能把重复的那次吃掉
+        // （按下沿发布的话，编辑器鼠标会"按下消费一次 + 松手原生一次"触发两遍）。
+        if (pressed) _lastPressPos = pos;
+        if (!pressed && _wasPressed) PublishTap(_lastPressPos);
         _wasPressed = pressed;
     }
+
+    private static Vector2 _lastPressPos;
 
     private static bool ConsumeTapIn(Rect r)
     {
@@ -81,12 +86,21 @@ public static class GuiInput
         return true;
     }
 
-    /// <summary>双通道按钮：IMGUI 原生点击 或 转发触点落在矩形内。尊重 GUI.enabled。</summary>
+    /// <summary>双通道按钮：IMGUI 原生点击 或 转发触点落在矩形内。尊重 GUI.enabled。
+    ///
+    /// 原生命中时**顺手吞掉落在同一矩形里的待消费触点**：编辑器里鼠标点击会同时走
+    /// 两条通道（IMGUI 原生 + WorldInputController 转发），不吞的话下一个 OnGUI
+    /// 又消费一次转发触点，按钮触发两遍——"买材料"会买两次。</summary>
     public static bool Button(Rect r, string label)
     {
         bool native = GUI.Button(r, label);
         if (!GUI.enabled) return false;
-        return native || ConsumeTapIn(r);
+        if (native)
+        {
+            ConsumeTapIn(r);   // 同一次点击的另一条通道，吞掉防双触发
+            return true;
+        }
+        return ConsumeTapIn(r);
     }
 
     /// <summary>面板未打开时也要吃点击的常驻按钮（如 HIRE）每帧登记热区。</summary>

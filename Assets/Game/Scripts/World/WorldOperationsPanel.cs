@@ -17,6 +17,9 @@ public class WorldOperationsPanel : MonoBehaviour
 
     private Tab _tab = Tab.Today;
     private bool _collapsed;
+    private float _speed = 1f;          // 玩家选的倍速（Time.timeScale）
+    private int _skipTargetMinute = -1; // >=0 表示正在快进到该分钟
+    private int _skipDay = -1;
     private string _toast = "";
     private float _toastUntil;
     private RenovationPlanKind _plan = RenovationPlanKind.Economy;
@@ -27,9 +30,43 @@ public class WorldOperationsPanel : MonoBehaviour
 
     private void Update()
     {
-        // 自取触点：世界场景有 WorldInputController，但它只在面板打开/热区内转发。
-        // 抽屉是常驻的，所以这里自己收按下沿（PollSelfServed 一帧只处理一次，重复调用无害）。
-        GuiInput.PollSelfServed();
+        // **不要**在这里调 GuiInput.PollSelfServed()：世界场景有 WorldInputController，
+        // 它会在热区内把点击转发给 GUI（松手时）。若这里再按下沿自取一次，
+        // 同一次点击就发布两遍——"买 10 份材料"会买两次（双通道双触发，v2 踩过的坑）。
+        // 自取通道只给没有输入控制器的原型场景用。
+        TickSkip();
+    }
+
+    /// <summary>"跳到下一时段" = 临时把 Time.timeScale 拉高，直到 Sim 走到目标分钟。
+    ///
+    /// 为什么不直接 FastForwardTo：世界场景里有**两套时钟**（v1 的日控制器 + Sim），
+    /// 只快进 Sim 会让经济瞬移而 NPC 还在原地慢慢走，两边彻底脱节。
+    /// 拉 timeScale 则所有用 Time.deltaTime 的东西一起加速——NPC 肉眼可见地跑起来，
+    /// v1 的日结也按比例提前，这正是"快速模拟"该有的样子。</summary>
+    private void TickSkip()
+    {
+        if (_skipTargetMinute < 0)
+        {
+            if (Time.timeScale != _speed) Time.timeScale = _speed;
+            return;
+        }
+
+        var clock = Sim != null ? Sim.Clock : null;
+        bool done = clock == null
+                    || clock.CurrentDay != _skipDay              // 日结把天翻过去了
+                    || clock.CurrentMinute >= _skipTargetMinute;
+        if (done)
+        {
+            _skipTargetMinute = -1;
+            Time.timeScale = _speed;
+            return;
+        }
+        Time.timeScale = 10f;
+    }
+
+    private void OnDisable()
+    {
+        Time.timeScale = 1f;   // 别把加速状态留给别的场景
     }
 
     private void Say(string message)
@@ -49,6 +86,14 @@ public class WorldOperationsPanel : MonoBehaviour
 
         float sheetTop = _collapsed ? h - 34f : h * (1f - sheetHeight);
 
+        // **登记热区，否则点击穿透到世界**：WorldInputController 只有在
+        // GuiInput.IsInReservedZone 命中时才把点击转发给 GUI，不然照常打世界射线——
+        // 点抽屉里的按钮会同时让经理跑过去（试玩截图抓到的点穿就是这个）。
+        GuiInput.ReserveZone(new Rect(6, 6, w - 12, 62));                         // 顶栏
+        GuiInput.ReserveZone(new Rect(10, sheetTop - 26f, w - 20, 26f));          // 折叠按钮那一条
+        if (!_collapsed)
+            GuiInput.ReserveZone(new Rect(6, sheetTop, w - 12, h - sheetTop));    // 整个抽屉
+
         // 折叠按钮永远在抽屉顶边上，位置一眼可预测
         if (GuiInput.Button(new Rect(10, sheetTop - 26f, 120, 24f),
                             GameText.T(_collapsed ? "OPEN THE DESK" : "HIDE THE DESK")))
@@ -61,6 +106,7 @@ public class WorldOperationsPanel : MonoBehaviour
 
         GUI.Box(new Rect(6, sheetTop, w - 12, h - sheetTop - 6f), "");
         float y = sheetTop + 8f;
+        y = DrawSpeedRow(w, y);
         y = DrawTabs(w, y);
 
         switch (_tab)
@@ -88,6 +134,35 @@ public class WorldOperationsPanel : MonoBehaviour
                        Sim.Reputation.Stars.ToString("0.0"), Sim.Rooms.SellableCount, Sim.Rooms.DirtyBacklog,
                        Sim.Rooms.CountOf(RoomSimState.Occupied), Sim.Rooms.CountOf(RoomSimState.Blocked),
                        Sim.Rooms.CountOf(RoomSimState.Ruined), Sim.Materials.Stock));
+    }
+
+    /// <summary>倍速与"跳到下一时段"（原型就有，玩家点名要回来）。</summary>
+    private float DrawSpeedRow(float w, float y)
+    {
+        bool skipping = _skipTargetMinute >= 0;
+
+        if (GuiInput.Button(new Rect(10, y, 52, 22), (_speed == 0.25f ? "> " : "") + "0.25x")) SetSpeed(0.25f);
+        if (GuiInput.Button(new Rect(66, y, 52, 22), (_speed == 1f ? "> " : "") + "1x")) SetSpeed(1f);
+        if (GuiInput.Button(new Rect(122, y, 52, 22), (_speed == 2f ? "> " : "") + "2x")) SetSpeed(2f);
+
+        if (GuiInput.Button(new Rect(182, y, w - 192, 22),
+                            GameText.T(skipping ? "FAST-FORWARDING..." : "SKIP TO NEXT PHASE"))
+            && !skipping)
+        {
+            if (PhaseScheduler.CanSkip(Sim.Clock.CurrentMinute, 0, out string reason))
+            {
+                _skipTargetMinute = PhaseScheduler.NextKeyMinuteAfter(Sim.Clock.CurrentMinute);
+                _skipDay = Sim.Clock.CurrentDay;
+            }
+            else Say(reason);
+        }
+        return y + 26f;
+    }
+
+    private void SetSpeed(float speed)
+    {
+        _speed = speed;
+        if (_skipTargetMinute < 0) Time.timeScale = speed;
     }
 
     private float DrawTabs(float w, float y)

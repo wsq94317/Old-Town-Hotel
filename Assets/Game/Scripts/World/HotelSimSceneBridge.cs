@@ -114,6 +114,11 @@ public class HotelSimSceneBridge : MonoBehaviour
         // 钟面与 v1 的日号对齐，绝不出现两套日历
         Sim.Clock.JumpTo(_bootClock.CurrentDay, _bootClock.CurrentMinute);
 
+        // **日长对齐**：v1 一天 240 真实秒（BalanceConfig），Sim 1x 一天 480 秒。
+        // 不对齐的话 v1 日结时 Sim 才走到 15:00，16:00 起的入住高峰整个被截掉，
+        // 预订客一半永远到不了店（实测就是这么发现的）。2x 让两边同时收工。
+        Sim.Clock.SpeedMultiplier = 2f;
+
         Sim.FurnishInheritedRooms();   // 继承的破家具：这家酒店本来就是这么破
         Sim.Materials.Add(6);
 

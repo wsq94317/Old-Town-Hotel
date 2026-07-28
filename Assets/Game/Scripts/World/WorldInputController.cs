@@ -67,7 +67,10 @@ public class WorldInputController : MonoBehaviour
             // 每次按压重建分类器：热重载后 _classifier 为 null（Awake 不重跑），
             // 顺带跟上转屏/改分辨率后的 GuiScale.Factor（阈值别冻结在 Awake 时刻）
             _classifier = new TapDragClassifier(dragThresholdPixels * GuiScale.Factor);
-            _pressStartedOverUi = IsOverUi();
+            // IMGUI 热区（操作台抽屉/顶栏）也算 UI：IsOverUi 只认 UGUI 的 EventSystem，
+            // 不加这条的话按住抽屉拖动会转动相机（点穿的拖动版）
+            _pressStartedOverImGui = GuiInput.IsInReservedZone(pos);
+            _pressStartedOverUi = IsOverUi() || _pressStartedOverImGui;
             if (!_pressStartedOverUi) _classifier.Press(pos);
             _lastPos = pos;
         }
@@ -93,6 +96,9 @@ public class WorldInputController : MonoBehaviour
             }
             else
             {
+                // 从 IMGUI 热区开始的按压：世界不响应，但**点击本身要转发给 GUI**，
+                // 否则抽屉按钮在触屏上又聋了（世界面板不再自取触点，全靠这条转发）
+                if (_pressStartedOverImGui) GuiInput.PublishTap(_lastPos);
                 TapDebug = "release ignored: pressStartedOverUi";
             }
         }
@@ -131,6 +137,8 @@ public class WorldInputController : MonoBehaviour
                Mouse.current.leftButton.isPressed &&
                EventSystem.current.IsPointerOverGameObject();
     }
+
+    private bool _pressStartedOverImGui;
 
     private ManagerInteraction _interaction;
     private ComplaintInteraction _complaint;
