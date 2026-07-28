@@ -96,6 +96,9 @@ public sealed class HotelSim
     public BookingBook Bookings { get; }
     public AvailabilityCalendar Calendar { get; }
 
+    /// <summary>破败房的垃圾清理进度（只花人工那条路，见 JunkClearing）。</summary>
+    public JunkClearingQueue Clearing { get; } = new JunkClearingQueue();
+
     /// <summary>当日声誉明细（晨报读它回答"今天为什么涨/为什么掉"）。</summary>
     public ReputationBreakdown Breakdown { get; } = new ReputationBreakdown();
 
@@ -580,6 +583,73 @@ public sealed class HotelSim
         Rooms.TryFindFirstInState(RoomSimState.Ruined, out roomNumber);
 
     // ── 破败房复原（用户设计：破败房不是脏，是废，只能装修） ───────────────────
+
+    // ── 破败房清理：只花人工的那条路 ────────────────────────────────────────
+
+    /// <summary>指派清理一间破败房。**不花钱不花材料**——代价是占客房部的工时，
+    /// 和今天的退房脏房抢同一批人手。这条路永远走得通，所以现金归零也锁不死玩家
+    /// （同"胶带糊家具"一样的自救设计）。</summary>
+    public bool TryStartJunkClearing(int roomNumber, out string reason)
+    {
+        reason = "";
+        if (!Rooms.Contains(roomNumber)) { reason = "No such room."; return false; }
+        if (Rooms.At(roomNumber).state != RoomSimState.Ruined)
+        {
+            reason = "Only derelict rooms need clearing out.";
+            return false;
+        }
+        if (Renovations.IsRenovating(roomNumber))
+        {
+            reason = "That room is already a building site.";
+            return false;
+        }
+        if (!Clearing.Begin(roomNumber))
+        {
+            reason = "Already being cleared out.";
+            return false;
+        }
+        return true;
+    }
+
+    /// <summary>工作人员进屋干了一趟。清满了就把房间转成脏房——
+    /// **沿用原有的破家具**（没有家具的房会现配一套继承货），于是它以 Old 档
+    /// 进入正常循环：还得再打扫一次才可售，这一次由客房部照常处理。
+    /// 返回 true 表示这一趟把房清完了（世界场景据此播完工动效）。</summary>
+    public bool ApplyJunkClearingVisit(int roomNumber, int workUnits)
+    {
+        if (!Clearing.ApplyVisit(roomNumber, workUnits)) return false;
+
+        Rooms.SetState(roomNumber, RoomSimState.Dirty);
+        if (Furniture.InRoom(roomNumber).Count == 0)
+        {
+            // 破家具照旧：崭新度垫底、天天出故障。想要好家具就掏钱走 ReclaimPlan。
+            float newness = 0.05f + (float)_rng.NextDouble() * 0.10f;
+            float health = 0.2f + (float)_rng.NextDouble() * 0.3f;
+            Furniture.FurnishDerelictRoom(roomNumber, newness, health);
+        }
+        SetPriceBand(roomNumber, RoomTier.Old);       // 交付垫底就只配挂 Old（M-C2 的规矩）
+        return true;
+    }
+
+    /// <summary>放弃清理（进度一并丢掉——半途而废就是白干）。</summary>
+    public bool CancelJunkClearing(int roomNumber) => Clearing.Cancel(roomNumber);
+
+    /// <summary>正在清理的房号，进度高的在前（工作人员先把快完的干完）。</summary>
+    public List<int> RoomsBeingCleared() => Clearing.RoomsByProgress();
+
+    /// <summary>能指派清理的破败房号（还没在清、也没在装修的）。</summary>
+    public List<int> RoomsNeedingClearing(int max)
+    {
+        var result = new List<int>();
+        for (int i = 0; i < Rooms.Count && result.Count < max; i++)
+        {
+            RoomRecord room = Rooms.Peek(i);
+            if (room.state != RoomSimState.Ruined) continue;
+            if (Clearing.IsClearing(room.number) || Renovations.IsRenovating(room.number)) continue;
+            result.Add(room.number);
+        }
+        return result;
+    }
 
     /// <summary>能开工复原的破败房号。</summary>
     public List<int> ReclaimableRooms(int max)

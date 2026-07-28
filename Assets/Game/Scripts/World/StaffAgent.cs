@@ -31,6 +31,8 @@ public class StaffAgent : MonoBehaviour
 
     [SerializeField] private float cleanSeconds = 5f;
     [SerializeField] private float inspectSeconds = 4f;
+    [Tooltip("破败房清垃圾一趟耗时（一趟清不完，要来好几趟）")]
+    [SerializeField] private float clearJunkSeconds = 6f;
 
     private NavMeshAgent _agent;
     private AgentState _state = AgentState.OffShift;
@@ -307,6 +309,19 @@ public class StaffAgent : MonoBehaviour
             return;
         }
 
+        // 走到门口才发现这活没了（玩家取消了清理，或者别人先干完了）——白跑一趟，
+        // 但不能站在那儿对着一间正常房间扬灰
+        if (_task.Kind == StaffTaskKind.ClearJunk)
+        {
+            var bridge = HotelSimSceneBridge.Instance;
+            if (bridge == null || bridge.Sim == null
+                || !bridge.Sim.Clearing.IsClearing(_task.Room.roomNumber))
+            {
+                FinishTask();
+                return;
+            }
+        }
+
         _workTimer = 0f;
         _wallTimer = 0f;
         _state = AgentState.Working;
@@ -315,7 +330,13 @@ public class StaffAgent : MonoBehaviour
 
     private void TickWork()
     {
-        float duration = _task.Kind == StaffTaskKind.Clean ? cleanSeconds : inspectSeconds;
+        float duration;
+        switch (_task.Kind)
+        {
+            case StaffTaskKind.Clean: duration = cleanSeconds; break;
+            case StaffTaskKind.ClearJunk: duration = clearJunkSeconds; break;
+            default: duration = inspectSeconds; break;
+        }
         if (Member != null)
         {
             float speedMultiplier = Mathf.Lerp(0.8f, 1.3f, Member.Attributes.Speed / 100f);
@@ -326,7 +347,8 @@ public class StaffAgent : MonoBehaviour
         // 一个管家独自干，每间房磨得明显更久；第二个人到位后两人都快起来。
         // 世界场景里 agent 才是清洁模拟的本体（会走路、会摸鱼、会留瑕疵），
         // Sim 只负责"多快"——各管一段，一个关注点只有一个权威。
-        if (_task.Kind == StaffTaskKind.Clean) duration /= HousekeepingPaceMultiplier();
+        if (_task.Kind == StaffTaskKind.Clean || _task.Kind == StaffTaskKind.ClearJunk)
+            duration /= HousekeepingPaceMultiplier();
 
         bool productive = true;
         if (_slack != null && _manager != null)
@@ -353,6 +375,20 @@ public class StaffAgent : MonoBehaviour
                 _task.Room.FinishCleaning();
                 if (Member != null && FlawPolicy.RollFlaw(Member.Attributes.Quality, _rng))
                     RoomFlaw.Add(_task.Room, Member);
+            }
+        }
+        else if (_task.Kind == StaffTaskKind.ClearJunk)
+        {
+            // 一趟的成果记进 Sim 的进度账。清满了 Sim 会把房转成脏房，
+            // 桥的房态同步下一拍就把 v1 的 Blocked 推成 Dirty，客房部接着干。
+            var bridge = HotelSimSceneBridge.Instance;
+            if (bridge != null && bridge.Sim != null)
+            {
+                bool finished = bridge.Sim.ApplyJunkClearingVisit(
+                    _task.Room.roomNumber, JunkClearingModel.WorkUnitsPerVisit);
+                FloatingTextFx.Spawn(transform.position,
+                    finished ? "CLEARED!" : "-" + JunkClearingModel.WorkUnitsPerVisit + "% junk",
+                    finished ? new Color(0.35f, 0.95f, 0.4f) : new Color(0.85f, 0.8f, 0.55f));
             }
         }
         else if (_task.Room.CanApproveInspection())

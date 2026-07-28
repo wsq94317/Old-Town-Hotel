@@ -37,12 +37,45 @@ public class TaskDispatcher : MonoBehaviour
             EnsureSubscribed(agent);
 
             StaffTask? task = TaskDispatchLogic.NextTaskFor(agent.Member.Role, demandLoop.rooms, _claimed);
+            // **脏房优先，清垃圾垫底**：客人在等今天的房，破败房不急一时。
+            // 这就是"什么时候清破败房"的真代价——不是钱，是被挪走的工时。
+            if (!task.HasValue) task = NextJunkClearingTask(agent.Member.Role);
             if (!task.HasValue) continue;
             if (agent.AssignTask(task.Value))
             {
                 _claimed.Add(task.Value.Room);
             }
         }
+    }
+
+    /// <summary>没有脏房要打扫时，客房部去清破败房的垃圾。
+    ///
+    /// 目标房从 **Sim 的清理清单**取（进度高的在前，先把快完的那间干完），
+    /// 而不是看 v1 房态——破败房在 v1 里是 Blocked，房态里没有"玩家指派了清理"
+    /// 这条信息，那是 Sim 的账。</summary>
+    private StaffTask? NextJunkClearingTask(StaffRole role)
+    {
+        if (role != StaffRole.Housekeeper) return null;
+        var bridge = HotelSimSceneBridge.Instance;
+        if (bridge == null || bridge.Sim == null) return null;
+
+        var queued = bridge.Sim.RoomsBeingCleared();
+        for (int i = 0; i < queued.Count; i++)
+        {
+            Room2DEntity room = FindRoom(queued[i]);
+            if (room == null || _claimed.Contains(room)) continue;
+            return new StaffTask(room, StaffTaskKind.ClearJunk);
+        }
+        return null;
+    }
+
+    private Room2DEntity FindRoom(int roomNumber)
+    {
+        var rooms = demandLoop.rooms;
+        if (rooms == null) return null;
+        for (int i = 0; i < rooms.Length; i++)
+            if (rooms[i] != null && rooms[i].roomNumber == roomNumber) return rooms[i];
+        return null;
     }
 
     private void EnsureSubscribed(StaffAgent agent)

@@ -43,6 +43,11 @@ public class HotelSimSceneBridge : MonoBehaviour
     /// Sim 负责经济那一半。B1b 起同步变成**双向**，裁判在 RoomAuthorityPolicy。</summary>
     public bool MirrorMode { get; private set; } = true;
 
+    [Header("Derelict rooms at start")]
+    [Tooltip("开局有几间破败房（满是蜘蛛网和垃圾，要派人一次次清出来）。" +
+             "0 = 全部可用，那样'清理'这套操作就没有对象，玩家也没有解锁的进展感。")]
+    [SerializeField] private int derelictRoomsAtStart = 4;
+
     /// <summary>B1b：客人与房费归 Sim。v1 需求循环退化为纯清洁演出——
     /// 不再自己发明客人、不再给房费入账、不再每早垫几位假过夜客。
     /// 这是"绞杀者迁移"里真正的权威翻转那一刀。</summary>
@@ -128,6 +133,11 @@ public class HotelSimSceneBridge : MonoBehaviour
         }
         if (defs.Count == 0) return false;
 
+        // **开局锁住几间房**：白盒场景本来 12 间全可用，于是"清理破败房"没有对象，
+        // 玩家也没有"解锁一间"的进展感（玩家原话：破败房间现在是 0）。
+        // 从房号最大的往前锁——顶楼先烂，符合"老楼上面没人管"的直觉。
+        MarkTopRoomsDerelict(defs, derelictRoomsAtStart);
+
         // 用**场景里真实的房**建完整内核（不是另造一套 100 间的假房）
         int startingCash = economy != null ? economy.Cash : 4000;
         Sim = new HotelSim(new RoomLedger(defs), _bootStaff, RoomRateTable.Default,
@@ -165,6 +175,31 @@ public class HotelSimSceneBridge : MonoBehaviour
     /// 入住能力。模型没错——前台无人时它返回 0——错在总账没跟着现实走。
     /// 一般化教训：**镜像同步必须处理"消失"**，只处理"出现"的同步迟早对不上账
     /// （同一个坑在房态上踩过：v1 覆写住着人的房导致房费蒸发）。</summary>
+    /// <summary>把房号最大的几间标成破败（顶楼先烂）。
+    /// 场景里那些房在 v1 眼里还是好房，桥的房态同步下一拍会把它们推成 Blocked，
+    /// 于是玩家一进游戏就看到楼上几间是封着的。</summary>
+    private static void MarkTopRoomsDerelict(List<RoomDefinition> defs, int count)
+    {
+        if (count <= 0) return;
+
+        var byNumber = new List<RoomDefinition>(defs);
+        byNumber.Sort((a, b) => b.number.CompareTo(a.number));
+
+        int locked = 0;
+        for (int i = 0; i < byNumber.Count && locked < count; i++)
+        {
+            // 至少留几间能卖的，否则开局无房可售直接死局
+            if (defs.Count - locked <= 4) break;
+
+            int index = defs.IndexOf(byNumber[i]);
+            if (index < 0) continue;
+            RoomDefinition d = defs[index];
+            defs[index] = new RoomDefinition(d.number, d.floor, d.zone, d.category,
+                                             d.tier, RoomSimState.Ruined);
+            locked++;
+        }
+    }
+
     private void RegisterStaffFromPayroll()
     {
         if (economy == null || economy.Payroll == null) return;

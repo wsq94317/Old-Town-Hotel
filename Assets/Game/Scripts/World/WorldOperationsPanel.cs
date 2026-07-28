@@ -277,7 +277,9 @@ public class WorldOperationsPanel : MonoBehaviour
                             GameText.F("COLLECT ${0}", Sim.Safebox.Balance)))
             Say(GameText.F("Collected ${0}.", Sim.CollectSafebox()));
         GUI.Label(new Rect(14, 46, w - 28, 20),
-            GameText.F("{0}*   ROOMS {1} ready / {2} dirty / {3} in use / {4} BROKEN / {5} derelict   MAT {6}",
+            // 斜杠分隔被玩家读成"："（"11 可售 / 0 待清" 看着像 11:0）——
+            // 改成"数字+标签"成对，中间用间距分组
+            GameText.F("{0}*   {1} sellable   {2} to clean   {3} in use   {4} broken   {5} derelict   MAT {6}",
                        Sim.Reputation.Stars.ToString("0.0"), Sim.Rooms.SellableCount, Sim.Rooms.DirtyBacklog,
                        Sim.Rooms.CountOf(RoomSimState.Occupied), Sim.Rooms.CountOf(RoomSimState.Blocked),
                        Sim.Rooms.CountOf(RoomSimState.Ruined), Sim.Materials.Stock));
@@ -366,6 +368,106 @@ public class WorldOperationsPanel : MonoBehaviour
         panel.Draw(10, y, w - 20, GameText.T("TODAY"));
     }
 
+    /// <summary>破败房清垃圾区：免费但占客房部工时，要好几趟才清完。
+    /// 每间在清的房画一根进度条——玩家要看见"它在动"，否则会以为按钮没生效。</summary>
+    private float DrawJunkClearing(float w, float y, int derelictCount)
+    {
+        var underway = Sim.RoomsBeingCleared();
+
+        if (derelictCount <= 0 && underway.Count == 0)
+        {
+            GUI.Label(new Rect(14, y, w - 28, 20),
+                      GameText.T("Nothing left to dig out. Every room is in the rotation."));
+            return y + 22f;
+        }
+
+        // 刚清完的房要吱一声：进度条直接消失的话，玩家会以为"按了没反应"
+        // （探针踩到过同一个歧义：ProgressOf 对"没开始"和"已完工"都返回 0）
+        if (Sim.Rooms.CountOf(RoomSimState.Ruined) < _lastDerelictSeen)
+        {
+            _clearedFlashUntil = Time.time + 4f;
+            _lastClearedCount += _lastDerelictSeen - Sim.Rooms.CountOf(RoomSimState.Ruined);
+        }
+        _lastDerelictSeen = Sim.Rooms.CountOf(RoomSimState.Ruined);
+
+        if (Time.time < _clearedFlashUntil)
+        {
+            GUI.Label(new Rect(14, y, w - 28, 20),
+                      GameText.F("DUG OUT {0} room(s) - now filthy, housekeeping takes over.",
+                                 _lastClearedCount));
+            y += 22f;
+        }
+
+        // 进行中：房号 + 进度条 + 还差几趟 + 放弃
+        for (int i = 0; i < underway.Count && i < 4; i++)
+        {
+            int roomNumber = underway[i];
+            float progress = Sim.Clearing.ProgressOf(roomNumber);
+            int visitsLeft = JunkClearingModel.VisitsRemaining(Sim.Clearing.WorkDoneOn(roomNumber));
+
+            GUI.Label(new Rect(14, y, 96, 20), GameText.F("R{0}", roomNumber));
+            DrawProgressBar(new Rect(66, y + 3, w - 158, 14), progress);
+            GUI.Label(new Rect(w - 88, y, 46, 20), progress.ToString("P0"));
+            if (GuiInput.Button(new Rect(w - 44, y, 34, 20), GameText.T("X")))
+                Say(Sim.CancelJunkClearing(roomNumber)
+                    ? GameText.F("R{0} left half-dug. That work is wasted.", roomNumber)
+                    : "Nothing to cancel.");
+            y += 22f;
+
+            GUI.Label(new Rect(24, y, w - 38, 18),
+                      GameText.F("{0} more trips to go", visitsLeft)); y += 20f;
+        }
+
+        // 待指派：一键派下一间
+        var waiting = Sim.RoomsNeedingClearing(1);
+        if (waiting.Count > 0)
+        {
+            if (GuiInput.Button(new Rect(10, y, w - 20, 24),
+                                GameText.F("CLEAR OUT R{0} (free - costs housekeeping time)", waiting[0])))
+                Say(Sim.TryStartJunkClearing(waiting[0], out string reason)
+                    ? GameText.F("R{0}: cobwebs and rubbish. Takes about {1} trips.",
+                                 waiting[0], JunkClearingModel.VisitsForOneRoom)
+                    : reason);
+            y += 28f;
+        }
+        else if (underway.Count > 0)
+        {
+            GUI.Label(new Rect(14, y, w - 28, 20),
+                      GameText.T("Housekeeping digs these out when no room needs turning over."));
+            y += 22f;
+        }
+
+        return y;
+    }
+
+    private int _lastDerelictSeen = -1;
+    private float _clearedFlashUntil;
+    private int _lastClearedCount;
+
+    /// <summary>一根最朴素的进度条（白盒够用；3D 阶段会移到房间上方）。</summary>
+    private void DrawProgressBar(Rect rect, float fill01)
+    {
+        GUI.Box(rect, GUIContent.none);
+        float inner = (rect.width - 4f) * Mathf.Clamp01(fill01);
+        if (inner > 1f)
+            GUI.DrawTexture(new Rect(rect.x + 2f, rect.y + 2f, inner, rect.height - 4f), ProgressFill);
+    }
+
+    private static Texture2D _progressFill;
+    private static Texture2D ProgressFill
+    {
+        get
+        {
+            if (_progressFill == null)
+            {
+                _progressFill = new Texture2D(1, 1);
+                _progressFill.SetPixel(0, 0, new Color(0.45f, 0.8f, 0.45f, 1f));
+                _progressFill.Apply();
+            }
+            return _progressFill;
+        }
+    }
+
     private void DrawPricing(float w, float y)
     {
         foreach (PriceTemplate t in System.Enum.GetValues(typeof(PriceTemplate)))
@@ -444,10 +546,13 @@ public class WorldOperationsPanel : MonoBehaviour
         }
         y += 30f;
 
-        // 破败房复原
+        // ── 破败房清垃圾：不要钱，要人工（玩家设计的那条"一次次进屋"的路）──────
         int derelict = Sim.Rooms.CountOf(RoomSimState.Ruined);
         GUI.Label(new Rect(14, y, w - 28, 20),
             GameText.F("DERELICT ROOMS - {0} left to open", derelict)); y += 22f;
+
+        y = DrawJunkClearing(w, y, derelict);
+
         if (derelict > 0)
         {
             if (GuiInput.Button(new Rect(10, y, w - 20, 22),

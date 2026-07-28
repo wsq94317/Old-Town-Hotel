@@ -36,8 +36,8 @@ public static class GameText
         { "CASH ${0}   SAFEBOX ${1}/{2}", "现金 ${0}   保险箱 ${1}/{2}" },
         { "   SPILLED ${0}", "   溢出 ${0}" },
         { "   DEBT ${0}", "   欠款 ${0}" },
-        { "{0}*   ROOMS {1} ready / {2} dirty / {3} in use / {4} BROKEN / {5} derelict   MAT {6}",
-          "{0}★   客房 {1} 可售 / {2} 待清 / {3} 在住 / {4} 坏封 / {5} 破败   材料 {6}" },
+        { "{0}*   {1} sellable   {2} to clean   {3} in use   {4} broken   {5} derelict   MAT {6}",
+          "{0}★   可售 {1}   待清 {2}   在住 {3}   坏封 {4}   破败 {5}   材料 {6}" },
 
         // ── 页签与时间控制 ────────────────────────────────────────────────────
         // 世界场景的底部抽屉
@@ -99,6 +99,16 @@ public static class GameText
         { "REFUND ${0}", "退款 ${0}" },
         { "REFUSE", "拒绝" },
         { "Refunded. Reputation intact.", "已退款。口碑保住了。" },
+        { "Nothing left to dig out. Every room is in the rotation.", "没有要挖的了——每间房都进了循环。" },
+        { "R{0}", "{0} 房" },
+        { "{0} more trips to go", "还要跑 {0} 趟" },
+        { "R{0} left half-dug. That work is wasted.", "{0} 房挖了一半就丢下了，那些活白干了。" },
+        { "Nothing to cancel.", "没什么可取消的。" },
+        { "DUG OUT {0} room(s) - now filthy, housekeeping takes over.", "挖出了 {0} 间房——现在很脏，交给客房部了。" },
+        { "CLEAR OUT R{0} (free - costs housekeeping time)", "清理 {0} 房（不花钱，占客房部工时）" },
+        { "R{0}: cobwebs and rubbish. Takes about {1} trips.", "{0} 房：蜘蛛网和垃圾。大约要跑 {1} 趟。" },
+        { "Housekeeping digs these out when no room needs turning over.", "没有脏房要周转时，客房部就来挖这些。" },
+        { "X", "取消" },
         { "FRONT DESK UNMANNED - {0} guests waiting, nobody checking them in.", "前台无人值守——{0} 位客人在排队，没人给他们办入住。" },
         { "FRONT DESK UNMANNED - hire a receptionist or nobody gets a room.", "前台无人值守——雇一个前台，否则谁也住不进来。" },
         { "FRONT DESK        {0} on duty   {1}/h   queue {2}", "前台        在岗 {0} 人   每小时 {1} 个   排队 {2}" },
