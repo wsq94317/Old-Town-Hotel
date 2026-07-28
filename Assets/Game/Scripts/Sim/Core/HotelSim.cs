@@ -137,6 +137,11 @@ public sealed class HotelSim
     /// 做强弱对比请用 TotalCheckInWaitToday（客人实际承受的等待总量）。</summary>
     public int PeakCheckInWaitToday { get; private set; }
 
+    /// <summary>此刻在前台排队等办入住的人数。UI 要显示它——
+    /// 前台空岗时客人只是无声地排队，玩家看到的是"没人来"而不是"没人办"
+    /// （解雇前台后玩家一脸茫然的那个 bug 修完就轮到这个可读性问题）。</summary>
+    public int DeskQueueLength => _deskQueue.Count;
+
     /// <summary>今日所有入住客承受的等待分钟总和——满意度实际吃的就是它。</summary>
     public int TotalCheckInWaitToday { get; private set; }
 

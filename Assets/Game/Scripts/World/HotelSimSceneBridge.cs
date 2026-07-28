@@ -158,9 +158,17 @@ public class HotelSimSceneBridge : MonoBehaviour
         return true;
     }
 
+    /// <summary>把 v1 的花名册同步进 Sim 总账——**双向**：雇了要加，解雇要减。
+    ///
+    /// 以前只加不减，于是"解雇前台之后客人照常入住"（玩家实测）：v1 的名册里
+    /// 人没了，Sim 总账里他还在上班，ServiceCapacityModel 照样算出每小时 6 个
+    /// 入住能力。模型没错——前台无人时它返回 0——错在总账没跟着现实走。
+    /// 一般化教训：**镜像同步必须处理"消失"**，只处理"出现"的同步迟早对不上账
+    /// （同一个坑在房态上踩过：v1 覆写住着人的房导致房费蒸发）。</summary>
     private void RegisterStaffFromPayroll()
     {
         if (economy == null || economy.Payroll == null) return;
+
         foreach (var member in economy.Payroll.Roster)
         {
             if (member == null || member.Role == StaffRole.Manager) continue; // 经理=玩家
@@ -169,7 +177,37 @@ public class HotelSimSceneBridge : MonoBehaviour
             _staffIdByMember[member] = id;
             Staff.StartShift(id); // M-B 由 ShiftPlan 决定谁上班
         }
+
+        UnregisterFiredStaff();
     }
+
+    /// <summary>名册里已经没有的人要从 Sim 总账里摘掉（解雇/辞职）。</summary>
+    private void UnregisterFiredStaff()
+    {
+        _scratchFired.Clear();
+        foreach (var pair in _staffIdByMember)
+        {
+            bool stillEmployed = false;
+            foreach (var member in economy.Payroll.Roster)
+                if (ReferenceEquals(member, pair.Key)) { stillEmployed = true; break; }
+            if (!stillEmployed) _scratchFired.Add(pair.Key);
+        }
+
+        foreach (var member in _scratchFired)
+        {
+            // 先下班再摘：Pipeline 每分钟都会把"人手缩了却还占着的房"退回脏房池
+            // （ReleaseIfCrewShrank），所以只要状态先落到 OffShift 就自愈；
+            // 直接 Remove 而不下班的话那一分钟的清洁额度会算在幽灵身上。
+            if (_staffIdByMember.TryGetValue(member, out int staffId))
+            {
+                Staff.EndShift(staffId);
+                Staff.Remove(staffId);
+            }
+            _staffIdByMember.Remove(member);
+        }
+    }
+
+    private readonly List<StaffMember> _scratchFired = new List<StaffMember>();
 
     // ── 与 v1 对齐 ───────────────────────────────────────────────────────────
 

@@ -332,6 +332,18 @@ public class WorldOperationsPanel : MonoBehaviour
                              Sim.ArrivalsPlannedToday, Sim.ReservationArrivalsToday, Sim.WalkInArrivalsToday));
         panel.Add(GameText.F("Checked in          {0}", Sim.ArrivalsCheckedInToday));
         panel.Add(GameText.F("Turned away         {0}   (no clean room)", Sim.ArrivalsTurnedAwayToday));
+
+        // 前台那一行：没有它的话"解雇前台"表现为客人凭空不来，玩家查不出原因
+        float perHour = ServiceCapacityModel.CheckInsPerHour(Sim.Staff);
+        int onDesk = Sim.Staff.ProductiveCountOfRole(StaffRole.Reception);
+        if (perHour <= 0f && Sim.DeskQueueLength > 0)
+            panel.Add(GameText.F("FRONT DESK UNMANNED - {0} guests waiting, nobody checking them in.",
+                                 Sim.DeskQueueLength));
+        else if (perHour <= 0f)
+            panel.Add(GameText.T("FRONT DESK UNMANNED - hire a receptionist or nobody gets a room."));
+        else
+            panel.Add(GameText.F("FRONT DESK        {0} on duty   {1}/h   queue {2}",
+                                 onDesk, perHour.ToString("0.#"), Sim.DeskQueueLength));
         panel.Add(GameText.F("Checkouts booked    {0}   (${1})", Sim.CheckoutsToday, Sim.GrossIncomeToday));
 
         var cleaning = Sim.Rooms.RoomNumbersInState(RoomSimState.Cleaning, 6);

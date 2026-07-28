@@ -99,6 +99,9 @@ public static class GameText
         { "REFUND ${0}", "退款 ${0}" },
         { "REFUSE", "拒绝" },
         { "Refunded. Reputation intact.", "已退款。口碑保住了。" },
+        { "FRONT DESK UNMANNED - {0} guests waiting, nobody checking them in.", "前台无人值守——{0} 位客人在排队，没人给他们办入住。" },
+        { "FRONT DESK UNMANNED - hire a receptionist or nobody gets a room.", "前台无人值守——雇一个前台，否则谁也住不进来。" },
+        { "FRONT DESK        {0} on duty   {1}/h   queue {2}", "前台        在岗 {0} 人   每小时 {1} 个   排队 {2}" },
         { "Refund is ${0} and you have ${1}. Collect the safebox or refuse.", "退款要 ${0}，你手上只有 ${1}。先收保险箱，或者拒绝。" },
         { "Refused. They are writing a review as we speak.", "拒了。他现在就在写评价。" },
 
