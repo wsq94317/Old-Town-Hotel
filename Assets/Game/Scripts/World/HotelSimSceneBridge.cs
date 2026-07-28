@@ -51,6 +51,9 @@ public class HotelSimSceneBridge : MonoBehaviour
     private void Awake()
     {
         Instance = this;
+        // 注意：真正的自愈在 OnEnable——Play 中热重载会清空静态与非序列化字段，
+        // 而 Awake 不重跑（本项目定过的规矩：静态注册表放 OnEnable）
+
         if (dayController == null) dayController = FindFirstObjectByType<Room2DDemoDayController>();
         if (demandLoop == null) demandLoop = FindFirstObjectByType<Room2DPrototypeDemandLoop>();
         if (economy == null) economy = FindFirstObjectByType<EconomySystem>();
@@ -67,9 +70,24 @@ public class HotelSimSceneBridge : MonoBehaviour
         if (Instance == this) Instance = null;
     }
 
-    private void Start()
+    private void OnEnable()
     {
-        if (dayController != null) dayController.OnDaySettled += HandleLegacyDaySettled;
+        // 域重载自愈：静态单例、纯 C# 对象、委托订阅全被热重载清空，
+        // OnEnable 会重跑，所以这里把它们全部补齐（Awake 不会再来一次）。
+        Instance = this;
+        if (_bootClock == null) _bootClock = new SimClock();
+        if (_bootStaff == null) _bootStaff = new StaffRoster();
+
+        if (dayController == null) dayController = FindFirstObjectByType<Room2DDemoDayController>();
+        if (dayController != null)
+        {
+            dayController.OnDaySettled -= HandleLegacyDaySettled;   // 防双订阅
+            dayController.OnDaySettled += HandleLegacyDaySettled;
+        }
+        // Sim 本体（纯 C#）被热重载清空，但 _built 是 bool（可序列化）**活了下来**——
+        // 不归零的话桥以为账还在，永远不重建，Sim 恒为 null（实测踩到，NRE 刷屏）。
+        // 中途状态（当日现金/预订）保不住，这是开发期热重载的固有代价，只保证不坏。
+        if (Sim == null) _built = false;
     }
 
     private void Update()
@@ -259,7 +277,7 @@ public class HotelSimSceneBridge : MonoBehaviour
     /// <summary>调试 HUD 用的一行摘要。</summary>
     public string DebugSummary()
     {
-        if (!_built) return "[Sim] building...";
+        if (!_built || Sim == null) return "[Sim] building...";
         return $"[Sim] D{Clock.CurrentDay} {Clock.TimeFormatted} {PhaseScheduler.Label(PhaseScheduler.PhaseFor(Clock.CurrentMinute))}" +
                $" x{Clock.SpeedMultiplier:0.##}" +
                $" | rooms rdy{Rooms.SellableCount} drt{Rooms.DirtyBacklog} occ{Rooms.CountOf(RoomSimState.Occupied)}" +

@@ -25,6 +25,24 @@ public class WorldOperationsPanel : MonoBehaviour
 
     private HotelSim Sim => HotelSimSceneBridge.Instance != null ? HotelSimSceneBridge.Instance.Sim : null;
 
+    /// <summary>全屏晨报的不透明底。GUI.Box 默认皮肤半透明，场景会透出来搅乱阅读；
+    /// 报告是一天的收束时刻，底下的世界该完全让位。</summary>
+    private static Texture2D _reportBackdrop;
+
+    private static Texture2D ReportBackdrop
+    {
+        get
+        {
+            if (_reportBackdrop == null)   // 域重载后静态清空，惰性重建
+            {
+                _reportBackdrop = new Texture2D(1, 1, TextureFormat.RGBA32, false);
+                _reportBackdrop.SetPixel(0, 0, new Color(0.09f, 0.10f, 0.13f, 1f));
+                _reportBackdrop.Apply();
+            }
+            return _reportBackdrop;
+        }
+    }
+
     private void Update()
     {
         // **不要**在这里调 GuiInput.PollSelfServed()：世界场景有 WorldInputController，
@@ -130,7 +148,7 @@ public class WorldOperationsPanel : MonoBehaviour
     /// 退款没处理完不给开门（和原型同一条规矩：拖着不处理绝不能划算）。</summary>
     private void DrawMorningReport(float w, float h)
     {
-        GUI.Box(new Rect(0, 0, w, h), "");
+        GUI.DrawTexture(new Rect(0, 0, w, h), ReportBackdrop);   // 不透明：场景完全让位
         var last = Sim.LastSettlement;
 
         var report = new GuiPanel();
@@ -244,6 +262,12 @@ public class WorldOperationsPanel : MonoBehaviour
             + (speedTag.Length > 0 ? "   " + speedTag : ""));
         GUI.Label(new Rect(14, 28, w - 28, 20),
             GameText.F("CASH ${0}   SAFEBOX ${1}/{2}", Sim.Cash, Sim.Safebox.Balance, Sim.Safebox.Capacity));
+        // 收款常驻顶栏：保险箱有钱随时能收。这是"今天赚到了"的成就感入口，
+        // 不该藏在晨报里等第二天（收款的爽点要即时）。
+        if (Sim.Safebox.Balance > 0 &&
+            GuiInput.Button(new Rect(w - 118, 27, 104, 22),
+                            GameText.F("COLLECT ${0}", Sim.Safebox.Balance)))
+            Say(GameText.F("Collected ${0}.", Sim.CollectSafebox()));
         GUI.Label(new Rect(14, 46, w - 28, 20),
             GameText.F("{0}*   ROOMS {1} ready / {2} dirty / {3} in use / {4} BROKEN / {5} derelict   MAT {6}",
                        Sim.Reputation.Stars.ToString("0.0"), Sim.Rooms.SellableCount, Sim.Rooms.DirtyBacklog,
