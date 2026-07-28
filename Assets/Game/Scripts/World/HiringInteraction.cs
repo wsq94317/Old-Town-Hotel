@@ -114,7 +114,9 @@ public class HiringInteraction : MonoBehaviour
 
         if (!_panelOpen)
         {
-            var hireRect = new Rect(width - 90f, 40f, 80f, 28f);
+            // HIRE 固定在通知右栏顶部（以前的 y=40 正压在新顶栏第三行上）
+            Rect rail = UiLayout.NotificationRail(width, height);
+            var hireRect = new Rect(rail.xMax - 84f, rail.y, 80f, 28f);
             GuiInput.ReserveZone(hireRect);
             if (GuiInput.Button(hireRect, "HIRE"))
             {

@@ -114,18 +114,20 @@ public class ManagerPhone : MonoBehaviour
         if (Time.time < _hintUntil)
             GUI.Label(new Rect(w * 0.5f - 150, h - 132, 300, 22), _hint);
 
-        // 通知不折叠：来了就自动挂在右侧（HIRE 下方），逐条带 GO。
-        // GO 按钮各自登记热区（触屏通道）；行本身不吃点击。
+        // 通知只许堆在**通知右栏**（UiLayout 契约）：以前起点是写死的 y=104，
+        // 和新顶栏/HIRE/警报全叠在一起，点 GO 会误触压在下面的按钮。
+        Rect rail = UiLayout.NotificationRail(w, h);
         for (int i = 0; i < _notes.Count && i < 5; i++)
         {
             var n = _notes[i];
-            float y = 104 + i * 40; // 从 HUD 第四行文字（y76-98）下方开始，别叠在统计行上
-            GUI.Box(new Rect(w - 316, y, 306, 36), "");
+            float y = rail.y + 34f + i * 40f;   // rail 顶部留给 HIRE 按钮
+            if (y + 36f > rail.yMax) break;      // 塞不下就不画，绝不越界
+            GUI.Box(new Rect(rail.x, y, rail.width, 36), "");
             var old = GUI.color;
             GUI.color = n.Tint;
-            GUI.Label(new Rect(w - 308, y + 2, 210, 32), (n.Floor + 1) + "F  " + n.Title);
+            GUI.Label(new Rect(rail.x + 8, y + 2, rail.width - 96, 32), (n.Floor + 1) + "F  " + n.Title);
             GUI.color = old;
-            var goRect = new Rect(w - 92, y + 5, 76, 26);
+            var goRect = new Rect(rail.xMax - 84, y + 5, 76, 26);
             GuiInput.ReserveZone(goRect);
             if (GuiInput.Button(goRect, "GO"))
             {

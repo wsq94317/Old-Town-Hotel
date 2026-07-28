@@ -73,6 +73,9 @@ public class DebugHudOverlay : MonoBehaviour
     private void OnGUI()
     {
         if (dayController == null) return;
+        // 新操作台在场时调试 HUD 退居幕后：文字全叠在顶栏上（重叠灾难的一员）。
+        // 只藏绘制——日结自动续天的逻辑还归它管，M-F 收编日结 UI 时一起退役。
+        if (HotelSimSceneBridge.Instance != null && HotelSimSceneBridge.Instance.Sim != null) return;
         GuiScale.Begin(); // 高 DPI 下等比放大（左上角固定坐标随矩阵缩放）
         int dirty = 0, cleaning = 0, awaiting = 0, occupied = 0;
         if (demandLoop != null && demandLoop.rooms != null)

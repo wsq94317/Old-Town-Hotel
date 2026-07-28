@@ -12,9 +12,6 @@ public class WorldOperationsPanel : MonoBehaviour
 {
     private enum Tab { Today, Pricing, Staff, Build, Rooms }
 
-    [Tooltip("抽屉占屏幕高度的比例（上半屏留给酒店）")]
-    [SerializeField, Range(0.3f, 0.7f)] private float sheetHeight = 0.46f;
-
     private Tab _tab = Tab.Today;
     private bool _collapsed;
     private float _speed = 1f;          // 玩家选的倍速（Time.timeScale）
@@ -84,7 +81,7 @@ public class WorldOperationsPanel : MonoBehaviour
 
         DrawTopBar(w);
 
-        float sheetTop = _collapsed ? h - 34f : h * (1f - sheetHeight);
+        float sheetTop = UiLayout.DrawerTop(h, _collapsed);
 
         // **登记热区，否则点击穿透到世界**：WorldInputController 只有在
         // GuiInput.IsInReservedZone 命中时才把点击转发给 GUI，不然照常打世界射线——
@@ -124,9 +121,14 @@ public class WorldOperationsPanel : MonoBehaviour
     {
         var clock = Sim.Clock;
         GUI.Box(new Rect(6, 6, w - 12, 62), "");
+        // 倍速指示常驻顶栏：跳段的 10 倍速若没有可见提示，玩家看到的就是
+        // "速度莫名忽快忽慢"（试玩反馈原话）。变速必须永远有解释。
+        string speedTag = _skipTargetMinute >= 0 ? ">>> x10"
+                        : _speed != 1f ? "x" + _speed.ToString("0.##") : "";
         GUI.Label(new Rect(14, 10, w - 28, 20),
             GameText.F("DAY {0}   {1}   {2}", clock.CurrentDay, clock.TimeFormatted,
-                       GameText.T(PhaseScheduler.Label(PhaseScheduler.PhaseFor(clock.CurrentMinute)))));
+                       GameText.T(PhaseScheduler.Label(PhaseScheduler.PhaseFor(clock.CurrentMinute))))
+            + (speedTag.Length > 0 ? "   " + speedTag : ""));
         GUI.Label(new Rect(14, 28, w - 28, 20),
             GameText.F("CASH ${0}   SAFEBOX ${1}/{2}", Sim.Cash, Sim.Safebox.Balance, Sim.Safebox.Capacity));
         GUI.Label(new Rect(14, 46, w - 28, 20),

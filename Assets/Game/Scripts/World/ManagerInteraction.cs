@@ -404,6 +404,10 @@ public class ManagerInteraction : MonoBehaviour
 
     private void DrawRoleLegend(Vector2 view)
     {
+        // 图例是 M2 的教学辅助，现在正压在底部抽屉的折叠按钮上——退役。
+        // 员工颜色随 M-F 的正式 UI 用头顶名牌表达。
+        if (HotelSimSceneBridge.Instance != null && HotelSimSceneBridge.Instance.Sim != null) return;
+
         float width = Mathf.Min(260f, view.x * 0.42f);
         float height = 108f;
         var legendRect = new Rect(18f, view.y - height - 18f, width, height);
