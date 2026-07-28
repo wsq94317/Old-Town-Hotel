@@ -102,7 +102,7 @@ public class WorldOperationsPanel : MonoBehaviour
         var bridge = HotelSimSceneBridge.Instance;
         if (bridge != null && bridge.AwaitingMorningReport)
         {
-            GuiInput.ReserveZone(new Rect(0, 0, w, h));
+            GuiInput.ReserveZone(GuiScale.FullScreenVirtualRect());
             DrawMorningReport(w, h);
             return;
         }
@@ -148,7 +148,9 @@ public class WorldOperationsPanel : MonoBehaviour
     /// 退款没处理完不给开门（和原型同一条规矩：拖着不处理绝不能划算）。</summary>
     private void DrawMorningReport(float w, float h)
     {
-        GUI.DrawTexture(new Rect(0, 0, w, h), ReportBackdrop);   // 不透明：场景完全让位
+        // 不透明底要盖住**整块物理屏幕**：安全区坐标系里 (0,0,w,h) 盖不住刘海带
+        // 和底部条，世界会从上下两条缝里露出来（试玩截图抓到的正是这个）
+        GUI.DrawTexture(GuiScale.FullScreenVirtualRect(), ReportBackdrop);
         var last = Sim.LastSettlement;
 
         var report = new GuiPanel();
@@ -204,7 +206,13 @@ public class WorldOperationsPanel : MonoBehaviour
                           "R" + r.roomNumber + " $" + r.amount + ": " + GameText.T(r.line));
                 float half = (w - 50) / 2f;
                 if (GuiInput.Button(new Rect(20, ry + 19, half, 22), GameText.F("REFUND ${0}", r.amount)))
-                { Sim.ApproveRefund(r.requestId); Say("Refunded. Reputation intact."); break; }
+                {
+                    // 退款从现金掏：没钱时会失败，不能谎报"已退款"
+                    Say(Sim.ApproveRefund(r.requestId) ? "Refunded. Reputation intact."
+                        : GameText.F("Refund is ${0} and you have ${1}. Collect the safebox or refuse.",
+                                     r.amount, Sim.Cash));
+                    break;
+                }
                 if (GuiInput.Button(new Rect(30 + half, ry + 19, half, 22), GameText.T("REFUSE")))
                 { Sim.RejectRefund(r.requestId); Say("Refused. They are writing a review as we speak."); break; }
                 ry += 44;

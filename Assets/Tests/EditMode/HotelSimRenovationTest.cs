@@ -193,13 +193,14 @@ namespace OldTownHotel.Tests.EditMode
             int renovatedRevenue = 0, untouchedRevenue = 0;
             for (int day = 1; day <= 14; day++)
             {
-                renovated.BeginDay(); renovated.RunToEndOfDay();
+                // 打烊结账（M-F）：房费在 SettleDay 里入账，读毛收入要在它**之后**
+                renovated.BeginDay(); renovated.RunToEndOfDay(); renovated.SettleDay();
                 renovatedRevenue += renovated.GrossIncomeToday;
-                renovated.SettleDay(); renovated.Clock.BeginNextDay();
+                renovated.Clock.BeginNextDay();
 
-                untouched.BeginDay(); untouched.RunToEndOfDay();
+                untouched.BeginDay(); untouched.RunToEndOfDay(); untouched.SettleDay();
                 untouchedRevenue += untouched.GrossIncomeToday;
-                untouched.SettleDay(); untouched.Clock.BeginNextDay();
+                untouched.Clock.BeginNextDay();
             }
 
             // 断言的是"翻新过的房交付水平远高于没动的房"，不是"两周后还剩几成新"——

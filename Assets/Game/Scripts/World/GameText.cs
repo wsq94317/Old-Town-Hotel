@@ -99,6 +99,7 @@ public static class GameText
         { "REFUND ${0}", "退款 ${0}" },
         { "REFUSE", "拒绝" },
         { "Refunded. Reputation intact.", "已退款。口碑保住了。" },
+        { "Refund is ${0} and you have ${1}. Collect the safebox or refuse.", "退款要 ${0}，你手上只有 ${1}。先收保险箱，或者拒绝。" },
         { "Refused. They are writing a review as we speak.", "拒了。他现在就在写评价。" },
 
         // ── 当日概况 ──────────────────────────────────────────────────────────

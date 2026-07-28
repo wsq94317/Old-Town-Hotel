@@ -240,14 +240,14 @@ namespace OldTownHotel.Tests.EditMode
             viaDirect.Bookings.Add(BookingChannels.DirectId, arrivalDay: 1, nights: 1,
                                    RoomTier.Old, 80, GuestSegment.Budget, bookedOnDay: 1);
 
-            // 第一天住进来，第二天早上退房把房费与佣金入账
+            // 打烊结账（M-F）：房费与佣金在 SettleDay 入账，当日读数在下一个
+            // BeginDay 才清零——所以结算完直接读，不再翻页到第二天
             foreach (var sim in new[] { viaPlatform, viaDirect })
             {
-                sim.BeginDay(); sim.RunToEndOfDay(); sim.SettleDay(); sim.Clock.BeginNextDay();
-                sim.BeginDay();
+                sim.BeginDay(); sim.RunToEndOfDay(); sim.SettleDay();
             }
 
-            Assume.That(viaDirect.GrossIncomeToday, Is.GreaterThan(0), "住了一晚就该有房费");
+            Assert.That(viaDirect.GrossIncomeToday, Is.GreaterThan(0), "住了一晚就该有房费");
 
             Assert.That(viaPlatform.CommissionToday, Is.GreaterThan(viaDirect.CommissionToday),
                         "同一张单走平台要被抽成，走直营不用——把客人养成回头客的回报");

@@ -52,6 +52,16 @@ public static class GuiScale
         return new Vector2(safe.width / f, safe.height / f);
     }
 
+    /// <summary>**整块物理屏幕**在虚拟坐标系里的矩形（含刘海带与底部条）。
+    /// Begin() 的矩阵原点在安全区左上，所以 (0,0,w,h) 只盖得住安全区——
+    /// 全屏遮罩（比如晨报的不透明底）用这个，否则刘海上下会露出世界。</summary>
+    public static Rect FullScreenVirtualRect()
+    {
+        float f = Factor;
+        Vector2 origin = SafeOriginPixels;
+        return new Rect(-origin.x / f, -origin.y / f, Screen.width / f, Screen.height / f);
+    }
+
     /// <summary>屏幕坐标（原点左下）→ 虚拟 GUI 坐标（原点=安全区左上）。
     /// **必须与 Begin() 的矩阵严格互逆**，否则触点命中会整体偏一个刘海的高度。</summary>
     public static Vector2 ScreenToVirtual(Vector2 screenPos)

@@ -338,12 +338,14 @@ public sealed class HotelSim
     // ── 退款申请 ─────────────────────────────────────────────────────────────
 
     /// <summary>批准退款：退还房费，声誉不再额外受损。</summary>
+    /// <summary>批准退款：**从现金掏**。打烊结账（M-F）之后，退款申请出现时房费
+    /// 已经入箱结算完了——再扣当日毛收入等于扣了个寂寞。现金不够就退不了，
+    /// 只能拒绝并吃声誉（和赔偿超售客同一逻辑：没钱时最贵的是口碑）。</summary>
     public bool ApproveRefund(int requestId)
     {
         RefundRequest request = FindRefund(requestId);
         if (request == null) return false;
-        _grossIncomeToday -= request.amount;
-        if (_grossIncomeToday < 0) _grossIncomeToday = 0;
+        if (!TrySpendCash(request.amount)) return false;
         _refunds.Remove(request);
         RefundsApprovedToday++;
         return true;
@@ -744,11 +746,9 @@ public sealed class HotelSim
         OverbookingsWalkedToday = 0;
         TapedTodayCount = 0;
 
-        // 声誉明细在退房潮**之前**清零：晨报显示的是上一次 BeginDay 到上一次 SettleDay
-        // 之间累计的账（玩家点"开门营业"才会走到这里，所以报告已经看完了）。
+        // 声誉明细清零：晨报显示的是昨日累计的账（玩家点"开门营业"才走到这里，
+        // 报告已经看完了）。退房潮已挪到 SettleDay（打烊结账），这里不再跑。
         Breakdown.Reset();
-
-        RunCheckoutWave();
 
         RefundsApprovedToday = 0;
         RefundsRejectedToday = 0;
@@ -1224,6 +1224,17 @@ public sealed class HotelSim
         AutoResolveIgnoredOverbookings();
         ResolveNoShows();
 
+        // 昨晚晨报上没处理的退款先按拒绝清掉（拖着不处理绝不能划算）——
+        // 必须排在退房潮**之前**，否则今晚新产生的退款申请当场就被没收，
+        // 玩家在晨报上永远见不到它们。
+        AutoResolveIgnoredRefunds();
+
+        // **打烊结账**（M-F 调整）：退房结算从次日早晨挪到 22:00。
+        // 原时序下"今天卖了 7 间房"的钱要第二天早上才入账、日结永远晚一拍，
+        // 晨报上没有任何可收的钱——收款是成就感的来源，不该被记账口径偷走。
+        // 也与世界场景 v1 的"打烊清场"对齐：客人本来就是日终离场的。
+        RunCheckoutWave();
+
         var input = new DaySettlementInput(
             grossIncome: _grossIncomeToday,
             commission: _commissionToday,
@@ -1239,9 +1250,6 @@ public sealed class HotelSim
         Overflow.Add(result.overflowed);
         Overflow.RollTheft(_rng.NextDouble());
         Cash = result.cashAfter;
-
-        // 无视到日结的退款申请按拒绝处理，且额外掉声誉（比主动拒绝更亏）
-        AutoResolveIgnoredRefunds();
 
         // 顺序要紧：先算当晚老化，再让装修/维修完工——反过来会让"翻新重置"当场被覆盖
         Furniture.ApplyIdleDay();

@@ -235,7 +235,12 @@ public class V3PrototypeSession : MonoBehaviour
                           "R" + r.roomNumber + " $" + r.amount + ": " + GameText.T(r.line));
                 float half = (w - 50) / 2f;
                 if (GuiInput.Button(new Rect(20, ry + 19, half, 20), GameText.F("REFUND ${0}", r.amount)))
-                { _sim.ApproveRefund(r.requestId); Say("Refunded. Reputation intact."); break; }
+                {
+                    Say(_sim.ApproveRefund(r.requestId) ? "Refunded. Reputation intact."
+                        : GameText.F("Refund is ${0} and you have ${1}. Collect the safebox or refuse.",
+                                     r.amount, _sim.Cash));
+                    break;
+                }
                 if (GuiInput.Button(new Rect(30 + half, ry + 19, half, 20), GameText.T("REFUSE")))
                 { _sim.RejectRefund(r.requestId); Say("Refused. They are writing a review as we speak."); break; }
                 ry += 42;

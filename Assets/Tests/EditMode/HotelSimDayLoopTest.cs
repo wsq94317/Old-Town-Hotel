@@ -67,20 +67,21 @@ namespace OldTownHotel.Tests.EditMode
         public void SecondDay_CheckoutWaveBooksRevenueAndDirtiesRooms()
         {
             var sim = BuildHotel();
-            RunOneDay(sim);
+            sim.BeginDay();
+            sim.RunToEndOfDay();
             int stayed = sim.Rooms.CountOf(RoomSimState.Occupied);
-            Assert.That(stayed, Is.GreaterThan(0), "第一晚要有人住着");
+            Assert.That(stayed, Is.GreaterThan(0), "打烊前要有人住着");
 
-            sim.BeginDay(); // 第二天晨间退房潮
+            sim.SettleDay();   // 打烊结账（M-F）：退房潮在日结里跑
 
-            // M-D 起有连住单：住第二晚的人今早不退房，所以退房数 ≤ 昨晚在住数。
-            // 但**每个住过的人都要付昨夜的房费**，连住的也一样（按晚计）。
+            // M-D 起有连住单：住第二晚的人今晚不退房，所以退房数 ≤ 在住数。
+            // 但**每个住过的人都要付这一晚的房费**，连住的也一样（按晚计）。
             int stillIn = sim.Rooms.CountOf(RoomSimState.Occupied);
             Assert.That(sim.CheckoutsToday + stillIn, Is.EqualTo(stayed),
-                        "昨晚在住的人，今早要么退房要么续住，一个都不能凭空消失");
-            Assert.That(sim.GrossIncomeToday, Is.GreaterThan(0), "退房结算房费");
+                        "在住的人打烊时要么退房要么续住，一个都不能凭空消失");
+            Assert.That(sim.GrossIncomeToday, Is.GreaterThan(0), "打烊结算房费——晨报上就有钱可收");
             Assert.That(sim.Rooms.CountOf(RoomSimState.Dirty), Is.GreaterThanOrEqualTo(sim.CheckoutsToday),
-                        "退房后房间变脏，要打扫");
+                        "退房后房间变脏，次晨打扫");
         }
 
         [Test]

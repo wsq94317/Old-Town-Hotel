@@ -127,18 +127,28 @@ namespace OldTownHotel.Tests.EditMode
         {
             var sim = BuildHotel(seed: 4242);
             sim.SetPriceBandForFloor(1, RoomTier.Better);
-            RunOneDay(sim);
-            sim.BeginDay();
-            Assume.That(sim.PendingRefunds.Count, Is.GreaterThan(0));
+            // 打烊结账（M-F）：退款申请在 SettleDay 的退房潮里产生，晨报上处理
+            sim.BeginDay(); sim.RunToEndOfDay(); sim.SettleDay();
+            Assert.That(sim.PendingRefunds.Count, Is.GreaterThan(0), "虚报价该在打烊时收到退款申请");
 
-            int incomeBefore = sim.GrossIncomeToday;
+            sim.CollectSafebox();   // 得先有现金才退得起
+            int cashBefore = sim.Cash;
             var request = sim.PendingRefunds[0];
             bool ok = sim.ApproveRefund(request.requestId);
 
             Assert.That(ok, Is.True);
-            Assert.That(sim.GrossIncomeToday, Is.EqualTo(incomeBefore - request.amount), "退了钱");
+            Assert.That(sim.Cash, Is.EqualTo(cashBefore - request.amount),
+                        "退款从现金掏——钱已入箱，扣毛收入是扣寂寞");
             Assert.That(sim.RefundsApprovedToday, Is.EqualTo(1));
             Assert.That(sim.ApproveRefund(request.requestId), Is.False, "同一笔不能退两次");
+
+            // 现金掏空后退不了，只能拒绝吃声誉（和赔偿超售客同一逻辑）
+            if (sim.PendingRefunds.Count > 0)
+            {
+                sim.TrySpendCash(sim.Cash);
+                Assert.That(sim.ApproveRefund(sim.PendingRefunds[0].requestId), Is.False,
+                            "没现金就退不了款");
+            }
         }
 
         [Test]
@@ -167,18 +177,23 @@ namespace OldTownHotel.Tests.EditMode
             ignoring.SetPriceBandForFloor(1, RoomTier.Better);
             rejecting.SetPriceBandForFloor(1, RoomTier.Better);
 
+            // 打烊结账：第一晚 SettleDay 产生退款申请（挂给晨报）
             RunOneDay(ignoring);
             RunOneDay(rejecting);
-            ignoring.BeginDay();
-            rejecting.BeginDay();
-            Assume.That(rejecting.PendingRefunds.Count, Is.GreaterThan(0));
+            Assert.That(rejecting.PendingRefunds.Count, Is.GreaterThan(0), "打烊时该有退款申请");
             while (rejecting.PendingRefunds.Count > 0)
                 rejecting.RejectRefund(rejecting.PendingRefunds[0].requestId);
 
-            ignoring.RunToEndOfDay(); ignoring.SettleDay();   // 无视到日结
-            rejecting.RunToEndOfDay(); rejecting.SettleDay();
+            // 记下拖着的这批单号：下一次日结要把**它们**收口（今晚新产生的照样挂着）
+            var ignoredIds = new List<int>();
+            foreach (var r in ignoring.PendingRefunds) ignoredIds.Add(r.requestId);
 
-            Assert.That(ignoring.PendingRefunds, Is.Empty, "日结时自动收口");
+            ignoring.BeginDay(); ignoring.RunToEndOfDay(); ignoring.SettleDay();
+            rejecting.BeginDay(); rejecting.RunToEndOfDay(); rejecting.SettleDay();
+
+            foreach (var r in ignoring.PendingRefunds)
+                Assert.That(ignoredIds, Has.No.Member(r.requestId),
+                            "昨晚拖着的退款必须在下一次日结被自动收口");
             Assert.That(ignoring.Reputation.AverageSatisfaction,
                         Is.LessThanOrEqualTo(rejecting.Reputation.AverageSatisfaction),
                         "装作没看见比明确拒绝更亏");
