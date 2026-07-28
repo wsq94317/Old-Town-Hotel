@@ -79,6 +79,16 @@ public class WorldOperationsPanel : MonoBehaviour
         Vector2 v = GuiScale.Begin();
         float w = v.x, h = v.y;
 
+        // 日结 → **全屏晨报**：时间已被桥暂停，看完点"开门营业"才进新的一天。
+        // 全屏 = 整个屏幕都是热区，世界这时收不到任何点击。
+        var bridge = HotelSimSceneBridge.Instance;
+        if (bridge != null && bridge.AwaitingMorningReport)
+        {
+            GuiInput.ReserveZone(new Rect(0, 0, w, h));
+            DrawMorningReport(w, h);
+            return;
+        }
+
         DrawTopBar(w);
 
         float sheetTop = UiLayout.DrawerTop(h, _collapsed);
@@ -113,6 +123,109 @@ public class WorldOperationsPanel : MonoBehaviour
             case Tab.Build: DrawBuild(w, y); break;
             case Tab.Rooms: DrawRooms(w, y); break;
             default: DrawToday(w, y); break;
+        }
+    }
+
+    /// <summary>全屏晨报：昨日结算 + 评价明细 + 收保险箱 + 退款闸门。
+    /// 退款没处理完不给开门（和原型同一条规矩：拖着不处理绝不能划算）。</summary>
+    private void DrawMorningReport(float w, float h)
+    {
+        GUI.Box(new Rect(0, 0, w, h), "");
+        var last = Sim.LastSettlement;
+
+        var report = new GuiPanel();
+        report.Add(GameText.F("Gross taken          ${0}",
+            last.netToSafebox + last.overflowed + last.cashPaidFromReserve));
+        report.Add(GameText.F("Into the safebox     ${0}", last.netToSafebox));
+        report.AddIf(last.overflowed > 0, GameText.F("Spilled (65% back)   ${0}", last.overflowed));
+        report.AddIf(last.cashPaidFromReserve > 0,
+                     GameText.F("Covered from cash    ${0}", last.cashPaidFromReserve));
+        report.Add(last.wagesPaid ? GameText.T("Payroll: everybody got paid.")
+                                  : GameText.F("PAYROLL SHORT by ${0}. They noticed.", last.unpaidAmount));
+        report.Add(GameText.F("Checked in {0}, turned away {1}, queue cost {2} min",
+                              Sim.ArrivalsCheckedInToday, Sim.ArrivalsTurnedAwayToday,
+                              Sim.TotalCheckInWaitToday));
+        report.Add(GameText.F("Commission ${0}   Cancelled {1}   No-shows {2}",
+                              Sim.CommissionToday, Sim.CancellationsToday, Sim.NoShowsToday));
+        report.AddIf(Sim.BookingsDeclinedToday > 0,
+                     GameText.F("TURNED DOWN {0} BOOKINGS - no rooms left to sell.",
+                                Sim.BookingsDeclinedToday));
+        report.Add(GameText.F("Rating {0}*", Sim.Reputation.Stars.ToString("0.00")));
+        AddReputationBreakdown(report);
+
+        float y = report.Draw(10, 40, w - 20,
+                              GameText.F("YESTERDAY  (day {0})", Sim.Clock.CurrentDay - 1)) + 10f;
+
+        // 收钱按钮：有钱可收才占位置
+        bool hasSafebox = Sim.Safebox.Balance > 0, hasSpill = Sim.Overflow.Balance > 0;
+        if (hasSafebox || hasSpill)
+        {
+            float half = (w - 50) / 2f;
+            if (hasSafebox &&
+                GuiInput.Button(new Rect(20, y, hasSpill ? half : w - 40, 28),
+                                GameText.F("COLLECT ${0}", Sim.Safebox.Balance)))
+                Say(GameText.F("Collected ${0}.", Sim.CollectSafebox()));
+            if (hasSpill &&
+                GuiInput.Button(new Rect(hasSafebox ? 30 + half : 20, y, hasSafebox ? half : w - 40, 28),
+                                GameText.F("SALVAGE ${0} (65%)", Sim.Overflow.Balance)))
+                Say(GameText.F("Salvaged ${0} of the cash that wouldn't fit.", Sim.RecoverOverflow()));
+            y += 34f;
+        }
+
+        // 退款闸门：处理完才给开门
+        var refunds = Sim.PendingRefunds;
+        if (refunds.Count > 0)
+        {
+            int shown = refunds.Count < 3 ? refunds.Count : 3;
+            GUI.Box(new Rect(10, y, w - 20, 26 + shown * 44), GameText.F("REFUND DEMANDS ({0})", refunds.Count));
+            float ry = y + 24;
+            for (int i = 0; i < shown; i++)
+            {
+                var r = refunds[i];
+                GUI.Label(new Rect(20, ry, w - 40, 19),
+                          "R" + r.roomNumber + " $" + r.amount + ": " + GameText.T(r.line));
+                float half = (w - 50) / 2f;
+                if (GuiInput.Button(new Rect(20, ry + 19, half, 22), GameText.F("REFUND ${0}", r.amount)))
+                { Sim.ApproveRefund(r.requestId); Say("Refunded. Reputation intact."); break; }
+                if (GuiInput.Button(new Rect(30 + half, ry + 19, half, 22), GameText.T("REFUSE")))
+                { Sim.RejectRefund(r.requestId); Say("Refused. They are writing a review as we speak."); break; }
+                ry += 44;
+            }
+            if (Time.time < _toastUntil)
+                GUI.Box(new Rect(10, h - 40, w - 20, 26), _toast);
+            return;   // 先处理完退款再开门
+        }
+
+        if (GuiInput.Button(new Rect(10, y, w - 20, 40), GameText.T("OPEN THE DOORS")))
+            HotelSimSceneBridge.Instance.ContinueToNextDay();
+
+        if (Time.time < _toastUntil)
+            GUI.Box(new Rect(10, h - 40, w - 20, 26), _toast);
+    }
+
+    /// <summary>把"今天为什么涨/为什么掉"加进晨报（与原型同一套明细）。</summary>
+    private void AddReputationBreakdown(GuiPanel panel)
+    {
+        var down = Sim.Breakdown.Ranked(positive: false);
+        var up = Sim.Breakdown.Ranked(positive: true);
+        if (down.Count == 0 && up.Count == 0)
+        {
+            panel.Add(GameText.T("No guests rated you yesterday."));
+            return;
+        }
+        for (int i = 0; i < down.Count && i < 2; i++)
+        {
+            var e = down[i];
+            panel.Add(GameText.F("  DOWN  {0}   {1}  (x{2})",
+                                 GameText.T(ReputationBreakdown.LabelOf(e.cause)),
+                                 e.total.ToString("0.00"), e.count));
+        }
+        for (int i = 0; i < up.Count && i < 2; i++)
+        {
+            var e = up[i];
+            panel.Add(GameText.F("  UP    {0}   +{1}  (x{2})",
+                                 GameText.T(ReputationBreakdown.LabelOf(e.cause)),
+                                 e.total.ToString("0.00"), e.count));
         }
     }
 

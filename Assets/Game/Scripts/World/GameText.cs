@@ -72,6 +72,7 @@ public static class GameText
         { "TURNED DOWN {0} BOOKINGS - no rooms left to sell.",
           "有 {0} 单接不下来 — 没房可卖了。" },
         { "Rating {0}*   Debt ${1}", "评分 {0}★   欠款 ${1}" },
+        { "Rating {0}*", "评分 {0}★" },
         // 声誉明细：今天为什么涨/为什么掉
         { "No guests rated you yesterday.", "昨天没有客人给出评价。" },
         { "  DOWN  {0}   {1}  (x{2})", "  掉分  {0}   {1}（{2} 次）" },

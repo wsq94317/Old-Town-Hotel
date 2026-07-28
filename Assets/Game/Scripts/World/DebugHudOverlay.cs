@@ -43,6 +43,9 @@ public class DebugHudOverlay : MonoBehaviour
     // 日结后自动翻天（临时——M6 的日结 UI 会接管 Continue）。
     private void HandleDaySettled(int day, int served, DayLedger ledger)
     {
+        // 新操作台在场时，翻天由玩家在全屏晨报上点"开门营业"决定——
+        // 这里再自动续天会把报告从玩家眼前抢走（3 秒后日子自己开了）。
+        if (HotelSimSceneBridge.Instance != null && HotelSimSceneBridge.Instance.Sim != null) return;
         StartCoroutine(AutoContinue());
     }
 

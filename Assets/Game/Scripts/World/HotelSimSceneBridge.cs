@@ -168,6 +168,8 @@ public class HotelSimSceneBridge : MonoBehaviour
 
     private void DriveClock()
     {
+        if (AwaitingMorningReport) return;   // 晨报没看完，时间不走
+
         if (_needsBeginDay)
         {
             Sim.BeginDay();
@@ -207,7 +209,23 @@ public class HotelSimSceneBridge : MonoBehaviour
         Sim.Clock.BeginNextDay();
         // 日号与 v1 对齐（v1 的 demoDayIndex 在 Continue 时才 ++，这里跟着它走）
         Sim.Clock.JumpTo(day + 1, SimClock.DayStartMinute);
-        _needsBeginDay = true;
+
+        // **不立刻开新一天**：先亮全屏晨报，玩家看完点"开门营业"才继续。
+        // BeginDay 会清零昨日明细（Breakdown.Reset），必须等报告被看过之后再跑。
+        AwaitingMorningReport = true;
+    }
+
+    /// <summary>日结完成、等玩家看晨报（WorldOperationsPanel 据此画全屏报告）。
+    /// 为 true 期间 Sim 时钟暂停，v1 世界也停在日结后等 Restart。</summary>
+    public bool AwaitingMorningReport { get; private set; }
+
+    /// <summary>玩家点了"开门营业"：关报告，v1 开新的一天，Sim 跑晨间流程。</summary>
+    public void ContinueToNextDay()
+    {
+        if (!AwaitingMorningReport) return;
+        AwaitingMorningReport = false;
+        _needsBeginDay = true;                       // 下一帧跑 Sim.BeginDay（退房潮+预订晨间流程）
+        if (dayController != null) dayController.RestartDemoDay();
     }
 
     /// <summary>次晨要不要跑 Sim 的 BeginDay（退房潮 + 预订晨间流程）。
