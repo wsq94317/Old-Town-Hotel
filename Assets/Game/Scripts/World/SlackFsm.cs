@@ -3,8 +3,13 @@ using System;
 // 偷懒状态机（纯 C#，随机注入，EditMode 全测）：
 //   Working →(经理不在场, 概率)→ Slacking →(经理进层)→ Waking(惊醒延迟)
 //   → PanicFaking(慌张装忙) → Working
+//   Slacking →(懒够了, 自愈)→ Working
 // Waking/PanicFaking 期间经理靠近（managerNear）→ 现场抓包（OnCaught）。
 // Slacking 中 IsProductive=false（宿主冻结工作进度）。
+//
+// **自愈这条边是必需的**：只留"经理进层"一条出路的话，经理不去的楼层会永久
+// 卡住（实测：验房员 3.78/4 秒的活干了 205 秒，两间房整天回不到可售）。
+// 经理的价值不是"唯一的解药"而是"加速器 + 让偷懒有代价"。
 public sealed class SlackFsm
 {
     public enum State { Working, Slacking, Waking, PanicFaking }
@@ -42,6 +47,7 @@ public sealed class SlackFsm
                 {
                     Current = State.Slacking;
                     HasRecentSlackRecord = true;
+                    _windowTimer = RollSlackDuration();
                 }
                 break;
 
@@ -52,7 +58,11 @@ public sealed class SlackFsm
                     _windowTimer = _lazy
                         ? SupervisionTuning.WakeDelayLazySeconds
                         : SupervisionTuning.WakeDelaySeconds;
+                    break;
                 }
+                // 没人管也会自己回去干活（懒够了/怕被发现），否则这一格是死锁
+                _windowTimer -= dt;
+                if (_windowTimer <= 0f) Current = State.Working;
                 break;
 
             case State.Waking:
@@ -71,6 +81,15 @@ public sealed class SlackFsm
                 if (_windowTimer <= 0f) Current = State.Working;
                 break;
         }
+    }
+
+    /// <summary>这一次偷懒打算持续多久。记录（HasRecentSlackRecord）不受影响——
+    /// 自己回去干活了不等于没偷懒，质询照样问得出来。</summary>
+    private float RollSlackDuration()
+    {
+        float span = SupervisionTuning.SlackMaxSeconds - SupervisionTuning.SlackMinSeconds;
+        float seconds = SupervisionTuning.SlackMinSeconds + (float)_rng.NextDouble() * span;
+        return _lazy ? seconds * SupervisionTuning.LazySlackMultiplier : seconds;
     }
 
     private bool RollSlackEntry(float dt)

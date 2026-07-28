@@ -7,6 +7,16 @@ public static class SupervisionTuning
     public const float LowMoraleMultiplier = 1.5f;
     public const int LowMoraleThreshold = 40;
 
+    // 偷懒会自己结束——**这不是妥协，是防死锁的硬约束**。原设计只有"经理进层"
+    // 一条出路，于是经理不去的那层员工永远懒下去：实测验房员卡在 3.78/4 秒的
+    // 进度上耗掉 205 秒，两间房整天回不到可售。100 间房的酒店经理不可能无处
+    // 不在，那样整栈房态都会死锁。
+    // 经理到场依然重要：它把"偷懒"变成"被抓"（掉士气、涨威望、留记录），
+    // 也就是从"慢一点"升级成"有代价"——监督是加速器，不是唯一的解药。
+    public const float SlackMinSeconds = 6f;
+    public const float SlackMaxSeconds = 18f;
+    public const float LazySlackMultiplier = 1.6f;   // Lazy 特质懒得更久
+
     // ── 发现窗口 ─────────────────────────────────────────────────────────────
     public const float WakeDelaySeconds = 1.5f;      // 经理进层后惊醒延迟
     public const float WakeDelayLazySeconds = 3f;    // Lazy 特质更迟钝

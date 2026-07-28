@@ -180,6 +180,14 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
     public string lastAssignmentMode = "None";
     public string lastResolvedAssignmentMode = "None";
 
+    [Header("Sim authority (B1b)")]
+    // 世界场景里客人与房费归 Sim 管（预订流 + 分房 + 打烊结账），这个循环只留
+    // 清洁演出。桥（HotelSimSceneBridge）每帧把它置 true，纯 v1 原型场景不受影响。
+    //   关掉的三件事：自己发明客人、自己给房费入账、每早垫几位假过夜客。
+    // 两套账同时收客的后果在试玩里见过：两边抢同一批房，晨报"接不下来"的单
+    // 其实是被 v1 的客人占掉的，而 v1 的房费又走另一套经济，对不上账。
+    [System.NonSerialized] public bool guestFlowOwnedBySim;
+
     [Header("Closing / Phase Gating (day-cycle v2)")]
     // CheckInPeak 才收新客；Preparation/Recovery 只运转退房潮与在场客人。
     public bool acceptingNewGuests = true;
@@ -348,7 +356,7 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
 
         // day-cycle v2：只有开门迎客时段（CheckInPeak）才产生新客；
         // 退房潮、在场客人（active/complaint）与日汇总在任何营业时段都照常运转。
-        if (acceptingNewGuests)
+        if (acceptingNewGuests && !guestFlowOwnedBySim)
         {
             if (useUpcomingDemandPreview)
             {
@@ -1959,7 +1967,9 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
             if (room != null && room.currentState == Room2DState.Occupied) { anyOvernight = true; break; }
         }
 
-        if (!anyOvernight && fallbackMorningDepartures > 0)
+        // 垫假过夜客是纯 v1 原型的便利（让第一天也走完整退房流程）。Sim 接管后
+        // 这几位是凭空多出来的房客：占着房、脏了房，却从没付过钱。
+        if (!anyOvernight && fallbackMorningDepartures > 0 && !guestFlowOwnedBySim)
         {
             int seeded = 0;
             foreach (var room in rooms)
@@ -2046,6 +2056,8 @@ public class Room2DPrototypeDemandLoop : MonoBehaviour
     private int SettleCheckoutRevenue(Room2DEntity room, Room2DMatchQuality? forcedQuality = null)
     {
         if (room == null) return 0;
+        // Sim 接管房费后这里必须闭嘴：同一晚收两次钱，玩家看到的现金和晨报对不上
+        if (guestFlowOwnedBySim) return 0;
         if (!_economyRefsSearched)
         {
             _economyRefsSearched = true;

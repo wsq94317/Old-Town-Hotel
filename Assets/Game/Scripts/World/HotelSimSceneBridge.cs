@@ -40,8 +40,16 @@ public class HotelSimSceneBridge : MonoBehaviour
     ///
     /// **B1a 阶段刻意保持 true**：世界场景里的 StaffAgent 才是清洁模拟的本体
     /// （会走路、会摸鱼、会被抓、会留瑕疵），比 Sim 的信用额模型好，所以房态归它。
-    /// Sim 负责经济那一半。B1b 会把收客与收入也接过来。</summary>
+    /// Sim 负责经济那一半。B1b 起同步变成**双向**，裁判在 RoomAuthorityPolicy。</summary>
     public bool MirrorMode { get; private set; } = true;
+
+    /// <summary>B1b：客人与房费归 Sim。v1 需求循环退化为纯清洁演出——
+    /// 不再自己发明客人、不再给房费入账、不再每早垫几位假过夜客。
+    /// 这是"绞杀者迁移"里真正的权威翻转那一刀。</summary>
+    public bool SimOwnsGuestFlow { get; private set; } = true;
+
+    /// <summary>上一次同步里推给 v1 的房间数（调试/验收用）。</summary>
+    public int LastPushedRoomCount { get; private set; }
 
     private readonly Dictionary<int, int> _staffIdByRoomlessMember = new Dictionary<int, int>();
     private readonly Dictionary<StaffMember, int> _staffIdByMember = new Dictionary<StaffMember, int>();
@@ -95,7 +103,7 @@ public class HotelSimSceneBridge : MonoBehaviour
         // 场景里的房/员工在 Start 时可能还没建好，首帧起惰性建账（时序坑，踩过）
         if (!_built && !TryBuild()) return;
 
-        SyncFromLegacy();
+        SyncRooms();
         DriveClock();
     }
 
@@ -165,23 +173,52 @@ public class HotelSimSceneBridge : MonoBehaviour
 
     // ── 与 v1 对齐 ───────────────────────────────────────────────────────────
 
-    /// <summary>镜像期把 v1 房态跟读进总账（每 0.5 秒一次，够 HUD 用且不浪费）。</summary>
-    private void SyncFromLegacy()
+    /// <summary>房态双向同步（每 0.5 秒一次，够 HUD 用且不浪费）。
+    ///
+    /// B1b：Sim 管客人（入住/退房/封房要**写进** v1，否则管家看不到活、
+    /// 投诉系统找不到住客），v1 管清洁链（Dirty→Cleaning→验房→Ready 只能**读**，
+    /// 写进去会抹掉管家刚干完的进度）。逐格裁决在 RoomAuthorityPolicy。</summary>
+    private void SyncRooms()
     {
         if (!MirrorMode || Rooms == null || demandLoop == null || demandLoop.rooms == null) return;
+
+        // v1 需求循环每帧都可能被别人（日控制器/调试面板）改回默认，所以每次都表态
+        demandLoop.guestFlowOwnedBySim = SimOwnsGuestFlow;
 
         _mirrorTimer -= Time.deltaTime;
         if (_mirrorTimer > 0f) return;
         _mirrorTimer = 0.5f;
 
+        int pushed = 0;
         foreach (var room in demandLoop.rooms)
         {
-            if (room == null) continue;
-            // Sim 台账里住着人的房不许覆写：v1 不知道这位客人的存在，会把状态
-            // 写回 Ready，让分房点把同一间房再卖一次（房费凭空蒸发的元凶）。
-            if (Sim != null && Sim.HasActiveStay(room.roomNumber)) continue;
-            Rooms.SetState(room.roomNumber, RoomStateMapping.FromLegacy(room.currentState));
+            if (room == null || Sim == null || !Rooms.Contains(room.roomNumber)) continue;
+
+            RoomSimState simState = Rooms.At(room.roomNumber).state;
+            var direction = RoomAuthorityPolicy.Decide(
+                simState, room.currentState, Sim.HasActiveStay(room.roomNumber),
+                out Room2DState pushTarget);
+
+            if (direction == RoomSyncDirection.PushToLegacy)
+            {
+                if (room.currentState != pushTarget)
+                {
+                    // SetState 是强制入口（绕过 guard）——这里就是要绕：Sim 的裁决
+                    // 不必迁就 v1 的状态机顺序，比如打烊结账可以直接 Occupied→Dirty。
+                    room.SetState(pushTarget);
+                    // 房牌颜色不会自己跟上：EnterState 只改数据，刷视觉是控制器的活。
+                    // 漏了这一句的话玩家看到的是"房态没变但管家跑过去了"。
+                    var controller = room.GetComponent<Room2DController>();
+                    if (controller != null) controller.ApplyStateVisual();
+                    pushed++;
+                }
+            }
+            else
+            {
+                Rooms.SetState(room.roomNumber, RoomStateMapping.FromLegacy(room.currentState));
+            }
         }
+        LastPushedRoomCount = pushed;
 
         // 新雇的人也要进总账（HiringInteraction 随时可能加人）
         RegisterStaffFromPayroll();
