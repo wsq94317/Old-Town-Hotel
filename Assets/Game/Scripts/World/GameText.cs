@@ -18,7 +18,7 @@ public static class GameText
     public static string T(string english)
     {
         if (!UseChinese || string.IsNullOrEmpty(english)) return english;
-        return Zh.TryGetValue(english, out string zh) ? zh : english;
+        return Zh.Map.TryGetValue(english, out string zh) ? zh : english;
     }
 
     /// <summary>带参数的文案：先翻译模板再填参数。模板里的占位符是 {0}/{1}…</summary>
@@ -28,8 +28,46 @@ public static class GameText
         return args == null || args.Length == 0 ? template : string.Format(template, args);
     }
 
+    /// <summary>查表。**重复键忽略而不是抛异常**。
+    ///
+    /// 为什么不直接用 `Dictionary` 的集合初始化器（原来的写法）：重复键会让
+    /// 静态构造函数抛 ArgumentException，而这是**静态**构造函数——它一炸，
+    /// GameText 整个类型永久损坏，之后每一次 T() 都抛，于是**整个界面消失**。
+    /// 真实发生过：加了一条已存在的 "RENOVATE"，游戏里 UI 全没了。
+    /// **一个漏译键的爆炸半径不该是整个界面。**
+    ///
+    /// 集合初始化器调用的是 `Add(k, v)`，所以换一个"重复就记下来并忽略"的容器
+    /// 就够了，下面 280 行词条一个字都不用改。重复本身由 GameTextTest 挡在
+    /// 运行之前——这里只是保证"万一漏了也不至于全灭"。</summary>
+    /// <summary>C# 的集合初始化器要求这个类型实现 IEnumerable（只要求"存在"，
+    /// 编译器并不调用它），并有一个匹配的 Add——所以下面 280 行 `{ "a", "b" }`
+    /// 走的就是这个 Add。</summary>
+    private sealed class Table : System.Collections.IEnumerable
+    {
+        public readonly Dictionary<string, string> Map = new Dictionary<string, string>();
+        public readonly List<string> Duplicates = new List<string>();
+
+        public void Add(string key, string value)
+        {
+            if (string.IsNullOrEmpty(key)) return;
+            if (Map.ContainsKey(key)) { Duplicates.Add(key); return; }
+            Map[key] = value;
+        }
+
+        public System.Collections.IEnumerator GetEnumerator() => Map.GetEnumerator();
+    }
+
+    /// <summary>重复键清单（测试用：应当为空）。</summary>
+    public static IReadOnlyList<string> DuplicateKeys() => Zh.Duplicates;
+
+    /// <summary>词条总数（测试用）。</summary>
+    public static int EntryCount => Zh.Map.Count;
+
+    /// <summary>全部词条（测试用：校对占位符数量是否一致）。</summary>
+    public static IEnumerable<KeyValuePair<string, string>> AllPairs() => Zh.Map;
+
     // 键 = 英文原文。顺序按界面分区排，方便对照着校对。
-    private static readonly Dictionary<string, string> Zh = new Dictionary<string, string>
+    private static readonly Table Zh = new Table
     {
         // ── 顶栏 ──────────────────────────────────────────────────────────────
         { "DAY {0}   {1}   {2}", "第 {0} 天   {1}   {2}" },
@@ -118,7 +156,6 @@ public static class GameText
         { "A handyman is on it - {0} day(s) left.", "师傅在修了——还剩 {0} 天。" },
         { "REPAIR - ${0}, {1} day(s)", "维修 —— ${0}，{1} 天" },
         { "DUCT TAPE - free, sellable, broken again tomorrow", "糊胶带 —— 免费，能卖，明天照坏" },
-        { "RENOVATE", "装修" },
         { "{0} room(s) at once - bulk is cheaper and slower", "一次做 {0} 间 —— 批量更省钱，但更慢" },
         { "Materials {0}/{1} in the warehouse", "仓库里的材料 {0}/{1}" },
         { "BUY 10 MATERIALS - ${0}", "买 10 份材料 —— ${0}" },
