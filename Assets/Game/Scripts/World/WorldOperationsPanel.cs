@@ -131,6 +131,7 @@ public class WorldOperationsPanel : MonoBehaviour
 
         GUI.Box(new Rect(6, sheetTop, w - 12, h - sheetTop - 6f), "");
         float y = sheetTop + 8f;
+        y = DrawSelectedRoomCard(w, y);
         y = DrawSpeedRow(w, y);
         y = DrawTabs(w, y);
 
@@ -241,6 +242,106 @@ public class WorldOperationsPanel : MonoBehaviour
 
         if (Time.time < _toastUntil)
             GUI.Box(new Rect(10, h - 40, w - 20, 26), _toast);
+    }
+
+    /// <summary>世界里点中的那间房：状态、房况、以及**这一刻真正能做的事**。
+    ///
+    /// 玩家反馈"场景里还没有玩家可以解锁和装修的房间"——症结不是缺功能
+    /// （清理/复原/装修/维修的逻辑全都有），是那些功能和那栋楼没有关系：
+    /// 房间在场景里连碰撞体都没有，只能在抽屉页里对着房号列表盲操作。
+    /// 现在：世界里点一下房间 → 这张卡出现 → 按钮就在手边。</summary>
+    private float DrawSelectedRoomCard(float w, float y)
+    {
+        int number = RoomSelection.Selected;
+        if (number <= 0 || !Sim.Rooms.Contains(number))
+        {
+            GUI.Label(new Rect(14, y, w - 28, 20), GameText.T("Tap a room in the hotel to work on it."));
+            return y + 22f;
+        }
+
+        RoomSimState state = Sim.Rooms.At(number).state;
+        GUI.Box(new Rect(6, y, w - 12, 24), GameText.F("ROOM {0} - {1}   [{2}]",
+                                                      number,
+                                                      GameText.T(RoomStatePalette.WordOf(state)),
+                                                      GameText.T(FurnitureLedger.ConditionWord(
+                                                          Sim.Furniture.WorstHealthIn(number), false))));
+        y += 28f;
+
+        // 破败房：清理（免费，占人工）
+        if (state == RoomSimState.Ruined)
+        {
+            if (Sim.Clearing.IsClearing(number))
+            {
+                float progress = Sim.Clearing.ProgressOf(number);
+                DrawProgressBar(new Rect(14, y + 3, w - 120, 14), progress);
+                GUI.Label(new Rect(w - 100, y, 90, 20),
+                          GameText.F("{0} more trips to go",
+                                     JunkClearingModel.VisitsRemaining(Sim.Clearing.WorkDoneOn(number))));
+                y += 24f;
+            }
+            else if (GuiInput.Button(new Rect(10, y, w - 20, 26),
+                                     GameText.F("CLEAR OUT R{0} (free - costs housekeeping time)", number)))
+            {
+                Say(Sim.TryStartJunkClearing(number, out string reason)
+                        ? GameText.F("R{0}: cobwebs and rubbish. Takes about {1} trips.",
+                                     number, JunkClearingModel.VisitsForOneRoom)
+                        : reason);
+                y += 30f;
+            }
+            else y += 30f;
+
+            // 花钱买速度：复原方案（现有三档）
+            var one = new System.Collections.Generic.List<int> { number };
+            var rp = ReclaimPlan.For(_reclaimPlan);
+            if (GuiInput.Button(new Rect(10, y, w - 20, 24),
+                                GameText.F("or {0} - ${1}, {2} materials, {3} days",
+                                           GameText.T(ReclaimPlan.LabelOf(_reclaimPlan)),
+                                           ReclaimPricing.CashCostFor(rp, 1),
+                                           ReclaimPricing.MaterialCostFor(rp, 1),
+                                           ReclaimPricing.BlockDaysFor(rp, 1))))
+                Say(Sim.TryStartReclaim(_reclaimPlan, one, out string why)
+                        ? GameText.F("R{0} is a building site now.", number) : why);
+            y += 28f;
+            return y;
+        }
+
+        // 家具坏了：修 / 糊胶带就在这张卡上
+        var brokenHere = new System.Collections.Generic.List<FurnitureInstance>();
+        foreach (var item in Sim.Furniture.InRoom(number))
+            if (item.IsFaulted) brokenHere.Add(item);
+
+        if (brokenHere.Count > 0)
+        {
+            var item = brokenHere[0];
+            FurnitureKind kind = FurnitureCatalog.Get(item.kindId);
+            GUI.Label(new Rect(14, y, w - 28, 20), GameText.T(FurnitureLedger.FaultLineOf(item)));
+            y += 22f;
+            float half = (w - 30) / 2f;
+            if (!item.wrecked && !item.IsUnderRepair &&
+                GuiInput.Button(new Rect(10, y, half, 24), GameText.F("FIX ${0}", kind.repairCost)))
+                Say(Sim.TryRepairFurniture(item.instanceId, out string reason)
+                        ? GameText.F("{0} in room {1}: {2} day(s) of work. It will only come back as good as it is old.",
+                                     GameText.T(kind.name), number, kind.repairDays) : reason);
+            if (!item.taped &&
+                GuiInput.Button(new Rect(20 + half, y, half, 24), GameText.T("TAPE")))
+                Say(Sim.TryTapeFurniture(item.instanceId, out string reason)
+                        ? GameText.F("Taped up room {0}. Sellable, ugly, and broken again tomorrow.", number)
+                        : reason);
+            y += 28f;
+            return y;
+        }
+
+        // 好房：升级装修
+        if (GuiInput.Button(new Rect(10, y, w - 20, 24),
+                            GameText.F("RENOVATE R{0} - {1}", number,
+                                       GameText.T(RenovationPlan.LabelOf(_plan)))))
+        {
+            var one = new System.Collections.Generic.List<int> { number };
+            Say(Sim.TryStartRenovation(_plan, one, out string reason)
+                    ? GameText.F("R{0} is shut for the works.", number) : reason);
+        }
+        y += 28f;
+        return y;
     }
 
     /// <summary>晨报上的账单区：发工资 + 还贷。

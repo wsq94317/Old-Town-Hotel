@@ -206,6 +206,17 @@ public class WorldInputController : MonoBehaviour
             if (interaction != null) { interaction.OnStaffTapped(staff); return; }
         }
 
+        // 点房间 = 选中它（玩家反馈"场景里没有可以解锁和装修的房间"：
+        // 房间原本连碰撞体都没有，解锁只能在抽屉页里盲操作）。
+        // 排在员工之后：员工站在房里时点人优先，那更符合直觉。
+        var room = hit.collider.GetComponentInParent<RoomSceneBinder>();
+        if (room != null && room.RoomNumber > 0)
+        {
+            RoomSelection.Select(room.RoomNumber);
+            ClickMarkerFx.Spawn(hit.point);
+            return;
+        }
+
         if (manager != null) manager.MoveTo(hit.point);
         ClickMarkerFx.Spawn(hit.point);
     }

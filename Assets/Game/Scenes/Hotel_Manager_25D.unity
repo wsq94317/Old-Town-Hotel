@@ -5684,6 +5684,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 332390760}
+  - component: {fileID: 332390761}
   m_Layer: 0
   m_Name: Room_204
   m_TagString: Untagged
@@ -5711,6 +5712,20 @@ Transform:
   - {fileID: 1623436750}
   m_Father: {fileID: 1652457200}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &332390761
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 332390759}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bf60586f42d2bca49b223c10824c01ca, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: OldTownHotel.Game::RoomSceneBinder
+  roomNumber: 0
+  tapBoxSize: {x: 4.2, y: 2.4, z: 4.2}
 --- !u!1 &332590249
 GameObject:
   m_ObjectHideFlags: 0
@@ -7797,6 +7812,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 475672475}
+  - component: {fileID: 475672476}
   m_Layer: 0
   m_Name: Room_205
   m_TagString: Untagged
@@ -7824,6 +7840,20 @@ Transform:
   - {fileID: 861336676}
   m_Father: {fileID: 1652457200}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &475672476
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 475672474}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bf60586f42d2bca49b223c10824c01ca, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: OldTownHotel.Game::RoomSceneBinder
+  roomNumber: 0
+  tapBoxSize: {x: 4.2, y: 2.4, z: 4.2}
 --- !u!1 &478884372
 GameObject:
   m_ObjectHideFlags: 0
@@ -7918,7 +7948,7 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2
@@ -8443,6 +8473,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 528597911}
+  - component: {fileID: 528597912}
   m_Layer: 0
   m_Name: Room_206
   m_TagString: Untagged
@@ -8470,6 +8501,20 @@ Transform:
   - {fileID: 186400200}
   m_Father: {fileID: 1652457200}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &528597912
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 528597910}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bf60586f42d2bca49b223c10824c01ca, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: OldTownHotel.Game::RoomSceneBinder
+  roomNumber: 0
+  tapBoxSize: {x: 4.2, y: 2.4, z: 4.2}
 --- !u!1 &536228955
 GameObject:
   m_ObjectHideFlags: 0
@@ -8822,7 +8867,7 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2
@@ -9592,6 +9637,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 596850919}
+  - component: {fileID: 596850920}
   m_Layer: 0
   m_Name: Room_304
   m_TagString: Untagged
@@ -9619,6 +9665,20 @@ Transform:
   - {fileID: 2006208866}
   m_Father: {fileID: 722618742}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &596850920
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 596850918}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bf60586f42d2bca49b223c10824c01ca, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: OldTownHotel.Game::RoomSceneBinder
+  roomNumber: 0
+  tapBoxSize: {x: 4.2, y: 2.4, z: 4.2}
 --- !u!1 &607842691
 GameObject:
   m_ObjectHideFlags: 0
@@ -15506,6 +15566,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 998753408}
+  - component: {fileID: 998753409}
   m_Layer: 0
   m_Name: Room_301
   m_TagString: Untagged
@@ -15533,6 +15594,20 @@ Transform:
   - {fileID: 1366847551}
   m_Father: {fileID: 722618742}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &998753409
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 998753407}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bf60586f42d2bca49b223c10824c01ca, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: OldTownHotel.Game::RoomSceneBinder
+  roomNumber: 0
+  tapBoxSize: {x: 4.2, y: 2.4, z: 4.2}
 --- !u!1 &1022066384
 GameObject:
   m_ObjectHideFlags: 0
@@ -16128,6 +16203,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1062215550}
+  - component: {fileID: 1062215551}
   m_Layer: 0
   m_Name: Room_302
   m_TagString: Untagged
@@ -16155,6 +16231,20 @@ Transform:
   - {fileID: 831102964}
   m_Father: {fileID: 722618742}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1062215551
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1062215549}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bf60586f42d2bca49b223c10824c01ca, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: OldTownHotel.Game::RoomSceneBinder
+  roomNumber: 0
+  tapBoxSize: {x: 4.2, y: 2.4, z: 4.2}
 --- !u!1 &1066365396
 GameObject:
   m_ObjectHideFlags: 0
@@ -18757,6 +18847,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1191481091}
+  - component: {fileID: 1191481092}
   m_Layer: 0
   m_Name: Room_203
   m_TagString: Untagged
@@ -18784,6 +18875,20 @@ Transform:
   - {fileID: 173885847}
   m_Father: {fileID: 1652457200}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1191481092
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1191481090}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bf60586f42d2bca49b223c10824c01ca, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: OldTownHotel.Game::RoomSceneBinder
+  roomNumber: 0
+  tapBoxSize: {x: 4.2, y: 2.4, z: 4.2}
 --- !u!1 &1192445360
 GameObject:
   m_ObjectHideFlags: 0
@@ -18846,6 +18951,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1196261454}
+  - component: {fileID: 1196261455}
   m_Layer: 0
   m_Name: Room_303
   m_TagString: Untagged
@@ -18873,6 +18979,20 @@ Transform:
   - {fileID: 778004121}
   m_Father: {fileID: 722618742}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1196261455
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1196261453}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bf60586f42d2bca49b223c10824c01ca, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: OldTownHotel.Game::RoomSceneBinder
+  roomNumber: 0
+  tapBoxSize: {x: 4.2, y: 2.4, z: 4.2}
 --- !u!1 &1197458054
 GameObject:
   m_ObjectHideFlags: 0
@@ -20111,6 +20231,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1278388641}
+  - component: {fileID: 1278388642}
   m_Layer: 0
   m_Name: Room_208
   m_TagString: Untagged
@@ -20138,6 +20259,20 @@ Transform:
   - {fileID: 348713438}
   m_Father: {fileID: 1652457200}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1278388642
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1278388640}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bf60586f42d2bca49b223c10824c01ca, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: OldTownHotel.Game::RoomSceneBinder
+  roomNumber: 0
+  tapBoxSize: {x: 4.2, y: 2.4, z: 4.2}
 --- !u!21 &1283610849
 Material:
   serializedVersion: 8
@@ -20983,6 +21118,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1352165636}
+  - component: {fileID: 1352165637}
   m_Layer: 0
   m_Name: Room_207
   m_TagString: Untagged
@@ -21010,6 +21146,20 @@ Transform:
   - {fileID: 2110977232}
   m_Father: {fileID: 1652457200}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1352165637
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1352165635}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bf60586f42d2bca49b223c10824c01ca, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: OldTownHotel.Game::RoomSceneBinder
+  roomNumber: 0
+  tapBoxSize: {x: 4.2, y: 2.4, z: 4.2}
 --- !u!1 &1355450901
 GameObject:
   m_ObjectHideFlags: 0
@@ -21972,6 +22122,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1424771172}
+  - component: {fileID: 1424771173}
   m_Layer: 0
   m_Name: Room_202
   m_TagString: Untagged
@@ -21999,6 +22150,20 @@ Transform:
   - {fileID: 1615183648}
   m_Father: {fileID: 1652457200}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1424771173
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1424771171}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bf60586f42d2bca49b223c10824c01ca, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: OldTownHotel.Game::RoomSceneBinder
+  roomNumber: 0
+  tapBoxSize: {x: 4.2, y: 2.4, z: 4.2}
 --- !u!1 &1425126099
 GameObject:
   m_ObjectHideFlags: 0
@@ -24868,7 +25033,7 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2
@@ -28691,6 +28856,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1840006116}
+  - component: {fileID: 1840006117}
   m_Layer: 0
   m_Name: Room_201
   m_TagString: Untagged
@@ -28718,6 +28884,20 @@ Transform:
   - {fileID: 1681177241}
   m_Father: {fileID: 1652457200}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1840006117
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1840006115}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bf60586f42d2bca49b223c10824c01ca, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: OldTownHotel.Game::RoomSceneBinder
+  roomNumber: 0
+  tapBoxSize: {x: 4.2, y: 2.4, z: 4.2}
 --- !u!1 &1842792587
 GameObject:
   m_ObjectHideFlags: 0
@@ -28812,7 +28992,7 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2
@@ -32691,6 +32871,7 @@ MonoBehaviour:
   spawner: {fileID: 0}
   rngSeed: 20260720
   maxTicksPerFrame: 120
+  derelictRoomsAtStart: 4
 --- !u!114 &2129138166
 MonoBehaviour:
   m_ObjectHideFlags: 0
