@@ -26,10 +26,9 @@ public class RoomSceneBinder : MonoBehaviour
     /// <summary>点击热区的尺寸（房间大约 5×5，给一个略小的盒子避免和走廊抢点击）。</summary>
     [SerializeField] private Vector3 tapBoxSize = new Vector3(4.2f, 2.4f, 4.2f);
 
-    private readonly System.Collections.Generic.List<Renderer> _tintTargets =
-        new System.Collections.Generic.List<Renderer>();
     private TextMesh _label;
-    private Material _tintMaterial;
+    private Renderer _stateChip;
+    private Material _chipMaterial;
     private RoomSimState _shownState = (RoomSimState)(-1);
     private bool _shownSelected;
     private int _shownClearingPercent = -1;
@@ -41,7 +40,8 @@ public class RoomSceneBinder : MonoBehaviour
     {
         // 热重载自愈：这些引用全是运行时找的，域重载会清空（本项目定过的规矩）
         if (roomNumber <= 0) roomNumber = ParseRoomNumber(gameObject.name);
-        CollectTintTargets();
+        FindLabel();
+        EnsureStateChip();
         EnsureTapCollider();
         _shownState = (RoomSimState)(-1);   // 强制下一帧重刷
     }
@@ -60,17 +60,50 @@ public class RoomSceneBinder : MonoBehaviour
         return digits > 0 ? value : 0;
     }
 
-    private void CollectTintTargets()
+    private void FindLabel()
     {
-        _tintTargets.Clear();
         _label = null;
-        foreach (var renderer in GetComponentsInChildren<Renderer>(includeInactive: true))
+        foreach (var text in GetComponentsInChildren<TextMesh>(includeInactive: true))
+            if (text != null) { _label = text; break; }
+    }
+
+    /// <summary>房态灯：一块小方片，挂在**走廊那一侧的房门口外**。
+    ///
+    /// 第一版是直接给整间房的墙和床染色，玩家实测反馈"颜色有闪烁，根据玩家位置
+    /// 不同颜色也有不同"——根因是 RoomDoor 把门口那块 Darkness 遮罩的透明度
+    /// 按"门开或屋里有人"从 0.78 淡到 0：经理走近遮罩消失、染色的墙露出全彩，
+    /// 他一走开同一面墙又变暗，淡入淡出的 0.8-1.2 秒就是那个闪烁。
+    /// 而且染墙会把整栋楼变成彩虹（红绿黄一片）。
+    ///
+    /// 两条硬要求，这块小片同时满足：
+    ///   ① **不能被遮罩覆盖**——所以它在房门外侧，不在房间内部；
+    ///   ② **不能被光照改变**——所以用 Unlit。Lit 材质在阴影里会变色，
+    ///      那又是一种"颜色随位置变"。</summary>
+    private void EnsureStateChip()
+    {
+        Transform existing = transform.Find("StateChip");
+        if (existing == null)
         {
-            if (renderer == null) continue;
-            var text = renderer.GetComponent<TextMesh>();
-            if (text != null) { _label = text; continue; }   // 标签不上色，只改文字
-            _tintTargets.Add(renderer);
+            var quad = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            quad.name = "StateChip";
+            Destroy(quad.GetComponent<Collider>());       // 别抢点击
+            quad.transform.SetParent(transform, worldPositionStays: false);
+            // 贴在走廊那一侧的地面上（房间 5×5，走廊边在本地 z=±2.5）。
+            // 用房间自己的 z 符号决定朝哪边——205-208 的朝向是镜像的。
+            float corridorSide = transform.localPosition.z >= 0f ? -1f : 1f;
+            quad.transform.localPosition = new Vector3(0f, 0.06f, corridorSide * 2.15f);
+            quad.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+            quad.transform.localScale = new Vector3(2.6f, 0.55f, 1f);
+            existing = quad.transform;
         }
+        _stateChip = existing.GetComponent<Renderer>();
+
+        if (_chipMaterial == null)
+        {
+            Shader unlit = Shader.Find("Universal Render Pipeline/Unlit");
+            _chipMaterial = unlit != null ? new Material(unlit) : null;
+        }
+        if (_stateChip != null && _chipMaterial != null) _stateChip.sharedMaterial = _chipMaterial;
     }
 
     /// <summary>房间要能被点到。原本整间房只有墙和床各自的碰撞体，
@@ -114,22 +147,11 @@ public class RoomSceneBinder : MonoBehaviour
 
     private void Apply(RoomSimState state, bool selected, HotelSim sim)
     {
+        // **只染那块状态灯，绝不染墙**（见 EnsureStateChip 的注释：染墙会和
+        // 门口遮罩的淡入淡出打架，表现为"颜色闪烁、随玩家位置变"）
         Color tint = RoomStatePalette.ColorOf(state);
-        if (selected) tint = Color.Lerp(tint, Color.white, 0.45f);   // 选中的那间亮一档
-
-        if (_tintMaterial == null)
-        {
-            // 一间房一份材质实例：直接改 sharedMaterial 会把**所有**用 Wall 材质的
-            // 东西一起染色（整栋楼的外墙都会跟着变，试过就知道多难看）
-            Shader shader = Shader.Find("Universal Render Pipeline/Lit");
-            _tintMaterial = shader != null ? new Material(shader) : null;
-        }
-        if (_tintMaterial != null)
-        {
-            _tintMaterial.color = tint;
-            for (int i = 0; i < _tintTargets.Count; i++)
-                if (_tintTargets[i] != null) _tintTargets[i].sharedMaterial = _tintMaterial;
-        }
+        if (selected) tint = Color.Lerp(tint, Color.white, 0.5f);   // 选中的那间亮一档
+        if (_chipMaterial != null) _chipMaterial.color = tint;
 
         if (_label != null)
             _label.text = roomNumber + "\n" + GameText.T(RoomStatePalette.WordOf(state))
@@ -145,7 +167,7 @@ public class RoomSceneBinder : MonoBehaviour
 
     private void OnDestroy()
     {
-        if (_tintMaterial != null) Destroy(_tintMaterial);
+        if (_chipMaterial != null) Destroy(_chipMaterial);
     }
 }
 

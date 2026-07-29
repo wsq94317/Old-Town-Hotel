@@ -124,8 +124,15 @@ public class WorldOperationsPanel : MonoBehaviour
                             GameText.T(_collapsed ? "OPEN THE DESK" : "HIDE THE DESK")))
             _collapsed = !_collapsed;
 
+        // 存档入口放在这一行的**右端**。第一版塞在倍速行里，直接压住了
+        // "跳到下一时段"（玩家截图抓到）——IMGUI 没有 z 序，重叠就是误触。
+        // 这一行左边是折叠按钮、中间是提示条（占到 w-150），右端本来空着。
+        if (GuiInput.Button(new Rect(w - 86f, sheetTop - 26f, 76f, 24f), GameText.T("SAVES")))
+            SaveSlotPanel.Toggle();
+
+        // 提示条右边界要给存档按钮留出位置，否则又是一处重叠
         if (Time.time < _toastUntil)
-            GUI.Box(new Rect(140, sheetTop - 26f, w - 150, 24f), _toast);
+            GUI.Box(new Rect(140, sheetTop - 26f, w - 236f, 24f), _toast);
 
         if (_collapsed) return;
 
@@ -133,10 +140,6 @@ public class WorldOperationsPanel : MonoBehaviour
         float y = sheetTop + 8f;
         y = DrawSelectedRoomCard(w, y);
         y = DrawSpeedRow(w, y);
-
-        // 存档入口：三个槽位，可存可读（玩家要求）
-        if (GuiInput.Button(new Rect(w - 92, y - 30f, 82, 22), GameText.T("SAVES")))
-            SaveSlotPanel.Toggle();
         y = DrawTabs(w, y);
 
         switch (_tab)
