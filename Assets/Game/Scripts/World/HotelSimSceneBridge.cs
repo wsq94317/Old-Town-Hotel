@@ -160,6 +160,19 @@ public class HotelSimSceneBridge : MonoBehaviour
         Sim.Materials.Add(6);
 
         RegisterStaffFromPayroll();
+
+        // **建完账立刻灌存档**（如果有）。读档发生在 Start，而这里是首帧 Update——
+        // SaveCoordinator 把 sim 段挂在 SaveSlots 上等这一刻（见 SaveSlots 文件头）。
+        // 顺序要紧：必须在 _built = true **之前**，否则同一帧的 SyncRooms/DriveClock
+        // 会先用出厂状态跑一拍，把刚要恢复的房态和时钟又推走一次。
+        SimState pending = SaveSlots.ConsumeSimRestore();
+        if (pending != null)
+        {
+            Sim.RestoreFrom(pending);
+            // 日长对齐要重设：RestoreFrom 恢复的是存档里的时钟，不含这个场景参数
+            Sim.Clock.SpeedMultiplier = 2f;
+        }
+
         _built = true;
 
         Debug.Log($"[HotelSim] 建账完成：{Rooms.Count} 间房（{Rooms.OpenRoomCount} 营业 / " +

@@ -133,6 +133,10 @@ public class WorldOperationsPanel : MonoBehaviour
         float y = sheetTop + 8f;
         y = DrawSelectedRoomCard(w, y);
         y = DrawSpeedRow(w, y);
+
+        // 存档入口：三个槽位，可存可读（玩家要求）
+        if (GuiInput.Button(new Rect(w - 92, y - 30f, 82, 22), GameText.T("SAVES")))
+            SaveSlotPanel.Toggle();
         y = DrawTabs(w, y);
 
         switch (_tab)

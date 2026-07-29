@@ -1804,6 +1804,23 @@ public sealed class HotelSim
     {
         if (state == null) return;
 
+        // 声誉样本（v8）：以前没存，于是玩了二十天的口碑一读档就归零。
+        // 这是把存档真接上之后第一批暴露出来的缺口。
+        state.reputationSamples = Reputation.ExportSamples();
+
+        // v8 的其余三套账：不存就同样读档归零
+        state.warehouseCapacity = Warehouse.Capacity;
+        state.payrollCycle = (int)Payroll.Cycle;
+        state.payrollOwed = Payroll.Owed;
+        state.payrollDaysAccrued = Payroll.DaysAccrued;
+        state.payrollMissedPaydays = Payroll.MissedPaydays;
+        state.creditScore = Credit.Score;
+        state.creditMissedPayments = Credit.MissedPayments;
+
+        state.junkClearing = new List<JunkClearEntry>();
+        foreach (var pair in Clearing.Export())
+            state.junkClearing.Add(new JunkClearEntry { room = pair.Key, workDone = pair.Value });
+
         state.day = Clock.CurrentDay;
         state.minute = Clock.CurrentMinute;
         state.totalMinutesElapsed = Clock.TotalMinutesElapsed;
@@ -1924,6 +1941,25 @@ public sealed class HotelSim
     public void RestoreFrom(SimState state)
     {
         if (state == null) return;
+
+        if (state.reputationSamples != null && state.reputationSamples.Count > 0)
+            Reputation.ImportSamples(state.reputationSamples);
+
+        // v8：仓库容量 / 工资账 / 信用 / 清理进度。
+        // 容量为 0 的旧档保持"不设上限"，由场景在建账时设真实值——
+        // 别在这里塞默认值，否则读档会悄悄改掉场景参数。
+        if (state.warehouseCapacity > 0) Warehouse.SetCapacity(state.warehouseCapacity);
+        Payroll.Restore((PayrollCycle)state.payrollCycle, state.payrollOwed,
+                        state.payrollDaysAccrued, state.payrollMissedPaydays);
+        Credit.Restore(state.creditScore, state.creditMissedPayments);
+
+        if (state.junkClearing != null)
+        {
+            var entries = new List<KeyValuePair<int, int>>();
+            foreach (var e in state.junkClearing)
+                entries.Add(new KeyValuePair<int, int>(e.room, e.workDone));
+            Clearing.Restore(entries);
+        }
 
         Clock.RestoreFromSave(state.day, state.minute, state.totalMinutesElapsed);
 

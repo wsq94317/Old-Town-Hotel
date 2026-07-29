@@ -1,23 +1,63 @@
 using System.IO;
 using UnityEngine;
 
-// Single-slot JSON save to Application.persistentDataPath. Path-based overloads
-// exist so tests can round-trip through a temp file without touching the real slot.
+// JSON 存档，写到 Application.persistentDataPath。
+// **三个槽位**（SaveSlots）：Save()/Load() 走当前槽位，SaveToSlot/LoadSlot 指定槽位。
+// 基于路径的重载留着，测试靠它在临时文件里往返而不碰玩家的真档。
 public static class SaveService
 {
-    private const string FileName = "slot0.json";
+    /// <summary>老的单槽文件名。保留常量是为了迁移（SaveSlots.MigrateLegacySlotIfNeeded）。</summary>
+    private const string LegacyFileName = "slot0.json";
 
-    public static string DefaultPath => Path.Combine(Application.persistentDataPath, FileName);
+    /// <summary>当前槽位的路径。加槽位之前这里是 slot0.json，
+    /// 老档由 MigrateLegacySlotIfNeeded 搬进 1 号槽。</summary>
+    public static string DefaultPath => SaveSlots.PathOf(SaveSlots.ActiveSlot);
 
-    public static bool HasSave() => File.Exists(DefaultPath);
+    public static string LegacyPath => Path.Combine(Application.persistentDataPath, LegacyFileName);
+
+    public static bool HasSave() => File.Exists(DefaultPath) || File.Exists(LegacyPath);
 
     public static void Save(GameState state) => SaveTo(DefaultPath, state);
 
-    public static GameState Load() => LoadFrom(DefaultPath);
+    /// <summary>读当前槽位。槽位文件不存在时回落到老的单槽档
+    /// （老玩家第一次进新版本，进度不能凭空消失）。</summary>
+    public static GameState Load()
+    {
+        GameState state = LoadFrom(DefaultPath);
+        return state ?? LoadFrom(LegacyPath);
+    }
 
     public static void Delete()
     {
         if (File.Exists(DefaultPath)) File.Delete(DefaultPath);
+    }
+
+    // ── 槽位 ─────────────────────────────────────────────────────────────────
+
+    public static void SaveToSlot(int slot, GameState state)
+    {
+        if (!SaveSlots.IsValid(slot)) return;
+        SaveTo(SaveSlots.PathOf(slot), state);
+    }
+
+    public static GameState LoadSlot(int slot) =>
+        SaveSlots.IsValid(slot) ? LoadFrom(SaveSlots.PathOf(slot)) : null;
+
+    public static void DeleteSlot(int slot)
+    {
+        if (!SaveSlots.IsValid(slot)) return;
+        string path = SaveSlots.PathOf(slot);
+        if (File.Exists(path)) File.Delete(path);
+    }
+
+    /// <summary>槽位摘要（UI 用）。**读不出来就当空槽**，不要让一个坏文件
+    /// 把整个存档界面炸掉——玩家至少还能存到别的槽位自救。</summary>
+    public static SaveSlotSummary SummaryOf(int slot)
+    {
+        if (!SaveSlots.IsValid(slot)) return SaveSlotSummary.Empty(slot);
+        GameState state = LoadSlot(slot);
+        return state == null ? SaveSlotSummary.Empty(slot)
+                             : SaveSlotSummary.From(slot, state);
     }
 
     public static void SaveTo(string path, GameState state)

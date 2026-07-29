@@ -159,6 +159,8 @@ public class WorldInputController : MonoBehaviour
         if (_fire == null) _fire = FindFirstObjectByType<FireAlarmIncident>();
         if (_breakdowns == null) _breakdowns = FindFirstObjectByType<BreakdownSystem>();
         bool panelOpen =
+            // 存档面板：静态查询，因为它是按需自动装的（场景文件里没有这个物体）
+            SaveSlotPanel.AnyPanelOpen ||
             (_interaction != null && _interaction.PanelOpen) ||
             (_complaint != null && _complaint.PanelOpen) ||
             (_events != null && _events.PanelOpen) ||

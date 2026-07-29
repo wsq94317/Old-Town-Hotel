@@ -21,13 +21,31 @@ public sealed class SaveCoordinator : MonoBehaviour
         if (dayController == null) dayController = FindFirstObjectByType<Room2DDemoDayController>();
         if (demandLoop == null) demandLoop = FindFirstObjectByType<Room2DPrototypeDemandLoop>();
         _breakdowns = FindFirstObjectByType<BreakdownSystem>();
+        _simBridge = FindFirstObjectByType<HotelSimSceneBridge>();
+
+        // 老的单槽存档搬进 1 号槽（只在 1 号槽空着时搬）——加槽位不能让老玩家丢进度
+        SaveSlots.MigrateLegacySlotIfNeeded();
     }
+
+    private HotelSimSceneBridge _simBridge;
 
     // Subscribe in Start so RenovationSystem (subscribes in Awake) ticks the day
     // BEFORE we capture — the autosave then reflects post-tick tiers.
     private void Start()
     {
         if (dayController != null) dayController.OnDaySettled += HandleDaySettled;
+
+        // 玩家在存档界面点了"读取 2 号槽"→ 场景重载 → 现在把意向消费掉。
+        // 读档必须走重载：第 12 天读第 3 天的档，场上有走到一半的客人、在途的
+        // 施工单、正在打扫的管家——逐个系统改回去不可能改干净（见 SaveSlots 注释）。
+        int requested = SaveSlots.ConsumePendingLoad();
+        if (SaveSlots.IsValid(requested))
+        {
+            SaveSlots.SetActiveSlot(requested);
+            LoadGame();
+            return;
+        }
+
         if (autoLoadOnStart && SaveService.HasSave()) LoadGame();
     }
 
@@ -62,6 +80,21 @@ public sealed class SaveCoordinator : MonoBehaviour
         // v3 世界层：设施解锁 / 威望 / 胶带复发 / 锁房
         FacilitySystem.CaptureTo(gs.world);
         gs.world.prestige = ManagerReputation.Prestige;
+
+        // **模拟内核**（v4-v7 的 sim 段）。以前这一段从来没被写过——SimState 结构
+        // 完整、HotelSim.CaptureTo 也写好了，但**没有人调用它**。于是家具、预订簿、
+        // 在途施工单、仓库、工资账、信用……读档一律回到出厂状态。
+        // 玩家自建酒店（改墙/摆家具）的前提就是它：改完一读档全没，功能等于假的。
+        if (_simBridge != null && _simBridge.Sim != null)
+        {
+            _simBridge.Sim.CaptureTo(gs.sim);
+        }
+        else if (_lastLoaded != null && _lastLoaded.sim != null)
+        {
+            // 本场景没有桥（v1 原型场景）：把读进来的 sim 段原样带过，
+            // 别用空表覆盖掉经理模式的进度（同 world 段的处理）
+            gs.sim = _lastLoaded.sim;
+        }
         if (_breakdowns != null) _breakdowns.CaptureTo(gs.world);
         else if (_lastLoaded != null && _lastLoaded.world != null)
         {
@@ -93,6 +126,13 @@ public sealed class SaveCoordinator : MonoBehaviour
             ManagerReputation.Restore(gs.world.prestige);
             if (_breakdowns != null) _breakdowns.RestoreFrom(gs.world);
         }
+        // **Sim 段延迟应用**：此刻是 Start 阶段，而 Sim 是在
+        // HotelSimSceneBridge.Update() → TryBuild() 里惰性建的（那时 demandLoop.rooms
+        // 才填好）。Unity 所有 Start 先于任何 Update ⇒ 这里 _simBridge.Sim 保证是 null，
+        // 直接灌不是"没生效"而是**存档损坏**（并行审计抓到的）。
+        // 挂到 SaveSlots 上，桥建完账第一件事就是取用。
+        if (gs.sim != null) SaveSlots.QueueSimRestore(gs.sim);
+
         // 顶栏现金对齐（否则读档当天一直显示序列化默认值）
         if (dayController != null) dayController.SyncCashFromEconomy();
     }
@@ -103,6 +143,7 @@ public sealed class SaveCoordinator : MonoBehaviour
         // 静态世界状态一并归零，否则上一局的威望/解锁渗进新档
         ManagerReputation.ResetForNewGame();
         FacilitySystem.ResetForNewGame();
+        SaveSlots.ResetForNewGame();
         _lastLoaded = null;
     }
 

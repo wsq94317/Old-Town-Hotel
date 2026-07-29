@@ -202,8 +202,27 @@ public sealed class SimState
     // 破败房复原工期最长 7 天（全游戏最长），不存等于直接吞钱。
     public int nextBuildJobId;
     public List<BuildJobEntry> buildJobs = new List<BuildJobEntry>();
+
+    // v8：**Sim 自己的声誉样本**。把存档接通之后才暴露出来的缺口——
+    // 世界场景的星级走 Sim 的 ReputationLedger，而这里以前只有 v1 经济体那份
+    // （EconomyState.reputationSamples，经理模式压根不填它）。
+    // 结果：每次读档星级归零，玩了二十天的口碑一瞬间白给。
+    public List<float> reputationSamples = new List<float>();
+
+    // v8：本次会话新加的三套账，同样不存就同样读档归零
+    public int warehouseCapacity;                       // 仓库容量（0 = 不设上限）
+    public int payrollCycle;                            // PayrollCycle
+    public int payrollOwed;                             // 累计未付工资
+    public int payrollDaysAccrued;
+    public int payrollMissedPaydays;
+    public int creditScore = CreditPolicy.StartingScore; // 信用 0-100
+    public int creditMissedPayments;
+    public List<JunkClearEntry> junkClearing = new List<JunkClearEntry>();   // 破败房清理进度
     public List<RoomStateEntry> roomStates = new List<RoomStateEntry>();
 }
+
+[Serializable]
+public sealed class JunkClearEntry { public int room; public int workDone; }
 
 [Serializable]
 public sealed class GameState
@@ -212,7 +231,8 @@ public sealed class GameState
     // v5: + 家具（崭新度/健康度）、材料库存、每房挂牌档
     // v6: + 预订簿（逐单 Reservation）、故意超售档、预订视野已铺开标记
     // v7: + 在建施工单（装修/复原）与房态——以前工单和房态都会在读档时丢
-    public const int CurrentVersion = 7;
+    // v8: + Sim 的声誉样本（星级以前每次读档归零）；仓库容量；工资账与信用
+    public const int CurrentVersion = 8;
 
     public int version = CurrentVersion;
     public EconomyState economy = new EconomyState();
@@ -241,6 +261,10 @@ public sealed class GameState
         if (sim.reservations == null) sim.reservations = new List<ReservationSaveEntry>();
         if (sim.buildJobs == null) sim.buildJobs = new List<BuildJobEntry>();
         if (sim.roomStates == null) sim.roomStates = new List<RoomStateEntry>();
+        if (sim.reputationSamples == null) sim.reputationSamples = new List<float>();
+        if (sim.junkClearing == null) sim.junkClearing = new List<JunkClearEntry>();
+        // 旧档没有信用分：给满分而不是 0，否则老玩家一读档就变"已拉黑"
+        if (version < 8 && sim.creditScore == 0) sim.creditScore = CreditPolicy.StartingScore;
 
         // v3 及更早：Sim 尚未存在，用进度里的日号对齐钟面（读档即是那天早上）
         if (version < 4 && sim.day <= 1 && progress.day > 0) sim.day = progress.day;
