@@ -206,16 +206,17 @@ public class WorldInputController : MonoBehaviour
             if (interaction != null) { interaction.OnStaffTapped(staff); return; }
         }
 
-        // 点房间 = 选中它（玩家反馈"场景里没有可以解锁和装修的房间"：
-        // 房间原本连碰撞体都没有，解锁只能在抽屉页里盲操作）。
-        // 排在员工之后：员工站在房里时点人优先，那更符合直觉。
+        // 点房间 = 选中它 **并且** 让经理走过去。
+        //
+        // 这里曾经 `return`，那是个真回归（对抗审计抓到的）：房间的点击盒是
+        // 4.2×4.2 而房间本身 5×5，几乎盖满内部，于是 MoveTo 永远轮不到——
+        // **经理再也不能被派进房间**，门禁/刷卡/验房/走错房那一整套流程
+        // （RoomDoor 靠 _managerAgent.destination 落在房内才触发）全部失效。
+        //
+        // 一次点击同时做两件合理的事，彼此并不冲突：选中它（抽屉里就能对它下手），
+        // 同时把人派过去（要检查总得先走到）。
         var room = hit.collider.GetComponentInParent<RoomSceneBinder>();
-        if (room != null && room.RoomNumber > 0)
-        {
-            RoomSelection.Select(room.RoomNumber);
-            ClickMarkerFx.Spawn(hit.point);
-            return;
-        }
+        if (room != null && room.RoomNumber > 0) RoomSelection.Select(room.RoomNumber);
 
         if (manager != null) manager.MoveTo(hit.point);
         ClickMarkerFx.Spawn(hit.point);
