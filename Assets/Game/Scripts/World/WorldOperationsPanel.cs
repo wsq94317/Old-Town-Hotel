@@ -165,6 +165,13 @@ public class WorldOperationsPanel : MonoBehaviour
         report.Add(GameText.F("Checked in {0}, turned away {1}, queue cost {2} min",
                               Sim.ArrivalsCheckedInToday, Sim.ArrivalsTurnedAwayToday,
                               Sim.TotalCheckInWaitToday));
+        // 夜班的成绩单：接住了几个、几个吃了闭门羹（玩家靠这两行决定要不要排夜班）
+        report.AddIf(Sim.NightCheckInsToday > 0,
+                     GameText.F("NIGHT DESK took in {0} late arrival(s) - rooms you'd have lost.",
+                                Sim.NightCheckInsToday));
+        report.AddIf(Sim.NightLockedOutToday > 0,
+                     GameText.F("{0} guest(s) found a locked door at night. They wrote about it.",
+                                Sim.NightLockedOutToday));
         report.Add(GameText.F("Commission ${0}   Cancelled {1}   No-shows {2}",
                               Sim.CommissionToday, Sim.CancellationsToday, Sim.NoShowsToday));
         report.AddIf(Sim.BookingsDeclinedToday > 0,
@@ -497,9 +504,39 @@ public class WorldOperationsPanel : MonoBehaviour
             y += 26f;
         }
         y += 4f;
+
+        // ── 夜班：22:00-08:00 的幕后班（用户要求）──────────────────────────────
+        // 夜班接住"打烊时还在排队的客人"，代价是 +50% 工资。它必须和加成、
+        // 和夜间产能并排显示，否则玩家没法算这笔账。
+        int nightDesk = Sim.Shifts.NightCountOnDuty(Sim.Staff, StaffRole.Reception);
+        int nightWanted = Sim.Shifts.NightCountOf(StaffRole.Reception);
+        if (GuiInput.Button(new Rect(10, y, w - 20, 24),
+                            GameText.F("NIGHT DESK  {0} on nights (+50% pay)  -  tap to change", nightDesk)))
+        {
+            // 在 0..前台总人数 之间循环（留一个人给白班，所以上限是总数-1）
+            int receptionTotal = 0;
+            foreach (var e in Sim.Staff.Entries)
+                if (e.member != null && e.member.Role == StaffRole.Reception) receptionTotal++;
+            int max = receptionTotal - 1 < 0 ? 0 : receptionTotal - 1;
+            Sim.Shifts.SetNightCount(StaffRole.Reception, nightWanted >= max ? 0 : nightWanted + 1);
+            Sim.Shifts.ApplyTo(Sim.Staff);
+            Say(GameText.F("Night desk set to {0}. Takes effect tomorrow morning.",
+                           Sim.Shifts.NightCountOf(StaffRole.Reception)));
+        }
+        y += 26f;
         GUI.Label(new Rect(14, y, w - 28, 20),
-            GameText.F("On duty {0}/{1}   wages today ${2}",
-                       Sim.Staff.OnDutyCount, Sim.Staff.Count, Sim.Shifts.DailyWageCost(Sim.Staff))); y += 22f;
+            nightDesk > 0
+                ? GameText.F("Night desk can take {0} late arrivals; the rest find a locked door.",
+                             NightDeskModel.CapacityFor(nightDesk))
+                : GameText.T("Nobody on nights: guests still queuing at 22:00 are lost and angry."));
+        y += 24f;
+
+        bool weekend = PricingPolicy.IsWeekend(Sim.Clock.CurrentDay);
+        GUI.Label(new Rect(14, y, w - 28, 20),
+            GameText.F("On duty {0}/{1} by day, {2} on nights   wages today ${3}{4}",
+                       Sim.Staff.OnDutyCount, Sim.Staff.Count, Sim.Shifts.NightStaffOnDuty,
+                       Sim.Shifts.DailyWageCost(Sim.Staff, Sim.Clock.CurrentDay),
+                       weekend ? GameText.T("  (WEEKEND +30%)") : "")); y += 22f;
         GUI.Label(new Rect(14, y, w - 28, 20),
             GameText.F("Clean capacity {0}/h   check-ins {1}/h",
                        ServiceCapacityModel.CleanRoomsPerHour(Sim.Staff, 1f).ToString("0.0"),

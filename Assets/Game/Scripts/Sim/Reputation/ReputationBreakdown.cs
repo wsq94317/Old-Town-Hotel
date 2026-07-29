@@ -21,7 +21,9 @@ public enum ReputationCause
     RefundIgnored,      // 退款申请拖到日结
     OverbookingWalked,  // 超售客被赶走
     OverbookingPaid,    // 超售客赔钱送走
-    OverbookingUpgraded // 超售客升级安顿（正面）
+    OverbookingUpgraded,// 超售客升级安顿（正面）
+    NightDeskClosed,    // 夜里到店发现前台没人（比"没来"更伤：人家真到了门口）
+    NightDeskSaved      // 夜班前台通宵接住了客人（正面）
 }
 
 public sealed class ReputationBreakdown
@@ -123,7 +125,9 @@ public sealed class ReputationBreakdown
             case ReputationCause.RefundIgnored: return "Refunds left hanging";
             case ReputationCause.OverbookingWalked: return "Overbooked guests sent away";
             case ReputationCause.OverbookingPaid: return "Overbooked guests paid off";
-            default: return "Overbooked guests upgraded";
+            case ReputationCause.OverbookingUpgraded: return "Overbooked guests upgraded";
+            case ReputationCause.NightDeskClosed: return "Locked door at 1am";
+            default: return "Night desk took them in";
         }
     }
 }

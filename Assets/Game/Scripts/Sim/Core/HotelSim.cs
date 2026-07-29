@@ -816,6 +816,8 @@ public sealed class HotelSim
         ReservationArrivalsToday = 0;
         WalkInArrivalsToday = 0;
         NoShowsToday = 0;
+        NightCheckInsToday = 0;
+        NightLockedOutToday = 0;
         OverbookingsToday = 0;
         OverbookingsUpgradedToday = 0;
         OverbookingsCompensatedToday = 0;
@@ -1239,6 +1241,57 @@ public sealed class HotelSim
         ArrivalsCheckedInToday++;
     }
 
+    /// <summary>夜间前台：把打烊时还在排队的客人处理掉。
+    ///
+    /// 有夜班前台 → 通宵办入住（一人一夜有上限，见 NightDeskModel），
+    ///              这些客人今夜就住进房间，房费明晚退房时才收。
+    /// 没有夜班   → 客人对着锁着的门站到天亮：记差评、算劝走。
+    ///              **比 no-show 更伤**——人家是真的到了门口没人理。</summary>
+    private void RunNightDesk()
+    {
+        NightCheckInsToday = 0;
+        NightLockedOutToday = 0;
+        if (_deskQueue.Count == 0) return;
+
+        int capacity = NightDeskModel.CapacityFor(
+            Shifts.NightCountOnDuty(Staff, StaffRole.Reception));
+
+        while (_deskQueue.Count > 0)
+        {
+            int ticket = _deskQueue.Dequeue();
+
+            if (NightCheckInsToday < capacity)
+            {
+                int before = ArrivalsCheckedInToday;
+                // 夜里到店的人等了很久才被接进去，但总算住上了——按 60 分钟等待记账
+                AdmitOneGuest(ticket, waitMinutes: 60);
+                if (ArrivalsCheckedInToday > before)
+                {
+                    NightCheckInsToday++;
+                    Reputation.RecordGuest(1f);   // 深夜有人接待，这本身就是好体验
+                    Breakdown.Add(ReputationCause.NightDeskSaved, 0f);
+                    continue;
+                }
+                // 没房可给（超售/没干净房）：AdmitOneGuest 已经按它的规矩处置了
+                continue;
+            }
+
+            // 没人值夜（或夜班也忙不过来）：吃一记差评
+            NightLockedOutToday++;
+            ArrivalsTurnedAwayToday++;
+            Reputation.RecordGuest(
+                SimMath.Clamp(1f - NightDeskModel.LockedOutPenalty,
+                              ReputationLedger.MinSatisfaction, ReputationLedger.MaxSatisfaction));
+            Breakdown.Add(ReputationCause.NightDeskClosed, -NightDeskModel.LockedOutPenalty);
+        }
+    }
+
+    /// <summary>夜班前台通宵接下了几位客人（晨报展示：夜班挣回来的钱）。</summary>
+    public int NightCheckInsToday { get; private set; }
+
+    /// <summary>几位客人深夜到店发现没人（晨报展示：不排夜班的代价）。</summary>
+    public int NightLockedOutToday { get; private set; }
+
     /// <summary>打烊时还没出现的今日预订 = no-show。
     /// 不收钱、不扣声誉（人没来，怪不到服务上），但那一晚的库存已经白占了——
     /// 这正是"故意超售"赌注的另一面：赌取消/no-show，赌赢了多赚，赌输了要处置人。</summary>
@@ -1350,10 +1403,16 @@ public sealed class HotelSim
         // 也与世界场景 v1 的"打烊清场"对齐：客人本来就是日终离场的。
         RunCheckoutWave();
 
+        // **夜间前台**（用户要求加夜班）：打烊时还站在前台排队的客人以前在
+        // BeginDay 被静默清掉——白丢一笔房费，而且玩家完全看不到。
+        // 现在有人值夜就通宵办入住，没人值夜他们就对着锁门站到天亮（差评照记）。
+        // 排在退房潮之后：夜里能给的房是"本来就干净着的"，刚退的房还没打扫。
+        RunNightDesk();
+
         var input = new DaySettlementInput(
             grossIncome: _grossIncomeToday,
             commission: _commissionToday,
-            wages: Shifts.DailyWageCost(Staff),
+            wages: Shifts.DailyWageCost(Staff, Clock.CurrentDay),   // 周末/夜班加成在这里生效
             interest: interest,
             scheduledRepayment: scheduledRepayment,
             supplies: supplies,
