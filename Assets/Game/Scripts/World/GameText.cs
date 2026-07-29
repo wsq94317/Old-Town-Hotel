@@ -75,7 +75,9 @@ public static class GameText
         { "   SPILLED ${0}", "   溢出 ${0}" },
         { "   DEBT ${0}", "   欠款 ${0}" },
         { "{0}*   {1} sellable   {2} to clean   {3} in use   {4} broken   {5} derelict   MAT {6}/{7}",
-          "{0}★   可售 {1}   待清 {2}   在住 {3}   坏封 {4}   破败 {5}   材料 {6}/{7}" },
+          "{0}★   今天可售 {1}   待清 {2}   在住 {3}   坏封 {4}   破败 {5}   材料 {6}/{7}" },
+        { "SOLD OUT on night(s) {0} - that is where the refusals come from.",
+          "第 {0} 晚已订满 —— 拒单就是从这儿来的。" },
         { "The warehouse only has room for {0} more. Space: {1}/{2}.", "仓库只装得下 {0} 份了。占用：{1}/{2}。" },
 
         // ── 页签与时间控制 ────────────────────────────────────────────────────
@@ -108,8 +110,12 @@ public static class GameText
           "入住 {0} 人，劝走 {1} 人，排队共耗 {2} 分钟" },
         { "Commission ${0}   Cancelled {1}   No-shows {2}",
           "渠道佣金 ${0}   取消 {1} 单   未到店 {2} 人" },
-        { "TURNED DOWN {0} BOOKINGS - no rooms left to sell.",
-          "有 {0} 单接不下来 — 没房可卖了。" },
+{ "TURNED DOWN {0} BOOKINGS - night {1} is already full.",
+          "有 {0} 单接不下来 —— 第 {1} 晚已经订满了。" },
+        { "TURNED DOWN {0} BOOKINGS - nights {1}-{2} are already full ({3} nights).",
+          "有 {0} 单接不下来 —— 第 {1} 到 {2} 晚已经订满（共 {3} 晚）。" },
+        { "TURNED DOWN {0} BOOKINGS - they wanted bands you do not offer.",
+          "有 {0} 单接不下来 —— 他们要的档位你没有挂出来。" },
         { "Rating {0}*   Debt ${1}", "评分 {0}★   欠款 ${1}" },
         { "Rating {0}*", "评分 {0}★" },
         // 声誉明细：今天为什么涨/为什么掉

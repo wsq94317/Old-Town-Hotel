@@ -185,9 +185,7 @@ public class WorldOperationsPanel : MonoBehaviour
                                 Sim.NightLockedOutToday));
         report.Add(GameText.F("Commission ${0}   Cancelled {1}   No-shows {2}",
                               Sim.CommissionToday, Sim.CancellationsToday, Sim.NoShowsToday));
-        report.AddIf(Sim.BookingsDeclinedToday > 0,
-                     GameText.F("TURNED DOWN {0} BOOKINGS - no rooms left to sell.",
-                                Sim.BookingsDeclinedToday));
+        report.AddIf(Sim.BookingsDeclinedToday > 0, DeclinedBookingsLine());
         report.Add(GameText.F("Rating {0}*", Sim.Reputation.Stars.ToString("0.00")));
         AddReputationBreakdown(report);
 
@@ -394,6 +392,26 @@ public class WorldOperationsPanel : MonoBehaviour
         }
     }
 
+    /// <summary>拒单那一行的人话：**点明是哪几晚满了**。
+    ///
+    /// 玩家实测困惑："UI 看是可售有几个，但是结算的时候说没房可卖。"
+    /// 顶栏的"可售"是今天的空房，拒单说的是未来某一晚的间夜卖光了——
+    /// 不点明晚号，这两个数字看起来就是自相矛盾。</summary>
+    private string DeclinedBookingsLine()
+    {
+        var full = Sim.FullyBookedNights();
+        if (full.Count == 0)
+            return GameText.F("TURNED DOWN {0} BOOKINGS - they wanted bands you do not offer.",
+                              Sim.BookingsDeclinedToday);
+
+        if (full.Count == 1)
+            return GameText.F("TURNED DOWN {0} BOOKINGS - night {1} is already full.",
+                              Sim.BookingsDeclinedToday, full[0]);
+
+        return GameText.F("TURNED DOWN {0} BOOKINGS - nights {1}-{2} are already full ({3} nights).",
+                          Sim.BookingsDeclinedToday, full[0], full[full.Count - 1], full.Count);
+    }
+
     /// <summary>把"今天为什么涨/为什么掉"加进晨报（与原型同一套明细）。</summary>
     private void AddReputationBreakdown(GuiPanel panel)
     {
@@ -533,6 +551,13 @@ public class WorldOperationsPanel : MonoBehaviour
         }
         panel.Add(GameText.F("Next 7 nights sold  {0}   (cap {1})",
                              SoldNightsPreview(), Sim.Rooms.OpenRoomCount));
+
+        // 满房的晚号直接列出来：顶栏的"今天可售"和"未来某晚订满"是两件事，
+        // 玩家实测把它们当成了矛盾（"UI 看是可售有几个，结算说没房可卖"）
+        var full = Sim.FullyBookedNights();
+        panel.AddIf(full.Count > 0,
+                    GameText.F("SOLD OUT on night(s) {0} - that is where the refusals come from.",
+                               string.Join(", ", full)));
         panel.Draw(10, y, w - 20, GameText.T("TODAY"));
     }
 

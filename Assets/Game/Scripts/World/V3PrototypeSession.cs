@@ -113,6 +113,22 @@ public class V3PrototypeSession : MonoBehaviour
 
     // ── UI ───────────────────────────────────────────────────────────────────
 
+    /// <summary>拒单那一行：**点明是哪几晚满了**（世界场景同款措辞）。
+    /// 顶栏的"可售"是今天的空房，拒单说的是未来某晚的间夜卖光了——
+    /// 不点明晚号，玩家会把这两个数字当成自相矛盾（实测反馈）。</summary>
+    private string DeclinedLine()
+    {
+        var full = _sim.FullyBookedNights();
+        if (full.Count == 0)
+            return GameText.F("TURNED DOWN {0} BOOKINGS - they wanted bands you do not offer.",
+                              _sim.BookingsDeclinedToday);
+        if (full.Count == 1)
+            return GameText.F("TURNED DOWN {0} BOOKINGS - night {1} is already full.",
+                              _sim.BookingsDeclinedToday, full[0]);
+        return GameText.F("TURNED DOWN {0} BOOKINGS - nights {1}-{2} are already full ({3} nights).",
+                          _sim.BookingsDeclinedToday, full[0], full[full.Count - 1], full.Count);
+    }
+
     private void OnGUI()
     {
         if (_sim == null) return;
@@ -196,8 +212,7 @@ public class V3PrototypeSession : MonoBehaviour
         report.Add(GameText.F("Commission ${0}   Cancelled {1}   No-shows {2}",
                               _sim.CommissionToday, _sim.CancellationsToday, _sim.NoShowsToday));
         report.AddIf(_sim.BookingsDeclinedToday > 0,
-                     GameText.F("TURNED DOWN {0} BOOKINGS - no rooms left to sell.",
-                                _sim.BookingsDeclinedToday));
+                     DeclinedLine());
         report.Add(GameText.F("Rating {0}*   Debt ${1}",
                               _sim.Reputation.Stars.ToString("0.00"), _loan.Balance));
         AddReputationBreakdown(report);

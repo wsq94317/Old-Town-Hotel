@@ -947,6 +947,31 @@ public sealed class HotelSim
         }
     }
 
+    /// <summary>未来视野内**已经订满**的那些晚（按日号升序）。
+    ///
+    /// 玩家实测困惑："UI 看是可售有几个，但是结算的时候说没房可卖。"
+    /// 两个数字说的不是一回事——顶栏的"可售"是**今天**的 Ready 间数，
+    /// 而拒单说的是**未来某一晚**的间夜库存卖光了。实测那一局：今天可售 4 间，
+    /// 而第 6、7 晚的剩余是 0，所以 6 张单被拒得完全正确。
+    /// 措辞不点明是哪几晚，玩家只会以为这两个数字互相矛盾。</summary>
+    public List<int> FullyBookedNights()
+    {
+        var nights = new List<int>();
+        var bands = OfferedBands();
+        if (bands.Count == 0) return nights;
+
+        int today = Clock.CurrentDay;
+        for (int offset = 0; offset < BookingGenerator.HorizonDays; offset++)
+        {
+            int day = today + offset;
+            bool anyLeft = false;
+            for (int i = 0; i < bands.Count; i++)
+                if (Calendar.RemainingOn(day, bands[i]) > 0) { anyLeft = true; break; }
+            if (!anyLeft) nights.Add(day);
+        }
+        return nights;
+    }
+
     /// <summary>酒店实际挂出来的档位（客人只能订这些）。</summary>
     private List<RoomTier> OfferedBands()
     {
