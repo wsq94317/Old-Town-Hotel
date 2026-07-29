@@ -199,6 +199,10 @@ public class WorldOperationsPanel : MonoBehaviour
             y += 34f;
         }
 
+        // ── 两笔要玩家亲手付的钱（用户设计：要肉疼）──────────────────────────
+        // 顺序刻意：先给他收钱的快感，紧接着让他把一部分交出去。
+        y = DrawBillsToPay(w, y);
+
         // 退款闸门：处理完才给开门
         var refunds = Sim.PendingRefunds;
         if (refunds.Count > 0)
@@ -234,6 +238,103 @@ public class WorldOperationsPanel : MonoBehaviour
 
         if (Time.time < _toastUntil)
             GUI.Box(new Rect(10, h - 40, w - 20, 26), _toast);
+    }
+
+    /// <summary>晨报上的账单区：发工资 + 还贷。
+    /// **两笔都从现金扣、不够动保险箱**——玩家亲手付（肉疼），
+    /// 但"忘了按收取"绝不会害他欠薪（修订版 3 的铁律）。</summary>
+    private float DrawBillsToPay(float w, float y)
+    {
+        int owed = Sim.Payroll.Owed;
+        bool weekly = Sim.Payroll.Cycle == PayrollCycle.Weekly;
+        int daysLeft = Sim.Payroll.DaysUntilPayday(Sim.Clock.CurrentDay);
+
+        if (owed > 0)
+        {
+            // 周付的常驻提醒：本周待付多少、还剩几天（用户明确要求）
+            GUI.Label(new Rect(14, y, w - 28, 20),
+                      weekly
+                          ? GameText.F("PAYROLL  ${0} owed, payday in {1} day(s)", owed, daysLeft)
+                          : GameText.F("PAYROLL  ${0} owed today", owed));
+            y += 22f;
+
+            float half = (w - 30) / 2f;
+            if (GuiInput.Button(new Rect(10, y, half, 28), GameText.F("PAY WAGES ${0}", owed)))
+            {
+                var payment = Sim.PayWages();
+                Say(payment.cleared
+                        ? GameText.F("Paid ${0}. They can eat this week.", payment.paid)
+                        : GameText.F("Only managed ${0}. Still ${1} short - they noticed.",
+                                     payment.paid, payment.stillOwed));
+            }
+            if (GuiInput.Button(new Rect(20 + half, y, half, 28),
+                               GameText.T(weekly ? "SWITCH TO DAILY" : "SWITCH TO WEEKLY")))
+            {
+                Say(Sim.Payroll.TrySetCycle(weekly ? PayrollCycle.Daily : PayrollCycle.Weekly,
+                                            out string why)
+                        ? GameText.T(weekly ? "Paying daily from now on."
+                                            : "Weekly it is. Keep the cash - and the risk.")
+                        : why);
+            }
+            y += 32f;
+        }
+
+        // 还贷：金额按 DebtPolicy 建议（赚得多就多还），但**要玩家自己按**
+        var economy = Economy;
+        if (economy != null && economy.Loan != null && economy.Loan.Balance > 0)
+        {
+            int suggested = DebtPolicy.ScheduledRepaymentFor(
+                economy.Loan.Balance, Sim.LastSettlement.netToSafebox,
+                Sim.Cash + Sim.Safebox.Balance, cap: 150);
+
+            GUI.Label(new Rect(14, y, w - 28, 20),
+                      GameText.F("DEBT ${0}   credit: {1}", economy.Loan.Balance,
+                                 GameText.T(CreditPolicy.LabelOf(Sim.Credit.Rating))));
+            y += 22f;
+
+            // **逾期必须说出来**：悄悄扣评级和利率，玩家只会觉得游戏在暗算他。
+            // 第一次是警告（不涨息），第二次起才真疼——这一行要把差别讲清楚。
+            if (Sim.Credit.MissedPayments > 0)
+            {
+                GUI.Label(new Rect(14, y, w - 28, 20),
+                          Sim.Credit.PenaltyRate > 0f
+                              ? GameText.F("You skipped the bank {0}x. Interest is now higher.",
+                                           Sim.Credit.MissedPayments)
+                              : GameText.T("You skipped the bank once. A warning - next time it costs."));
+                y += 22f;
+            }
+
+            if (suggested > 0 && GuiInput.Button(new Rect(10, y, w - 20, 28),
+                                                 GameText.F("PAY THE BANK ${0}", suggested)))
+            {
+                int paid = Sim.PayLoanInstallment(suggested);
+                if (paid > 0) economy.RepayLoan(paid);
+                Say(paid > 0
+                        ? GameText.F("Paid the bank ${0}. Interest keeps running anyway.", paid)
+                        : GameText.T("Not a cent to spare. The bank will remember."));
+            }
+            else if (suggested <= 0)
+            {
+                GUI.Label(new Rect(14, y, w - 28, 20),
+                          GameText.T("Nothing due today - but the interest never sleeps."));
+            }
+            y += 32f;
+        }
+
+        return y;
+    }
+
+    private EconomySystem _economyCache;
+
+    /// <summary>贷款账本在 v1 的 EconomySystem 上。惰性查找 + 每次校验，
+    /// 因为域重载会把引用清成"假 null"（本项目踩过两次的坑）。</summary>
+    private EconomySystem Economy
+    {
+        get
+        {
+            if (_economyCache == null) _economyCache = FindFirstObjectByType<EconomySystem>();
+            return _economyCache;
+        }
     }
 
     /// <summary>把"今天为什么涨/为什么掉"加进晨报（与原型同一套明细）。</summary>

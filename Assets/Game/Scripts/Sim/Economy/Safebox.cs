@@ -45,6 +45,19 @@ public sealed class Safebox
         return amount - stored;
     }
 
+    /// <summary>按需取一部分（支付按钮用）。返回真的取到多少。
+    ///
+    /// **为什么不复用 Collect()**：付工资时若把整箱钱先收上来再花掉一部分，
+    /// 玩家就再也没有"按下收款、看见数字跳上去"的那一刻了——而那正是成就感的
+    /// 来源（玩家原话："收款是玩家获得成就感的来源"）。账单只该拿走它需要的。</summary>
+    public int Withdraw(int amount)
+    {
+        if (amount <= 0 || Balance <= 0) return 0;
+        int taken = amount < Balance ? amount : Balance;
+        Balance -= taken;
+        return taken;
+    }
+
     /// <summary>玩家收取：全额进现金，箱子清空。</summary>
     public int Collect()
     {

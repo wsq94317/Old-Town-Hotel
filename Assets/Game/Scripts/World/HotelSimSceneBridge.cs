@@ -303,7 +303,10 @@ public class HotelSimSceneBridge : MonoBehaviour
 
         if (_needsBeginDay)
         {
-            Sim.BeginDay();
+            // 有债务在身 = 昨天有一笔该还的钱。玩家在晨报上没按还款键就记一次逾期
+            // （涨利率、掉信用评级）——BeginDay 里收口，因为支付发生在晨报上。
+            bool loanWasDue = economy != null && economy.Loan != null && economy.Loan.Balance > 0;
+            Sim.BeginDay(loanWasDue);
             _needsBeginDay = false;
         }
 

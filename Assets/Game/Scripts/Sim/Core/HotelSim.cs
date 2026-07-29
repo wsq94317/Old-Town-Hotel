@@ -99,6 +99,12 @@ public sealed class HotelSim
     /// <summary>破败房的垃圾清理进度（只花人工那条路，见 JunkClearing）。</summary>
     public JunkClearingQueue Clearing { get; } = new JunkClearingQueue();
 
+    /// <summary>工资账：日结只记账，等玩家亲手按下支付（见 PayrollAccount）。</summary>
+    public PayrollAccount Payroll { get; } = new PayrollAccount();
+
+    /// <summary>还款信用：逾期涨利率、掉评级、卡额度（见 CreditStanding）。</summary>
+    public CreditStanding Credit { get; } = new CreditStanding();
+
     /// <summary>当日声誉明细（晨报读它回答"今天为什么涨/为什么掉"）。</summary>
     public ReputationBreakdown Breakdown { get; } = new ReputationBreakdown();
 
@@ -795,8 +801,14 @@ public sealed class HotelSim
     // ── 一天开始 ─────────────────────────────────────────────────────────────
 
     /// <summary>开门：排班落表 → 退房潮 → 掷今日客量。</summary>
-    public void BeginDay()
+    /// <summary>开新的一天。loanPaymentWasDue：昨天有没有一笔该还的贷款
+    /// （有债务就算有；玩家在晨报上没按还款键就记一次逾期）。</summary>
+    public void BeginDay(bool loanPaymentWasDue = false)
     {
+        // 先收口昨天的两笔账：发薪日拖着没付 = 欠薪，该还没还 = 逾期。
+        // 必须在 Shifts.ApplyTo 之前——士气影响今天的产能。
+        SettleYesterdaysBills(loanPaymentWasDue);
+
         Shifts.ApplyTo(Staff);
         Pipeline.BeginDay();        // 清空"今日已清洁间数"
 
@@ -1241,6 +1253,85 @@ public sealed class HotelSim
         ArrivalsCheckedInToday++;
     }
 
+    // ── 支付：玩家亲手按的两笔钱（用户要求）────────────────────────────────
+
+    /// <summary>今天记上账的工资（晨报显示"今天欠下多少"）。</summary>
+    public int WagesAccruedToday { get; private set; }
+
+    /// <summary>昨天是不是发薪日（拖过去没付就要罚士气）。</summary>
+    public bool PayrollWasDueToday { get; private set; }
+
+    /// <summary>上一次发工资付了多少（晨报回执）。</summary>
+    public int WagesPaidLastTime { get; private set; }
+
+    /// <summary>发工资：**从现金扣，不够就动保险箱**。
+    ///
+    /// 为什么允许动保险箱（这条不是偷懒，是修订版 3 定过的铁律）：
+    /// 早期设计让工资只能从"玩家收取过的现金"里出，结果是①叙事荒唐——前台自己
+    /// 收的钱不能拆开发薪？②留存自杀——离线几天回来全员士气归零集体离职。
+    /// 所以按钮直接把箱子当收银台使。玩家照样亲手付、照样看见钱流走（这就是"肉疼"），
+    /// 但**永远不会因为"忘了按收取"而欠薪**——欠薪只源于真实亏损。
+    ///
+    /// 真正的赌注在周付：钱留在手上六天，你可能已经拿它装修了，发薪日才发现凑不齐。</summary>
+    public PayrollPayment PayWages()
+    {
+        int available = Cash + Safebox.Balance;
+        PayrollPayment payment = Payroll.Pay(available, Payroll.IsPaydayOn(Clock.CurrentDay));
+
+        int remaining = payment.paid;
+        int fromCash = remaining < Cash ? remaining : Cash;
+        Cash -= fromCash;
+        remaining -= fromCash;
+        // 现金不够就从箱子里**按需**取——不整箱收上来，
+        // 那会抢走玩家按下"收款"时数字跳动的那一刻（成就感的来源）
+        if (remaining > 0) Safebox.Withdraw(remaining);
+
+        WagesPaidLastTime = payment.paid;
+        if (payment.moralePenalty > 0) ApplyPayrollArrearsMorale(payment.moralePenalty);
+        return payment;
+    }
+
+    /// <summary>还贷：同样从现金扣、不够动保险箱。付了就不算逾期。
+    /// 返回实还金额（调用方负责减少贷款余额——贷款账本在巡查层/原型层）。</summary>
+    public int PayLoanInstallment(int amount)
+    {
+        if (amount <= 0) return 0;
+        int available = Cash + Safebox.Balance;
+        int paid = amount < available ? amount : available;
+        if (paid <= 0) return 0;
+
+        int fromCash = paid < Cash ? paid : Cash;
+        Cash -= fromCash;
+        int remaining = paid - fromCash;
+        if (remaining > 0) Safebox.Withdraw(remaining);   // 同上：按需取，别清箱
+
+        Credit.RecordPayment();
+        return paid;
+    }
+
+    /// <summary>新的一天开始时收口昨天的账：发薪日拖着没付 = 欠薪（罚士气），
+    /// 该还的贷款没还 = 逾期（涨利率、掉评级）。
+    /// **放在 BeginDay** 是因为玩家是在晨报上支付的——日结当时还没给他机会。</summary>
+    private void SettleYesterdaysBills(bool loanPaymentWasDue)
+    {
+        if (PayrollWasDueToday && Payroll.Owed > 0)
+        {
+            // 拖过了发薪日：按 Pay 的同一套规则算惩罚，但一分钱也没付
+            PayrollPayment missed = Payroll.Pay(0, isPayday: true);
+            if (missed.moralePenalty > 0) ApplyPayrollArrearsMorale(missed.moralePenalty);
+        }
+        PayrollWasDueToday = false;
+
+        Credit.CloseDay(loanPaymentWasDue);
+    }
+
+    /// <summary>欠薪的士气代价：按缺口天数摊到每个人头上。</summary>
+    private void ApplyPayrollArrearsMorale(int penalty)
+    {
+        foreach (var entry in Staff.Entries)
+            entry.member?.AdjustMorale(-penalty);
+    }
+
     /// <summary>夜间前台：把打烊时还在排队的客人处理掉。
     ///
     /// 有夜班前台 → 通宵办入住（一人一夜有上限，见 NightDeskModel），
@@ -1409,10 +1500,17 @@ public sealed class HotelSim
         // 排在退房潮之后：夜里能给的房是"本来就干净着的"，刚退的房还没打扫。
         RunNightDesk();
 
+        // **工资不再自动扣**（用户要求：支付必须是玩家的动作，要肉疼）。
+        // 日结只把今天的工资记上账，玩家在晨报上亲手按"发工资"。
+        // 周末/夜班加成在 DailyWageCost 里生效。
+        WagesAccruedToday = Shifts.DailyWageCost(Staff, Clock.CurrentDay);
+        Payroll.Accrue(WagesAccruedToday);
+        PayrollWasDueToday = Payroll.IsPaydayOn(Clock.CurrentDay);
+
         var input = new DaySettlementInput(
             grossIncome: _grossIncomeToday,
             commission: _commissionToday,
-            wages: Shifts.DailyWageCost(Staff, Clock.CurrentDay),   // 周末/夜班加成在这里生效
+            wages: 0,                                   // ↑ 走 Payroll，不在这里扣
             interest: interest,
             scheduledRepayment: scheduledRepayment,
             supplies: supplies,
@@ -1437,8 +1535,10 @@ public sealed class HotelSim
         SyncRoomWearFromFurniture();
         SyncRoomBlocksFromFurniture();
 
-        Staff.SettleDay(result.wagesPaid);
-        Pipeline.SettleDay(result.wagesPaid);
+        // 欠薪士气链改由**发薪日拖着没付**驱动（见 BeginDay 的 SettlePayrollArrears），
+        // 日结这里一律按"没欠薪"处理：钱还没到该付的时候，谈不上欠。
+        Staff.SettleDay(wagesPaid: true);
+        Pipeline.SettleDay(wagesPaid: true);
 
         LastSettlement = result;
         return result;

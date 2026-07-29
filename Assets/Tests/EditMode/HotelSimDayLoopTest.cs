@@ -260,35 +260,60 @@ namespace OldTownHotel.Tests.EditMode
         // ── 亏损日与欠薪链 ───────────────────────────────────────────────────
 
         [Test]
-        public void CrushingInterest_DrainsCashThenMissesPayroll()
+        public void CrushingInterest_DrainsEverythingThenPayrollCannotBeMet()
         {
+            // 工资改成玩家亲手付之后，"欠薪"的定义变了：不是日结自动扣不出来，
+            // 而是**按下发工资时现金加保险箱都不够**。这才是真实亏损。
             var sim = BuildHotel(startingCash: 50);
-            RunOneDay(sim); // 先住进人，第二天才有收入
+            RunOneDay(sim);                      // 先住进人，第二天才有收入
+            RunOneDay(sim, interest: 5000);      // 荒唐的利息把钱榨干
 
-            var result = RunOneDay(sim, interest: 5000); // 荒唐的利息制造真实亏损
+            Assert.That(sim.Cash + sim.Safebox.Balance, Is.LessThan(sim.Payroll.Owed),
+                        "钱确实不够付工资了");
 
-            Assert.That(result.wagesPaid, Is.False, "真实经营亏损 + 现金见底 → 欠薪");
-            Assert.That(result.unpaidAmount, Is.GreaterThan(0));
-            Assert.That(sim.Cash, Is.EqualTo(0), "现金榨干但不为负");
+            var payment = sim.PayWages();
 
-            float moraleAfter = sim.Staff.AverageMorale;
-            Assert.That(moraleAfter, Is.LessThan(StaffMember.DefaultMorale), "欠薪打击士气");
+            Assert.That(payment.cleared, Is.False, "付不清");
+            Assert.That(payment.stillOwed, Is.GreaterThan(0));
+            Assert.That(sim.Cash, Is.GreaterThanOrEqualTo(0), "现金榨干但不为负");
+            Assert.That(sim.Staff.AverageMorale, Is.LessThan(StaffMember.DefaultMorale),
+                        "欠薪打击士气");
         }
 
         [Test]
-        public void FullSafebox_StillPaysWages()
+        public void FullSafebox_NeverBlocksPayroll()
         {
-            // 回归：钱堆在保险箱里绝不能造成欠薪（修订版 3 推翻的旧设计）。
-            // 给一点开局现金：第一天没有隔夜客可退房，零收入零现金本就发不出工资，
-            // 那是真实亏损而不是保险箱造成的。
+            // **修订版 3 的铁律，换了实现也要守住**：钱堆在保险箱里绝不能造成欠薪。
+            // 支付按钮把箱子当收银台使——玩家照样亲手付，但"忘了按收取"不会害死他。
             var sim = BuildHotel(startingCash: 500);
             for (int day = 1; day <= 6; day++)
             {
-                var result = RunOneDay(sim);
-                Assert.That(result.wagesPaid, Is.True,
-                            "第 " + day + " 天：只要当日收入够付固定成本就不欠薪，与箱子满不满无关");
+                RunOneDay(sim);
+                var payment = sim.PayWages();
+                Assert.That(payment.cleared, Is.True,
+                            "第 " + day + " 天：钱在箱子里也得发得出工资，与箱子满不满无关");
             }
-            Assert.That(sim.Safebox.Balance + sim.Overflow.Balance, Is.GreaterThan(0));
+        }
+
+        [Test]
+        public void WagesLeaveTheAutomaticSettlement_SoThePlayerFeelsThem()
+        {
+            // 用户原话："每天能看到现金都是上千"——工资自动扣掉时玩家全程无感。
+            // 现在日结不碰工资，钱是玩家亲手交出去的。
+            var sim = BuildHotel(startingCash: 2000);
+            RunOneDay(sim);
+            RunOneDay(sim);
+
+            Assert.That(sim.Payroll.Owed, Is.GreaterThan(0), "工资记在账上等玩家付");
+            Assert.That(sim.WagesAccruedToday, Is.GreaterThan(0));
+
+            int before = sim.Cash + sim.Safebox.Balance;
+            int owed = sim.Payroll.Owed;
+            sim.PayWages();
+
+            Assert.That(sim.Cash + sim.Safebox.Balance, Is.EqualTo(before - owed),
+                        "钱是从玩家手上真的走掉的");
+            Assert.That(sim.Payroll.Owed, Is.EqualTo(0));
         }
 
         // ── 确定性 ───────────────────────────────────────────────────────────
