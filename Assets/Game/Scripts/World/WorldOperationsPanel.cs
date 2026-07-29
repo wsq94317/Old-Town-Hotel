@@ -288,37 +288,42 @@ public class WorldOperationsPanel : MonoBehaviour
                 Sim.Cash + Sim.Safebox.Balance, cap: 150);
 
             GUI.Label(new Rect(14, y, w - 28, 20),
-                      GameText.F("DEBT ${0}   credit: {1}", economy.Loan.Balance,
+                      GameText.F("DEBT ${0}   credit {1}/100 - {2}", economy.Loan.Balance,
+                                 Sim.Credit.Score,
                                  GameText.T(CreditPolicy.LabelOf(Sim.Credit.Rating))));
             y += 22f;
 
-            // **逾期必须说出来**：悄悄扣评级和利率，玩家只会觉得游戏在暗算他。
-            // 第一次是警告（不涨息），第二次起才真疼——这一行要把差别讲清楚。
-            if (Sim.Credit.MissedPayments > 0)
+            // 规则写在脸上：一行说完"怎么加怎么减、它只管借贷额度"，玩家不用猜
+            GUI.Label(new Rect(14, y, w - 28, 20), GameText.T(CreditPolicy.RuleLine));
+            y += 22f;
+
+            // **付过了就把按钮收起来**：留着它玩家会再点一次，然后看到
+            // "一分钱都挤不出来"——以为出了 bug（试玩截图抓到的正是这个）。
+            if (Sim.Credit.PaidToday)
             {
                 GUI.Label(new Rect(14, y, w - 28, 20),
-                          Sim.Credit.PenaltyRate > 0f
-                              ? GameText.F("You skipped the bank {0}x. Interest is now higher.",
-                                           Sim.Credit.MissedPayments)
-                              : GameText.T("You skipped the bank once. A warning - next time it costs."));
-                y += 22f;
+                          GameText.T("Bank paid for today. Credit will tick up tomorrow."));
+                y += 26f;
             }
-
-            if (suggested > 0 && GuiInput.Button(new Rect(10, y, w - 20, 28),
-                                                 GameText.F("PAY THE BANK ${0}", suggested)))
+            else if (suggested > 0)
             {
-                int paid = Sim.PayLoanInstallment(suggested);
-                if (paid > 0) economy.RepayLoan(paid);
-                Say(paid > 0
-                        ? GameText.F("Paid the bank ${0}. Interest keeps running anyway.", paid)
-                        : GameText.T("Not a cent to spare. The bank will remember."));
+                if (GuiInput.Button(new Rect(10, y, w - 20, 28),
+                                    GameText.F("PAY THE BANK ${0}", suggested)))
+                {
+                    int paid = Sim.PayLoanInstallment(suggested);
+                    if (paid > 0) economy.RepayLoan(paid);
+                    Say(paid > 0
+                            ? GameText.F("Paid the bank ${0}. Interest keeps running anyway.", paid)
+                            : GameText.T("Not a cent to spare. The bank will remember."));
+                }
+                y += 32f;
             }
-            else if (suggested <= 0)
+            else
             {
                 GUI.Label(new Rect(14, y, w - 28, 20),
                           GameText.T("Nothing due today - but the interest never sleeps."));
+                y += 26f;
             }
-            y += 32f;
         }
 
         return y;

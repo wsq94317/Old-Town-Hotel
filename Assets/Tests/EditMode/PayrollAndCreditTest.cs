@@ -191,10 +191,12 @@ namespace OldTownHotel.Tests.EditMode
             Assert.That(sim.Payroll.MissedPaydays, Is.GreaterThan(0));
         }
 
-        // ── 信用：逾期的阶梯惩罚 ──────────────────────────────────────────────
+        // ── 信用：一个数字、两条规则、能恢复 ──────────────────────────────────
+        // 用户拍板简化：惩罚不能是玩家算不清的复杂算法，也不能是杀存档的主因。
+        // 所以信用只有 0-100 一个分数，**完全不碰利率**，只决定能借多少新钱。
 
         [Test]
-        public void PayingOnTime_KeepsTheRatingGood()
+        public void PayingOnTime_KeepsCreditAtTheTop()
         {
             var credit = new CreditStanding();
             for (int day = 1; day <= 10; day++)
@@ -203,59 +205,85 @@ namespace OldTownHotel.Tests.EditMode
                 credit.CloseDay(paymentWasDue: true);
             }
 
+            Assert.That(credit.Score, Is.EqualTo(CreditPolicy.MaxScore), "不会超过 100");
             Assert.That(credit.Rating, Is.EqualTo(CreditRating.Good));
-            Assert.That(credit.PenaltyRate, Is.EqualTo(0f));
         }
 
         [Test]
-        public void RatingSlidesDownAsMissesPileUp_OneStepAtATime()
+        public void OneRuleEachWay_MinusTwentyForAMissPlusTenForAPayment()
         {
-            // 每一档都要看得见，玩家才能预判下一刀
+            // 玩家要能心算：没还 -20，还了 +10。就这两条。
             var credit = new CreditStanding();
-            var seen = new List<CreditRating>();
-            for (int day = 1; day <= 8; day++)
+            int start = credit.Score;
+
+            credit.CloseDay(paymentWasDue: true);          // 没还
+            Assert.That(credit.Score, Is.EqualTo(start - CreditPolicy.MissPenalty));
+
+            credit.RecordPayment();
+            credit.CloseDay(paymentWasDue: true);          // 还了
+            Assert.That(credit.Score,
+                        Is.EqualTo(start - CreditPolicy.MissPenalty + CreditPolicy.PaymentReward));
+        }
+
+        [Test]
+        public void CreditGrowsBackSoOneBadWeekIsNotPermanent()
+        {
+            // **必须能恢复**：只扣不回的话一个糟糕的星期永久刻在档案上，
+            // 玩家再也没有翻身的叙事
+            var credit = new CreditStanding();
+            // 五次不还从 100 掉到 0（100 / MissPenalty），刚好触底
+            for (int i = 0; i < 5; i++) credit.CloseDay(paymentWasDue: true);
+            Assert.That(credit.Score, Is.EqualTo(0));
+            Assert.That(credit.Rating, Is.EqualTo(CreditRating.Blacklisted));
+
+            for (int i = 0; i < 10; i++)
             {
-                credit.CloseDay(paymentWasDue: true);   // 一次都没付
-                seen.Add(credit.Rating);
-            }
-
-            Assert.That(seen[0], Is.EqualTo(CreditRating.Shaky), "第一次逾期就掉一档");
-            Assert.That(seen, Has.Member(CreditRating.Bad));
-            Assert.That(seen[seen.Count - 1], Is.EqualTo(CreditRating.Blacklisted));
-        }
-
-        [Test]
-        public void FirstMissIsAWarning_NotACharge()
-        {
-            // Play 实测：第一天日结一过评级就掉了，而玩家那时还没搞懂晨报上有还款按钮。
-            // 在人看懂规则之前就扣钱是设计事故——评级掉（警告），钱包先不疼。
-            var credit = new CreditStanding();
-            credit.CloseDay(paymentWasDue: true);
-
-            Assert.That(credit.Rating, Is.EqualTo(CreditRating.Shaky), "警告要看得见");
-            Assert.That(credit.PenaltyRate, Is.EqualTo(0f), "但第一次不涨息");
-
-            credit.CloseDay(paymentWasDue: true);
-            Assert.That(credit.PenaltyRate, Is.GreaterThan(0f), "第二次才开始涨");
-        }
-
-        [Test]
-        public void PenaltyInterest_RisesButIsCapped()
-        {
-            // 连续逾期不能把利率翻成高利贷绞索——那是即死，不是惩罚
-            var credit = new CreditStanding();
-            credit.CloseDay(paymentWasDue: true);   // 第一次是警告，不计息
-            float previous = 0f;
-            for (int i = 1; i <= 3; i++)
-            {
+                credit.RecordPayment();
                 credit.CloseDay(paymentWasDue: true);
-                Assert.That(credit.PenaltyRate, Is.GreaterThan(previous), "每次逾期都更贵");
-                previous = credit.PenaltyRate;
             }
 
-            for (int i = 0; i < 50; i++) credit.CloseDay(paymentWasDue: true);
-            Assert.That(credit.PenaltyRate, Is.EqualTo(CreditPolicy.MaxPenaltyRate),
-                        "惩罚利率必须封顶");
+            Assert.That(credit.Rating, Is.EqualTo(CreditRating.Good), "坚持还款能爬回来");
+        }
+
+        [Test]
+        public void RecoveryIsSlowerThanTheDamage()
+        {
+            // 回得比扣得慢，否则按时还款不是件要坚持的事，是随手能刷的
+            Assert.That(CreditPolicy.PaymentReward, Is.LessThan(CreditPolicy.MissPenalty));
+        }
+
+        [Test]
+        public void CreditOnlyLimitsBorrowing_ItNeverTouchesTheInterestRate()
+        {
+            // 这是"不做成死亡螺旋"的结构保证：信用差不会让债务长得更快，
+            // 只会让你借不到新钱。利滚利杀存档的路被从设计上切断了。
+            var type = typeof(CreditStanding);
+            foreach (var member in type.GetMembers())
+                Assert.That(member.Name.Contains("Rate"), Is.False,
+                            "信用不该有任何和利率有关的成员：" + member.Name);
+            foreach (var member in typeof(CreditPolicy).GetMembers())
+                Assert.That(member.Name.Contains("Rate"), Is.False,
+                            "信用政策不该有任何和利率有关的成员：" + member.Name);
+        }
+
+        [Test]
+        public void EachRatingBandLendsLessThanTheOneAbove()
+        {
+            // 四个档位一个词一个含义，额度单调递减，玩家能预判下一档
+            var credit = new CreditStanding();
+            int good = credit.BorrowingLimitFor(10000);
+
+            credit.Restore(CreditPolicy.ShakyAtOrAbove, 0);
+            int shaky = credit.BorrowingLimitFor(10000);
+            credit.Restore(CreditPolicy.BadAtOrAbove, 0);
+            int bad = credit.BorrowingLimitFor(10000);
+            credit.Restore(0, 0);
+            int blacklisted = credit.BorrowingLimitFor(10000);
+
+            Assert.That(good, Is.GreaterThan(shaky));
+            Assert.That(shaky, Is.GreaterThan(bad));
+            Assert.That(bad, Is.GreaterThan(blacklisted));
+            Assert.That(blacklisted, Is.EqualTo(0), "拉黑就是借不到");
         }
 
         [Test]
@@ -263,13 +291,19 @@ namespace OldTownHotel.Tests.EditMode
         {
             // 永远留一条自救路：借不到新钱，但可以靠经营自己爬出来
             var credit = new CreditStanding();
-            for (int i = 0; i < CreditPolicy.MissesForBlacklist; i++)
-                credit.CloseDay(paymentWasDue: true);
+            for (int i = 0; i < 5; i++) credit.CloseDay(paymentWasDue: true);
 
             Assert.That(credit.Rating, Is.EqualTo(CreditRating.Blacklisted));
             Assert.That(credit.BorrowingLimitFor(50000), Is.EqualTo(0), "借不到新钱");
-            Assert.That(credit.PenaltyRate, Is.LessThanOrEqualTo(CreditPolicy.MaxPenaltyRate),
-                        "但利率还是封顶的——不做成即死");
+            Assert.That(credit.Score, Is.GreaterThanOrEqualTo(0), "分数不为负——没有无底洞");
+        }
+
+        [Test]
+        public void TheRuleFitsInOneLine_SoTheUiCanJustSayIt()
+        {
+            // 惩罚必须是玩家看一眼就懂的，所以规则本身要能一行说完
+            Assert.That(CreditPolicy.RuleLine, Is.Not.Empty);
+            Assert.That(CreditPolicy.RuleLine.Length, Is.LessThan(90), "一行说得完");
         }
 
         [Test]
