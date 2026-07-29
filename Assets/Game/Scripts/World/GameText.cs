@@ -36,8 +36,9 @@ public static class GameText
         { "CASH ${0}   SAFEBOX ${1}/{2}", "现金 ${0}   保险箱 ${1}/{2}" },
         { "   SPILLED ${0}", "   溢出 ${0}" },
         { "   DEBT ${0}", "   欠款 ${0}" },
-        { "{0}*   {1} sellable   {2} to clean   {3} in use   {4} broken   {5} derelict   MAT {6}",
-          "{0}★   可售 {1}   待清 {2}   在住 {3}   坏封 {4}   破败 {5}   材料 {6}" },
+        { "{0}*   {1} sellable   {2} to clean   {3} in use   {4} broken   {5} derelict   MAT {6}/{7}",
+          "{0}★   可售 {1}   待清 {2}   在住 {3}   坏封 {4}   破败 {5}   材料 {6}/{7}" },
+        { "The warehouse only has room for {0} more. Space: {1}/{2}.", "仓库只装得下 {0} 份了。占用：{1}/{2}。" },
 
         // ── 页签与时间控制 ────────────────────────────────────────────────────
         // 世界场景的底部抽屉

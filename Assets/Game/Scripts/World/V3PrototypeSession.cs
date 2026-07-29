@@ -65,6 +65,7 @@ public class V3PrototypeSession : MonoBehaviour
         _sim = new HotelSim(new RoomLedger(defs), staff, RoomRateTable.Default,
                             DemandConfig.Default, startingCash, rngSeed);
         _loan = new LoanAccount(startingLoan, dailyInterestRate);
+        _sim.Warehouse.SetCapacity(Warehouse.DefaultCapacity);   // 仓库会满
         _sim.Materials.Add(6); // 开局送几份材料，省得第一天什么都干不了
         _sim.FurnishInheritedRooms();  // 继承的破家具：崭新度 5-15%，天天出故障
     }
@@ -596,6 +597,10 @@ public class V3PrototypeSession : MonoBehaviour
         if (GuiInput.Button(new Rect(20, y, (w - 50) / 2f, 26), GameText.T("BUY 10 MATERIALS")))
         {
             if (_sim.TryBuyMaterials(10)) Say("Materials delivered.");
+            else if (_sim.MaterialsThatFit(10) < 10)
+                Say(GameText.F("The warehouse only has room for {0} more. Space: {1}/{2}.",
+                               _sim.MaterialsThatFit(10), _sim.Materials.Stock,
+                               _sim.Warehouse.Capacity));
             else Say("Can't afford materials right now.");
         }
         if (GuiInput.Button(new Rect(30 + (w - 50) / 2f, y, (w - 50) / 2f, 26), GameText.T("START THE WORK")))

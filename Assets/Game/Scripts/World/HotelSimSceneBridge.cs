@@ -156,6 +156,7 @@ public class HotelSimSceneBridge : MonoBehaviour
         Sim.Clock.SpeedMultiplier = 2f;
 
         Sim.FurnishInheritedRooms();   // 继承的破家具：这家酒店本来就是这么破
+        Sim.Warehouse.SetCapacity(Warehouse.DefaultCapacity);   // 仓库会满（容量是场景参数）
         Sim.Materials.Add(6);
 
         RegisterStaffFromPayroll();

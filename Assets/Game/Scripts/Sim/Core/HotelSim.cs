@@ -99,6 +99,10 @@ public sealed class HotelSim
     /// <summary>破败房的垃圾清理进度（只花人工那条路，见 JunkClearing）。</summary>
     public JunkClearingQueue Clearing { get; } = new JunkClearingQueue();
 
+    /// <summary>仓库容量（"仓库会满"，见 Warehouse）。默认不设上限——
+    /// 容量是场景参数，两个游戏场景各自设一个真实值。</summary>
+    public Warehouse Warehouse { get; } = new Warehouse();
+
     /// <summary>工资账：日结只记账，等玩家亲手按下支付（见 PayrollAccount）。</summary>
     public PayrollAccount Payroll { get; } = new PayrollAccount();
 
@@ -789,14 +793,30 @@ public sealed class HotelSim
     }
 
     /// <summary>买材料。</summary>
+    /// <summary>买材料。**仓库装不下就一份也不收、一分钱也不扣**——
+    /// 部分收货会让玩家付了 10 份的钱只拿到 3 份，那是最难被原谅的一种"惩罚"。
+    /// UI 该先问 `Warehouse.UnitsThatFit` 把能买的份数告诉玩家（见 MaterialsThatFit）。</summary>
     public bool TryBuyMaterials(int units)
     {
         if (units <= 0) return true;
+        if (Warehouse.UnitsThatFit(Materials.Stock, units) < units) return false;
         int price = Materials.PriceFor(units);
         if (!TrySpendCash(price)) return false;
         Materials.Add(units);
         return true;
     }
+
+    /// <summary>这一批里仓库还能收下几份（UI 用它把话说清楚：
+    /// "仓库只剩 3 格" 而不是干巴巴一句失败）。</summary>
+    public int MaterialsThatFit(int wantedUnits) =>
+        Warehouse.UnitsThatFit(Materials.Stock, wantedUnits);
+
+    /// <summary>仓库满了吗（顶栏据此变红）。</summary>
+    public bool WarehouseIsFull => Warehouse.IsFullAt(Materials.Stock);
+
+    /// <summary>仓库还剩几格（不设上限时返回 -1，UI 据此不显示分数）。</summary>
+    public int WarehouseSpaceLeft =>
+        Warehouse.HasLimit ? Warehouse.SpaceLeftWith(Materials.Stock) : -1;
 
     // ── 一天开始 ─────────────────────────────────────────────────────────────
 

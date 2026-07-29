@@ -392,10 +392,13 @@ public class WorldOperationsPanel : MonoBehaviour
         GUI.Label(new Rect(14, 46, w - 28, 20),
             // 斜杠分隔被玩家读成"："（"11 可售 / 0 待清" 看着像 11:0）——
             // 改成"数字+标签"成对，中间用间距分组
-            GameText.F("{0}*   {1} sellable   {2} to clean   {3} in use   {4} broken   {5} derelict   MAT {6}",
+            // MAT 后面的分数**只在"材料是唯一占用者"时诚实**。以后家具箱进仓库了，
+            // 这个分子必须改成"总占格数"，否则就是审计点名的"混单位"歧义。
+            GameText.F("{0}*   {1} sellable   {2} to clean   {3} in use   {4} broken   {5} derelict   MAT {6}/{7}",
                        Sim.Reputation.Stars.ToString("0.0"), Sim.Rooms.SellableCount, Sim.Rooms.DirtyBacklog,
                        Sim.Rooms.CountOf(RoomSimState.Occupied), Sim.Rooms.CountOf(RoomSimState.Blocked),
-                       Sim.Rooms.CountOf(RoomSimState.Ruined), Sim.Materials.Stock));
+                       Sim.Rooms.CountOf(RoomSimState.Ruined), Sim.Materials.Stock,
+                       Sim.Warehouse.HasLimit ? Sim.Warehouse.Capacity.ToString() : "-"));
     }
 
     /// <summary>倍速与"跳到下一时段"（原型就有，玩家点名要回来）。</summary>
@@ -678,7 +681,17 @@ public class WorldOperationsPanel : MonoBehaviour
 
         float half = (w - 30) / 2f;
         if (GuiInput.Button(new Rect(10, y, half, 24), GameText.T("BUY 10 MATERIALS")))
-            Say(Sim.TryBuyMaterials(10) ? "Materials delivered." : "Can't afford materials right now.");
+        {
+            // 三种失败要说三句不同的话：装不下 / 买不起 / 成功。
+            // 一句"买不起"糊过去的话，玩家会对着满仓库反复点按钮找钱（审计点名的"沉默失败"）
+            int fits = Sim.MaterialsThatFit(10);
+            if (fits < 10)
+                Say(GameText.F("The warehouse only has room for {0} more. Space: {1}/{2}.",
+                               fits, Sim.Materials.Stock, Sim.Warehouse.Capacity));
+            else
+                Say(Sim.TryBuyMaterials(10) ? "Materials delivered."
+                                            : "Can't afford materials right now.");
+        }
         if (GuiInput.Button(new Rect(20 + half, y, half, 24), GameText.T("START THE WORK")))
         {
             var rooms = Sim.RenovatableRooms(_plan, _batch);
