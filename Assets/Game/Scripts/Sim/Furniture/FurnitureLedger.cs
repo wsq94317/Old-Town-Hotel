@@ -16,6 +16,11 @@ public sealed class FurnitureInstance
     public int faultLineIndex = -1; // ≥0 = 正在故障，指向文案池
     public int repairDaysRemaining; // >0 = 师傅还在修（"花时间"的那一半，期间仍不可用）
 
+    /// <summary>这件家具摆在哪个锚点上（FurnitureAnchors，0 = 还没指派）。
+    /// **Place() 是家具唯一的创建点**，所以在那里自动指派就够了——继承的破家具、
+    /// 买新、复原、两档装修全部自动变成"位置正确"，一行新逻辑都不用加。</summary>
+    public int anchorId;
+
     /// <summary>用胶带糊上了：房间能重新开卖，但客人看得见，而且明天照坏。
     /// 这是**给破产玩家的唯一出路**——现金归零时故障会把房一间间永久封死
     /// （试玩实测：第 23 天 20 间房全在 Blocked，玩家看不见也修不动，局面已死）。
@@ -80,6 +85,12 @@ public sealed class FurnitureLedger
             posX = posX,
             posY = posY,
         };
+
+        // 自动指派一个空着的合法锚点。挑不到就留 Unassigned——
+        // 表现层会把它当"还没摆好"，不会崩，也不会和别的家具重叠。
+        instance.anchorId = FurnitureAnchors.FirstFreeAnchorFor(
+            FurnitureCatalog.Get(kindId).slot, OccupiedAnchorsIn(roomNumber));
+
         _all.Add(instance);
         _byId[instance.instanceId] = instance;
         if (!_byRoom.TryGetValue(roomNumber, out var list))
@@ -89,6 +100,66 @@ public sealed class FurnitureLedger
         }
         list.Add(instance);
         return instance;
+    }
+
+    /// <summary>这间房已经被占用的锚点。</summary>
+    public HashSet<int> OccupiedAnchorsIn(int roomNumber)
+    {
+        var occupied = new HashSet<int>();
+        if (!_byRoom.TryGetValue(roomNumber, out var list)) return occupied;
+        for (int i = 0; i < list.Count; i++)
+            if (list[i].anchorId != FurnitureAnchors.Unassigned) occupied.Add(list[i].anchorId);
+        return occupied;
+    }
+
+    /// <summary>把一件家具挪到指定锚点（玩家拖拽摆放的落点）。
+    /// 锚点不收这种家具、或者已经被占，就拒绝并说明原因——
+    /// 静默失败会让玩家以为拖拽坏了。</summary>
+    public bool TryMoveToAnchor(int instanceId, int anchorId, bool doorOnPositiveZ, out string reason)
+    {
+        reason = "";
+        if (!_byId.TryGetValue(instanceId, out FurnitureInstance f)) { reason = "No such piece."; return false; }
+        if (!FurnitureAnchors.TryGet(anchorId, doorOnPositiveZ, out FurnitureAnchor anchor))
+        { reason = "No such spot."; return false; }
+
+        FurnitureKind kind = FurnitureCatalog.Get(f.kindId);
+        if (!anchor.Accepts(kind.slot))
+        { reason = kind.name + " does not go there."; return false; }
+
+        if (_byRoom.TryGetValue(f.roomNumber, out var list))
+            for (int i = 0; i < list.Count; i++)
+                if (list[i] != f && list[i].anchorId == anchorId)
+                { reason = "Something is already there."; return false; }
+
+        f.anchorId = anchorId;
+        f.posX = anchor.localX;
+        f.posY = anchor.localZ;
+        return true;
+    }
+
+    /// <summary>读档后给没有锚点的家具补派（**必须两趟**：先把存档里写明的
+    /// 锚点全部落位，再给剩下的补——反过来的话旧档（无锚点）会抢走新档条目
+    /// 明确记着的位置，两件家具叠在一起。并行审计点名的坑）。</summary>
+    public void AssignMissingAnchors()
+    {
+        foreach (var pair in _byRoom)
+        {
+            var occupied = new HashSet<int>();
+            var list = pair.Value;
+            // 第一趟：尊重存档里已有的指派
+            for (int i = 0; i < list.Count; i++)
+                if (list[i].anchorId != FurnitureAnchors.Unassigned) occupied.Add(list[i].anchorId);
+            // 第二趟：给空着的补
+            for (int i = 0; i < list.Count; i++)
+            {
+                if (list[i].anchorId != FurnitureAnchors.Unassigned) continue;
+                int anchorId = FurnitureAnchors.FirstFreeAnchorFor(
+                    FurnitureCatalog.Get(list[i].kindId).slot, occupied);
+                if (anchorId == FurnitureAnchors.Unassigned) continue;
+                list[i].anchorId = anchorId;
+                occupied.Add(anchorId);
+            }
+        }
     }
 
     /// <summary>移走一件家具（卖掉/替换）。</summary>
@@ -409,7 +480,8 @@ public sealed class FurnitureLedger
 
     /// <summary>读档：按存下来的 id 原样恢复一件家具。</summary>
     public FurnitureInstance RestoreInstance(int instanceId, int kindId, int roomNumber,
-                                            float posX, float posY, float newness, float health, int faultLineIndex)
+                                            float posX, float posY, float newness, float health,
+                                            int faultLineIndex, int anchorId = FurnitureAnchors.Unassigned)
     {
         var instance = new FurnitureInstance
         {
@@ -421,6 +493,9 @@ public sealed class FurnitureLedger
             newness = SimMath.Clamp01(newness),
             health = SimMath.Clamp01(health),
             faultLineIndex = faultLineIndex,
+            // 旧档没有这个字段（=0）。**这里不当场补派**——补派要等整间房
+            // 都恢复完才知道哪些锚点被占（见 AssignMissingAnchors 的两趟注释）
+            anchorId = anchorId,
         };
         _all.Add(instance);
         _byId[instanceId] = instance;

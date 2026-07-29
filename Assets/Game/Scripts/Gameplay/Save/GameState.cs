@@ -118,6 +118,7 @@ public sealed class FurnitureSaveEntry
     public float health = 1f;
     public int faultLineIndex = -1;
     public int repairDaysRemaining;
+    public int anchorId;          // v8：摆在哪个锚点上（0 = 旧档，读档时补派）
 }
 
 /// <summary>每间房的挂牌档（RoomTier = "你声称它有多好"，玩家设定）。</summary>

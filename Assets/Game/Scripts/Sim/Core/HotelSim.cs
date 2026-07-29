@@ -1858,6 +1858,7 @@ public sealed class HotelSim
                 health = f.health,
                 faultLineIndex = f.faultLineIndex,
                 repairDaysRemaining = f.repairDaysRemaining,
+                anchorId = f.anchorId,
             });
         }
         state.roomBands.Clear();
@@ -1984,9 +1985,12 @@ public sealed class HotelSim
             Furniture.Clear();
             foreach (var f in state.furniture)
                 Furniture.RestoreInstance(f.instanceId, f.kindId, f.roomNumber, f.posX, f.posY,
-                                          f.newness, f.health, f.faultLineIndex)
+                                          f.newness, f.health, f.faultLineIndex, f.anchorId)
                          .repairDaysRemaining = f.repairDaysRemaining;
             Furniture.RestoreIdSeed(state.nextFurnitureId);
+            // **必须在全部恢复之后**才补派锚点：旧档没有 anchorId，
+            // 逐条补派会让它抢走新档条目明确记着的位置（两件家具叠在一起）
+            Furniture.AssignMissingAnchors();
         }
         if (state.roomBands != null)
             foreach (var entry in state.roomBands)
