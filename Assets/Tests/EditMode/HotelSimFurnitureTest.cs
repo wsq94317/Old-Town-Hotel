@@ -220,7 +220,12 @@ namespace OldTownHotel.Tests.EditMode
             RunOneDay(sim);   // 工期走完
 
             Assert.That(bed.IsFaulted, Is.False, "修好了");
-            Assert.That(bed.health, Is.EqualTo(1f).Within(1e-3f), "健康度回满");
+            // 修好 ≠ 修新：健康度只回到这件家具剩下的寿命为止（新规则）。
+            // 不锁具体数值——工期跑完那一晚崭新度还会再掉一点，钉死数字会闪断。
+            Assert.That(bed.health, Is.GreaterThan(0f), "修完总比坏着好");
+            Assert.That(bed.health, Is.LessThan(FurnitureWearModel.TroubleThreshold),
+                        "破家具修完仍在故障线以下——它几天后照样会坏，这是设计");
+            Assert.That(bed.patchedUp, Is.True, "将就过了：以后有塌的可能");
             Assert.That(sim.Rooms.At(201).state, Is.Not.EqualTo(RoomSimState.Blocked), "房间放回来了");
         }
 

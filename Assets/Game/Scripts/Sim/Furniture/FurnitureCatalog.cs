@@ -168,6 +168,13 @@ public static class FurnitureCatalog
         return map;
     }
 
+    /// <summary>这个位置的家具**承重**吗（人躺上去、坐上去、站上去的）。
+    /// 从 slot 推导而不是给 11 行目录各加一列——加列要改构造函数签名，
+    /// 而 decorPoints 的校准被好几个测试钉着（"每个档位都有一个投资阶段能诚实交付它"），
+    /// 碰它风险远大于收益。承重的东西塌下来会伤人，不承重的坏了只是难看。</summary>
+    public static bool BearsWeight(FurnitureSlot slot) =>
+        slot == FurnitureSlot.Bed || slot == FurnitureSlot.Bathroom || slot == FurnitureSlot.Seating;
+
     public static bool TryGet(int kindId, out FurnitureKind kind) => Kinds.TryGetValue(kindId, out kind);
 
     public static FurnitureKind Get(int kindId) =>

@@ -22,7 +22,19 @@ public sealed class FurnitureInstance
     /// v2 巡查层早有"胶带明日复发"的成语，这里是它在 Sim 侧的对应物。</summary>
     public bool taped;
 
+    /// <summary>这件家具被**将就过**（修过或糊过胶带，而不是换新）。
+    /// 塌陷只发生在被将就过的家具上——它记录的是玩家的一个决定，
+    /// 不是一个倒计时。开局那批破家具在玩家做任何选择之前不会塌人。</summary>
+    public bool patchedUp;
+
+    /// <summary>塌了（不只是坏了）。**修不了**——只能换新或者先糊胶带顶着。
+    /// 承重家具（床/卫浴/沙发）在健康度极低时会塌，而且会伤到住在里面的客人。</summary>
+    public bool wrecked;
+
     public bool IsFaulted => faultLineIndex >= 0;
+
+    /// <summary>还修得动吗（塌掉的修不动）。</summary>
+    public bool IsRepairable => IsFaulted && !IsUnderRepair && !wrecked;
     public bool IsUnderRepair => repairDaysRemaining > 0;
 
     /// <summary>能不能用（糊上的也算能用——只是不体面）。</summary>
@@ -221,16 +233,46 @@ public sealed class FurnitureLedger
         return kind.faultLines[SimMath.Clamp(instance.faultLineIndex, 0, kind.faultLines.Length - 1)];
     }
 
+    /// <summary>一间房里最差那件家具的健康度（0-1）。
+    /// **UI 必须能显示它**：整套"修好的床几天后还会塌"的机制都建立在健康度上，
+    /// 而在加这套机制之前，三个面板里 grep "health" 是零命中——
+    /// 后果全都会变成玩家眼里"莫名其妙发生的事"（设计审计点名的头号问题）。</summary>
+    public float WorstHealthIn(int roomNumber)
+    {
+        var list = InRoom(roomNumber);
+        if (list.Count == 0) return 1f;
+        float worst = 1f;
+        for (int i = 0; i < list.Count; i++)
+            if (list[i].health < worst) worst = list[i].health;
+        return worst;
+    }
+
+    /// <summary>把健康度说成人话。数字（0.28）对玩家没有意义，
+    /// "快塌了"有意义——而且这四个词直接对应故障线与塌陷线两个阈值。</summary>
+    public static string ConditionWord(float health, bool wrecked)
+    {
+        if (wrecked) return "WRECKED";
+        if (health < FurnitureWearModel.CollapseHealthThreshold) return "ABOUT TO GIVE WAY";
+        if (health < FurnitureWearModel.TroubleThreshold) return "BREAKS CONSTANTLY";
+        if (health < 0.7f) return "worn but fine";
+        return "solid";
+    }
+
     // ── 维修 / 翻新 ───────────────────────────────────────────────────────────
 
-    /// <summary>维修：健康度回满、故障清除，**崭新度一动不动**（用户明确要求）。
+    /// <summary>维修：故障清除，健康度回到**这件家具剩下的寿命**为止
+    /// （FurnitureWearModel.RepairedHealthCeiling），**崭新度一动不动**。
+    /// 修一张破床只能修成一张能用的破床——它几天后照样会坏，这是设计。
+    /// 已经在上限之上的（健康家具偶发故障）不往下压，修完照旧健康。
     /// 立即生效的版本（测试/胶带式速修用）。</summary>
     public bool Repair(int instanceId)
     {
         if (!_byId.TryGetValue(instanceId, out FurnitureInstance f)) return false;
-        f.health = 1f;
+        float ceiling = FurnitureWearModel.RepairedHealthCeiling(f.newness);
+        if (f.health < ceiling) f.health = ceiling;
         f.faultLineIndex = -1;
         f.repairDaysRemaining = 0;
+        f.patchedUp = true;             // 将就过了：以后有塌的可能
         return true;
     }
 
@@ -253,9 +295,11 @@ public sealed class FurnitureLedger
             if (!f.IsUnderRepair) continue;
             if (--f.repairDaysRemaining > 0) continue;
             f.repairDaysRemaining = 0;
-            f.health = 1f;              // 健康度回满
+            float ceiling = FurnitureWearModel.RepairedHealthCeiling(f.newness);
+            if (f.health < ceiling) f.health = ceiling;   // 回到"剩下的寿命"为止，不回满
             f.faultLineIndex = -1;      // 崭新度**不动**
             f.taped = false;            // 真修好了，胶带撕掉
+            f.patchedUp = true;         // 但将就过了：以后有塌的可能
             done.Add(f);
         }
         return done;

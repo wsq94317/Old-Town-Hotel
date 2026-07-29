@@ -170,9 +170,14 @@ namespace OldTownHotel.Tests.EditMode
 
             ledger.Repair(bed.instanceId);
 
-            Assert.That(bed.health, Is.EqualTo(1f).Within(1e-4f), "健康度回满");
+            // **规则改了**（用户设计"修好的床还是有塌陷的可能"）：健康度不再回满，
+            // 只回到"这件家具剩下的寿命"为止。修一张破床只能修成一张能用的破床。
+            Assert.That(bed.health, Is.EqualTo(0.12f).Within(1e-4f), "健康度回到寿命上限，不是回满");
+            Assert.That(bed.health, Is.LessThan(FurnitureWearModel.TroubleThreshold),
+                        "崭新度 12% 的床修完仍在故障线以下——它几天后照样会坏");
             Assert.That(bed.IsFaulted, Is.False, "故障清除");
             Assert.That(bed.newness, Is.EqualTo(0.12f).Within(1e-4f), "崭新度一动不动");
+            Assert.That(bed.patchedUp, Is.True, "将就过了：以后有塌的可能");
         }
 
         [Test]

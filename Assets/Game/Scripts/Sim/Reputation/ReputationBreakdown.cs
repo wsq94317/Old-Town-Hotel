@@ -23,7 +23,8 @@ public enum ReputationCause
     OverbookingPaid,    // 超售客赔钱送走
     OverbookingUpgraded,// 超售客升级安顿（正面）
     NightDeskClosed,    // 夜里到店发现前台没人（比"没来"更伤：人家真到了门口）
-    NightDeskSaved      // 夜班前台通宵接住了客人（正面）
+    NightDeskSaved,     // 夜班前台通宵接住了客人（正面）
+    GuestInjured        // 家具塌了压伤客人（送医 + 赔偿）
 }
 
 public sealed class ReputationBreakdown
@@ -127,7 +128,8 @@ public sealed class ReputationBreakdown
             case ReputationCause.OverbookingPaid: return "Overbooked guests paid off";
             case ReputationCause.OverbookingUpgraded: return "Overbooked guests upgraded";
             case ReputationCause.NightDeskClosed: return "Locked door at 1am";
-            default: return "Night desk took them in";
+            case ReputationCause.NightDeskSaved: return "Night desk took them in";
+            default: return "A guest got hurt";
         }
     }
 }

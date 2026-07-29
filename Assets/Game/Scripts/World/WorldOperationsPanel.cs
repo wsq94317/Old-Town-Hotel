@@ -165,6 +165,9 @@ public class WorldOperationsPanel : MonoBehaviour
         report.Add(GameText.F("Checked in {0}, turned away {1}, queue cost {2} min",
                               Sim.ArrivalsCheckedInToday, Sim.ArrivalsTurnedAwayToday,
                               Sim.TotalCheckInWaitToday));
+        // 事故：家具塌了压伤客人。一天最多一起，所以一行说完
+        report.AddIf(Sim.InjuriesToday > 0, GameText.T(Sim.LastInjuryLine));
+
         // 夜班的成绩单：接住了几个、几个吃了闭门羹（玩家靠这两行决定要不要排夜班）
         report.AddIf(Sim.NightCheckInsToday > 0,
                      GameText.F("NIGHT DESK took in {0} late arrival(s) - rooms you'd have lost.",
@@ -765,17 +768,30 @@ public class WorldOperationsPanel : MonoBehaviour
             GameText.F("Furniture: {0} pieces, avg newness {1}, {2} broken",
                        Sim.Furniture.Count, AverageNewness().ToString("0.00"), broken.Count)); y += 22f;
 
-        for (int b = 0; b < broken.Count && b < 2; b++)
+        // **每一件坏家具都要看得见**：原来硬截前 2 条且没有"还有 N 件"的提示，
+        // 而塌掉的家具是修不动的——它要是被截掉，玩家会有一间永远封着、
+        // 既看不见也修不了的房（设计审计点名的问题）。塌掉的排最前。
+        broken.Sort((a, bb) => (bb.wrecked ? 1 : 0).CompareTo(a.wrecked ? 1 : 0));
+        int shownBroken = broken.Count < 4 ? broken.Count : 4;
+        for (int b = 0; b < shownBroken; b++)
         {
             var item = broken[b];
             FurnitureKind kind = FurnitureCatalog.Get(item.kindId);
+
+            // 房况说人话（"快塌了"而不是 0.28）——整套塌陷机制都建立在健康度上，
+            // 不显示它的话所有后果都是"莫名其妙发生的事"
             GUI.Label(new Rect(14, y, w - 150, 20),
-                      "R" + item.roomNumber + ": " + GameText.T(FurnitureLedger.FaultLineOf(item)));
+                      "R" + item.roomNumber + " [" +
+                      GameText.T(FurnitureLedger.ConditionWord(item.health, item.wrecked)) + "] " +
+                      GameText.T(FurnitureLedger.FaultLineOf(item)));
+
             if (!item.IsUnderRepair)
             {
-                if (GuiInput.Button(new Rect(w - 132, y - 2, 62, 22), GameText.F("FIX ${0}", kind.repairCost)))
+                // 塌掉的修不动：不画 FIX，免得玩家反复点一个永远失败的按钮
+                if (!item.wrecked &&
+                    GuiInput.Button(new Rect(w - 132, y - 2, 62, 22), GameText.F("FIX ${0}", kind.repairCost)))
                     Say(Sim.TryRepairFurniture(item.instanceId, out string reason)
-                        ? GameText.F("{0} in room {1}: {2} day(s) of work.",
+                        ? GameText.F("{0} in room {1}: {2} day(s) of work. It will only come back as good as it is old.",
                                      GameText.T(kind.name), item.roomNumber, kind.repairDays)
                         : reason);
                 if (!item.taped &&
@@ -785,6 +801,12 @@ public class WorldOperationsPanel : MonoBehaviour
                                      item.roomNumber)
                         : reason);
             }
+            y += 22f;
+        }
+        if (broken.Count > shownBroken)
+        {
+            GUI.Label(new Rect(14, y, w - 28, 20),
+                      GameText.F("...and {0} more broken pieces.", broken.Count - shownBroken));
             y += 22f;
         }
     }

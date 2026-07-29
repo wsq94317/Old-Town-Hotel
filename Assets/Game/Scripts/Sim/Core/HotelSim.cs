@@ -41,8 +41,11 @@ public sealed class HotelSim
         if (!f.IsFaulted) { reason = "That one works fine."; return false; }
         if (f.IsUnderRepair) { reason = "Someone's already on it."; return false; }
         if (f.taped) { reason = "It's already held together with tape."; return false; }
+        // **塌掉的也能糊**：胶带是永不关闭的出路，否则现金归零 + 一次塌陷
+        // 就等于永久少一间房（同"清垃圾免费"的铁律）
 
         f.taped = true;
+        f.patchedUp = true;             // 胶带是最将就的将就法：塌得最快
         TapedTodayCount++;
         SyncRoomBlocksFromFurniture();      // 房间立刻放回可售流程
         return true;
@@ -98,6 +101,10 @@ public sealed class HotelSim
 
     /// <summary>破败房的垃圾清理进度（只花人工那条路，见 JunkClearing）。</summary>
     public JunkClearingQueue Clearing { get; } = new JunkClearingQueue();
+
+    /// <summary>事故专用随机源。**必须与主流隔离**：主 _rng 的抽取次序被
+    /// 十几个种子测试钉着，往里插一次掷骰会把所有对照实验重排（审计点名的坑）。</summary>
+    private readonly Random _accidentRng;
 
     /// <summary>仓库容量（"仓库会满"，见 Warehouse）。默认不设上限——
     /// 容量是场景参数，两个游戏场景各自设一个真实值。</summary>
@@ -218,6 +225,7 @@ public sealed class HotelSim
         DemandCfg = demandConfig;
         Cash = startingCash;
         _rng = new Random(rngSeed);
+        _accidentRng = new Random(rngSeed ^ 0x5EED1);   // 与主流隔离，见字段注释
         Pipeline = new SimPipeline(Clock, rooms, staff, rngSeed);
         Renovations = new SimRenovationQueue();
         Materials = new MaterialStore();
@@ -343,6 +351,9 @@ public sealed class HotelSim
         if (!Furniture.TryGet(instanceId, out FurnitureInstance f)) { reason = "Nothing to fix there."; return false; }
         if (!f.IsFaulted) { reason = "That one works fine."; return false; }
         if (f.IsUnderRepair) { reason = "Someone's already on it."; return false; }
+
+        // 塌了的修不动——这是"一直修不换"的终点。只能换新，或者先糊胶带顶着
+        if (f.wrecked) { reason = "That one's wrecked. Buy a new one - or tape it and pray."; return false; }
 
         FurnitureKind kind = FurnitureCatalog.Get(f.kindId);
         if (!TrySpendCash(kind.repairCost))
@@ -1273,6 +1284,104 @@ public sealed class HotelSim
         ArrivalsCheckedInToday++;
     }
 
+    // ── 家具塌了会伤人（用户设计）────────────────────────────────────────────
+
+    /// <summary>一天最多一起事故。**这是"记得住的事故"和"死亡螺旋"之间的那条线**——
+    /// 一晚塌三张床赔三笔钱，玩家只会觉得游戏在惩罚他，而不是在讲一个故事。</summary>
+    public const int MaxInjuriesPerDay = 1;
+
+    /// <summary>赔偿 = 房价的这个倍数，再夹进上下限。用户要求"不要太狠"：
+    /// 12 间房日毛收入约 $500，所以 $200-900 是"疼一到两天"而不是终局。</summary>
+    /// 一开始设成 2 倍房价 / $200-900，被 FullSafebox_NeverBlocksPayroll 抓到：
+    /// 12 间房的店日净利约 $268，一次事故就把当天的钱吃光，连带发不出工资——
+    /// 那是"太狠"的定义。降到 1 倍房价 / $120-400：疼小半天，不动摇当天的运营。
+    public const float InjuryCompensationRateFactor = 1f;
+    public const int MinInjuryCompensation = 120;
+    public const int MaxInjuryCompensation = 400;
+
+    /// <summary>今晚有几起家具伤人事故（晨报读它）。</summary>
+    public int InjuriesToday { get; private set; }
+
+    /// <summary>今晚为事故赔了多少钱。</summary>
+    public int InjuryCompensationToday { get; private set; }
+
+    /// <summary>事故原话（晨报直接显示）。</summary>
+    public string LastInjuryLine { get; private set; } = "";
+
+    /// <summary>承重家具在健康度极低时会**塌**，把住在里面的客人压伤：
+    /// 送医院 + 赔钱 + 差评，那件家具从此**修不动**（只能换新或先糊胶带顶着）。
+    ///
+    /// 这是"修一张破床只能修成一张能用的破床"的下游后果：一直修不换，
+    /// 健康度上限就一直压在故障线以下，早晚会塌。经营良好的酒店
+    /// （家具健康度在阈值之上）**永远见不到这套机制**。</summary>
+    private void RollFurnitureCollapse()
+    {
+        InjuriesToday = 0;
+        InjuryCompensationToday = 0;
+        LastInjuryLine = "";
+        if (_stays.Count == 0) return;
+
+        foreach (var pair in _stays)
+        {
+            if (InjuriesToday >= MaxInjuriesPerDay) break;
+
+            var items = Furniture.InRoom(pair.Key);
+            for (int i = 0; i < items.Count; i++)
+            {
+                var item = items[i];
+                if (item.wrecked) continue;
+                if (!FurnitureCatalog.TryGet(item.kindId, out FurnitureKind kind)) continue;
+                if (!FurnitureCatalog.BearsWeight(kind.slot)) continue;
+
+                // **只有被将就过的家具会塌**（修过或糊过胶带）。全新酒店开局那批
+                // 破家具在玩家还没做任何决定之前就塌人，是在惩罚一个他没做过的选择；
+                // 用户的原话也是"修好的床还是有塌陷的可能"——它是"修而不换"的后果。
+                if (!item.patchedUp) continue;
+
+                double chance = FurnitureWearModel.CollapseChancePerNight(item.health, item.taped);
+                if (chance <= 0d || _accidentRng.NextDouble() >= chance) continue;
+
+                WreckFurnitureAndInjureGuest(pair.Key, item, kind, pair.Value);
+                break;
+            }
+        }
+    }
+
+    private void WreckFurnitureAndInjureGuest(int roomNumber, FurnitureInstance item,
+                                              FurnitureKind kind, Stay stay)
+    {
+        item.wrecked = true;
+        if (!item.IsFaulted) item.faultLineIndex = 0;   // 塌了当然算坏：房间要封
+        item.taped = false;                            // 胶带跟着塌了
+
+        InjuriesToday++;
+
+        int claim = SimMath.Clamp(
+            SimMath.RoundToInt(stay.nightlyRate * InjuryCompensationRateFactor),
+            MinInjuryCompensation, MaxInjuryCompensation);
+
+        // 赔偿从现金掏、不够动保险箱（同工资/还贷）。**赔不出来就赔口碑**：
+        // 不能因为没钱把玩家卡死，也不能让他白赚一次事故。
+        int paid = 0;
+        int fromCash = claim < Cash ? claim : Cash;
+        Cash -= fromCash;
+        paid += fromCash;
+        int remaining = claim - fromCash;
+        if (remaining > 0) paid += Safebox.Withdraw(remaining);
+
+        InjuryCompensationToday += paid;
+
+        bool paidInFull = paid >= claim;
+        Reputation.RecordGuest(paidInFull ? 0.6f : ReputationLedger.MinSatisfaction);
+        Breakdown.Add(ReputationCause.GuestInjured, paidInFull ? -0.4f : -1f);
+
+        LastInjuryLine = paidInFull
+            ? "R" + roomNumber + ": the " + kind.name + " collapsed with a guest on it. "
+              + "Ambulance, apologies, $" + paid + " settled."
+            : "R" + roomNumber + ": the " + kind.name + " collapsed with a guest on it. "
+              + "You could not cover the claim - that review will hurt.";
+    }
+
     // ── 支付：玩家亲手按的两笔钱（用户要求）────────────────────────────────
 
     /// <summary>今天记上账的工资（晨报显示"今天欠下多少"）。</summary>
@@ -1549,6 +1658,7 @@ public sealed class HotelSim
         // 胶带过夜失效（要排在 TickRepairs 之前：真修完的那件会自己撕掉胶带，
         // 只糊没修的次晨重新封房——这才是"明日复发"）
         TapeExpiredToday = Furniture.ExpireTape();
+        RollFurnitureCollapse();
         Furniture.TickRepairs();
         ApplyNightlyWear();
         AdvanceRenovations();
