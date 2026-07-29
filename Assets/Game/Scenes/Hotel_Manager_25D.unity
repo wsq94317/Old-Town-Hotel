@@ -7177,6 +7177,62 @@ MonoBehaviour:
   interiorCenter: {x: 2.5, y: 4, z: 3.5}
   doorSenseRadius: 0.85
   autoCloseAfterOpen: 2
+--- !u!1 &413423296
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 413423298}
+  - component: {fileID: 413423297}
+  m_Layer: 0
+  m_Name: ArtDirection
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &413423297
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 413423296}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 59c933a853bb291498ea354866c32f2a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: OldTownHotel.Game::HotelLook
+  postExposure: 0.35
+  contrast: 12
+  saturation: -6
+  colorFilter: {r: 1, g: 0.96, b: 0.88, a: 1}
+  bloomIntensity: 0.55
+  bloomThreshold: 1.1
+  vignetteIntensity: 0.28
+  sunEuler: {x: 50, y: 35, z: 0}
+  sunColor: {r: 1, g: 0.95, b: 0.85, a: 1}
+  sunIntensity: 1.15
+  skyAmbient: {r: 0.42, g: 0.47, b: 0.58, a: 1}
+  groundAmbient: {r: 0.26, g: 0.23, b: 0.21, a: 1}
+--- !u!4 &413423298
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 413423296}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &420778251
 GameObject:
   m_ObjectHideFlags: 0
@@ -33047,3 +33103,4 @@ SceneRoots:
   - {fileID: 128087641}
   - {fileID: 2129138150}
   - {fileID: 694643968}
+  - {fileID: 413423298}
