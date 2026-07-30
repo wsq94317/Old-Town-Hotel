@@ -54,6 +54,7 @@ public static class HotelEnvironmentArtBuilder
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
         BuildFurniturePrefabs();
+        TuneLighting();
         RemoveArtRoots();
         SetGreyboxReplacementRenderers(false);
 
@@ -74,10 +75,17 @@ public static class HotelEnvironmentArtBuilder
         if (floor7 != null) BuildPool(CreateArtRoot(floor7));
 
         MarkArtBatchingStatic();
+        ValidateLowPolyHotelInternal(true);
         EditorSceneManager.MarkSceneDirty(scene);
         EditorSceneManager.SaveScene(scene);
         Selection.activeObject = FindPath("World/Floor1/" + ArtRootName);
         Debug.Log("Low-poly hotel art rebuilt from scene anchors and saved.");
+    }
+
+    [MenuItem("Old Town Hotel/Art/Validate Low Poly Hotel")]
+    public static void ValidateLowPolyHotel()
+    {
+        ValidateLowPolyHotelInternal(true);
     }
 
     [MenuItem("Old Town Hotel/Art/Remove Low Poly Hotel")]
@@ -106,6 +114,27 @@ public static class HotelEnvironmentArtBuilder
         string name = path.Substring(split + 1);
         EnsureFolder(parent);
         AssetDatabase.CreateFolder(parent, name);
+    }
+
+    private static void TuneLighting()
+    {
+        Light[] lights = Object.FindObjectsByType<Light>(FindObjectsSortMode.None);
+        for (int i = 0; i < lights.Length; i++)
+        {
+            if (lights[i] == null || lights[i].type != LightType.Directional) continue;
+            lights[i].color = new Color(1.0f, 0.94f, 0.86f);
+            lights[i].intensity = 1.18f;
+            lights[i].shadows = LightShadows.Soft;
+            lights[i].shadowStrength = 0.58f;
+            EditorUtility.SetDirty(lights[i]);
+            break;
+        }
+
+        RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;
+        RenderSettings.ambientSkyColor = new Color(0.56f, 0.67f, 0.74f);
+        RenderSettings.ambientEquatorColor = new Color(0.40f, 0.36f, 0.33f);
+        RenderSettings.ambientGroundColor = new Color(0.20f, 0.18f, 0.18f);
+        RenderSettings.ambientIntensity = 1.0f;
     }
 
     private static void EnsureMaterialAssets()
@@ -139,13 +168,22 @@ public static class HotelEnvironmentArtBuilder
                                 || id == HotelArtMaterial.MetalLight;
                 material.SetFloat("_Metallic", metallic ? 0.58f : 0f);
             }
+            material.enableInstancing = true;
 
             bool emissive = id == HotelArtMaterial.Warning || id == HotelArtMaterial.Water;
             if (material.HasProperty("_EmissionColor"))
             {
                 material.SetColor("_EmissionColor", emissive ? color * 0.35f : Color.black);
-                if (emissive) material.EnableKeyword("_EMISSION");
-                else material.DisableKeyword("_EMISSION");
+                if (emissive)
+                {
+                    material.EnableKeyword("_EMISSION");
+                    material.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
+                }
+                else
+                {
+                    material.DisableKeyword("_EMISSION");
+                    material.globalIlluminationFlags = MaterialGlobalIlluminationFlags.EmissiveIsBlack;
+                }
             }
             EditorUtility.SetDirty(material);
         }
@@ -178,6 +216,7 @@ public static class HotelEnvironmentArtBuilder
     private static void BuildLobby(Transform root)
     {
         LowPolyHotelKit.BuildLobbyDecor(root);
+        LowPolyHotelKit.BuildReceptionKeyWall(root, new Vector3(0f, 0f, 5.72f));
         AddVisibleFloorTrim(root);
         AddElevatorFrame(root);
 
@@ -188,7 +227,7 @@ public static class HotelEnvironmentArtBuilder
         {
             float x = -7.2f + i * 1.2f;
             LowPolyHotelKit.BuildChairAt(
-                root, "BarStool_" + i, new Vector3(x, 0f, 2.35f), 0f,
+                root, "BarStool_" + i, new Vector3(x, 0f, 2.35f), 180f,
                 HotelArtMaterial.FabricMustard);
         }
 
@@ -198,7 +237,10 @@ public static class HotelEnvironmentArtBuilder
             HotelArtMaterial.WoodWarm);
         LowPolyHotelKit.Part(loungeBar.transform, "Top", PrimitiveType.Cube,
             new Vector3(0f, 1.01f, -0.04f), new Vector3(3.4f, 0.12f, 0.88f),
-            HotelArtMaterial.Brass);
+            HotelArtMaterial.Stone);
+        LowPolyHotelKit.Part(loungeBar.transform, "FootRail", PrimitiveType.Cylinder,
+            new Vector3(0f, 0.22f, -0.47f), new Vector3(0.045f, 1.42f, 0.045f),
+            HotelArtMaterial.Brass, new Vector3(0f, 0f, 90f));
         for (int i = 0; i < 7; i++)
         {
             float x = -1.25f + i * 0.42f;
@@ -207,10 +249,10 @@ public static class HotelEnvironmentArtBuilder
                 i % 2 == 0 ? HotelArtMaterial.FabricRed : HotelArtMaterial.Green);
         }
 
-        BuildWallLamp(root, new Vector3(-7.6f, 1.25f, 5.72f), 0f);
-        BuildWallLamp(root, new Vector3(-3.0f, 1.25f, 5.72f), 0f);
-        BuildWallLamp(root, new Vector3(2.5f, 1.25f, 5.72f), 0f);
-        BuildWallLamp(root, new Vector3(6.2f, 1.25f, 5.72f), 0f);
+        BuildWallLamp(root, new Vector3(-7.6f, 0.57f, 5.72f), 0f);
+        BuildWallLamp(root, new Vector3(-3.0f, 0.57f, 5.72f), 0f);
+        BuildWallLamp(root, new Vector3(2.5f, 0.57f, 5.72f), 0f);
+        BuildWallLamp(root, new Vector3(6.2f, 0.57f, 5.72f), 0f);
 
         var entrance = LowPolyHotelKit.NewChild(root, "EntranceCanopy", new Vector3(0f, 0f, -5.55f));
         LowPolyHotelKit.Part(entrance.transform, "Mat", PrimitiveType.Cube,
@@ -244,7 +286,8 @@ public static class HotelEnvironmentArtBuilder
             int room = roomBase + i + 1;
             float x = -7.5f + i * 5f;
             BuildDoorFrame(root, "Frame_" + room, new Vector3(x, 0f, 1f), false);
-            BuildWallLamp(root, new Vector3(x + 1.65f, 1.12f, 1.15f), 180f);
+            BuildWallLamp(root, new Vector3(x + 1.65f, 0.57f, 0.95f), 0f);
+            BuildRoomPlaque(root, new Vector3(x + 1.24f, 0f, 0.94f), false);
         }
 
         int southCount = Mathf.Max(0, roomCount - 4);
@@ -253,7 +296,8 @@ public static class HotelEnvironmentArtBuilder
             int room = roomBase + i + 5;
             float x = -7.5f + i * 5f;
             BuildDoorFrame(root, "Frame_" + room, new Vector3(x, 0f, -1f), true);
-            BuildWallLamp(root, new Vector3(x + 1.65f, 1.12f, -1.15f), 0f);
+            BuildWallLamp(root, new Vector3(x + 1.65f, 0.57f, -0.95f), 180f);
+            BuildRoomPlaque(root, new Vector3(x + 1.24f, 0f, -0.94f), true);
         }
 
         BuildHousekeepingCart(root, new Vector3(-8.8f, 0f, 0.15f));
@@ -300,11 +344,12 @@ public static class HotelEnvironmentArtBuilder
         {
             Vector3 pos = tablePositions[i];
             BuildDiningSet(root, "DiningSet_" + i, pos);
-            BuildPendant(root, pos + new Vector3(0f, 2.1f, 0f));
         }
 
         BuildPlant(root, new Vector3(6.8f, 0f, 4.7f), 1.05f);
         BuildPlant(root, new Vector3(6.8f, 0f, -4.7f), 1.05f);
+        BuildRestaurantServiceStation(root, new Vector3(6.7f, 0f, 0.2f));
+        BuildHostStand(root, new Vector3(-0.2f, 0f, -4.7f));
     }
 
     private static void BuildGym(Transform root)
@@ -315,14 +360,28 @@ public static class HotelEnvironmentArtBuilder
             new Vector3(-0.4f, 0.025f, 0f), new Vector3(16.8f, 0.05f, 9.8f),
             HotelArtMaterial.Rubber);
         LowPolyHotelKit.Part(root, "MirrorWall", PrimitiveType.Cube,
-            new Vector3(-0.5f, 1.12f, 5.78f), new Vector3(15.8f, 2.15f, 0.04f),
+            new Vector3(-0.5f, 0.40f, 5.78f), new Vector3(15.8f, 0.72f, 0.04f),
             HotelArtMaterial.GlassBlue);
 
         BuildTreadmill(root, new Vector3(-5.5f, 0f, 1.7f));
         BuildTreadmill(root, new Vector3(-3.7f, 0f, 1.7f));
         BuildTreadmill(root, new Vector3(-1.9f, 0f, 1.7f));
         BuildWeightBench(root, new Vector3(1.0f, 0f, -1.8f));
+        BuildWeightBench(root, new Vector3(2.7f, 0f, -1.8f));
         BuildWeightRack(root, new Vector3(4.2f, 0f, -3.8f));
+        BuildWaterCooler(root, new Vector3(7.0f, 0f, 4.8f));
+        BuildTowelRack(root, new Vector3(6.7f, 0f, 3.3f));
+        BuildSpinBike(root, new Vector3(1.4f, 0f, 2.0f), 0f);
+        BuildSpinBike(root, new Vector3(3.0f, 0f, 2.0f), 0f);
+        BuildPunchingBag(root, new Vector3(6.4f, 0f, -0.8f));
+        BuildExerciseBallRack(root, new Vector3(-0.1f, 0f, -4.3f));
+
+        LowPolyHotelKit.Part(root, "CardioZoneLine", PrimitiveType.Cube,
+            new Vector3(-1.2f, 0.065f, 3.15f), new Vector3(10.8f, 0.025f, 0.07f),
+            HotelArtMaterial.Brass);
+        LowPolyHotelKit.Part(root, "StrengthZoneLine", PrimitiveType.Cube,
+            new Vector3(3.8f, 0.065f, -2.85f), new Vector3(7.0f, 0.025f, 0.07f),
+            HotelArtMaterial.Brass);
 
         for (int i = 0; i < 3; i++)
         {
@@ -340,6 +399,12 @@ public static class HotelEnvironmentArtBuilder
         LowPolyHotelKit.Part(root, "CasinoCarpet", PrimitiveType.Cube,
             new Vector3(-0.4f, 0.025f, 0f), new Vector3(16.8f, 0.05f, 9.8f),
             HotelArtMaterial.CarpetBlue);
+        LowPolyHotelKit.Part(root, "CasinoWallBand", PrimitiveType.Cube,
+            new Vector3(-0.4f, 0.38f, 5.77f), new Vector3(16.6f, 0.62f, 0.045f),
+            HotelArtMaterial.AccentRose);
+        LowPolyHotelKit.Part(root, "CasinoWallRail", PrimitiveType.Cube,
+            new Vector3(-0.4f, 0.70f, 5.73f), new Vector3(16.8f, 0.05f, 0.035f),
+            HotelArtMaterial.Brass);
         for (int i = 0; i < 12; i++)
         {
             float x = -7.5f + (i % 6) * 2.8f;
@@ -349,14 +414,32 @@ public static class HotelEnvironmentArtBuilder
                 HotelArtMaterial.Brass);
         }
 
-        BuildCasinoTable(root, new Vector3(-4f, 0f, 1f), 20f);
-        BuildCasinoTable(root, new Vector3(0f, 0f, -2f), -15f);
-        BuildCasinoTable(root, new Vector3(4f, 0f, 1.5f), 12f);
+        Vector3[] casinoTables =
+        {
+            new Vector3(-4f, 0f, 1f),
+            new Vector3(0f, 0f, -2f),
+            new Vector3(4f, 0f, 1.5f)
+        };
+        float[] casinoYaw = { 20f, -15f, 12f };
+        for (int i = 0; i < casinoTables.Length; i++)
+        {
+            LowPolyHotelKit.Part(root, "TableRug_" + i, PrimitiveType.Cylinder,
+                casinoTables[i] + new Vector3(0f, 0.055f, 0f),
+                new Vector3(2.30f, 0.018f, 1.85f), HotelArtMaterial.CarpetRed,
+                new Vector3(0f, casinoYaw[i], 0f));
+            BuildCasinoTable(root, casinoTables[i], casinoYaw[i]);
+        }
 
         for (int i = 0; i < 5; i++)
+        {
             BuildSlotMachine(root, new Vector3(-7.4f + i * 1.1f, 0f, -3.2f));
+            LowPolyHotelKit.BuildChairAt(root, "SlotChair_" + i,
+                new Vector3(-7.4f + i * 1.1f, 0f, -4.15f), 180f,
+                HotelArtMaterial.LeatherTan);
+        }
 
-        BuildVelvetRope(root, new Vector3(5.8f, 0f, -3.8f), 4);
+        BuildCasinoCashier(root, new Vector3(7.1f, 0f, -3.3f));
+        BuildVelvetRope(root, new Vector3(3.8f, 0f, -4.35f), 4);
     }
 
     private static void BuildPool(Transform root)
@@ -383,12 +466,19 @@ public static class HotelEnvironmentArtBuilder
         LowPolyHotelKit.Part(pool.transform, "CopingE", PrimitiveType.Cube,
             new Vector3(4.13f, 0.10f, 0f), new Vector3(0.26f, 0.20f, 5.0f),
             HotelArtMaterial.White);
+        for (int i = -1; i <= 1; i += 2)
+            LowPolyHotelKit.Part(pool.transform, "LaneMarker_" + i, PrimitiveType.Cube,
+                new Vector3(0f, 0.105f, i * 1.25f), new Vector3(7.55f, 0.012f, 0.055f),
+                HotelArtMaterial.White);
         BuildPoolLadder(pool.transform, new Vector3(3.5f, 0f, -2.2f));
 
         BuildLounger(root, new Vector3(4.0f, 0f, 2.0f), -10f);
         BuildLounger(root, new Vector3(5.2f, 0f, 2.0f), -10f);
         BuildLounger(root, new Vector3(6.4f, 0f, 2.0f), -10f);
         BuildUmbrella(root, new Vector3(5.2f, 0f, 3.8f));
+        BuildPoolSideTable(root, new Vector3(4.58f, 0f, 1.05f));
+        BuildPoolSideTable(root, new Vector3(5.85f, 0f, 1.05f));
+        BuildLifeRing(root, new Vector3(-6.9f, 0f, 4.85f));
 
         var bar = LowPolyHotelKit.NewChild(root, "PoolBar_LP", new Vector3(6.5f, 0f, -3.0f));
         LowPolyHotelKit.Part(bar.transform, "Body", PrimitiveType.Cube,
@@ -404,6 +494,16 @@ public static class HotelEnvironmentArtBuilder
             LowPolyHotelKit.Part(bar.transform, "CanopyPost", PrimitiveType.Cylinder,
                 new Vector3(x * 1.05f, 1.45f, 0.35f), new Vector3(0.06f, 0.55f, 0.06f),
                 HotelArtMaterial.WoodDark);
+        for (int i = 0; i < 3; i++)
+        {
+            LowPolyHotelKit.BuildChairAt(root, "PoolBarStool_" + i,
+                new Vector3(5.75f + i * 0.75f, 0f, -2.30f), 0f,
+                HotelArtMaterial.FabricMustard);
+            LowPolyHotelKit.Part(bar.transform, "Bottle_" + i, PrimitiveType.Cylinder,
+                new Vector3(-0.60f + i * 0.58f, 1.12f, 0f),
+                new Vector3(0.08f, 0.16f, 0.08f),
+                i == 1 ? HotelArtMaterial.Green : HotelArtMaterial.AccentRose);
+        }
     }
 
     private static void AddVisibleFloorTrim(Transform root)
@@ -443,14 +543,20 @@ public static class HotelEnvironmentArtBuilder
     {
         var panel = LowPolyHotelKit.NewChild(root, "WallPanel", position, yaw);
         LowPolyHotelKit.Part(panel.transform, "Back", PrimitiveType.Cube,
-            new Vector3(0f, 0.88f, 0f), new Vector3(width, 1.55f, 0.06f),
-            HotelArtMaterial.WoodWarm);
+            new Vector3(0f, 0.39f, 0f), new Vector3(width, 0.70f, 0.06f),
+            HotelArtMaterial.AccentRose);
+        LowPolyHotelKit.Part(panel.transform, "TopRail", PrimitiveType.Cube,
+            new Vector3(0f, 0.73f, -0.04f), new Vector3(width + 0.08f, 0.05f, 0.04f),
+            HotelArtMaterial.WoodLight);
+        LowPolyHotelKit.Part(panel.transform, "BottomRail", PrimitiveType.Cube,
+            new Vector3(0f, 0.08f, -0.04f), new Vector3(width + 0.08f, 0.05f, 0.04f),
+            HotelArtMaterial.WoodLight);
         for (int i = 0; i < 4; i++)
         {
             float x = -width * 0.38f + i * width * 0.25f;
             LowPolyHotelKit.Part(panel.transform, "Moulding_" + i, PrimitiveType.Cube,
-                new Vector3(x, 0.88f, -0.04f), new Vector3(0.04f, 1.38f, 0.035f),
-                HotelArtMaterial.Brass);
+                new Vector3(x, 0.40f, -0.04f), new Vector3(0.035f, 0.52f, 0.035f),
+                HotelArtMaterial.WoodLight);
         }
     }
 
@@ -468,21 +574,36 @@ public static class HotelEnvironmentArtBuilder
             HotelArtMaterial.Cream);
     }
 
+    private static void BuildRoomPlaque(Transform root, Vector3 position, bool facesPositiveZ)
+    {
+        var plaque = LowPolyHotelKit.NewChild(
+            root, "RoomPlaque", position, facesPositiveZ ? 180f : 0f);
+        LowPolyHotelKit.Part(plaque.transform, "Base", PrimitiveType.Cube,
+            new Vector3(0f, 0.50f, 0f), new Vector3(0.30f, 0.22f, 0.035f),
+            HotelArtMaterial.WoodDark);
+        LowPolyHotelKit.Part(plaque.transform, "Inset", PrimitiveType.Cube,
+            new Vector3(0f, 0.50f, -0.025f), new Vector3(0.22f, 0.14f, 0.018f),
+            HotelArtMaterial.Brass);
+        LowPolyHotelKit.Part(plaque.transform, "Dot", PrimitiveType.Sphere,
+            new Vector3(0f, 0.50f, -0.045f), new Vector3(0.055f, 0.055f, 0.025f),
+            HotelArtMaterial.WoodDark);
+    }
+
     private static void BuildDoorFrame(
         Transform root, string name, Vector3 position, bool facesPositiveZ)
     {
         var frame = LowPolyHotelKit.NewChild(root, name, position, facesPositiveZ ? 180f : 0f);
         LowPolyHotelKit.Part(frame.transform, "PostL", PrimitiveType.Cube,
-            new Vector3(-0.58f, 0.88f, 0f), new Vector3(0.13f, 1.76f, 0.13f),
+            new Vector3(-0.96f, 0.55f, 0f), new Vector3(0.12f, 1.10f, 0.13f),
             HotelArtMaterial.WoodDark);
         LowPolyHotelKit.Part(frame.transform, "PostR", PrimitiveType.Cube,
-            new Vector3(0.58f, 0.88f, 0f), new Vector3(0.13f, 1.76f, 0.13f),
+            new Vector3(0.96f, 0.55f, 0f), new Vector3(0.12f, 1.10f, 0.13f),
             HotelArtMaterial.WoodDark);
         LowPolyHotelKit.Part(frame.transform, "Header", PrimitiveType.Cube,
-            new Vector3(0f, 1.76f, 0f), new Vector3(1.28f, 0.14f, 0.13f),
+            new Vector3(0f, 1.15f, 0f), new Vector3(2.04f, 0.12f, 0.13f),
             HotelArtMaterial.WoodDark);
         LowPolyHotelKit.Part(frame.transform, "Threshold", PrimitiveType.Cube,
-            new Vector3(0f, 0.035f, 0f), new Vector3(1.15f, 0.07f, 0.24f),
+            new Vector3(0f, 0.035f, 0f), new Vector3(1.82f, 0.07f, 0.24f),
             HotelArtMaterial.Brass);
     }
 
@@ -523,8 +644,56 @@ public static class HotelEnvironmentArtBuilder
         {
             Vector3 chairPos = Quaternion.Euler(0f, i * 90f, 0f) * new Vector3(0f, 0f, 1.05f);
             LowPolyHotelKit.BuildChairAt(set.transform, "Chair_" + i, chairPos,
-                180f + i * 90f, i % 2 == 0 ? HotelArtMaterial.FabricRed : HotelArtMaterial.FabricTeal);
+                i * 90f, i % 2 == 0 ? HotelArtMaterial.FabricRed : HotelArtMaterial.FabricTeal);
+            Vector3 settingPos = Quaternion.Euler(0f, i * 90f, 0f) * new Vector3(0f, 0f, 0.50f);
+            LowPolyHotelKit.Part(set.transform, "Plate_" + i, PrimitiveType.Cylinder,
+                new Vector3(settingPos.x, 0.82f, settingPos.z),
+                new Vector3(0.22f, 0.018f, 0.22f), HotelArtMaterial.Cream);
+            Vector3 napkinPos = Quaternion.Euler(0f, i * 90f, 0f) * new Vector3(0.22f, 0f, 0.48f);
+            LowPolyHotelKit.Part(set.transform, "Napkin_" + i, PrimitiveType.Cube,
+                new Vector3(napkinPos.x, 0.84f, napkinPos.z),
+                new Vector3(0.13f, 0.018f, 0.24f), HotelArtMaterial.AccentRose,
+                new Vector3(0f, i * 90f, 0f));
         }
+        LowPolyHotelKit.Part(set.transform, "CenterVase", PrimitiveType.Cylinder,
+            new Vector3(0f, 0.96f, 0f), new Vector3(0.12f, 0.14f, 0.12f),
+            HotelArtMaterial.Brass);
+        LowPolyHotelKit.Part(set.transform, "CenterFlower", PrimitiveType.Sphere,
+            new Vector3(0f, 1.15f, 0f), new Vector3(0.30f, 0.18f, 0.30f),
+            HotelArtMaterial.AccentRose);
+    }
+
+    private static void BuildRestaurantServiceStation(Transform root, Vector3 position)
+    {
+        var station = LowPolyHotelKit.NewChild(root, "ServiceStation", position, -90f);
+        LowPolyHotelKit.Part(station.transform, "Cabinet", PrimitiveType.Cube,
+            new Vector3(0f, 0.42f, 0f), new Vector3(1.45f, 0.84f, 0.58f),
+            HotelArtMaterial.WoodDark);
+        LowPolyHotelKit.Part(station.transform, "Top", PrimitiveType.Cube,
+            new Vector3(0f, 0.88f, 0f), new Vector3(1.55f, 0.08f, 0.66f),
+            HotelArtMaterial.Stone);
+        for (int i = 0; i < 3; i++)
+            LowPolyHotelKit.Part(station.transform, "PlateStack_" + i, PrimitiveType.Cylinder,
+                new Vector3(-0.48f + i * 0.48f, 0.97f, 0f),
+                new Vector3(0.22f, 0.035f + i * 0.01f, 0.22f),
+                HotelArtMaterial.Cream);
+        LowPolyHotelKit.Part(station.transform, "Towel", PrimitiveType.Cube,
+            new Vector3(0.56f, 0.52f, -0.32f), new Vector3(0.30f, 0.38f, 0.025f),
+            HotelArtMaterial.White);
+    }
+
+    private static void BuildHostStand(Transform root, Vector3 position)
+    {
+        var stand = LowPolyHotelKit.NewChild(root, "HostStand", position);
+        LowPolyHotelKit.Part(stand.transform, "Pedestal", PrimitiveType.Cube,
+            new Vector3(0f, 0.45f, 0f), new Vector3(0.72f, 0.90f, 0.55f),
+            HotelArtMaterial.WoodDark);
+        LowPolyHotelKit.Part(stand.transform, "Top", PrimitiveType.Cube,
+            new Vector3(0f, 0.94f, -0.02f), new Vector3(0.82f, 0.09f, 0.64f),
+            HotelArtMaterial.Brass);
+        LowPolyHotelKit.Part(stand.transform, "Book", PrimitiveType.Cube,
+            new Vector3(0f, 1.02f, -0.08f), new Vector3(0.46f, 0.035f, 0.30f),
+            HotelArtMaterial.AccentRose, new Vector3(0f, -8f, 0f));
     }
 
     private static void BuildPendant(Transform root, Vector3 position)
@@ -601,6 +770,119 @@ public static class HotelEnvironmentArtBuilder
         }
     }
 
+    private static void BuildWaterCooler(Transform root, Vector3 position)
+    {
+        var cooler = LowPolyHotelKit.NewChild(root, "WaterCooler", position);
+        LowPolyHotelKit.Part(cooler.transform, "Body", PrimitiveType.Cube,
+            new Vector3(0f, 0.42f, 0f), new Vector3(0.52f, 0.84f, 0.48f),
+            HotelArtMaterial.White);
+        LowPolyHotelKit.Part(cooler.transform, "Bottle", PrimitiveType.Cylinder,
+            new Vector3(0f, 1.02f, 0f), new Vector3(0.27f, 0.38f, 0.27f),
+            HotelArtMaterial.GlassBlue);
+        LowPolyHotelKit.Part(cooler.transform, "Tap", PrimitiveType.Cube,
+            new Vector3(0f, 0.62f, -0.27f), new Vector3(0.18f, 0.12f, 0.08f),
+            HotelArtMaterial.FabricTeal);
+    }
+
+    private static void BuildTowelRack(Transform root, Vector3 position)
+    {
+        var rack = LowPolyHotelKit.NewChild(root, "TowelRack", position);
+        for (int i = 0; i < 3; i++)
+        {
+            LowPolyHotelKit.Part(rack.transform, "Shelf_" + i, PrimitiveType.Cube,
+                new Vector3(0f, 0.25f + i * 0.34f, 0f),
+                new Vector3(1.25f, 0.06f, 0.42f), HotelArtMaterial.MetalDark);
+            for (int j = 0; j < 3; j++)
+                LowPolyHotelKit.Part(rack.transform, "Towel_" + i + "_" + j, PrimitiveType.Cube,
+                    new Vector3(-0.39f + j * 0.39f, 0.33f + i * 0.34f, 0f),
+                    new Vector3(0.30f, 0.12f, 0.34f),
+                    i == 1 ? HotelArtMaterial.FabricTeal : HotelArtMaterial.White);
+        }
+    }
+
+    private static void BuildSpinBike(Transform root, Vector3 position, float yaw)
+    {
+        var bike = LowPolyHotelKit.NewChild(root, "SpinBike", position, yaw);
+        LowPolyHotelKit.Part(bike.transform, "Flywheel", PrimitiveType.Cylinder,
+            new Vector3(0f, 0.38f, -0.24f), new Vector3(0.34f, 0.10f, 0.34f),
+            HotelArtMaterial.MetalLight, new Vector3(90f, 0f, 0f));
+        LowPolyHotelKit.Part(bike.transform, "Frame", PrimitiveType.Cylinder,
+            new Vector3(0f, 0.58f, 0.05f), new Vector3(0.055f, 0.42f, 0.055f),
+            HotelArtMaterial.FabricTeal, new Vector3(-28f, 0f, 0f));
+        LowPolyHotelKit.Part(bike.transform, "SeatPost", PrimitiveType.Cylinder,
+            new Vector3(0f, 0.86f, 0.35f), new Vector3(0.045f, 0.30f, 0.045f),
+            HotelArtMaterial.MetalDark);
+        LowPolyHotelKit.Part(bike.transform, "Seat", PrimitiveType.Cube,
+            new Vector3(0f, 1.14f, 0.35f), new Vector3(0.36f, 0.10f, 0.28f),
+            HotelArtMaterial.LeatherTan);
+        LowPolyHotelKit.Part(bike.transform, "HandlePost", PrimitiveType.Cylinder,
+            new Vector3(0f, 0.82f, -0.48f), new Vector3(0.045f, 0.38f, 0.045f),
+            HotelArtMaterial.MetalDark, new Vector3(12f, 0f, 0f));
+        LowPolyHotelKit.Part(bike.transform, "Handlebar", PrimitiveType.Cylinder,
+            new Vector3(0f, 1.16f, -0.55f), new Vector3(0.04f, 0.32f, 0.04f),
+            HotelArtMaterial.MetalLight, new Vector3(0f, 0f, 90f));
+        LowPolyHotelKit.Part(bike.transform, "Base", PrimitiveType.Cube,
+            new Vector3(0f, 0.08f, 0f), new Vector3(0.72f, 0.08f, 1.25f),
+            HotelArtMaterial.MetalDark);
+    }
+
+    private static void BuildPunchingBag(Transform root, Vector3 position)
+    {
+        var station = LowPolyHotelKit.NewChild(root, "PunchingBagStation", position);
+        LowPolyHotelKit.Part(station.transform, "Base", PrimitiveType.Cylinder,
+            new Vector3(0f, 0.08f, 0f), new Vector3(0.64f, 0.08f, 0.64f),
+            HotelArtMaterial.Rubber);
+        LowPolyHotelKit.Part(station.transform, "Post", PrimitiveType.Cylinder,
+            new Vector3(0.42f, 0.92f, 0f), new Vector3(0.06f, 0.84f, 0.06f),
+            HotelArtMaterial.MetalDark);
+        LowPolyHotelKit.Part(station.transform, "Arm", PrimitiveType.Cylinder,
+            new Vector3(0f, 1.72f, 0f), new Vector3(0.055f, 0.48f, 0.055f),
+            HotelArtMaterial.MetalDark, new Vector3(0f, 0f, 90f));
+        LowPolyHotelKit.Part(station.transform, "Bag", PrimitiveType.Cylinder,
+            new Vector3(-0.43f, 1.10f, 0f), new Vector3(0.30f, 0.56f, 0.30f),
+            HotelArtMaterial.AccentRose);
+        LowPolyHotelKit.Part(station.transform, "BagCap", PrimitiveType.Sphere,
+            new Vector3(-0.43f, 1.67f, 0f), new Vector3(0.30f, 0.18f, 0.30f),
+            HotelArtMaterial.AccentRose);
+    }
+
+    private static void BuildExerciseBallRack(Transform root, Vector3 position)
+    {
+        var rack = LowPolyHotelKit.NewChild(root, "ExerciseBallRack", position);
+        LowPolyHotelKit.Part(rack.transform, "Rail", PrimitiveType.Cube,
+            new Vector3(0f, 0.22f, 0f), new Vector3(2.6f, 0.10f, 0.50f),
+            HotelArtMaterial.MetalDark);
+        HotelArtMaterial[] colors =
+        {
+            HotelArtMaterial.FabricTeal,
+            HotelArtMaterial.FabricRed,
+            HotelArtMaterial.FabricMustard
+        };
+        for (int i = 0; i < 3; i++)
+            LowPolyHotelKit.Part(rack.transform, "Ball_" + i, PrimitiveType.Sphere,
+                new Vector3(-0.85f + i * 0.85f, 0.58f, 0f),
+                new Vector3(0.62f, 0.62f, 0.62f), colors[i]);
+    }
+
+    private static void BuildCasinoCashier(Transform root, Vector3 position)
+    {
+        var cashier = LowPolyHotelKit.NewChild(root, "CasinoCashier", position);
+        LowPolyHotelKit.Part(cashier.transform, "Counter", PrimitiveType.Cube,
+            new Vector3(0f, 0.48f, 0f), new Vector3(1.75f, 0.96f, 0.72f),
+            HotelArtMaterial.WoodDark);
+        LowPolyHotelKit.Part(cashier.transform, "Top", PrimitiveType.Cube,
+            new Vector3(0f, 1.0f, 0f), new Vector3(1.92f, 0.10f, 0.86f),
+            HotelArtMaterial.Brass);
+        LowPolyHotelKit.Part(cashier.transform, "Front", PrimitiveType.Cube,
+            new Vector3(0f, 0.50f, -0.38f), new Vector3(1.34f, 0.48f, 0.035f),
+            HotelArtMaterial.Green);
+        for (int i = 0; i < 3; i++)
+            LowPolyHotelKit.Part(cashier.transform, "ChipTray_" + i, PrimitiveType.Cube,
+                new Vector3(-0.48f + i * 0.48f, 1.08f, -0.10f),
+                new Vector3(0.30f, 0.035f, 0.18f),
+                i == 1 ? HotelArtMaterial.AccentRose : HotelArtMaterial.Warning);
+    }
+
     private static void BuildCasinoTable(Transform root, Vector3 position, float yaw)
     {
         var table = LowPolyHotelKit.NewChild(root, "CasinoTable", position, yaw);
@@ -621,7 +903,7 @@ public static class HotelEnvironmentArtBuilder
             float angle = -90f + i * 45f;
             Vector3 p = Quaternion.Euler(0f, angle, 0f) * new Vector3(0f, 0f, 1.45f);
             LowPolyHotelKit.BuildChairAt(table.transform, "CasinoChair_" + i, p,
-                180f + angle, HotelArtMaterial.FabricRed);
+                angle, HotelArtMaterial.FabricRed);
         }
         for (int i = 0; i < 8; i++)
         {
@@ -719,6 +1001,35 @@ public static class HotelEnvironmentArtBuilder
                 new Vector3(0f, 0f, 90f));
     }
 
+    private static void BuildPoolSideTable(Transform root, Vector3 position)
+    {
+        var table = LowPolyHotelKit.NewChild(root, "PoolSideTable", position);
+        LowPolyHotelKit.Part(table.transform, "Top", PrimitiveType.Cylinder,
+            new Vector3(0f, 0.45f, 0f), new Vector3(0.38f, 0.06f, 0.38f),
+            HotelArtMaterial.WoodLight);
+        LowPolyHotelKit.Part(table.transform, "Stem", PrimitiveType.Cylinder,
+            new Vector3(0f, 0.23f, 0f), new Vector3(0.06f, 0.22f, 0.06f),
+            HotelArtMaterial.MetalDark);
+        LowPolyHotelKit.Part(table.transform, "Drink", PrimitiveType.Cylinder,
+            new Vector3(0f, 0.58f, 0f), new Vector3(0.09f, 0.09f, 0.09f),
+            HotelArtMaterial.GlassBlue);
+    }
+
+    private static void BuildLifeRing(Transform root, Vector3 position)
+    {
+        var ring = LowPolyHotelKit.NewChild(root, "LifeRing", position);
+        for (int i = 0; i < 12; i++)
+        {
+            float angle = i * 30f;
+            float radians = angle * Mathf.Deg2Rad;
+            LowPolyHotelKit.Part(ring.transform, "Segment_" + i, PrimitiveType.Cylinder,
+                new Vector3(Mathf.Cos(radians) * 0.31f, 0.55f + Mathf.Sin(radians) * 0.31f, 0f),
+                new Vector3(0.075f, 0.14f, 0.075f),
+                i % 3 == 0 ? HotelArtMaterial.White : HotelArtMaterial.AccentRose,
+                new Vector3(0f, 0f, angle));
+        }
+    }
+
     private static void RemoveArtRoots()
     {
         Transform world = FindPath("World");
@@ -760,6 +1071,174 @@ public static class HotelEnvironmentArtBuilder
                     StaticEditorFlags.BatchingStatic);
             }
         }
+    }
+
+    private static bool ValidateLowPolyHotelInternal(bool logResult)
+    {
+        Transform world = FindPath("World");
+        if (world == null)
+        {
+            if (logResult) Debug.LogError("Hotel art validation failed: World root is missing.");
+            return false;
+        }
+
+        int errors = 0;
+        int artRoots = 0;
+        int artObjects = 0;
+        int doorFrames = 0;
+        int checkedChairs = 0;
+
+        foreach (Transform item in world.GetComponentsInChildren<Transform>(true))
+        {
+            if (item == null) continue;
+            if (item.name == ArtRootName) artRoots++;
+            if (!IsUnderArtRoot(item)) continue;
+            artObjects++;
+
+            if (item.gameObject.layer != LowPolyHotelKit.ArtLayer)
+                ValidationError(ref errors, "Wrong art layer: " + GetPath(item));
+
+            Collider collider = item.GetComponent<Collider>();
+            if (collider != null)
+                ValidationError(ref errors, "Generated art owns a collider: " + GetPath(item));
+
+            if (item.name == "WallPanel"
+                || item.name == "WallLamp"
+                || item.name == "ReceptionKeyWall")
+            {
+                Transform artRoot = FindArtRoot(item);
+                if (artRoot != null && TryGetBounds(item, out Bounds decorBounds))
+                {
+                    float relativeTop = decorBounds.max.y - artRoot.position.y;
+                    if (relativeTop > 0.82f)
+                        ValidationError(ref errors,
+                            GetPath(item) + " exceeds cutaway wall height: " + relativeTop.ToString("F2"));
+                }
+            }
+
+            if (item.name.StartsWith("Frame_"))
+            {
+                doorFrames++;
+                if (TryGetBounds(item, out Bounds frameBounds))
+                {
+                    Transform artRoot = FindArtRoot(item);
+                    float relativeTop = frameBounds.max.y - (artRoot != null ? artRoot.position.y : 0f);
+                    if (Mathf.Abs(frameBounds.size.x - 2.04f) > 0.08f
+                        || Mathf.Abs(relativeTop - 1.21f) > 0.08f)
+                    {
+                        ValidationError(ref errors,
+                            GetPath(item) + " does not match the 1.8 x 1.1 room door.");
+                    }
+                }
+            }
+
+            bool diningChair = item.name.StartsWith("Chair_")
+                               && item.parent != null
+                               && item.parent.name.StartsWith("DiningSet_");
+            bool casinoChair = item.name.StartsWith("CasinoChair_");
+            if (diningChair || casinoChair)
+            {
+                checkedChairs++;
+                Vector3 toCenter = item.parent.position - item.position;
+                toCenter.y = 0f;
+                if (toCenter.sqrMagnitude > 0.001f)
+                {
+                    float alignment = Vector3.Dot(-item.forward, toCenter.normalized);
+                    if (alignment < 0.96f)
+                        ValidationError(ref errors,
+                            GetPath(item) + " faces away from its table (dot "
+                            + alignment.ToString("F2") + ").");
+                }
+            }
+        }
+
+        Transform lobbyArt = FindPath("World/Floor1/" + ArtRootName);
+        if (lobbyArt != null)
+        {
+            Bounds receptionClearance = new Bounds(
+                new Vector3(0f, lobbyArt.position.y + 0.82f, 3.92f),
+                new Vector3(0.82f, 1.42f, 0.72f));
+            Renderer[] renderers = lobbyArt.GetComponentsInChildren<Renderer>(true);
+            for (int i = 0; i < renderers.Length; i++)
+            {
+                if (renderers[i] == null || !renderers[i].bounds.Intersects(receptionClearance)) continue;
+                ValidationError(ref errors,
+                    "Reception staff clearance is blocked by " + GetPath(renderers[i].transform));
+            }
+        }
+
+        if (artRoots != 7)
+            ValidationError(ref errors, "Expected 7 art roots, found " + artRoots + ".");
+        if (doorFrames != 12)
+            ValidationError(ref errors, "Expected 12 room door frames, found " + doorFrames + ".");
+        if (checkedChairs != 31)
+            ValidationError(ref errors, "Expected 31 inward-facing table chairs, found " + checkedChairs + ".");
+
+        if (logResult)
+        {
+            if (errors == 0)
+                Debug.Log("Hotel art validation passed: " + artObjects
+                          + " objects, 7 floors, 12 door frames, 31 table chairs, no collider or clearance issues.");
+            else
+                Debug.LogError("Hotel art validation failed with " + errors + " issue(s).");
+        }
+        return errors == 0;
+    }
+
+    private static bool IsUnderArtRoot(Transform item)
+    {
+        return FindArtRoot(item) != null;
+    }
+
+    private static Transform FindArtRoot(Transform item)
+    {
+        Transform current = item;
+        while (current != null)
+        {
+            if (current.name == ArtRootName) return current;
+            current = current.parent;
+        }
+        return null;
+    }
+
+    private static bool TryGetBounds(Transform root, out Bounds bounds)
+    {
+        Renderer[] renderers = root.GetComponentsInChildren<Renderer>(true);
+        bounds = default;
+        bool found = false;
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            if (renderers[i] == null) continue;
+            if (!found)
+            {
+                bounds = renderers[i].bounds;
+                found = true;
+            }
+            else
+            {
+                bounds.Encapsulate(renderers[i].bounds);
+            }
+        }
+        return found;
+    }
+
+    private static string GetPath(Transform item)
+    {
+        if (item == null) return "<missing>";
+        string path = item.name;
+        Transform current = item.parent;
+        while (current != null)
+        {
+            path = current.name + "/" + path;
+            current = current.parent;
+        }
+        return path;
+    }
+
+    private static void ValidationError(ref int errors, string message)
+    {
+        errors++;
+        Debug.LogError("[Hotel Art] " + message);
     }
 
     private static Transform FindPath(string path)

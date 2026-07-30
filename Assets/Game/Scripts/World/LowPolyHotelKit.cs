@@ -25,7 +25,11 @@ public enum HotelArtMaterial
     Water,
     Black,
     White,
-    Warning
+    Warning,
+    WallSage,
+    Stone,
+    LeatherTan,
+    AccentRose
 }
 
 public static class HotelArtPalette
@@ -56,6 +60,10 @@ public static class HotelArtPalette
             case HotelArtMaterial.Black: return new Color(0.025f, 0.025f, 0.03f);
             case HotelArtMaterial.White: return new Color(0.92f, 0.90f, 0.84f);
             case HotelArtMaterial.Warning: return new Color(0.95f, 0.65f, 0.08f);
+            case HotelArtMaterial.WallSage: return new Color(0.31f, 0.43f, 0.39f);
+            case HotelArtMaterial.Stone: return new Color(0.48f, 0.44f, 0.38f);
+            case HotelArtMaterial.LeatherTan: return new Color(0.58f, 0.31f, 0.14f);
+            case HotelArtMaterial.AccentRose: return new Color(0.60f, 0.25f, 0.25f);
             default: return Color.magenta;
         }
     }
@@ -74,6 +82,9 @@ public static class HotelArtPalette
             case HotelArtMaterial.MetalDark:
             case HotelArtMaterial.Black:
                 return 0.38f;
+            case HotelArtMaterial.LeatherTan:
+            case HotelArtMaterial.Stone:
+                return 0.30f;
             default:
                 return 0.12f;
         }
@@ -218,15 +229,17 @@ public static class LowPolyHotelKit
         if (root == null) return;
         Part(root, "Floor", PrimitiveType.Cube, new Vector3(0f, 0.03f, 0.15f),
             new Vector3(4.0f, 0.06f, 2.8f), HotelArtMaterial.CarpetBlue);
-        Part(root, "BackWall", PrimitiveType.Cube, new Vector3(0f, 0.48f, 1.48f),
-            new Vector3(4.0f, 0.96f, 0.10f), HotelArtMaterial.TileCream);
-        Part(root, "SideWall", PrimitiveType.Cube, new Vector3(-1.95f, 0.48f, 0.15f),
-            new Vector3(0.10f, 0.96f, 2.75f), HotelArtMaterial.TileCream);
+        Part(root, "BackWall", PrimitiveType.Cube, new Vector3(0f, 0.40f, 1.48f),
+            new Vector3(4.0f, 0.80f, 0.10f), HotelArtMaterial.WallSage);
+        Part(root, "SideWall", PrimitiveType.Cube, new Vector3(-1.95f, 0.40f, 0.15f),
+            new Vector3(0.10f, 0.80f, 2.75f), HotelArtMaterial.WallSage);
+        Part(root, "WallRail", PrimitiveType.Cube, new Vector3(0f, 0.72f, 1.41f),
+            new Vector3(3.78f, 0.05f, 0.04f), HotelArtMaterial.WoodLight);
 
-        BuildSofaAt(root, "BreakSofa", new Vector3(-1.15f, 0f, 0.78f), 90f,
+        BuildSofaAt(root, "BreakSofa", new Vector3(-1.15f, 0f, 0.78f), -90f,
             HotelArtMaterial.FabricTeal, 1.45f);
         BuildTableAt(root, "BreakTable", new Vector3(0.15f, 0f, 0.05f), 0.72f, 0.50f);
-        BuildChairAt(root, "ChairA", new Vector3(0.15f, 0f, -0.62f), 0f, HotelArtMaterial.FabricMustard);
+        BuildChairAt(root, "ChairA", new Vector3(0.15f, 0f, -0.62f), 180f, HotelArtMaterial.FabricMustard);
         BuildChairAt(root, "ChairB", new Vector3(0.85f, 0f, 0.05f), 90f, HotelArtMaterial.FabricMustard);
 
         var lockers = NewChild(root, "Lockers", new Vector3(1.48f, 0f, 1.10f));
@@ -241,6 +254,14 @@ public static class LowPolyHotelKit
 
         BuildKitchenette(root, new Vector3(1.18f, 0f, -0.90f), 0f, 1.45f);
         BuildPlant(root, new Vector3(-1.55f, 0f, -0.95f), 0.75f);
+        Part(root, "NoticeBoard", PrimitiveType.Cube, new Vector3(-0.45f, 0.52f, 1.40f),
+            new Vector3(0.90f, 0.40f, 0.04f), HotelArtMaterial.WoodWarm);
+        for (int i = 0; i < 3; i++)
+            Part(root, "Notice_" + i, PrimitiveType.Cube,
+                new Vector3(-0.72f + i * 0.27f, 0.52f + (i % 2) * 0.06f, 1.37f),
+                new Vector3(0.19f, 0.22f, 0.015f),
+                i == 1 ? HotelArtMaterial.AccentRose : HotelArtMaterial.Cream,
+                new Vector3(0f, 0f, -5f + i * 4f));
     }
 
     public static void BuildFacility(
@@ -275,11 +296,16 @@ public static class LowPolyHotelKit
     {
         if (root == null) return;
         BuildReceptionDesk(root, new Vector3(0f, 0f, 3.0f), 0f);
-        BuildSofaAt(root, "LobbySofaA", new Vector3(-4.75f, 0f, 1.65f), 0f,
+        BuildSofaAt(root, "LobbySofaA", new Vector3(-4.65f, 0f, 1.60f), 0f,
             HotelArtMaterial.FabricRed, 1.75f);
-        BuildSofaAt(root, "LobbySofaB", new Vector3(-6.15f, 0f, 0.55f), 90f,
+        BuildSofaAt(root, "LobbySofaB", new Vector3(-6.05f, 0f, 0.35f), -90f,
             HotelArtMaterial.FabricTeal, 1.45f);
-        BuildTableAt(root, "LobbyCoffeeTable", new Vector3(-4.9f, 0f, 0.45f), 0.95f, 0.56f);
+        BuildTableAt(root, "LobbyCoffeeTable", new Vector3(-4.75f, 0f, 0.35f), 0.95f, 0.56f);
+        Part(root, "CoffeeTableBook", PrimitiveType.Cube, new Vector3(-4.92f, 0.51f, 0.34f),
+            new Vector3(0.32f, 0.035f, 0.24f), HotelArtMaterial.AccentRose,
+            new Vector3(0f, 12f, 0f));
+        Part(root, "CoffeeCup", PrimitiveType.Cylinder, new Vector3(-4.52f, 0.55f, 0.28f),
+            new Vector3(0.11f, 0.08f, 0.11f), HotelArtMaterial.Cream);
         BuildPlant(root, new Vector3(-2.7f, 0f, 3.8f), 1.05f);
         BuildPlant(root, new Vector3(3.15f, 0f, 3.7f), 0.85f);
         BuildLuggageCart(root, new Vector3(4.2f, 0f, 2.3f), 0f);
@@ -299,26 +325,46 @@ public static class LowPolyHotelKit
     public static void BuildReceptionDesk(Transform root, Vector3 position, float yaw)
     {
         var desk = NewChild(root, "ReceptionDesk_LP", position, yaw);
-        Part(desk.transform, "Body", PrimitiveType.Cube, new Vector3(0f, 0.48f, 0f),
-            new Vector3(2.75f, 0.96f, 0.72f), HotelArtMaterial.WoodDark);
-        Part(desk.transform, "FrontInset", PrimitiveType.Cube, new Vector3(0f, 0.50f, -0.375f),
-            new Vector3(2.28f, 0.58f, 0.035f), HotelArtMaterial.FabricTeal);
-        Part(desk.transform, "CounterTop", PrimitiveType.Cube, new Vector3(0f, 1.02f, -0.04f),
-            new Vector3(2.98f, 0.12f, 0.88f), HotelArtMaterial.Brass);
-        Part(desk.transform, "Bell", PrimitiveType.Sphere, new Vector3(-0.82f, 1.16f, -0.15f),
+        Part(desk.transform, "Body", PrimitiveType.Cube, new Vector3(0f, 0.39f, 0f),
+            new Vector3(2.75f, 0.78f, 0.72f), HotelArtMaterial.WoodDark);
+        Part(desk.transform, "FrontInset", PrimitiveType.Cube, new Vector3(0f, 0.42f, -0.375f),
+            new Vector3(2.28f, 0.46f, 0.035f), HotelArtMaterial.FabricTeal);
+        Part(desk.transform, "FrontTrimTop", PrimitiveType.Cube, new Vector3(0f, 0.69f, -0.398f),
+            new Vector3(2.40f, 0.045f, 0.025f), HotelArtMaterial.Brass);
+        Part(desk.transform, "FrontTrimBottom", PrimitiveType.Cube, new Vector3(0f, 0.16f, -0.398f),
+            new Vector3(2.40f, 0.045f, 0.025f), HotelArtMaterial.Brass);
+        Part(desk.transform, "CounterTop", PrimitiveType.Cube, new Vector3(0f, 0.83f, -0.04f),
+            new Vector3(2.98f, 0.11f, 0.88f), HotelArtMaterial.Stone);
+        Part(desk.transform, "Bell", PrimitiveType.Sphere, new Vector3(-0.82f, 0.94f, -0.15f),
             new Vector3(0.18f, 0.10f, 0.18f), HotelArtMaterial.Brass);
-        Part(desk.transform, "Ledger", PrimitiveType.Cube, new Vector3(0.42f, 1.12f, -0.10f),
-            new Vector3(0.55f, 0.04f, 0.36f), HotelArtMaterial.FabricRed, new Vector3(0f, -8f, 0f));
+        Part(desk.transform, "Ledger", PrimitiveType.Cube, new Vector3(0.42f, 0.93f, -0.10f),
+            new Vector3(0.55f, 0.04f, 0.36f), HotelArtMaterial.AccentRose, new Vector3(0f, -8f, 0f));
+        Part(desk.transform, "MonitorStand", PrimitiveType.Cylinder, new Vector3(0.82f, 0.94f, 0.18f),
+            new Vector3(0.06f, 0.10f, 0.06f), HotelArtMaterial.MetalDark);
+        Part(desk.transform, "Monitor", PrimitiveType.Cube, new Vector3(0.82f, 1.10f, 0.20f),
+            new Vector3(0.42f, 0.27f, 0.06f), HotelArtMaterial.MetalDark,
+            new Vector3(-8f, -8f, 0f));
+        Part(desk.transform, "MonitorScreen", PrimitiveType.Cube, new Vector3(0.78f, 1.10f, 0.166f),
+            new Vector3(0.31f, 0.18f, 0.012f), HotelArtMaterial.GlassBlue,
+            new Vector3(-8f, -8f, 0f));
+    }
 
-        var keys = NewChild(desk.transform, "KeyCubbies", new Vector3(0f, 0f, 0.60f));
-        Part(keys.transform, "Back", PrimitiveType.Cube, new Vector3(0f, 1.15f, 0f),
-            new Vector3(2.35f, 1.25f, 0.14f), HotelArtMaterial.WoodWarm);
-        for (int row = 0; row < 3; row++)
-        for (int col = 0; col < 6; col++)
+    public static void BuildReceptionKeyWall(Transform root, Vector3 position)
+    {
+        var keys = NewChild(root, "ReceptionKeyWall", position);
+        Part(keys.transform, "Back", PrimitiveType.Cube, new Vector3(0f, 0.39f, 0f),
+            new Vector3(2.35f, 0.70f, 0.08f), HotelArtMaterial.WoodWarm);
+        Part(keys.transform, "TopRail", PrimitiveType.Cube, new Vector3(0f, 0.72f, -0.055f),
+            new Vector3(2.45f, 0.05f, 0.04f), HotelArtMaterial.Brass);
+        for (int row = 0; row < 2; row++)
+        for (int col = 0; col < 7; col++)
         {
+            Part(keys.transform, "Slot_" + row + "_" + col, PrimitiveType.Cube,
+                new Vector3(-0.93f + col * 0.31f, 0.25f + row * 0.28f, -0.055f),
+                new Vector3(0.22f, 0.17f, 0.025f), HotelArtMaterial.WoodDark);
             Part(keys.transform, "Key_" + row + "_" + col, PrimitiveType.Cube,
-                new Vector3(-0.95f + col * 0.38f, 0.76f + row * 0.34f, -0.09f),
-                new Vector3(0.05f, 0.12f, 0.035f), HotelArtMaterial.Brass);
+                new Vector3(-0.93f + col * 0.31f, 0.25f + row * 0.28f, -0.075f),
+                new Vector3(0.035f, 0.08f, 0.018f), HotelArtMaterial.Brass);
         }
     }
 
@@ -615,41 +661,61 @@ public static class LowPolyHotelKit
     {
         Part(root, "Floor", PrimitiveType.Cube, new Vector3(0f, 0.03f, 0f),
             new Vector3(size.x, 0.06f, size.z), HotelArtMaterial.TileBlue);
-        Part(root, "BackWall", PrimitiveType.Cube, new Vector3(0f, 0.62f, size.z * 0.48f),
-            new Vector3(size.x, 1.24f, 0.10f), HotelArtMaterial.TileCream);
-        Part(root, "SideWall", PrimitiveType.Cube, new Vector3(size.x * 0.48f, 0.62f, 0f),
-            new Vector3(0.10f, 1.24f, size.z), HotelArtMaterial.TileCream);
-        Part(root, "StallDivider", PrimitiveType.Cube, new Vector3(-0.30f, 0.70f, 0.40f),
-            new Vector3(0.07f, 1.35f, 1.05f), HotelArtMaterial.MetalLight);
+        Part(root, "BackWall", PrimitiveType.Cube, new Vector3(0f, 0.40f, size.z * 0.48f),
+            new Vector3(size.x, 0.80f, 0.10f), HotelArtMaterial.WallSage);
+        Part(root, "SideWall", PrimitiveType.Cube, new Vector3(size.x * 0.48f, 0.40f, 0f),
+            new Vector3(0.10f, 0.80f, size.z), HotelArtMaterial.WallSage);
+        Part(root, "BackWallTileBand", PrimitiveType.Cube, new Vector3(0f, 0.24f, size.z * 0.42f),
+            new Vector3(size.x * 0.92f, 0.38f, 0.035f), HotelArtMaterial.TileCream);
+        Part(root, "StallDivider", PrimitiveType.Cube, new Vector3(-0.30f, 0.40f, 0.40f),
+            new Vector3(0.07f, 0.76f, 1.05f), HotelArtMaterial.MetalLight);
+        Part(root, "StallDoor", PrimitiveType.Cube, new Vector3(-0.84f, 0.36f, -0.06f),
+            new Vector3(0.88f, 0.66f, 0.06f), HotelArtMaterial.WallSage,
+            new Vector3(0f, -24f, 0f));
         BuildPublicToiletFixture(root, new Vector3(-0.83f, 0f, 0.50f));
         BuildPublicToiletFixture(root, new Vector3(0.26f, 0f, 0.50f));
+        Part(root, "Vanity", PrimitiveType.Cube, new Vector3(-0.14f, 0.39f, -0.52f),
+            new Vector3(1.65f, 0.12f, 0.46f), HotelArtMaterial.Stone);
+        for (int xSign = -1; xSign <= 1; xSign += 2)
+            Part(root, "VanityLeg", PrimitiveType.Cube, new Vector3(-0.14f + xSign * 0.68f, 0.19f, -0.52f),
+                new Vector3(0.08f, 0.38f, 0.08f), HotelArtMaterial.MetalDark);
         for (int i = 0; i < 2; i++)
         {
             float x = -0.52f + i * 0.76f;
-            Part(root, "Sink_" + i, PrimitiveType.Cylinder, new Vector3(x, 0.54f, -0.52f),
-                new Vector3(0.46f, 0.10f, 0.34f), HotelArtMaterial.Porcelain);
-            Part(root, "Mirror_" + i, PrimitiveType.Cube, new Vector3(x, 0.98f, -0.72f),
-                new Vector3(0.52f, 0.62f, 0.04f), HotelArtMaterial.GlassBlue);
+            Part(root, "Sink_" + i, PrimitiveType.Cylinder, new Vector3(x, 0.46f, -0.52f),
+                new Vector3(0.40f, 0.07f, 0.29f), HotelArtMaterial.Porcelain);
+            Part(root, "Faucet_" + i, PrimitiveType.Cylinder, new Vector3(x, 0.58f, -0.63f),
+                new Vector3(0.035f, 0.10f, 0.035f), HotelArtMaterial.MetalLight);
+            Part(root, "Mirror_" + i, PrimitiveType.Cube, new Vector3(x, 0.66f, -0.72f),
+                new Vector3(0.52f, 0.25f, 0.035f), HotelArtMaterial.GlassBlue);
         }
+        Part(root, "WasteBin", PrimitiveType.Cylinder, new Vector3(0.95f, 0.18f, -0.62f),
+            new Vector3(0.25f, 0.18f, 0.25f), HotelArtMaterial.MetalDark);
     }
 
     private static void BuildPublicToiletFixture(Transform root, Vector3 pos)
     {
         var toilet = NewChild(root, "Toilet", pos);
-        Part(toilet.transform, "Bowl", PrimitiveType.Cylinder, new Vector3(0f, 0.24f, 0f),
-            new Vector3(0.42f, 0.22f, 0.54f), HotelArtMaterial.Porcelain);
-        Part(toilet.transform, "Tank", PrimitiveType.Cube, new Vector3(0f, 0.48f, 0.22f),
-            new Vector3(0.46f, 0.44f, 0.20f), HotelArtMaterial.Porcelain);
+        Part(toilet.transform, "Pedestal", PrimitiveType.Cylinder, new Vector3(0f, 0.16f, 0.10f),
+            new Vector3(0.26f, 0.16f, 0.28f), HotelArtMaterial.Porcelain);
+        Part(toilet.transform, "Bowl", PrimitiveType.Cylinder, new Vector3(0f, 0.30f, -0.02f),
+            new Vector3(0.42f, 0.10f, 0.54f), HotelArtMaterial.Porcelain);
+        Part(toilet.transform, "Water", PrimitiveType.Cylinder, new Vector3(0f, 0.405f, -0.04f),
+            new Vector3(0.25f, 0.012f, 0.35f), HotelArtMaterial.Water);
+        Part(toilet.transform, "Tank", PrimitiveType.Cube, new Vector3(0f, 0.46f, 0.24f),
+            new Vector3(0.46f, 0.34f, 0.20f), HotelArtMaterial.Porcelain);
+        Part(toilet.transform, "Flush", PrimitiveType.Cube, new Vector3(0.14f, 0.66f, 0.24f),
+            new Vector3(0.08f, 0.025f, 0.06f), HotelArtMaterial.MetalLight);
     }
 
     private static void BuildKitchen(Transform root, Vector3 size)
     {
         Part(root, "Floor", PrimitiveType.Cube, new Vector3(0f, 0.03f, 0f),
             new Vector3(size.x, 0.06f, size.z), HotelArtMaterial.TileCream);
-        Part(root, "BackWall", PrimitiveType.Cube, new Vector3(0f, 0.65f, size.z * 0.48f),
-            new Vector3(size.x, 1.30f, 0.10f), HotelArtMaterial.TileCream);
-        Part(root, "SideWall", PrimitiveType.Cube, new Vector3(size.x * 0.48f, 0.65f, 0f),
-            new Vector3(0.10f, 1.30f, size.z), HotelArtMaterial.TileCream);
+        Part(root, "BackWall", PrimitiveType.Cube, new Vector3(0f, 0.40f, size.z * 0.48f),
+            new Vector3(size.x, 0.80f, 0.10f), HotelArtMaterial.TileCream);
+        Part(root, "SideWall", PrimitiveType.Cube, new Vector3(size.x * 0.48f, 0.40f, 0f),
+            new Vector3(0.10f, 0.80f, size.z), HotelArtMaterial.TileCream);
 
         BuildKitchenette(root, new Vector3(-0.72f, 0f, 0.73f), 0f, 1.55f);
         var stove = NewChild(root, "Stove", new Vector3(0.80f, 0f, 0.73f));
@@ -659,9 +725,13 @@ public static class LowPolyHotelKit
         for (int z = -1; z <= 1; z += 2)
             Part(stove.transform, "Hob", PrimitiveType.Cylinder, new Vector3(x * 0.20f, 0.86f, z * 0.13f),
                 new Vector3(0.18f, 0.025f, 0.18f), HotelArtMaterial.Black);
-        Part(stove.transform, "Hood", PrimitiveType.Cube, new Vector3(0f, 1.35f, 0.08f),
-            new Vector3(0.90f, 0.30f, 0.65f), HotelArtMaterial.MetalDark,
+        Part(stove.transform, "Backsplash", PrimitiveType.Cube, new Vector3(0f, 0.78f, 0.31f),
+            new Vector3(0.82f, 0.42f, 0.035f), HotelArtMaterial.Stone);
+        Part(stove.transform, "Hood", PrimitiveType.Cube, new Vector3(0f, 1.11f, 0.12f),
+            new Vector3(0.78f, 0.18f, 0.52f), HotelArtMaterial.MetalLight,
             new Vector3(-8f, 0f, 0f));
+        Part(stove.transform, "HoodDuct", PrimitiveType.Cylinder, new Vector3(0f, 1.39f, 0.19f),
+            new Vector3(0.16f, 0.24f, 0.16f), HotelArtMaterial.MetalDark);
 
         var prep = NewChild(root, "PrepIsland", new Vector3(0f, 0f, -0.45f));
         Part(prep.transform, "Top", PrimitiveType.Cube, new Vector3(0f, 0.72f, 0f),
@@ -680,8 +750,8 @@ public static class LowPolyHotelKit
     {
         Part(root, "Floor", PrimitiveType.Cube, new Vector3(0f, 0.03f, 0f),
             new Vector3(size.x, 0.06f, size.z), HotelArtMaterial.TileCream);
-        Part(root, "BackWall", PrimitiveType.Cube, new Vector3(0f, 0.52f, size.z * 0.48f),
-            new Vector3(size.x, 1.04f, 0.08f), HotelArtMaterial.TileCream);
+        Part(root, "BackWall", PrimitiveType.Cube, new Vector3(0f, 0.40f, size.z * 0.48f),
+            new Vector3(size.x, 0.80f, 0.08f), HotelArtMaterial.WallSage);
         var shelf = NewChild(root, "LinenShelf", new Vector3(0f, 0f, size.z * 0.28f));
         for (int x = -1; x <= 1; x += 2)
             Part(shelf.transform, "Post", PrimitiveType.Cube, new Vector3(x * size.x * 0.37f, 0.62f, 0f),
