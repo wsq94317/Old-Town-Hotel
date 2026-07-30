@@ -74,8 +74,8 @@ public static class GameText
         { "CASH ${0}   SAFEBOX ${1}/{2}", "现金 ${0}   保险箱 ${1}/{2}" },
         { "   SPILLED ${0}", "   溢出 ${0}" },
         { "   DEBT ${0}", "   欠款 ${0}" },
-        { "{0}*   {1} sellable   {2} to clean   {3} in use   {4} broken   {5} derelict   MAT {6}/{7}",
-          "{0}★   今天可售 {1}   待清 {2}   在住 {3}   坏封 {4}   破败 {5}   材料 {6}/{7}" },
+        { "{0}*   TONIGHT {1} taken   {2} clean now   {3} to clean   {4} broken   {5} derelict   MAT {6}/{7}",
+          "{0}★   今晚 {1}   干净 {2}   待清 {3}   坏封 {4}   破败 {5}   材料 {6}/{7}" },
         { "SOLD OUT on night(s) {0} - that is where the refusals come from.",
           "第 {0} 晚已订满 —— 拒单就是从这儿来的。" },
         { "The warehouse only has room for {0} more. Space: {1}/{2}.", "仓库只装得下 {0} 份了。占用：{1}/{2}。" },
@@ -246,7 +246,17 @@ public static class GameText
         { "Checkouts booked    {0}   (${1})", "退房结算   {0} 间（${1}）" },
         { "Flawed rooms sold   {0}   (no inspector on duty?)", "带瑕疵售出 {0} 间（没验房员在班？）" },
         { "Staff working       {0} hsk, morale {1}", "在岗       {0} 名客房，士气 {1}" },
-        { "Next 7 nights sold  {0}   (cap {1})", "未来七晚已售 {0}   （容量 {1}）" },
+        // 入住日历（玩家点名要的 "6/10"）。今晚那一格的分子含上门客，
+        // 后面几格只有预订——两种口径，所以第一格标 TONIGHT 而不是日号
+        { "TONIGHT             {0}   ({1} taken for tonight, {2} still to sell)",
+          "今晚                {0}   （今晚已订出 {1} 间，还能卖 {2} 间）" },
+        { "THE WEEK AHEAD   sold / rooms   ({0}% booked, {1} night(s) full)",
+          "未来一周   已售 / 总数   （入住率 {0}%，{1} 晚订满）" },
+        { "TONIGHT", "今晚" },
+        // 日历格只有 ~50px 宽，字号 9——"第5天 周末"会被切掉，所以省掉"第/天"
+        { "D{0} W", "{0}日 周末" },
+        { "D{0}", "{0}日" },
+        { "+{0}!", "超{0}!" },
         // 客房部进度 + 不可售房的原因拆分
         { "HOUSEKEEPING  done {0}   cleaning {1}   waiting {2}   to inspect {3}",
           "客房部  已清 {0}   在清 {1}   待清 {2}   待验 {3}" },

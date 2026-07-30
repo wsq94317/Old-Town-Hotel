@@ -594,6 +594,10 @@ public sealed class HotelSim
             Rooms.SetState(number, RoomSimState.Blocked);
             Rooms.AddFlags(number, RoomFlags.Renovating);
         }
+
+        // 库存立刻少了这几间：不在这里重算的话，今天剩下的时间里前台还在
+        // 按老容量接单，界面上的分母也还是旧的
+        RefreshCapacityForHorizon();
         return true;
     }
 
@@ -649,6 +653,10 @@ public sealed class HotelSim
             Furniture.FurnishDerelictRoom(roomNumber, newness, health);
         }
         SetPriceBand(roomNumber, RoomTier.Old);       // 交付垫底就只配挂 Old（M-C2 的规矩）
+
+        // 这间房刚从"破败"变回库存——**多出来的容量也要立刻算进去**。
+        // 只处理"减少"不处理"增加"，玩家清完房会发现今晚还是卖不出去
+        RefreshCapacityForHorizon();
         return true;
     }
 
@@ -917,8 +925,13 @@ public sealed class HotelSim
     /// 装修中的房在完工日之前不计入容量，于是已卖出的间夜自然把 remaining 压成负数。
     ///
     /// 铺的天数要比预订视野多出 MaxNights：视野最后一天的连住单会伸到视野之外，
-    /// 那些天若没有容量（=0），CanAccept 会把所有连住单拒掉。</summary>
-    private void RefreshCapacityForHorizon()
+    /// 那些天若没有容量（=0），CanAccept 会把所有连住单拒掉。
+    ///
+    /// **纯函数、幂等**：只看房态和"还要封几天"，不碰需求。所以任何时候
+    /// 多算一次都安全，而"改了库存之后立刻算一次"是玩家能不能相信界面的关键——
+    /// 原本它只在每天早晨跑一次，于是玩家中午点了装修，顶栏整天还把那间房
+    /// 算作可卖（新加的入住日历会当场把这个谎言显示出来）。</summary>
+    public void RefreshCapacityForHorizon()
     {
         int today = Clock.CurrentDay;
         var perBand = new int[3];
@@ -964,12 +977,67 @@ public sealed class HotelSim
         for (int offset = 0; offset < BookingGenerator.HorizonDays; offset++)
         {
             int day = today + offset;
-            bool anyLeft = false;
-            for (int i = 0; i < bands.Count; i++)
-                if (Calendar.RemainingOn(day, bands[i]) > 0) { anyLeft = true; break; }
-            if (!anyLeft) nights.Add(day);
+            if (NightIsSoldOut(day, bands)) nights.Add(day);
         }
         return nights;
+    }
+
+    /// <summary>这一晚一间都接不了了。**拒单提示和日历共用这一个判据**——
+    /// 各算一遍就会出现"日历说还有房、下单却被拒"的自相矛盾。</summary>
+    private bool NightIsSoldOut(int day, List<RoomTier> bands)
+    {
+        for (int i = 0; i < bands.Count; i++)
+            if (Calendar.RemainingOn(day, bands[i]) > 0) return false;
+        return true;
+    }
+
+    /// <summary>某一晚的入住情况——玩家点名要的"卖了 6 间 / 总共 10 间"。
+    ///
+    /// **今晚和未来的分子不是同一个口径**，这不是偷懒而是事实：
+    ///   · 今晚 = 在住间数（含上门客、含昨天住进来的连住客）+ 今天还没到店的预订。
+    ///     也就是"今晚会有人睡在里面的房间数"，玩家抬头看大堂能数出来的那个数。
+    ///   · 未来 = 那一晚已经卖掉的间夜（预订簿）。上门客还没走进门，
+    ///     未来那一格不可能包含他们——写成包含就是在骗玩家。
+    ///
+    /// 分母两者相同：那一天的库存容量（非破败、且当天不在装修中）。
+    /// 刻意**不用**"此刻 Ready 的间数"——那个数一天之内会随打扫/入住上下跳，
+    /// 玩家会看到分母自己在动，比没有这个数字更糟。</summary>
+    public NightOccupancy OccupancyForNight(int day)
+    {
+        var bands = OfferedBands();
+        int capacity = Calendar.CapacityOn(day, RoomTier.Old)
+                     + Calendar.CapacityOn(day, RoomTier.Basic)
+                     + Calendar.CapacityOn(day, RoomTier.Better);
+
+        bool tonight = day == Clock.CurrentDay;
+        int sold;
+        if (tonight)
+        {
+            // 在住的房 + 今天还会住进来的预订。check-in 会把预订从 Booked 翻成
+            // CheckedIn，而 ArrivalsFor 只收 Booked，所以两边不会把同一个人算两次
+            sold = ActiveStayCount + Bookings.ArrivalsFor(day).Count;
+        }
+        else
+        {
+            sold = Calendar.DemandOn(day, RoomTier.Old)
+                 + Calendar.DemandOn(day, RoomTier.Basic)
+                 + Calendar.DemandOn(day, RoomTier.Better);
+        }
+
+        return new NightOccupancy(day, sold, capacity, tonight,
+                                  bands.Count > 0 && NightIsSoldOut(day, bands));
+    }
+
+    /// <summary>今晚起连续几晚的入住日历（玩家要求："未来给我搞成一个日历UI，
+    /// 每天都是已售/全部这样显示"）。超出预订视野的天数不返回——
+    /// 那些天还没铺容量，会显示成假的 0/0。</summary>
+    public List<NightOccupancy> OccupancyCalendar(int days = OccupancyBoard.DefaultDays)
+    {
+        var list = new List<NightOccupancy>();
+        int reachable = days < BookingGenerator.HorizonDays ? days : BookingGenerator.HorizonDays;
+        for (int offset = 0; offset < reachable; offset++)
+            list.Add(OccupancyForNight(Clock.CurrentDay + offset));
+        return list;
     }
 
     /// <summary>酒店实际挂出来的档位（客人只能订这些）。</summary>
@@ -1744,6 +1812,10 @@ public sealed class HotelSim
                 Rooms.SetState(number, RoomSimState.Dirty); // 收工要清一遍才能卖
             }
         }
+
+        // 工期各少了一天、完工的房也回到了库存——两件事都动容量。
+        // 幂等，所以放在末尾统一算一次就够（不必在上面每个分支里各写一遍）
+        RefreshCapacityForHorizon();
     }
 
     /// <summary>房间磨损由家具平均健康度派生（避免两套衰减系统）。</summary>

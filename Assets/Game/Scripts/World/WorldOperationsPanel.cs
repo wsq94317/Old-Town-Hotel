@@ -462,11 +462,22 @@ public class WorldOperationsPanel : MonoBehaviour
         GUI.Label(new Rect(14, 46, w - 28, 20),
             // 斜杠分隔被玩家读成"："（"11 可售 / 0 待清" 看着像 11:0）——
             // 改成"数字+标签"成对，中间用间距分组
+            //
+            // 打头的 "TONIGHT 6/10" 是玩家点名要的那个数（"卖了6间，要显示成6/10"）。
+            // 它取代了原来的"在住 {n}"：在住只数此刻楼里的人，而今晚已售连
+            // 路上那几位一起算，回答的是同一个问题但更准。
+            //
             // MAT 后面的分数**只在"材料是唯一占用者"时诚实**。以后家具箱进仓库了，
             // 这个分子必须改成"总占格数"，否则就是审计点名的"混单位"歧义。
-            GameText.F("{0}*   {1} sellable   {2} to clean   {3} in use   {4} broken   {5} derelict   MAT {6}/{7}",
-                       Sim.Reputation.Stars.ToString("0.0"), Sim.Rooms.SellableCount, Sim.Rooms.DirtyBacklog,
-                       Sim.Rooms.CountOf(RoomSimState.Occupied), Sim.Rooms.CountOf(RoomSimState.Blocked),
+            // "taken" 而不是 "sold"、"clean now" 而不是 "ready to sell"：
+            // 实测截图里「今晚 4/8」紧挨着「可卖 5」，玩家会去加——4+5=9 比总数还大。
+            // 两个数其实是**重叠**的（一间干净房正等着今晚那位客人），
+            // 所以第二个字段必须描述状态而不是动作，否则又是一处看着矛盾的数字。
+            GameText.F("{0}*   TONIGHT {1} taken   {2} clean now   {3} to clean   {4} broken   {5} derelict   MAT {6}/{7}",
+                       Sim.Reputation.Stars.ToString("0.0"),
+                       Sim.OccupancyForNight(clock.CurrentDay).Fraction,
+                       Sim.Rooms.SellableCount, Sim.Rooms.DirtyBacklog,
+                       Sim.Rooms.CountOf(RoomSimState.Blocked),
                        Sim.Rooms.CountOf(RoomSimState.Ruined), Sim.Materials.Stock,
                        Sim.Warehouse.HasLimit ? Sim.Warehouse.Capacity.ToString() : "-"));
     }
@@ -549,8 +560,13 @@ public class WorldOperationsPanel : MonoBehaviour
             }
             panel.Add(GameText.F("  in progress: {0}", sb.ToString()));
         }
-        panel.Add(GameText.F("Next 7 nights sold  {0}   (cap {1})",
-                             SoldNightsPreview(), Sim.Rooms.OpenRoomCount));
+        // 今晚一句人话，紧挨着日历——顶栏那个 4/8 太小，这里说清楚它是什么。
+        // **不能写成"有人住"**：早上 8 点没人到店，可那几间已经订出去了。
+        // 实测截图里这一行说"4 间有人住"而上面一行写着"已入住 0 人"——
+        // 数字是对的，话是假的，玩家先看到的是后者
+        var tonight = Sim.OccupancyForNight(Sim.Clock.CurrentDay);
+        panel.Add(GameText.F("TONIGHT             {0}   ({1} taken for tonight, {2} still to sell)",
+                             tonight.Fraction, tonight.sold, tonight.Left));
 
         // 满房的晚号直接列出来：顶栏的"今天可售"和"未来某晚订满"是两件事，
         // 玩家实测把它们当成了矛盾（"UI 看是可售有几个，结算说没房可卖"）
@@ -558,8 +574,89 @@ public class WorldOperationsPanel : MonoBehaviour
         panel.AddIf(full.Count > 0,
                     GameText.F("SOLD OUT on night(s) {0} - that is where the refusals come from.",
                                string.Join(", ", full)));
-        panel.Draw(10, y, w - 20, GameText.T("TODAY"));
+
+        y = panel.Draw(10, y, w - 20, GameText.T("TODAY"));
+        DrawOccupancyCalendar(w, y + 4f);
     }
+
+    /// <summary>入住日历：一格一晚，写着"已售/总数"（玩家要求："未来给我搞成一个
+    /// 日历UI，每天都是已售/全部这样显示"）。
+    ///
+    /// 刻意做成格子而不是一行数字。上一版是 `SoldNightsPreview()` 吐出的
+    /// "3/4/2/6/1/0/5"——玩家把斜杠读成了冒号，那一行根本没法读。
+    /// 一格一晚、日号在上分数在下，斜杠才只有一个意思。
+    ///
+    /// 第一格是今晚，分子含上门客；后面几格是预订间夜。两者口径不同，
+    /// 所以第一格的标题写 TONIGHT 而不是日号——两种口径混在一张表里
+    /// 必须至少让人看出来它们不一样。</summary>
+    private void DrawOccupancyCalendar(float w, float y)
+    {
+        const float gap = 3f;
+        const float minCell = 44f;
+        const float cellH = 46f;
+
+        float available = w - 20f;
+        // 窄屏就少画几晚，而不是把格子压成读不出数字的细条
+        int fits = (int)((available + gap) / (minCell + gap));
+        if (fits < 2) return;
+
+        var nights = Sim.OccupancyCalendar(fits < OccupancyBoard.DefaultDays
+                                               ? fits : OccupancyBoard.DefaultDays);
+        if (nights.Count == 0) return;
+
+        float cellW = (available - gap * (nights.Count - 1)) / nights.Count;
+
+        GUI.Label(new Rect(10, y, available, 18),
+                  GameText.F("THE WEEK AHEAD   sold / rooms   ({0}% booked, {1} night(s) full)",
+                             OccupancyBoard.PercentBookedAcross(nights),
+                             OccupancyBoard.FullNightsAcross(nights)));
+        y += 20f;
+
+        for (int i = 0; i < nights.Count; i++)
+        {
+            NightOccupancy night = nights[i];
+            var cell = new Rect(10 + i * (cellW + gap), y, cellW, cellH);
+            GUI.Box(cell, GUIContent.none);
+
+            // 底色按入住率从下往上涨，满房转红——一眼扫出哪几晚该涨价
+            float fill = (cellH - 6f) * Mathf.Clamp01(night.Rate);
+            if (fill > 1f)
+                GUI.DrawTexture(new Rect(cell.x + 3f, cell.yMax - 3f - fill, cell.width - 6f, fill),
+                                night.soldOut ? FullNightFill : BusyNightFill);
+
+            // 日号那一行：今晚特别标出来（它的分子口径和后面几格不同），
+            // 周末标 W——需求本来就更高，玩家看得见才好提前涨价
+            string head = night.isTonight
+                ? GameText.T("TONIGHT")
+                : (PricingPolicy.IsWeekend(night.day)
+                       ? GameText.F("D{0} W", night.day)
+                       : GameText.F("D{0}", night.day));
+            GUI.Label(new Rect(cell.x, cell.y + 2f, cell.width, 16), head, CalendarHeadStyle());
+            GUI.Label(new Rect(cell.x, cell.y + 18f, cell.width, 20), night.Fraction, CalendarCellStyle());
+
+            // 超售不能只靠底色红：那是"已经卖多了"，和"刚好卖完"是两件事
+            if (night.Oversold > 0)
+                GUI.Label(new Rect(cell.x, cell.y + 30f, cell.width, 16),
+                          GameText.F("+{0}!", night.Oversold), CalendarHeadStyle());
+        }
+    }
+
+    private GUIStyle _calendarHead;
+    private GUIStyle _calendarCell;
+
+    private GUIStyle CalendarHeadStyle() =>
+        _calendarHead ?? (_calendarHead = new GUIStyle(GUI.skin.label)
+        {
+            alignment = TextAnchor.MiddleCenter,
+            fontSize = 9
+        });
+
+    private GUIStyle CalendarCellStyle() =>
+        _calendarCell ?? (_calendarCell = new GUIStyle(GUI.skin.label)
+        {
+            alignment = TextAnchor.MiddleCenter,
+            fontSize = 13
+        });
 
     // DrawJunkClearing / 清理完的闪示都退役了：它们的内容已经并入施工页
     // （DrawDerelictActions）。留着就是第二个入口，而"一个操作只在一个地方"
@@ -575,18 +672,25 @@ public class WorldOperationsPanel : MonoBehaviour
     }
 
     private static Texture2D _progressFill;
-    private static Texture2D ProgressFill
+    private static Texture2D ProgressFill =>
+        _progressFill ?? (_progressFill = SolidTexture(new Color(0.45f, 0.8f, 0.45f, 1f)));
+
+    private static Texture2D _busyNightFill;
+    /// <summary>日历格的底色：还能卖（偏青，与进度条的绿区分开）。</summary>
+    private static Texture2D BusyNightFill =>
+        _busyNightFill ?? (_busyNightFill = SolidTexture(new Color(0.35f, 0.62f, 0.78f, 0.85f)));
+
+    private static Texture2D _fullNightFill;
+    /// <summary>日历格的底色：这一晚一间都不剩了。</summary>
+    private static Texture2D FullNightFill =>
+        _fullNightFill ?? (_fullNightFill = SolidTexture(new Color(0.82f, 0.42f, 0.34f, 0.9f)));
+
+    private static Texture2D SolidTexture(Color color)
     {
-        get
-        {
-            if (_progressFill == null)
-            {
-                _progressFill = new Texture2D(1, 1);
-                _progressFill.SetPixel(0, 0, new Color(0.45f, 0.8f, 0.45f, 1f));
-                _progressFill.Apply();
-            }
-            return _progressFill;
-        }
+        var tex = new Texture2D(1, 1);
+        tex.SetPixel(0, 0, color);
+        tex.Apply();
+        return tex;
     }
 
     private void DrawPricing(float w, float y)
@@ -943,17 +1047,6 @@ public class WorldOperationsPanel : MonoBehaviour
         return sum / all.Count;
     }
 
-    private string SoldNightsPreview()
-    {
-        var sb = new System.Text.StringBuilder();
-        for (int k = 0; k < 7; k++)
-        {
-            int day = Sim.Clock.CurrentDay + k;
-            int sold = Sim.Calendar.DemandOn(day, RoomTier.Old)
-                     + Sim.Calendar.DemandOn(day, RoomTier.Basic)
-                     + Sim.Calendar.DemandOn(day, RoomTier.Better);
-            sb.Append(sold).Append(k == 6 ? "" : "/");
-        }
-        return sb.ToString();
-    }
+    // SoldNightsPreview() 退役了：它吐的是 "3/4/2/6/1/0/5" 一行数字，
+    // 玩家把斜杠读成了冒号。同一份信息现在由 DrawOccupancyCalendar 一格一晚地画。
 }
