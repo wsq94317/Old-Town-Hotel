@@ -242,11 +242,6 @@ public sealed class StaffBreakRoom : MonoBehaviour
         new Vector3(1.2f, 0f, 0.85f),
     };
 
-    private static Material _floorMat;
-    private static Material _trimMat;
-    private static Material _tableMat;
-    private static Material _seatMat;
-
     public static StaffBreakRoom EnsureInScene()
     {
         // Include inactive：休息室挂在楼层树里，玩家在楼上时 Floor1 是隐藏的——
@@ -297,21 +292,13 @@ public sealed class StaffBreakRoom : MonoBehaviour
     private void BuildVisualsIfNeeded()
     {
         if (transform.Find("Floor") != null) return;
-        if (GeneratedPlaceholderArt.TryDecorateBreakRoom(transform)) return;
-
-        // 墙高/家具高对齐大堂灰盒（外墙 0.8）：1.9 的近黑高墙在 45° 视角里像悬空二层
-        BuildBlock("Floor", new Vector3(0f, 0.03f, 0.2f), new Vector3(4.2f, 0.06f, 3f), FloorMaterial());
-        BuildBlock("BackWall", new Vector3(0f, 0.45f, 1.55f), new Vector3(4.2f, 0.9f, 0.12f), TrimMaterial());
-        BuildBlock("SideWall", new Vector3(-2.05f, 0.45f, 0.15f), new Vector3(0.12f, 0.9f, 2.75f), TrimMaterial());
-        BuildBlock("Table", new Vector3(0.25f, 0.32f, 0.2f), new Vector3(1.25f, 0.64f, 0.7f), TableMaterial());
-        BuildBlock("Bench_Left", new Vector3(-1.1f, 0.22f, 0.2f), new Vector3(0.75f, 0.44f, 1.35f), SeatMaterial());
-        BuildBlock("Bench_Right", new Vector3(1.35f, 0.22f, 0.2f), new Vector3(0.75f, 0.44f, 1.35f), SeatMaterial());
-        BuildBlock("Locker", new Vector3(1.65f, 0.45f, 1.05f), new Vector3(0.45f, 0.9f, 0.45f), TableMaterial());
+        LowPolyHotelKit.BuildBreakRoom(transform);
 
         var sign = new GameObject("Sign");
+        sign.layer = LowPolyHotelKit.ArtLayer;
         sign.transform.SetParent(transform, false);
-        sign.transform.localPosition = new Vector3(0f, 1.5f, 0.65f);
-        sign.transform.localScale = Vector3.one * 0.24f;
+        sign.transform.localPosition = new Vector3(0f, 1.48f, 1.1f);
+        sign.transform.localScale = Vector3.one * 0.18f;
 
         var text = sign.AddComponent<TextMeshPro>();
         text.text = "STAFF\nBREAK ROOM";
@@ -328,55 +315,6 @@ public sealed class StaffBreakRoom : MonoBehaviour
             text.font = TMP_Settings.defaultFontAsset;
 
         sign.AddComponent<BillboardSprite>();
-    }
-
-    private void BuildBlock(string name, Vector3 localPosition, Vector3 localScale, Material material)
-    {
-        var block = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        var collider = block.GetComponent<Collider>();
-        if (collider != null) Object.Destroy(collider);
-
-        block.name = name;
-        block.transform.SetParent(transform, false);
-        block.transform.localPosition = localPosition;
-        block.transform.localScale = localScale;
-        block.GetComponent<Renderer>().sharedMaterial = material;
-    }
-
-    private static Material FloorMaterial()
-    {
-        if (_floorMat != null) return _floorMat;
-        _floorMat = NewMaterial(new Color(0.36f, 0.23f, 0.18f));
-        return _floorMat;
-    }
-
-    private static Material TrimMaterial()
-    {
-        if (_trimMat != null) return _trimMat;
-        // 近黑(0.19)读起来像黑洞/别的楼层，调亮到暖灰棕
-        _trimMat = NewMaterial(new Color(0.42f, 0.36f, 0.32f));
-        return _trimMat;
-    }
-
-    private static Material TableMaterial()
-    {
-        if (_tableMat != null) return _tableMat;
-        _tableMat = NewMaterial(new Color(0.55f, 0.40f, 0.29f));
-        return _tableMat;
-    }
-
-    private static Material SeatMaterial()
-    {
-        if (_seatMat != null) return _seatMat;
-        _seatMat = NewMaterial(new Color(0.28f, 0.48f, 0.33f));
-        return _seatMat;
-    }
-
-    private static Material NewMaterial(Color color)
-    {
-        Shader shader = Shader.Find("Universal Render Pipeline/Lit");
-        if (shader == null) shader = Shader.Find("Standard");
-        return new Material(shader) { color = color };
     }
 }
 
@@ -488,20 +426,14 @@ public static class GeneratedPlaceholderArt
     public static void EnsureLobbyDecor()
     {
         if (Object.FindFirstObjectByType<GeneratedPlaceholderDecorTag>() != null) return;
+        if (GameObject.Find("World/Floor1/ArtPass_LowPoly") != null) return;
 
-        var root = new GameObject("GeneratedPlaceholderDecor");
+        var root = new GameObject("RuntimeLowPolyLobbyDecor");
+        root.layer = LowPolyHotelKit.ArtLayer;
         root.AddComponent<GeneratedPlaceholderDecorTag>();
         root.AddComponent<AgentFloorVisibility>();
         root.transform.position = Vector3.zero;
-
-        CreateDecorQuad(root.transform, "FrontDeskCounter", LoadWorldSprite("furniture_reception_counter"), new Vector3(0.9f, 0.82f, 3.25f), 1.35f, true);
-        CreateDecorQuad(root.transform, "QueueRope", LoadWorldSprite("prop_queue_rope"), new Vector3(-0.15f, 0.32f, 1.95f), 0.85f, true);
-        CreateDecorQuad(root.transform, "LobbySofa", LoadWorldSprite("furniture_sofa_ornate"), new Vector3(-4.8f, 0.85f, 2.35f), 1.45f, true);
-        CreateDecorQuad(root.transform, "CoffeeTable", LoadWorldSprite("furniture_coffee_table"), new Vector3(-3.85f, 0.42f, 2.1f), 0.7f, true);
-        CreateDecorQuad(root.transform, "Armchair", LoadWorldSprite("furniture_armchair"), new Vector3(-2.8f, 0.72f, 2.55f), 1.15f, true);
-        CreateDecorQuad(root.transform, "Plant", LoadWorldSprite("furniture_plant"), new Vector3(-1.45f, 0.7f, 2.95f), 1.15f, true);
-        CreateDecorQuad(root.transform, "LuggageCart", LoadWorldSprite("furniture_luggage_cart"), new Vector3(1.95f, 0.78f, 1.25f), 1.3f, true);
-        CreateDecorQuad(root.transform, "VendingMachine", LoadWorldSprite("furniture_vending_machine"), new Vector3(-7.55f, 0.88f, 0.95f), 1.4f, true);
+        LowPolyHotelKit.BuildLobbyDecor(root.transform);
     }
 
     private static void CreateDecorQuad(Transform parent, string name, Sprite sprite, Vector3 localPosition, float targetHeight, bool billboard)

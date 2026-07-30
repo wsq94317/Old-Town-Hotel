@@ -70,19 +70,14 @@ public sealed class StaffFacilityNode : MonoBehaviour
 
     private void BuildPlaceholder(string displayName, Vector3 size, Color color)
     {
-        if (transform.Find("Floor") != null) return;
+        if (transform.Find("Visual") != null) return;
 
-        Material material = NewMaterial(color);
-        BuildBlock("Floor", new Vector3(0f, 0.03f, 0f), new Vector3(size.x, 0.06f, size.z), material);
-        // 墙高对齐大堂灰盒（0.8）：之前 1.7 的高墙在 45° 视角里像悬空的"二楼盒子"。
-        // 背墙贴向最近的外墙侧（南半场贴南墙），开口朝向房间开阔面；
-        // 站位锚点放在开口侧、地台外 0.3m 的空地上——可见、可点击、不进墙缝。
+        // Placement comes exclusively from the scene anchor. The model mirrors toward
+        // the nearest exterior walls so the open side remains visible to the camera.
         float backSign = transform.position.z >= 0f ? 1f : -1f;
-        BuildBlock("BackWall", new Vector3(0f, 0.42f, backSign * size.z * 0.48f), new Vector3(size.x, 0.85f, 0.1f), material);
         _anchorLocal = new Vector3(0f, 0f, -backSign * (size.z * 0.5f + 0.3f));
-        // 侧墙贴靠外墙一侧：相机从西南 45° 看，东半场的设施侧墙放东侧才不会挡住内部
         float sideSign = transform.position.x >= 0f ? 1f : -1f;
-        BuildBlock("SideWall", new Vector3(sideSign * size.x * 0.48f, 0.42f, 0f), new Vector3(0.1f, 0.85f, size.z), material);
+        LowPolyHotelKit.BuildFacility(transform, Kind, size, backSign, sideSign);
 
         _signText = displayName;
         BuildSignIfNeeded();
@@ -110,24 +105,6 @@ public sealed class StaffFacilityNode : MonoBehaviour
         sign.AddComponent<BillboardSprite>();
     }
 
-    private void BuildBlock(string blockName, Vector3 localPosition, Vector3 localScale, Material material)
-    {
-        var block = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        var blockCollider = block.GetComponent<Collider>();
-        if (blockCollider != null) Destroy(blockCollider);
-        block.name = blockName;
-        block.transform.SetParent(transform, false);
-        block.transform.localPosition = localPosition;
-        block.transform.localScale = localScale;
-        block.GetComponent<Renderer>().sharedMaterial = material;
-    }
-
-    private static Material NewMaterial(Color color)
-    {
-        Shader shader = Shader.Find("Universal Render Pipeline/Lit");
-        if (shader == null) shader = Shader.Find("Standard");
-        return new Material(shader) { color = color };
-    }
 }
 
 [DisallowMultipleComponent]
