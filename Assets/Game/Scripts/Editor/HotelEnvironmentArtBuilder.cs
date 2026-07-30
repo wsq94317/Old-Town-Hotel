@@ -10,6 +10,8 @@ public static class HotelEnvironmentArtBuilder
     private const string MaterialFolder = "Assets/Game/Resources/HotelArt";
     private const string PrefabFolder = MaterialFolder + "/Prefabs";
     private const string ArtRootName = "ArtPass_LowPoly";
+    private const float GuestWallHeight = 1.25f;
+    private const float CutawayWallHeight = 0.80f;
 
     private static readonly string[] ReplacedGreyboxPaths =
     {
@@ -53,7 +55,7 @@ public static class HotelEnvironmentArtBuilder
         EnsureMaterialAssets();
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
-        BuildFurniturePrefabs();
+        BuildFurniturePrefabs(false);
         TuneLighting();
         RemoveArtRoots();
         SetGreyboxReplacementRenderers(false);
@@ -189,17 +191,33 @@ public static class HotelEnvironmentArtBuilder
         }
     }
 
-    private static void BuildFurniturePrefabs()
+    [MenuItem("Old Town Hotel/Art/Rebuild Furniture Prefabs")]
+    public static void RebuildFurniturePrefabs()
+    {
+        EnsureFolders();
+        EnsureMaterialAssets();
+        BuildFurniturePrefabs(true);
+        AssetDatabase.SaveAssets();
+        AssetDatabase.Refresh();
+        Debug.Log("Low-poly furniture prefabs rebuilt.");
+    }
+
+    private static void BuildFurniturePrefabs(bool overwriteExisting)
     {
         foreach (FurnitureKind kind in FurnitureCatalog.All)
         {
+            string prefabPath = PrefabFolder + "/LP_Furniture_" + kind.kindId + ".prefab";
+            if (!overwriteExisting
+                && AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath) != null)
+            {
+                continue;
+            }
+
             GameObject model = LowPolyHotelKit.CreateFurnitureProcedural(kind);
             model.name = "LP_Furniture_" + kind.kindId;
             LowPolyHotelKit.SetLayerRecursively(model, LowPolyHotelKit.ArtLayer);
             LowPolyHotelKit.RemoveColliders(model);
-            PrefabUtility.SaveAsPrefabAsset(
-                model,
-                PrefabFolder + "/LP_Furniture_" + kind.kindId + ".prefab");
+            PrefabUtility.SaveAsPrefabAsset(model, prefabPath);
             Object.DestroyImmediate(model);
         }
         AssetDatabase.SaveAssets();
@@ -271,6 +289,7 @@ public static class HotelEnvironmentArtBuilder
 
     private static void BuildGuestFloor(Transform root, int roomBase, int roomCount)
     {
+        NormalizeGuestFloorWalls(root.parent);
         AddVisibleFloorTrim(root);
         AddElevatorFrame(root);
         LowPolyHotelKit.Part(root, "CorridorRunner", PrimitiveType.Cube,
@@ -286,7 +305,7 @@ public static class HotelEnvironmentArtBuilder
             int room = roomBase + i + 1;
             float x = -7.5f + i * 5f;
             BuildDoorFrame(root, "Frame_" + room, new Vector3(x, 0f, 1f), false);
-            BuildWallLamp(root, new Vector3(x + 1.65f, 0.57f, 0.95f), 0f);
+            BuildWallLamp(root, new Vector3(x + 1.65f, 0.82f, 0.95f), 0f);
             BuildRoomPlaque(root, new Vector3(x + 1.24f, 0f, 0.94f), false);
         }
 
@@ -296,13 +315,32 @@ public static class HotelEnvironmentArtBuilder
             int room = roomBase + i + 5;
             float x = -7.5f + i * 5f;
             BuildDoorFrame(root, "Frame_" + room, new Vector3(x, 0f, -1f), true);
-            BuildWallLamp(root, new Vector3(x + 1.65f, 0.57f, -0.95f), 180f);
+            BuildWallLamp(root, new Vector3(x + 1.65f, 0.82f, -0.95f), 180f);
             BuildRoomPlaque(root, new Vector3(x + 1.24f, 0f, -0.94f), true);
         }
 
         BuildHousekeepingCart(root, new Vector3(-8.8f, 0f, 0.15f));
         for (int i = 0; i < 3; i++)
             LowPolyHotelKit.BuildPlant(root, new Vector3(5.8f + i * 0.65f, 0f, -0.55f), 0.58f);
+    }
+
+    private static void NormalizeGuestFloorWalls(Transform floor)
+    {
+        if (floor == null) return;
+        foreach (Transform item in floor.GetComponentsInChildren<Transform>(true))
+        {
+            if (item == null || !item.name.StartsWith("Wall_")) continue;
+            bool outerCutaway = item.parent == floor
+                                && (item.name == "Wall_S" || item.name == "Wall_W");
+            float height = outerCutaway ? CutawayWallHeight : GuestWallHeight;
+            Vector3 scale = item.localScale;
+            scale.y = height;
+            item.localScale = scale;
+            Vector3 position = item.localPosition;
+            position.y = height * 0.5f;
+            item.localPosition = position;
+            EditorUtility.SetDirty(item);
+        }
     }
 
     private static void BuildRestaurant(Transform root)
@@ -1110,7 +1148,11 @@ public static class HotelEnvironmentArtBuilder
                 if (artRoot != null && TryGetBounds(item, out Bounds decorBounds))
                 {
                     float relativeTop = decorBounds.max.y - artRoot.position.y;
-                    if (relativeTop > 0.82f)
+                    bool guestFloor = artRoot.parent != null
+                                      && (artRoot.parent.name == "Floor2"
+                                          || artRoot.parent.name == "Floor3");
+                    float wallLimit = guestFloor ? GuestWallHeight : 0.82f;
+                    if (relativeTop > wallLimit)
                         ValidationError(ref errors,
                             GetPath(item) + " exceeds cutaway wall height: " + relativeTop.ToString("F2"));
                 }
@@ -1173,6 +1215,8 @@ public static class HotelEnvironmentArtBuilder
             ValidationError(ref errors, "Expected 12 room door frames, found " + doorFrames + ".");
         if (checkedChairs != 31)
             ValidationError(ref errors, "Expected 31 inward-facing table chairs, found " + checkedChairs + ".");
+        ValidateGuestWallHeights(ref errors, FindPath("World/Floor2"));
+        ValidateGuestWallHeights(ref errors, FindPath("World/Floor3"));
 
         if (logResult)
         {
@@ -1183,6 +1227,29 @@ public static class HotelEnvironmentArtBuilder
                 Debug.LogError("Hotel art validation failed with " + errors + " issue(s).");
         }
         return errors == 0;
+    }
+
+    private static void ValidateGuestWallHeights(ref int errors, Transform floor)
+    {
+        if (floor == null)
+        {
+            ValidationError(ref errors, "Guest floor is missing.");
+            return;
+        }
+
+        foreach (Transform item in floor.GetComponentsInChildren<Transform>(true))
+        {
+            if (item == null || !item.name.StartsWith("Wall_")) continue;
+            bool outerCutaway = item.parent == floor
+                                && (item.name == "Wall_S" || item.name == "Wall_W");
+            float expected = outerCutaway ? CutawayWallHeight : GuestWallHeight;
+            if (Mathf.Abs(item.localScale.y - expected) > 0.01f
+                || Mathf.Abs(item.localPosition.y - expected * 0.5f) > 0.01f)
+            {
+                ValidationError(ref errors,
+                    GetPath(item) + " has incorrect guest-floor wall height.");
+            }
+        }
     }
 
     private static bool IsUnderArtRoot(Transform item)
