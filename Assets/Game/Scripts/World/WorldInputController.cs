@@ -237,22 +237,16 @@ public class WorldInputController : MonoBehaviour
             if (interaction != null) { interaction.OnStaffTapped(staff); return; }
         }
 
-        // 点房间 = 选中它 **并且** 让经理走过去。
-        //
-        // 这里曾经 `return`，那是个真回归（对抗审计抓到的）：房间的点击盒是
-        // 4.2×4.2 而房间本身 5×5，几乎盖满内部，于是 MoveTo 永远轮不到——
-        // **经理再也不能被派进房间**，门禁/刷卡/验房/走错房那一整套流程
-        // （RoomDoor 靠 _managerAgent.destination 落在房内才触发）全部失效。
-        //
-        // 一次点击同时做两件合理的事，彼此并不冲突：选中它（抽屉里就能对它下手），
-        // 同时把人派过去（要检查总得先走到）。
-        var room = hit.collider.GetComponentInParent<RoomSceneBinder>();
-        if (room != null && room.RoomNumber > 0)
+        // Rooms are selected only through their visible doorway chips. Looking
+        // up RoomSceneBinder from the hit collider's parents made every wall,
+        // bed and tall invisible room box steal nearby corridor taps.
+        if (TryFindRoomTap(ray, out RoomSceneBinder room))
         {
             WorldManagementHud.SelectRoom(room.RoomNumber);
             return;
         }
 
+        WorldManagementHud.ClearWorldSelection();
         if (manager != null && manager.TryMoveTo(movementTarget, out Vector3 destination))
         {
             ClickMarkerFx.Spawn(movementTarget);
@@ -261,6 +255,30 @@ public class WorldInputController : MonoBehaviour
         {
             ClickMarkerFx.SpawnRejected(movementTarget);
         }
+    }
+
+    /// <summary>Selects the nearest visible doorway footprint intersected by the ray.</summary>
+    public static bool TryFindRoomTap(Ray ray, out RoomSceneBinder selected)
+    {
+        selected = null;
+        float nearestDistance = float.PositiveInfinity;
+        RoomSceneBinder[] rooms = FindObjectsByType<RoomSceneBinder>(
+            FindObjectsInactive.Exclude,
+            FindObjectsSortMode.None);
+
+        for (int i = 0; i < rooms.Length; i++)
+        {
+            RoomSceneBinder candidate = rooms[i];
+            if (candidate == null || candidate.RoomNumber <= 0
+                || !candidate.TryGetTapDistance(ray, out float distance)
+                || distance >= nearestDistance)
+                continue;
+
+            nearestDistance = distance;
+            selected = candidate;
+        }
+
+        return selected != null;
     }
 
     /// <summary>

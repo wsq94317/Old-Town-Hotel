@@ -349,12 +349,42 @@ namespace OldTownHotel.Tests.EditMode
 
                 BoxCollider box = room.GetComponent<BoxCollider>();
                 Assert.NotNull(box);
-                Assert.AreEqual(1.1f, box.size.z, 0.001f);
-                Assert.AreEqual(-2.05f, box.center.z, 0.001f);
+                Assert.AreEqual(2.6f, box.size.x, 0.001f);
+                Assert.AreEqual(0.18f, box.size.y, 0.001f);
+                Assert.AreEqual(0.62f, box.size.z, 0.001f);
+                Assert.AreEqual(-2.15f, box.center.z, 0.001f);
 
                 NavMeshModifier modifier = room.GetComponent<NavMeshModifier>();
                 Assert.NotNull(modifier);
                 Assert.IsTrue(modifier.ignoreFromBuild);
+            }
+            finally
+            {
+                Object.DestroyImmediate(room);
+            }
+        }
+
+        [Test]
+        public void ObliqueRayAimedAtCorridor_DoesNotSelectRoomBehindIt()
+        {
+            var room = new GameObject("Room_205");
+            room.transform.position = new Vector3(-7.5f, 4f, -4f);
+
+            try
+            {
+                RoomSceneBinder binder = room.AddComponent<RoomSceneBinder>();
+                binder.ConfigureRoomNumber(205);
+
+                Vector3 cameraForward = new Vector3(0.58f, -0.57f, 0.58f).normalized;
+                Vector3 corridorPoint = new Vector3(-7f, 4f, 0f);
+                var corridorRay = new Ray(corridorPoint - cameraForward * 40f, cameraForward);
+                Assert.IsFalse(binder.TryGetTapDistance(corridorRay, out _),
+                    "A corridor floor point must not hit the room through collider height.");
+
+                Vector3 doorwayPoint = new Vector3(-7.5f, 4f, -1.85f);
+                var doorwayRay = new Ray(doorwayPoint - cameraForward * 40f, cameraForward);
+                Assert.IsTrue(binder.TryGetTapDistance(doorwayRay, out _),
+                    "The visible doorway chip must remain tappable.");
             }
             finally
             {

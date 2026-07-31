@@ -24,8 +24,10 @@ public class RoomSceneBinder : MonoBehaviour
     /// <summary>房号。留空则从物体名 "Room_301" 里解析。</summary>
     [SerializeField] private int roomNumber;
 
-    /// <summary>Doorway interaction area. The room floor remains available for movement taps.</summary>
-    [SerializeField] private Vector3 tapBoxSize = new Vector3(3.2f, 2.4f, 1.1f);
+    // Match the visible floor chip. A tall invisible box projects over the
+    // corridor in the fixed oblique camera and turns movement taps into room taps.
+    private static readonly Vector3 TapBoxSize = new Vector3(2.6f, 0.18f, 0.62f);
+    private const float TapBoxCorridorOffset = 2.15f;
 
     private TextMesh _label;
     private Renderer _stateChip;
@@ -36,6 +38,7 @@ public class RoomSceneBinder : MonoBehaviour
     private float _refreshTimer;
     private float _pulseUntil;
     private Vector3 _chipBaseScale;
+    private BoxCollider _tapCollider;
 
     public int RoomNumber => roomNumber;
 
@@ -127,22 +130,49 @@ public class RoomSceneBinder : MonoBehaviour
     /// </summary>
     private void EnsureTapCollider()
     {
-        // Migrate the original room-sized click boxes without requiring a scene
-        // reserialize. Only the doorway plaque is an interaction target now.
-        tapBoxSize.x = Mathf.Min(tapBoxSize.x, 3.2f);
-        tapBoxSize.y = Mathf.Max(tapBoxSize.y, 2.4f);
-        tapBoxSize.z = Mathf.Min(tapBoxSize.z, 1.1f);
-
         var existing = GetComponent<BoxCollider>();
         if (existing == null) existing = gameObject.AddComponent<BoxCollider>();
-        existing.size = tapBoxSize;
+        existing.size = TapBoxSize;
         float corridorSide = transform.localPosition.z >= 0f ? -1f : 1f;
-        existing.center = new Vector3(0f, tapBoxSize.y * 0.5f, corridorSide * 2.05f);
+        existing.center = new Vector3(
+            0f,
+            TapBoxSize.y * 0.5f,
+            corridorSide * TapBoxCorridorOffset);
         existing.isTrigger = false;
+        _tapCollider = existing;
 
         var modifier = GetComponent<NavMeshModifier>();
         if (modifier == null) modifier = gameObject.AddComponent<NavMeshModifier>();
         modifier.ignoreFromBuild = true;
+    }
+
+    /// <summary>
+    /// Tests the ray against the doorway chip's floor footprint, not the box's
+    /// screen-space volume. This keeps an oblique camera ray aimed at the
+    /// corridor from selecting a room several metres behind it.
+    /// </summary>
+    public bool TryGetTapDistance(Ray ray, out float distance)
+    {
+        if (_tapCollider == null) _tapCollider = GetComponent<BoxCollider>();
+        if (_tapCollider == null || !_tapCollider.enabled || !gameObject.activeInHierarchy)
+        {
+            distance = 0f;
+            return false;
+        }
+
+        Vector3 localPlanePoint = new Vector3(
+            _tapCollider.center.x,
+            _tapCollider.center.y,
+            _tapCollider.center.z);
+        var plane = new Plane(transform.up, transform.TransformPoint(localPlanePoint));
+        if (!plane.Raycast(ray, out distance) || distance < 0f) return false;
+
+        Vector3 localPoint = transform.InverseTransformPoint(ray.GetPoint(distance));
+        const float edgeEpsilon = 0.001f;
+        return Mathf.Abs(localPoint.x - _tapCollider.center.x)
+                   <= _tapCollider.size.x * 0.5f + edgeEpsilon
+               && Mathf.Abs(localPoint.z - _tapCollider.center.z)
+                   <= _tapCollider.size.z * 0.5f + edgeEpsilon;
     }
 
     private void Update()

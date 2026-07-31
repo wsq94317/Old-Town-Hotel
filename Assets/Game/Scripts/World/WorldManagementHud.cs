@@ -252,6 +252,19 @@ public sealed class WorldManagementHud : MonoBehaviour
         instance._refreshTimer = 0f;
     }
 
+    public static void ClearWorldSelection()
+    {
+        RoomSelection.Clear();
+        WorldManagementHud instance = ActiveInstance;
+        if (instance == null) return;
+
+        instance._selectedBusiness = null;
+        instance._pinnedOpportunity = null;
+        instance._opportunityCardOpen = false;
+        instance._roomStateKey = "";
+        instance._refreshTimer = 0f;
+    }
+
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void InstallForWorldScene()
     {
