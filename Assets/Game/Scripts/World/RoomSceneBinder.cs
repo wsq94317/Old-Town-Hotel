@@ -34,6 +34,8 @@ public class RoomSceneBinder : MonoBehaviour
     private bool _shownSelected;
     private int _shownClearingPercent = -1;
     private float _refreshTimer;
+    private float _pulseUntil;
+    private Vector3 _chipBaseScale;
 
     public int RoomNumber => roomNumber;
 
@@ -109,6 +111,7 @@ public class RoomSceneBinder : MonoBehaviour
             existing = quad.transform;
         }
         _stateChip = existing.GetComponent<Renderer>();
+        _chipBaseScale = existing.localScale;
 
         if (_chipMaterial == null)
         {
@@ -146,6 +149,7 @@ public class RoomSceneBinder : MonoBehaviour
     {
         var bridge = HotelSimSceneBridge.Instance;
         if (bridge == null || bridge.Sim == null || roomNumber <= 0) return;
+        TickPulse();
         if (bridge.AwaitingMorningReport) return;     // 晨报期间世界冻结
 
         // 每 0.25 秒够了：状态变化是分钟级的，逐帧刷是白烧手机电池
@@ -164,10 +168,34 @@ public class RoomSceneBinder : MonoBehaviour
         if (state == _shownState && selected == _shownSelected
             && clearingPercent == _shownClearingPercent) return;
 
+        RoomSimState previous = _shownState;
         _shownState = state;
         _shownSelected = selected;
         _shownClearingPercent = clearingPercent;
         Apply(state, selected, bridge.Sim);
+        if (previous >= 0 && previous != state
+            && (state == RoomSimState.Ready || state == RoomSimState.Occupied))
+            Pulse();
+    }
+
+    public void Pulse(float duration = 1.1f)
+    {
+        _pulseUntil = Mathf.Max(_pulseUntil, Time.time + duration);
+    }
+
+    private void TickPulse()
+    {
+        if (_stateChip == null) return;
+        float remaining = _pulseUntil - Time.time;
+        if (remaining <= 0f)
+        {
+            _stateChip.transform.localScale = _chipBaseScale;
+            return;
+        }
+
+        float scale = 1f + Mathf.Sin(Time.time * 16f) * 0.13f
+                      + Mathf.Clamp01(remaining) * 0.08f;
+        _stateChip.transform.localScale = _chipBaseScale * scale;
     }
 
     private void Apply(RoomSimState state, bool selected, HotelSim sim)

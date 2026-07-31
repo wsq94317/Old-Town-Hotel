@@ -79,6 +79,7 @@ public sealed class SaveCoordinator : MonoBehaviour
         gs.rooms = demandLoop != null ? demandLoop.CaptureOccupancy() : new RoomsState();
         // v3 世界层：设施解锁 / 威望 / 胶带复发 / 锁房
         FacilitySystem.CaptureTo(gs.world);
+        HotelEmpireProgress.CaptureTo(gs.world);
         gs.world.prestige = ManagerReputation.Prestige;
 
         // **模拟内核**（v4-v7 的 sim 段）。以前这一段从来没被写过——SimState 结构
@@ -123,6 +124,7 @@ public sealed class SaveCoordinator : MonoBehaviour
         if (gs.world != null)
         {
             FacilitySystem.RestoreFrom(gs.world);
+            HotelEmpireProgress.RestoreFrom(gs.world);
             ManagerReputation.Restore(gs.world.prestige);
             if (_breakdowns != null) _breakdowns.RestoreFrom(gs.world);
         }
@@ -143,6 +145,7 @@ public sealed class SaveCoordinator : MonoBehaviour
         // 静态世界状态一并归零，否则上一局的威望/解锁渗进新档
         ManagerReputation.ResetForNewGame();
         FacilitySystem.ResetForNewGame();
+        HotelEmpireProgress.ResetForNewGame();
         SaveSlots.ResetForNewGame();
         _lastLoaded = null;
     }

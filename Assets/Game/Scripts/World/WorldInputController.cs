@@ -214,6 +214,14 @@ public class WorldInputController : MonoBehaviour
         }
 
         // 点到员工 → 交给监督交互（近=开面板，远=走过去）
+        var business = hit.collider.GetComponentInParent<HotelBusinessHotspot>();
+        if (business != null)
+        {
+            WorldManagementHud.SelectBusiness(business);
+            business.Pulse();
+            return;
+        }
+
         var facility = hit.collider.GetComponentInParent<StaffFacilityNode>();
         if (facility != null)
         {
@@ -239,7 +247,11 @@ public class WorldInputController : MonoBehaviour
         // 一次点击同时做两件合理的事，彼此并不冲突：选中它（抽屉里就能对它下手），
         // 同时把人派过去（要检查总得先走到）。
         var room = hit.collider.GetComponentInParent<RoomSceneBinder>();
-        if (room != null && room.RoomNumber > 0) RoomSelection.Select(room.RoomNumber);
+        if (room != null && room.RoomNumber > 0)
+        {
+            WorldManagementHud.SelectRoom(room.RoomNumber);
+            return;
+        }
 
         if (manager != null && manager.TryMoveTo(movementTarget, out Vector3 destination))
         {

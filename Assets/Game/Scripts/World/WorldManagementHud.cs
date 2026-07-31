@@ -38,6 +38,17 @@ public sealed class WorldManagementHud : MonoBehaviour
         Assets
     }
 
+    private enum OpportunityKind
+    {
+        None,
+        StopLoss,
+        ReclaimRoom,
+        UpgradeRoom,
+        Reception,
+        UnlockFacility,
+        AcquireHotel
+    }
+
     // Old hotel front-desk language: smoked glass, walnut, oxidized brass and
     // muted ledger paper. Parchment is reserved for type, never large surfaces.
     private static readonly Color Ink = Hex("#1B1713");
@@ -68,6 +79,7 @@ public sealed class WorldManagementHud : MonoBehaviour
     private RectTransform _drawerContent;
     private RectTransform _roomCard;
     private RectTransform _alertStrip;
+    private RectTransform _opportunityBar;
     private RectTransform _contextSheet;
     private RectTransform _contextContent;
     private RectTransform _toastPanel;
@@ -80,6 +92,12 @@ public sealed class WorldManagementHud : MonoBehaviour
     private TextMeshProUGUI _cashLabel;
     private TextMeshProUGUI _earnedLabel;
     private TextMeshProUGUI _occupancyLabel;
+    private TextMeshProUGUI _netRateLabel;
+    private TextMeshProUGUI _todayProgressLabel;
+    private TextMeshProUGUI _goalTitleLabel;
+    private TextMeshProUGUI _goalBenefitLabel;
+    private TextMeshProUGUI _opportunityTitle;
+    private TextMeshProUGUI _opportunityDetail;
     private TextMeshProUGUI _safeboxLabel;
     private TextMeshProUGUI _drawerTitle;
     private TextMeshProUGUI _roomTitle;
@@ -95,11 +113,15 @@ public sealed class WorldManagementHud : MonoBehaviour
     private TextMeshProUGUI _openDoorsLabel;
 
     private Image _safeboxFill;
+    private Image _todayProgressFill;
+    private Image _goalProgressFill;
     private Image _safeboxButtonImage;
     private Button _safeboxButton;
     private Button _roomPrimary;
     private Button _roomSecondary;
     private Button _alertGoButton;
+    private Button _goalButton;
+    private Button _opportunityButton;
     private Button _openDoorsButton;
 
     private readonly List<Button> _navButtons = new List<Button>();
@@ -122,6 +144,15 @@ public sealed class WorldManagementHud : MonoBehaviour
     private Rect _lastSafeArea;
     private Coroutine _toastRoutine;
     private ManagerPhone.Note _displayedNote;
+    private HotelBusinessHotspot _selectedBusiness;
+    private OpportunityModel _opportunity;
+    private OpportunityModel _pinnedOpportunity;
+    private bool _opportunityCardOpen;
+    private HotelEconomySnapshot _economySnapshot;
+    private readonly Dictionary<int, RoomSimState> _observedRoomStates =
+        new Dictionary<int, RoomSimState>();
+    private int _lastCheckIns = -1;
+    private int _lastTurnedAway = -1;
     private WorldHudMode _hudMode = WorldHudMode.Hidden;
     private string _morningStateKey = "";
 
@@ -139,6 +170,23 @@ public sealed class WorldManagementHud : MonoBehaviour
         public string Title;
         public string Body;
         public readonly List<ContextAction> Actions = new List<ContextAction>();
+    }
+
+    private sealed class OpportunityModel
+    {
+        public string Key;
+        public OpportunityKind Kind;
+        public string Title;
+        public string Detail;
+        public string PrimaryLabel;
+        public int Cost;
+        public float GainPerMinute;
+        public float LossAvoidedPerMinute;
+        public int RoomNumber;
+        public HotelBusinessHotspot Business;
+        public Vector3 Anchor;
+        public Action PrimaryAction;
+        public float Score;
     }
 
     private HotelSim Sim =>
@@ -177,6 +225,32 @@ public sealed class WorldManagementHud : MonoBehaviour
         }
     }
 
+    public static void SelectRoom(int roomNumber)
+    {
+        WorldManagementHud instance = ActiveInstance;
+        if (instance == null || roomNumber <= 0) return;
+
+        instance._selectedBusiness = null;
+        RoomSelection.Select(roomNumber);
+        instance._roomStateKey = "";
+        instance._refreshTimer = 0f;
+
+        RoomSceneBinder binder = FindRoomBinder(roomNumber);
+        if (binder != null) binder.Pulse();
+    }
+
+    public static void SelectBusiness(HotelBusinessHotspot business)
+    {
+        WorldManagementHud instance = ActiveInstance;
+        if (instance == null || business == null) return;
+
+        RoomSelection.Clear();
+        instance._selectedBusiness =
+            instance._selectedBusiness == business ? null : business;
+        instance._roomStateKey = "";
+        instance._refreshTimer = 0f;
+    }
+
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void InstallForWorldScene()
     {
@@ -199,6 +273,7 @@ public sealed class WorldManagementHud : MonoBehaviour
         if (!IsActive || !instance._safeRoot.gameObject.activeInHierarchy) return false;
         if (Contains(instance._topPanel, screenPoint)) return true;
         if (Contains(instance._bottomNav, screenPoint)) return true;
+        if (Contains(instance._opportunityBar, screenPoint)) return true;
         if (Contains(instance._alertStrip, screenPoint)) return true;
         if (Contains(instance._contextSheet, screenPoint)) return true;
         if (instance._drawerOpen && Contains(instance._drawer, screenPoint)) return true;
@@ -262,7 +337,10 @@ public sealed class WorldManagementHud : MonoBehaviour
             return;
         }
 
+        RefreshEconomySnapshot();
+        RefreshOpportunity();
         RefreshTop();
+        RefreshSceneEconomyFeedback();
         RefreshAlerts();
         RefreshContextSheet();
         RefreshRoomCard();
@@ -277,6 +355,7 @@ public sealed class WorldManagementHud : MonoBehaviour
         bool operations = mode == WorldHudMode.Operations;
         _topPanel.gameObject.SetActive(operations);
         _bottomNav.gameObject.SetActive(operations);
+        _opportunityBar.gameObject.SetActive(operations);
         _drawer.gameObject.SetActive(operations && _drawerOpen);
         _roomCard.gameObject.SetActive(false);
         _alertStrip.gameObject.SetActive(false);
@@ -343,7 +422,336 @@ public sealed class WorldManagementHud : MonoBehaviour
         _lastSafebox = Sim.Safebox.Balance;
     }
 
+    private void RefreshEconomySnapshot()
+    {
+        BreakdownSystem breakdown = FindFirstObjectByType<BreakdownSystem>();
+        float incidentLoss = breakdown != null
+            ? breakdown.EstimatedLossPerMinute(Sim)
+            : 0f;
+        _economySnapshot = HotelEconomyPresentation.Build(
+            Sim,
+            incidentLoss,
+            HotelEmpireProgress.PassiveIncomePerMinute);
+    }
+
+    private void RefreshOpportunity()
+    {
+        OpportunityModel next = BuildBestOpportunity();
+        _opportunity = next;
+
+        bool visible = next != null
+                       && !_drawerOpen
+                       && !_opportunityCardOpen
+                       && RoomSelection.Selected <= 0
+                       && _selectedBusiness == null;
+        _opportunityBar.gameObject.SetActive(visible);
+        if (!visible) return;
+
+        int shortfall = Mathf.Max(0, next.Cost - Sim.Cash);
+        _opportunityTitle.text = shortfall > 0
+            ? L("EARN $", "再赚 $") + shortfall + L("  ·  ", "  ·  ") + next.Title
+            : next.Title;
+        _opportunityDetail.text = next.Detail;
+        _opportunityButton.GetComponent<Image>().color =
+            next.Kind == OpportunityKind.StopLoss ? Walnut : Paper;
+    }
+
+    private OpportunityModel BuildBestOpportunity()
+    {
+        if (Sim == null) return null;
+
+        OpportunityModel best = null;
+        BreakdownSystem breakdown = FindFirstObjectByType<BreakdownSystem>();
+        if (breakdown != null
+            && breakdown.TryGetHighestLossIncident(
+                Sim,
+                out Vector3 incidentAnchor,
+                out int incidentRoom,
+                out string incidentTitle,
+                out float incidentLoss))
+        {
+            bool urgent = incidentLoss >= Mathf.Max(0.8f, Mathf.Abs(_economySnapshot.NetPerMinute) * 0.2f);
+            ConsiderOpportunity(ref best, new OpportunityModel
+            {
+                Key = "repair|" + incidentTitle + "|" + incidentRoom,
+                Kind = OpportunityKind.StopLoss,
+                Title = L("STOP THE LOSS", "立即止损"),
+                Detail = incidentTitle + "  ·  -$" + FormatRate(incidentLoss)
+                         + L("/min until fixed", "/分钟，直到修复"),
+                PrimaryLabel = L("SEND MANAGER TO INSPECT", "派经理检查"),
+                Cost = 0,
+                LossAvoidedPerMinute = incidentLoss,
+                RoomNumber = incidentRoom,
+                Anchor = incidentAnchor,
+                PrimaryAction = () => NavigateManagerTo(incidentAnchor),
+                Score = HotelEconomyPresentation.OpportunityScore(
+                    1, Sim.Cash, 0f, incidentLoss, false, urgent)
+            });
+        }
+
+        for (int i = 0; i < Sim.Rooms.Count; i++)
+        {
+            RoomRecord room = Sim.Rooms.Peek(i);
+            if (room.state != RoomSimState.Ruined) continue;
+
+            ReclaimPlan plan = ReclaimPlan.For(ReclaimPlanKind.Refit);
+            int cashCost = Sim.QuoteReclaim(ReclaimPlanKind.Refit, 1);
+            int missingMaterials = Mathf.Max(0, plan.materialsPerRoom - Sim.Materials.Stock);
+            int immediateCost = cashCost + Sim.Materials.PriceFor(missingMaterials);
+            int fullInvestment = RoomInvestmentMath.TotalInvestment(
+                cashCost,
+                plan.materialsPerRoom,
+                Sim.Materials.UnitPrice);
+            float gain = HotelEconomyPresentation.RoomRevenuePerMinute(
+                Sim,
+                RoomTier.Basic,
+                _economySnapshot.ExpectedOccupancy);
+            int payback = HotelEconomyPresentation.PaybackMinutes(fullInvestment, gain);
+            int capturedRoom = room.number;
+            ConsiderOpportunity(ref best, new OpportunityModel
+            {
+                Key = "reclaim|" + room.number + "|" + immediateCost,
+                Kind = OpportunityKind.ReclaimRoom,
+                Title = L("OPEN ROOM ", "解锁房间 ") + room.number,
+                Detail = "+$" + FormatRate(gain) + L("/min  ·  payback ", "/分钟  ·  回本 ")
+                         + FormatPayback(payback)
+                         + L("  ·  +1 sellable room", "  ·  +1间可售房"),
+                PrimaryLabel = L("INVEST & RESTORE  $", "投资并修复  $") + immediateCost,
+                Cost = immediateCost,
+                GainPerMinute = gain,
+                RoomNumber = room.number,
+                Anchor = RoomWorldPosition(room.number),
+                PrimaryAction = () => StartRecommendedReclaim(capturedRoom),
+                Score = HotelEconomyPresentation.OpportunityScore(
+                            immediateCost, Sim.Cash, gain, 0f, true, false)
+                        + 1.5f
+            });
+            break;
+        }
+
+        if (Sim.DeskQueueLength >= 2 || !Sim.FrontDeskCoverageAvailable)
+        {
+            HiringInteraction hiring = FindFirstObjectByType<HiringInteraction>();
+            StaffMember candidate = BestCandidate(hiring, StaffRole.Reception);
+            int cost = candidate != null ? hiring.SigningCostFor(candidate) : 0;
+            float gain = Mathf.Max(
+                0.5f,
+                Sim.DeskQueueLength * AverageOpenRoomContribution() * 0.35f);
+            ConsiderOpportunity(ref best, new OpportunityModel
+            {
+                Key = "reception|" + Sim.DeskQueueLength + "|" + cost,
+                Kind = OpportunityKind.Reception,
+                Title = L("RELIEVE RECEPTION", "缓解前台排队"),
+                Detail = L("Queue ", "排队 ") + Sim.DeskQueueLength
+                         + L("  ·  recover about $", "  ·  预计挽回 $")
+                         + FormatRate(gain) + L("/min", "/分钟"),
+                PrimaryLabel = candidate != null
+                    ? L("HIRE ", "招聘 ") + candidate.DisplayName + "  $" + cost
+                    : L("OPEN TEAM DESK", "打开员工面板"),
+                Cost = cost,
+                GainPerMinute = gain,
+                Business = FindBusiness(HotelBusinessKind.Reception),
+                Anchor = BusinessAnchor(HotelBusinessKind.Reception),
+                PrimaryAction = candidate != null
+                    ? () => HireFromOpportunity(hiring, candidate)
+                    : () => SelectTab(DeskTab.Staff),
+                Score = HotelEconomyPresentation.OpportunityScore(
+                    Mathf.Max(1, cost), Sim.Cash, gain, 0f, false, !Sim.FrontDeskCoverageAvailable)
+            });
+        }
+
+        if (Sim.Rooms.CountOf(RoomSimState.Ruined) == 0)
+        {
+            for (int i = 0; i < Sim.Rooms.Count; i++)
+            {
+                RoomRecord room = Sim.Rooms.Peek(i);
+                if (room.tier == RoomTier.Better
+                    || room.state == RoomSimState.Occupied
+                    || room.state == RoomSimState.Blocked
+                    || Sim.Renovations.IsRenovating(room.number))
+                    continue;
+
+                RenovationPlan plan = RenovationPlan.For(RenovationPlanKind.Economy);
+                if ((int)plan.targetTier <= (int)room.tier) continue;
+                int cashCost = Sim.QuoteRenovation(RenovationPlanKind.Economy, 1);
+                int missingMaterials = Mathf.Max(0, plan.materialsPerRoom - Sim.Materials.Stock);
+                int immediateCost = cashCost + Sim.Materials.PriceFor(missingMaterials);
+                float current = HotelEconomyPresentation.RoomRevenuePerMinute(
+                    Sim, room.tier, _economySnapshot.ExpectedOccupancy);
+                float target = HotelEconomyPresentation.RoomRevenuePerMinute(
+                    Sim, plan.targetTier, _economySnapshot.ExpectedOccupancy);
+                float gain = Mathf.Max(0f, target - current);
+                int fullInvestment = RoomInvestmentMath.TotalInvestment(
+                    cashCost, plan.materialsPerRoom, Sim.Materials.UnitPrice);
+                int payback = HotelEconomyPresentation.PaybackMinutes(fullInvestment, gain);
+                int capturedRoom = room.number;
+                ConsiderOpportunity(ref best, new OpportunityModel
+                {
+                    Key = "upgrade|" + room.number + "|" + immediateCost,
+                    Kind = OpportunityKind.UpgradeRoom,
+                    Title = L("UPGRADE ROOM ", "升级房间 ") + room.number,
+                    Detail = "+$" + FormatRate(gain) + L("/min  ·  payback ", "/分钟  ·  回本 ")
+                             + FormatPayback(payback),
+                    PrimaryLabel = L("UPGRADE NOW  $", "立即升级  $") + immediateCost,
+                    Cost = immediateCost,
+                    GainPerMinute = gain,
+                    RoomNumber = room.number,
+                    Anchor = RoomWorldPosition(room.number),
+                    PrimaryAction = () => StartRecommendedRenovation(capturedRoom),
+                    Score = HotelEconomyPresentation.OpportunityScore(
+                        immediateCost, Sim.Cash, gain, 0f, false, false)
+                });
+                break;
+            }
+        }
+
+        OpportunityModel facility = BuildFacilityOpportunity();
+        ConsiderOpportunity(ref best, facility);
+
+        if (best == null)
+        {
+            int hotelCost = HotelEmpireProgress.NextHotelCost;
+            best = new OpportunityModel
+            {
+                Key = "empire|hotel" + (HotelEmpireProgress.HotelCount + 1),
+                Kind = OpportunityKind.AcquireHotel,
+                Title = L("ACQUIRE HOTEL NO. ", "收购第 ")
+                        + (HotelEmpireProgress.HotelCount + 1)
+                        + L("", " 家酒店"),
+                Detail = L("Portfolio income +$8.0/min.", "酒店组合收入 +$8.0/分钟。"),
+                PrimaryLabel = L("ACQUIRE  $", "收购  $") + hotelCost,
+                Cost = hotelCost,
+                GainPerMinute = 8f,
+                PrimaryAction = AcquireNextHotel,
+                Score = 0f
+            };
+        }
+
+        return best;
+    }
+
+    private static void ConsiderOpportunity(ref OpportunityModel best, OpportunityModel candidate)
+    {
+        if (candidate == null) return;
+        if (best == null || candidate.Score > best.Score) best = candidate;
+    }
+
+    private OpportunityModel BuildFacilityOpportunity()
+    {
+        int floor;
+        int cost;
+        HotelBusinessKind kind;
+        string title;
+        float gain;
+        if (!FacilitySystem.GymUnlocked)
+        {
+            floor = FacilitySystem.GymFloor;
+            cost = FacilitySystem.GymCost;
+            kind = HotelBusinessKind.Gym;
+            title = L("OPEN THE GYM", "开放健身房");
+            gain = 1.5f;
+        }
+        else if (!FacilitySystem.CasinoUnlocked)
+        {
+            floor = FacilitySystem.CasinoFloor;
+            cost = FacilitySystem.CasinoCost;
+            kind = HotelBusinessKind.Casino;
+            title = L("OPEN THE CASINO", "开放赌场");
+            gain = 3.5f;
+        }
+        else if (!FacilitySystem.PoolUnlocked)
+        {
+            floor = FacilitySystem.PoolFloor;
+            cost = FacilitySystem.PoolCost;
+            kind = HotelBusinessKind.Pool;
+            title = L("OPEN THE ROOFTOP POOL", "开放屋顶泳池");
+            gain = 5f;
+        }
+        else
+        {
+            return null;
+        }
+
+        int capturedFloor = floor;
+        HotelBusinessHotspot business = FindBusiness(kind);
+        bool businessVisible = business != null && business.gameObject.activeInHierarchy;
+        return new OpportunityModel
+        {
+            Key = "facility|" + floor,
+            Kind = OpportunityKind.UnlockFacility,
+            Title = title,
+            Detail = L("New guest activity  ·  about +$", "新增客人活动  ·  预计 +$")
+                     + FormatRate(gain) + L("/min", "/分钟"),
+            PrimaryLabel = L("UNLOCK  $", "解锁  $") + cost,
+            Cost = cost,
+            GainPerMinute = gain,
+            Business = businessVisible ? business : null,
+            Anchor = businessVisible ? business.Anchor : Vector3.zero,
+            PrimaryAction = () => UnlockFacility(capturedFloor),
+            Score = HotelEconomyPresentation.OpportunityScore(
+                cost, Sim.Cash, gain, 0f, true, false)
+        };
+    }
+
     private void RefreshTop()
+    {
+        var clock = Sim.Clock;
+        string speed = _skipTargetMinute >= 0
+            ? "  >>>"
+            : (_speed == 1f ? "" : "  x" + _speed.ToString("0.##"));
+
+        _dayTimeLabel.text = L(
+            "DAY " + clock.CurrentDay + "  " + clock.TimeFormatted,
+            "第 " + clock.CurrentDay + " 天  " + clock.TimeFormatted)
+            + "  " + GameText.T(PhaseScheduler.Label(
+                PhaseScheduler.PhaseFor(clock.CurrentMinute)))
+            + speed;
+        _cashLabel.text = L("AVAILABLE  $", "可用现金  $") + Sim.Cash.ToString("N0");
+        _netRateLabel.text = L("EST. ", "预计 ")
+                             + (_economySnapshot.NetPerMinute >= 0f ? "+$" : "-$")
+                             + FormatRate(Mathf.Abs(_economySnapshot.NetPerMinute))
+                             + L("/MIN NET", "/分钟净收入");
+        _netRateLabel.color = _economySnapshot.NetPerMinute >= 0f ? TealSoft : Coral;
+
+        int dailyGoal = Mathf.Max(1, _economySnapshot.DailyRevenueGoal);
+        float dailyProgress = Mathf.Clamp01(Sim.GrossIncomeToday / (float)dailyGoal);
+        _todayProgressLabel.text = L("TODAY  $", "今日营收  $")
+                                   + Sim.GrossIncomeToday.ToString("N0")
+                                   + " / $" + dailyGoal.ToString("N0");
+        _todayProgressFill.rectTransform.anchorMax =
+            new Vector2(dailyProgress, 1f);
+
+        if (_opportunity != null)
+        {
+            int shortfall = Mathf.Max(0, _opportunity.Cost - Sim.Cash);
+            _goalTitleLabel.text = shortfall > 0
+                ? L("NEXT  ·  $", "下一目标  ·  还差 $") + shortfall
+                  + L(" TO ", "  ·  ") + _opportunity.Title
+                : L("READY  ·  ", "可以投资  ·  ") + _opportunity.Title;
+            _goalBenefitLabel.text = _opportunity.Detail;
+            _goalProgressFill.rectTransform.anchorMax = new Vector2(
+                _opportunity.Cost <= 0
+                    ? 1f
+                    : Mathf.Clamp01(Sim.Cash / (float)_opportunity.Cost),
+                1f);
+        }
+
+        bool safeboxVisible = Sim.Safebox.Balance > 0;
+        _safeboxButton.gameObject.SetActive(safeboxVisible);
+        _todayProgressLabel.rectTransform.anchorMax =
+            new Vector2(safeboxVisible ? 0.70f : 1f, 0.75f);
+        if (!safeboxVisible) return;
+
+        _safeboxLabel.text = L("SAFE  +$", "待收  +$")
+                             + Sim.Safebox.Balance.ToString("N0");
+        _safeboxFill.rectTransform.anchorMax =
+            new Vector2(Mathf.Clamp01(Sim.Safebox.FillRatio), 1f);
+        _safeboxButton.interactable = true;
+        _safeboxButtonImage.color = Gold;
+        _safeboxLabel.color = Ink;
+    }
+
+    private void RefreshLegacyTop()
     {
         var clock = Sim.Clock;
         var tonight = Sim.OccupancyForNight(clock.CurrentDay);
@@ -378,6 +786,54 @@ public sealed class WorldManagementHud : MonoBehaviour
     {
         int number = RoomSelection.Selected;
         bool contextOpen = _contextSheet != null && _contextSheet.gameObject.activeSelf;
+        bool hasRoom = number > 0 && Sim.Rooms.Contains(number);
+        bool hasBusiness = _selectedBusiness != null;
+        bool hasOpportunity = _opportunityCardOpen && _pinnedOpportunity != null;
+        bool visible = !_drawerOpen && !contextOpen
+                       && (hasRoom || hasBusiness || hasOpportunity);
+        _roomCard.gameObject.SetActive(visible);
+        if (!visible)
+        {
+            _roomStateKey = "";
+            return;
+        }
+
+        _opportunityBar.gameObject.SetActive(false);
+        _alertStrip.gameObject.SetActive(false);
+
+        if (hasRoom)
+        {
+            RoomRecord room = Sim.Rooms.At(number);
+            string key = "room|" + number + "|" + room.state + "|" + room.tier
+                         + "|" + Sim.Cash + "|" + Sim.Materials.Stock
+                         + "|" + Sim.Clearing.ProgressOf(number).ToString("0.00")
+                         + "|" + Sim.Renovations.DaysRemainingFor(number);
+            if (_roomStateKey == key) return;
+            _roomStateKey = key;
+            ConfigureRoomCard(room);
+            return;
+        }
+
+        if (hasBusiness)
+        {
+            string key = "business|" + _selectedBusiness.Kind + "|" + Sim.Cash
+                         + "|" + Sim.DeskQueueLength + "|" + Sim.Staff.Count;
+            if (_roomStateKey == key) return;
+            _roomStateKey = key;
+            ConfigureBusinessCard(_selectedBusiness);
+            return;
+        }
+
+        string opportunityKey = "opportunity|" + _pinnedOpportunity.Key + "|" + Sim.Cash;
+        if (_roomStateKey == opportunityKey) return;
+        _roomStateKey = opportunityKey;
+        ConfigureOpportunityCard(_pinnedOpportunity);
+    }
+
+    private void RefreshLegacyRoomCard()
+    {
+        int number = RoomSelection.Selected;
+        bool contextOpen = _contextSheet != null && _contextSheet.gameObject.activeSelf;
         bool valid = !_drawerOpen && !contextOpen && number > 0 && Sim.Rooms.Contains(number);
         _roomCard.gameObject.SetActive(valid);
         if (!valid)
@@ -400,6 +856,171 @@ public sealed class WorldManagementHud : MonoBehaviour
     }
 
     private void ConfigureRoomCard(RoomRecord room)
+    {
+        int number = room.number;
+        float occupancy = _economySnapshot.ExpectedOccupancy;
+        float currentContribution = room.state == RoomSimState.Ruined
+                                    || room.state == RoomSimState.Blocked
+            ? 0f
+            : HotelEconomyPresentation.RoomRevenuePerMinute(
+                Sim, room.tier, occupancy);
+
+        _roomTitle.text = L("ROOM ", "房间 ") + number + "  ·  "
+                          + GameText.T(RoomStatePalette.WordOf(room.state));
+
+        if (Sim.Renovations.IsRenovating(number))
+        {
+            int days = Sim.Renovations.DaysRemainingFor(number);
+            _roomHeadline.text = L("INVESTMENT IN PROGRESS", "投资施工中");
+            _roomDetail.text = days
+                               + L(" day(s) to handover  ·  projected contribution +$",
+                                   " 天后交付  ·  预计贡献 +$")
+                               + FormatRate(HotelEconomyPresentation.RoomRevenuePerMinute(
+                                   Sim, room.tier, occupancy))
+                               + L("/min", "/分钟");
+            SetRoomButton(
+                _roomPrimary,
+                _roomPrimaryLabel,
+                L("FOCUS IN HOTEL", "查看场景位置"),
+                () => FocusRoom(number),
+                true,
+                Teal);
+            SetRoomButton(
+                _roomSecondary,
+                _roomSecondaryLabel,
+                L("CLOSE", "关闭"),
+                CloseDetailCard,
+                true,
+                Ink);
+            return;
+        }
+
+        if (room.state == RoomSimState.Ruined)
+        {
+            ReclaimPlan plan = ReclaimPlan.For(ReclaimPlanKind.Refit);
+            int cashCost = Sim.QuoteReclaim(ReclaimPlanKind.Refit, 1);
+            int missingMaterials = Mathf.Max(0, plan.materialsPerRoom - Sim.Materials.Stock);
+            int immediateCost = cashCost + Sim.Materials.PriceFor(missingMaterials);
+            int fullInvestment = RoomInvestmentMath.TotalInvestment(
+                cashCost,
+                plan.materialsPerRoom,
+                Sim.Materials.UnitPrice);
+            float gain = HotelEconomyPresentation.RoomRevenuePerMinute(
+                Sim, RoomTier.Basic, occupancy);
+            int payback = HotelEconomyPresentation.PaybackMinutes(fullInvestment, gain);
+            int shortfall = Mathf.Max(0, immediateCost - Sim.Cash);
+
+            _roomHeadline.text = L("OFF MARKET  ·  +$", "未营业  ·  预计 +$")
+                                 + FormatRate(gain) + L("/min potential", "/分钟");
+            _roomDetail.text = L("Investment $", "投资 $") + immediateCost
+                               + L("  ·  +1 sellable room", "  ·  +1间可售房")
+                               + "\n" + L("Expected payback ", "预计回本 ")
+                               + FormatPayback(payback);
+            SetRoomButton(
+                _roomPrimary,
+                _roomPrimaryLabel,
+                shortfall > 0
+                    ? L("EARN $", "还差 $") + shortfall
+                    : L("INVEST & RESTORE  $", "投资并修复  $") + immediateCost,
+                () => StartRecommendedReclaim(number),
+                shortfall == 0,
+                Gold);
+            SetRoomButton(
+                _roomSecondary,
+                _roomSecondaryLabel,
+                L("FOCUS LOCATION", "查看位置"),
+                () => FocusRoom(number),
+                true,
+                Ink);
+            return;
+        }
+
+        if (room.state == RoomSimState.Blocked)
+        {
+            float loss = HotelEconomyPresentation.RoomRevenuePerMinute(
+                Sim, room.tier, occupancy);
+            _roomHeadline.text = L("REVENUE PAUSED  ·  -$", "暂停营业  ·  -$")
+                                 + FormatRate(loss) + L("/min", "/分钟");
+            _roomDetail.text = L(
+                "Repair protects income already built. The room returns to turnover after the fault is cleared.",
+                "维修用于守住已有收入；故障清除后房间会重新进入周转。");
+            SetRoomButton(
+                _roomPrimary,
+                _roomPrimaryLabel,
+                L("ORDER REPAIR", "安排维修"),
+                () => RepairBroken(number),
+                FirstBrokenFurniture(number) != null,
+                Coral);
+            SetRoomButton(
+                _roomSecondary,
+                _roomSecondaryLabel,
+                L("FOCUS LOCATION", "查看位置"),
+                () => FocusRoom(number),
+                true,
+                Ink);
+            return;
+        }
+
+        _roomHeadline.text = "+$" + FormatRate(currentContribution)
+                             + L("/min  ·  ", "/分钟  ·  ")
+                             + OperationalRoomHeadline(room.state);
+
+        RenovationPlan upgrade = RenovationPlan.For(RenovationPlanKind.Economy);
+        bool canOfferUpgrade = room.state != RoomSimState.Occupied
+                               && (int)upgrade.targetTier > (int)room.tier;
+        if (canOfferUpgrade)
+        {
+            int cashCost = Sim.QuoteRenovation(RenovationPlanKind.Economy, 1);
+            int missingMaterials = Mathf.Max(0, upgrade.materialsPerRoom - Sim.Materials.Stock);
+            int immediateCost = cashCost + Sim.Materials.PriceFor(missingMaterials);
+            float targetContribution = HotelEconomyPresentation.RoomRevenuePerMinute(
+                Sim, upgrade.targetTier, occupancy);
+            float gain = Mathf.Max(0f, targetContribution - currentContribution);
+            int fullInvestment = RoomInvestmentMath.TotalInvestment(
+                cashCost,
+                upgrade.materialsPerRoom,
+                Sim.Materials.UnitPrice);
+            int payback = HotelEconomyPresentation.PaybackMinutes(fullInvestment, gain);
+            int shortfall = Mathf.Max(0, immediateCost - Sim.Cash);
+
+            _roomDetail.text = OperationalRoomDetail(room.state)
+                               + "\n" + L("Recommended upgrade $", "推荐升级 $") + immediateCost
+                               + "  ·  +$" + FormatRate(gain) + L("/min  ·  ", "/分钟  ·  ")
+                               + FormatPayback(payback);
+            SetRoomButton(
+                _roomPrimary,
+                _roomPrimaryLabel,
+                shortfall > 0
+                    ? L("EARN $", "还差 $") + shortfall
+                    : L("UPGRADE NOW  $", "立即升级  $") + immediateCost,
+                () => StartRecommendedRenovation(number),
+                shortfall == 0,
+                Gold);
+        }
+        else
+        {
+            _roomDetail.text = OperationalRoomDetail(room.state)
+                               + "\n" + L("Current contribution +$", "当前贡献 +$")
+                               + FormatRate(currentContribution) + L("/min.", "/分钟。");
+            SetRoomButton(
+                _roomPrimary,
+                _roomPrimaryLabel,
+                L("OPEN RATE STRATEGY", "调整房价"),
+                () => SelectTab(DeskTab.Pricing),
+                true,
+                Teal);
+        }
+
+        SetRoomButton(
+            _roomSecondary,
+            _roomSecondaryLabel,
+            L("FOCUS LOCATION", "查看位置"),
+            () => FocusRoom(number),
+            true,
+            Ink);
+    }
+
+    private void ConfigureLegacyRoomCard(RoomRecord room)
     {
         int number = room.number;
         int currentRate = room.state == RoomSimState.Ruined
@@ -478,7 +1099,185 @@ public sealed class WorldManagementHud : MonoBehaviour
             OpenAssetsForSelectedRoom, true, Ink);
     }
 
+    private void ConfigureBusinessCard(HotelBusinessHotspot business)
+    {
+        _roomTitle.text = business.DisplayName.ToUpperInvariant();
+
+        if (business.Kind == HotelBusinessKind.Reception)
+        {
+            HiringInteraction hiring = FindFirstObjectByType<HiringInteraction>();
+            StaffMember candidate = BestCandidate(hiring, StaffRole.Reception);
+            int fee = candidate != null ? hiring.SigningCostFor(candidate) : 0;
+            float recovered = Mathf.Max(
+                0.5f,
+                Sim.DeskQueueLength * AverageOpenRoomContribution() * 0.35f);
+
+            _roomHeadline.text = Sim.FrontDeskCoverageAvailable
+                ? L("QUEUE ", "当前排队 ") + Sim.DeskQueueLength
+                  + L("  ·  ", "  ·  ")
+                  + Sim.CurrentCheckInsPerHour.ToString("0.0") + L("/hour", "/小时")
+                : L("FRONT DESK UNSTAFFED", "前台无人值守");
+            _roomDetail.text = L("A second receptionist reduces abandonment and protects about $",
+                                  "增加前台人员可以减少客人流失，预计挽回 $")
+                               + FormatRate(recovered) + L("/min.", "/分钟。");
+            SetRoomButton(
+                _roomPrimary,
+                _roomPrimaryLabel,
+                candidate != null
+                    ? L("HIRE ", "招聘 ") + candidate.DisplayName + "  $" + fee
+                    : L("OPEN TEAM DESK", "打开员工面板"),
+                candidate != null
+                    ? () => HireFromOpportunity(hiring, candidate)
+                    : () => SelectTab(DeskTab.Staff),
+                candidate == null || Sim.Cash >= fee,
+                Gold);
+            SetRoomButton(
+                _roomSecondary,
+                _roomSecondaryLabel,
+                L("FOCUS LOCATION", "查看位置"),
+                () => FocusBusiness(business),
+                true,
+                Ink);
+            return;
+        }
+
+        bool unlocked;
+        int floor;
+        int cost;
+        float gain;
+        switch (business.Kind)
+        {
+            case HotelBusinessKind.Gym:
+                unlocked = FacilitySystem.GymUnlocked;
+                floor = FacilitySystem.GymFloor;
+                cost = FacilitySystem.GymCost;
+                gain = 1.5f;
+                break;
+            case HotelBusinessKind.Casino:
+                unlocked = FacilitySystem.CasinoUnlocked;
+                floor = FacilitySystem.CasinoFloor;
+                cost = FacilitySystem.CasinoCost;
+                gain = 3.5f;
+                break;
+            case HotelBusinessKind.Pool:
+                unlocked = FacilitySystem.PoolUnlocked;
+                floor = FacilitySystem.PoolFloor;
+                cost = FacilitySystem.PoolCost;
+                gain = 5f;
+                break;
+            default:
+                unlocked = true;
+                floor = FacilitySystem.RestaurantFloor;
+                cost = 0;
+                gain = Sim.ActiveStayCount * 8f / HotelEconomyPresentation.RealMinutesPerGameDay;
+                break;
+        }
+
+        _roomHeadline.text = unlocked
+            ? "+$" + FormatRate(gain) + L("/min contribution", "/分钟贡献")
+            : L("EXPANSION AVAILABLE", "可以扩建");
+        _roomDetail.text = unlocked
+            ? L("This facility turns occupancy into additional revenue and hotel demand.",
+                "该设施把入住客流转化为额外收入和酒店需求。")
+            : L("Investment $", "投资 $") + cost
+              + L("  ·  expected +$", "  ·  预计 +$") + FormatRate(gain)
+              + L("/min  ·  visible new guest activity", "/分钟  ·  新增客人活动");
+
+        if (unlocked)
+        {
+            SetRoomButton(
+                _roomPrimary,
+                _roomPrimaryLabel,
+                L("VIEW HOTEL PULSE", "查看酒店经营"),
+                () => SelectTab(DeskTab.Overview),
+                true,
+                Teal);
+        }
+        else
+        {
+            int capturedFloor = floor;
+            SetRoomButton(
+                _roomPrimary,
+                _roomPrimaryLabel,
+                Sim.Cash >= cost
+                    ? L("UNLOCK  $", "解锁  $") + cost
+                    : L("EARN $", "还差 $") + (cost - Sim.Cash),
+                () => UnlockFacility(capturedFloor),
+                Sim.Cash >= cost,
+                Gold);
+        }
+
+        SetRoomButton(
+            _roomSecondary,
+            _roomSecondaryLabel,
+            L("FOCUS LOCATION", "查看位置"),
+            () => FocusBusiness(business),
+            true,
+            Ink);
+    }
+
+    private void ConfigureOpportunityCard(OpportunityModel opportunity)
+    {
+        _roomTitle.text = L("BEST OPPORTUNITY", "当前最佳机会");
+        _roomHeadline.text = opportunity.Title;
+        _roomDetail.text = opportunity.Detail
+                           + (opportunity.Cost > 0
+                               ? "\n" + L("Available $", "可用现金 $") + Sim.Cash
+                                 + L("  ·  investment $", "  ·  投资 $") + opportunity.Cost
+                               : "");
+        SetRoomButton(
+            _roomPrimary,
+            _roomPrimaryLabel,
+            opportunity.PrimaryLabel,
+            opportunity.PrimaryAction,
+            opportunity.Cost <= Sim.Cash || opportunity.Cost == 0,
+            opportunity.Kind == OpportunityKind.StopLoss ? Coral : Gold);
+        SetRoomButton(
+            _roomSecondary,
+            _roomSecondaryLabel,
+            L("FOCUS LOCATION", "查看位置"),
+            () => FocusOpportunity(opportunity),
+            opportunity.RoomNumber > 0
+            || opportunity.Business != null
+            || opportunity.Anchor != Vector3.zero,
+            Ink);
+    }
+
     private void RefreshAlerts()
+    {
+        BreakdownSystem breakdown = FindFirstObjectByType<BreakdownSystem>();
+        int active = breakdown != null ? breakdown.ActiveCount : 0;
+        float loss = breakdown != null ? breakdown.EstimatedLossPerMinute(Sim) : 0f;
+        ManagerPhone phone = ManagerPhone.Instance;
+        int serviceNotes = phone != null ? phone.Notes.Count : 0;
+        bool visible = (active > 0 || serviceNotes > 0)
+                       && !_drawerOpen
+                       && !_opportunityCardOpen
+                       && RoomSelection.Selected <= 0
+                       && _selectedBusiness == null;
+        _alertStrip.gameObject.SetActive(visible);
+        if (!visible) return;
+
+        if (active > 0)
+        {
+            _alertLabel.text = L("INCOME AT RISK  -$", "收入损失  -$")
+                               + FormatRate(loss)
+                               + L("/min  ·  ", "/分钟  ·  ")
+                               + active
+                               + L(active == 1 ? " issue" : " issues", " 个问题");
+            _alertLabel.color = Coral;
+        }
+        else
+        {
+            _alertLabel.text = L("SERVICE EVENT  ·  ", "服务事件  ·  ")
+                               + serviceNotes
+                               + L(serviceNotes == 1 ? " item" : " items", " 项");
+            _alertLabel.color = Gold;
+        }
+        _alertGoLabel.text = L("REVIEW", "查看");
+    }
+
+    private void RefreshLegacyAlerts()
     {
         ManagerPhone phone = ManagerPhone.Instance;
         bool visible = phone != null && phone.Notes.Count > 0 && !_drawerOpen;
@@ -496,6 +1295,31 @@ public sealed class WorldManagementHud : MonoBehaviour
     }
 
     private void NavigateToDisplayedAlert()
+    {
+        OpportunityModel loss = BuildBestOpportunity();
+        if (loss != null && loss.Kind == OpportunityKind.StopLoss)
+        {
+            _pinnedOpportunity = loss;
+            _opportunityCardOpen = true;
+            FocusOpportunity(loss);
+            ForceAllRefresh();
+            return;
+        }
+
+        ManagerPhone phone = ManagerPhone.Instance;
+        if (phone != null && phone.Notes.Count > 0)
+        {
+            ManagerPhone.Note note = phone.Notes[phone.Notes.Count - 1];
+            phone.NavigateTo(note);
+            FocusWorldPoint(note.Anchor);
+            ShowToast(L("Service event highlighted.", "已定位服务事件。"));
+            return;
+        }
+
+        ShowToast(L("No active service issue.", "当前没有服务问题。"));
+    }
+
+    private void NavigateToLegacyAlert()
     {
         ManagerPhone.Instance?.NavigateTo(_displayedNote);
         ShowToast(L("Route set to the latest incident.", "已规划前往最新事件的路线。"));
@@ -832,7 +1656,11 @@ public sealed class WorldManagementHud : MonoBehaviour
                 return common + "|" + Sim.Rooms.SellableCount + "|"
                        + Sim.Rooms.CountOf(RoomSimState.Ruined) + "|"
                        + Sim.Rooms.CountOf(RoomSimState.Blocked) + "|"
-                       + Sim.Renovations.RoomsUnderRenovation;
+                       + Sim.Renovations.RoomsUnderRenovation + "|"
+                       + HotelEmpireProgress.HotelCount + "|"
+                       + FacilitySystem.GymUnlocked + "|"
+                       + FacilitySystem.CasinoUnlocked + "|"
+                       + FacilitySystem.PoolUnlocked;
             default:
                 return common + "|" + Sim.Rooms.DirtyBacklog + "|"
                        + Sim.DeskQueueLength + "|"
@@ -1067,6 +1895,100 @@ public sealed class WorldManagementHud : MonoBehaviour
 
     private void BuildAssetsDesk()
     {
+        AddSection(
+            L("VISIBLE GROWTH", "肉眼可见的增长"),
+            L("Every investment below changes capacity, guest activity or portfolio income.",
+              "每一项投资都会改变房量、客流、效率或酒店组合收入。"));
+        AddInfoCard(
+            L("O-TOWN PORTFOLIO  ·  ", "O-TOWN 酒店组合  ·  ")
+            + HotelEmpireProgress.HotelCount
+            + L(HotelEmpireProgress.HotelCount == 1 ? " HOTEL" : " HOTELS", " 家酒店"),
+            L("Open rooms ", "营业房间 ") + Sim.Rooms.OpenRoomCount + "/" + Sim.Rooms.Count
+            + L("  ·  sellable now ", "  ·  当前可售 ") + Sim.Rooms.SellableCount
+            + "\n" + L("Hotel net +$", "本店净收入 +$")
+            + FormatRate(_economySnapshot.NetPerMinute)
+            + L("/min  ·  portfolio +$", "/分钟  ·  组合收入 +$")
+            + FormatRate(HotelEmpireProgress.PassiveIncomePerMinute) + L("/min", "/分钟"),
+            Gold,
+            88f);
+
+        OpportunityModel roomGrowth = BuildBestOpportunity();
+        if (roomGrowth != null
+            && (roomGrowth.Kind == OpportunityKind.ReclaimRoom
+                || roomGrowth.Kind == OpportunityKind.UpgradeRoom))
+        {
+            AddPlanButton(
+                roomGrowth.Title,
+                roomGrowth.Detail + "\n" + L("Investment $", "投资 $") + roomGrowth.Cost,
+                () =>
+                {
+                    SetDrawerOpen(false);
+                    _pinnedOpportunity = roomGrowth;
+                    _opportunityCardOpen = true;
+                    FocusOpportunity(roomGrowth);
+                    ForceAllRefresh();
+                },
+                Gold,
+                true);
+        }
+
+        AddSection(
+            L("GUEST FACILITIES", "客用设施"),
+            L("Facilities add new activity and convert occupancy into extra value.",
+              "设施会增加客人活动，并把入住率转化为额外价值。"));
+        AddInfoCard(
+            L("EXPANSION STATUS", "扩建状态"),
+            L("Gym ", "健身房 ") + OpenWord(FacilitySystem.GymUnlocked)
+            + L("  ·  Casino ", "  ·  赌场 ") + OpenWord(FacilitySystem.CasinoUnlocked)
+            + L("  ·  Pool ", "  ·  泳池 ") + OpenWord(FacilitySystem.PoolUnlocked),
+            Teal,
+            62f);
+        OpportunityModel facility = BuildFacilityOpportunity();
+        if (facility != null)
+            AddPlanButton(
+                facility.Title,
+                facility.Detail + "\n" + L("Investment $", "投资 $") + facility.Cost,
+                () =>
+                {
+                    SetDrawerOpen(false);
+                    _pinnedOpportunity = facility;
+                    _opportunityCardOpen = true;
+                    FocusOpportunity(facility);
+                    ForceAllRefresh();
+                },
+                Gold,
+                true);
+
+        int nextHotel = HotelEmpireProgress.HotelCount + 1;
+        int acquisitionCost = HotelEmpireProgress.NextHotelCost;
+        int shortfall = Mathf.Max(0, acquisitionCost - Sim.Cash);
+        AddSection(
+            L("NEXT PROPERTY", "下一家酒店"),
+            L("Local growth eventually gives way to portfolio growth.",
+              "本店接近成熟后，继续通过收购扩大商业帝国。"));
+        AddPlanButton(
+            L("HOTEL NO. ", "第 ") + nextHotel + L(" ACQUISITION", " 家酒店收购"),
+            L("Cost $", "成本 $") + acquisitionCost
+            + L("  ·  portfolio income +$8.0/min", "  ·  酒店组合收入 +$8.0/分钟")
+            + (shortfall > 0
+                ? "\n" + L("Still needed $", "还差 $") + shortfall
+                : "\n" + L("Capital ready.", "资金已经到位。")),
+            AcquireNextHotel,
+            shortfall == 0 ? Gold : Ink,
+            shortfall == 0);
+
+        AddSection(
+            L("SAVE", "存档"),
+            L("Keep the current hotel and portfolio state.", "保存当前酒店与组合进度。"));
+        AddActionButton(
+            L("SAVE CURRENT SLOT", "保存当前槽位"),
+            () => SaveIntoSlot(SaveSlots.ActiveSlot),
+            Teal,
+            true);
+    }
+
+    private void BuildLegacyAssetsDesk()
+    {
         AddSection(L("CAPITAL ALLOCATION", "资金去向"),
             L("Cash is spendable now. Safebox profit must be collected before it can fund work.",
               "现金可立即投资；保险箱中的利润必须先收取，才能用于施工和还债。"));
@@ -1247,6 +2169,429 @@ public sealed class WorldManagementHud : MonoBehaviour
                 && Sim.Cash >= cash
                 && Sim.Materials.Stock >= plan.materialsPerRoom);
         }
+    }
+
+    private void RefreshSceneEconomyFeedback()
+    {
+        if (Sim == null) return;
+
+        if (_lastCheckIns < 0)
+        {
+            _lastCheckIns = Sim.ArrivalsCheckedInToday;
+            _lastTurnedAway = Sim.ArrivalsTurnedAwayToday;
+            _observedRoomStates.Clear();
+            for (int i = 0; i < Sim.Rooms.Count; i++)
+            {
+                RoomRecord initial = Sim.Rooms.Peek(i);
+                _observedRoomStates[initial.number] = initial.state;
+            }
+            return;
+        }
+
+        if (Sim.ArrivalsCheckedInToday > _lastCheckIns)
+        {
+            int count = Sim.ArrivalsCheckedInToday - _lastCheckIns;
+            int bookingValue = Mathf.Max(
+                1,
+                Mathf.RoundToInt(AverageOpenRoomContribution()
+                                 * HotelEconomyPresentation.RealMinutesPerGameDay));
+            FloatingTextFx.Spawn(
+                BusinessAnchor(HotelBusinessKind.Reception) + Vector3.up * 1.2f,
+                "CHECK-IN  +$" + bookingValue * count + " BOOKED",
+                new Color(0.90f, 0.69f, 0.28f),
+                1.15f);
+            StartCoroutine(FlyRevenueToCash(
+                BusinessAnchor(HotelBusinessKind.Reception),
+                "+$" + bookingValue * count));
+        }
+
+        if (Sim.ArrivalsTurnedAwayToday > _lastTurnedAway)
+        {
+            FloatingTextFx.Spawn(
+                BusinessAnchor(HotelBusinessKind.Reception) + Vector3.up * 1.2f,
+                "GUEST LOST",
+                Coral,
+                1.1f);
+        }
+
+        _lastCheckIns = Sim.ArrivalsCheckedInToday;
+        _lastTurnedAway = Sim.ArrivalsTurnedAwayToday;
+
+        for (int i = 0; i < Sim.Rooms.Count; i++)
+        {
+            RoomRecord room = Sim.Rooms.Peek(i);
+            if (!_observedRoomStates.TryGetValue(room.number, out RoomSimState previous))
+            {
+                _observedRoomStates[room.number] = room.state;
+                continue;
+            }
+            if (previous == room.state) continue;
+
+            _observedRoomStates[room.number] = room.state;
+            RoomSceneBinder binder = FindRoomBinder(room.number);
+            if (binder != null) binder.Pulse();
+            Vector3 position = binder != null ? binder.transform.position : RoomWorldPosition(room.number);
+
+            if (room.state == RoomSimState.Occupied)
+            {
+                int rate = Sim.Pricing.PriceFor(Sim.Clock.CurrentDay, room.tier);
+                FloatingTextFx.Spawn(
+                    position + Vector3.up * 1.4f,
+                    "ROOM SOLD  +$" + rate,
+                    new Color(0.90f, 0.69f, 0.28f),
+                    1.1f);
+            }
+            else if (room.state == RoomSimState.Ready)
+            {
+                float contribution = HotelEconomyPresentation.RoomRevenuePerMinute(
+                    Sim,
+                    room.tier,
+                    _economySnapshot.ExpectedOccupancy);
+                string message = previous == RoomSimState.Blocked
+                    ? "REVENUE RESTORED  +$"
+                    : "BACK ON SALE  +$";
+                FloatingTextFx.Spawn(
+                    position + Vector3.up * 1.4f,
+                    message + FormatRate(contribution) + "/MIN",
+                    TealSoft,
+                    1.15f);
+            }
+        }
+    }
+
+    private void StartRecommendedReclaim(int roomNumber)
+    {
+        ReclaimPlan plan = ReclaimPlan.For(ReclaimPlanKind.Refit);
+        int cashCost = Sim.QuoteReclaim(ReclaimPlanKind.Refit, 1);
+        int missing = Mathf.Max(0, plan.materialsPerRoom - Sim.Materials.Stock);
+        int totalCash = cashCost + Sim.Materials.PriceFor(missing);
+        if (Sim.Cash < totalCash)
+        {
+            ShowToast(L("Earn $", "还需要赚 $") + (totalCash - Sim.Cash)
+                      + L(" to restore this room.", " 才能修复该房间。"));
+            return;
+        }
+
+        if (missing > 0 && !Sim.TryBuyMaterials(missing))
+        {
+            ShowToast(L("Warehouse capacity is blocking this investment.",
+                        "仓库容量不足，暂时无法开始投资。"));
+            return;
+        }
+
+        bool ok = Sim.TryStartReclaim(
+            ReclaimPlanKind.Refit,
+            new List<int> { roomNumber },
+            out string reason);
+        ShowToast(ok
+            ? L("Room ", "房间 ") + roomNumber
+              + L(" is being restored. New revenue is on the way.",
+                  " 已开始修复，新的收入即将上线。")
+            : GameText.T(reason));
+        if (ok)
+        {
+            FindRoomBinder(roomNumber)?.Pulse(1.5f);
+            ShowMoneyBurst(L("INVESTMENT  -$", "投资支出  -$") + totalCash, Coral);
+        }
+        ForceAllRefresh();
+    }
+
+    private void StartRecommendedRenovation(int roomNumber)
+    {
+        RenovationPlan plan = RenovationPlan.For(RenovationPlanKind.Economy);
+        int cashCost = Sim.QuoteRenovation(RenovationPlanKind.Economy, 1);
+        int missing = Mathf.Max(0, plan.materialsPerRoom - Sim.Materials.Stock);
+        int totalCash = cashCost + Sim.Materials.PriceFor(missing);
+        if (Sim.Cash < totalCash)
+        {
+            ShowToast(L("Earn $", "还需要赚 $") + (totalCash - Sim.Cash)
+                      + L(" to start this upgrade.", " 才能开始升级。"));
+            return;
+        }
+
+        if (missing > 0 && !Sim.TryBuyMaterials(missing))
+        {
+            ShowToast(L("Warehouse capacity is blocking this upgrade.",
+                        "仓库容量不足，暂时无法开始升级。"));
+            return;
+        }
+
+        bool ok = Sim.TryStartRenovation(
+            RenovationPlanKind.Economy,
+            new List<int> { roomNumber },
+            out string reason);
+        ShowToast(ok
+            ? L("Upgrade started. Room income will rise after handover.",
+                "升级已开始，交付后房间收入将提高。")
+            : GameText.T(reason));
+        if (ok)
+        {
+            FindRoomBinder(roomNumber)?.Pulse(1.5f);
+            ShowMoneyBurst(L("UPGRADE  -$", "升级支出  -$") + totalCash, Coral);
+        }
+        ForceAllRefresh();
+    }
+
+    private void HireFromOpportunity(HiringInteraction hiring, StaffMember candidate)
+    {
+        if (hiring == null || candidate == null) return;
+        int cost = hiring.SigningCostFor(candidate);
+        hiring.HireCandidate(candidate);
+        ShowToast(L("Reception capacity increased.", "前台接待能力已提升。"));
+        ShowMoneyBurst(L("NEW HIRE  -$", "招聘支出  -$") + cost, Coral);
+        ForceAllRefresh();
+    }
+
+    private void UnlockFacility(int floor)
+    {
+        int cost = floor == FacilitySystem.GymFloor
+            ? FacilitySystem.GymCost
+            : floor == FacilitySystem.CasinoFloor
+                ? FacilitySystem.CasinoCost
+                : FacilitySystem.PoolCost;
+        bool ok = FacilitySystem.TryUnlockWithSim(floor, Sim, out string message);
+        ShowToast(GameText.T(message));
+        if (ok)
+        {
+            ShowMoneyBurst(L("EXPANSION  -$", "扩建支出  -$") + cost, Coral);
+            FloatingTextFx.Spawn(
+                OpportunityAnchor(_opportunity) + Vector3.up,
+                "NOW OPEN!",
+                Gold,
+                1.4f);
+        }
+        ForceAllRefresh();
+    }
+
+    private void AcquireNextHotel()
+    {
+        int cost = HotelEmpireProgress.NextHotelCost;
+        bool ok = HotelEmpireProgress.TryAcquireNextHotel(Sim, out string message);
+        ShowToast(GameText.T(message));
+        if (ok)
+        {
+            ShowMoneyBurst(L("HOTEL ACQUIRED  -$", "收购酒店  -$") + cost, Coral);
+            StartCoroutine(BumpCash());
+        }
+        ForceAllRefresh();
+    }
+
+    private void CloseDetailCard()
+    {
+        RoomSelection.Clear();
+        _selectedBusiness = null;
+        _pinnedOpportunity = null;
+        _opportunityCardOpen = false;
+        _roomStateKey = "";
+        ForceAllRefresh();
+    }
+
+    private void FocusOpportunity(OpportunityModel opportunity)
+    {
+        if (opportunity == null) return;
+        if (opportunity.RoomNumber > 0)
+        {
+            FocusRoom(opportunity.RoomNumber);
+            return;
+        }
+        if (opportunity.Business != null)
+        {
+            FocusBusiness(opportunity.Business);
+            return;
+        }
+
+        FocusWorldPoint(opportunity.Anchor);
+    }
+
+    private void OpenOpportunity()
+    {
+        if (_opportunity == null) return;
+        if (_opportunity.Kind == OpportunityKind.AcquireHotel)
+        {
+            SelectTab(DeskTab.Assets);
+            return;
+        }
+
+        if (_opportunity.RoomNumber > 0)
+        {
+            RoomSelection.Clear();
+            SelectRoom(_opportunity.RoomNumber);
+        }
+        else if (_opportunity.Business != null)
+        {
+            SelectBusiness(_opportunity.Business);
+        }
+        else
+        {
+            _pinnedOpportunity = _opportunity;
+            _opportunityCardOpen = true;
+        }
+
+        FocusOpportunity(_opportunity);
+        ForceAllRefresh();
+    }
+
+    private void FocusRoom(int roomNumber)
+    {
+        RoomSceneBinder binder = FindRoomBinder(roomNumber);
+        if (binder != null) binder.Pulse(1.4f);
+        FocusWorldPoint(binder != null ? binder.transform.position : RoomWorldPosition(roomNumber));
+    }
+
+    private static void FocusBusiness(HotelBusinessHotspot business)
+    {
+        if (business == null) return;
+        business.Pulse();
+        ManagerCameraRig rig = FindFirstObjectByType<ManagerCameraRig>();
+        if (rig != null) rig.FocusOnPoint(business.Anchor);
+    }
+
+    private static void FocusWorldPoint(Vector3 worldPoint)
+    {
+        ManagerCameraRig rig = FindFirstObjectByType<ManagerCameraRig>();
+        if (rig != null) rig.FocusOnPoint(worldPoint);
+    }
+
+    private static void NavigateManagerTo(Vector3 worldPoint)
+    {
+        ManagerController manager = FindFirstObjectByType<ManagerController>();
+        if (manager != null) manager.MoveTo(worldPoint);
+        FocusWorldPoint(worldPoint);
+    }
+
+    private static StaffMember BestCandidate(HiringInteraction hiring, StaffRole role)
+    {
+        if (hiring == null) return null;
+        IReadOnlyList<StaffMember> candidates = hiring.Candidates;
+        StaffMember best = null;
+        for (int i = 0; i < candidates.Count; i++)
+        {
+            StaffMember candidate = candidates[i];
+            if (candidate == null || candidate.Role != role) continue;
+            if (best == null
+                || candidate.Attributes.Quality + candidate.Attributes.Speed
+                > best.Attributes.Quality + best.Attributes.Speed)
+                best = candidate;
+        }
+        return best;
+    }
+
+    private float AverageOpenRoomContribution()
+    {
+        if (Sim == null) return 0f;
+        float total = 0f;
+        int count = 0;
+        for (int i = 0; i < Sim.Rooms.Count; i++)
+        {
+            RoomRecord room = Sim.Rooms.Peek(i);
+            if (!room.IsOpen || room.state == RoomSimState.Blocked) continue;
+            total += HotelEconomyPresentation.RoomRevenuePerMinute(
+                Sim,
+                room.tier,
+                _economySnapshot.ExpectedOccupancy);
+            count++;
+        }
+        return count > 0 ? total / count : 0f;
+    }
+
+    private static HotelBusinessHotspot FindBusiness(HotelBusinessKind kind)
+    {
+        HotelBusinessHotspot[] all = FindObjectsByType<HotelBusinessHotspot>(
+            FindObjectsInactive.Include,
+            FindObjectsSortMode.None);
+        for (int i = 0; i < all.Length; i++)
+            if (all[i] != null && all[i].Kind == kind) return all[i];
+        return null;
+    }
+
+    private static Vector3 BusinessAnchor(HotelBusinessKind kind)
+    {
+        HotelBusinessHotspot hotspot = FindBusiness(kind);
+        return hotspot != null ? hotspot.Anchor : Vector3.zero;
+    }
+
+    private static Vector3 OpportunityAnchor(OpportunityModel opportunity)
+    {
+        return opportunity != null ? opportunity.Anchor : Vector3.zero;
+    }
+
+    private static RoomSceneBinder FindRoomBinder(int roomNumber)
+    {
+        RoomSceneBinder[] binders = FindObjectsByType<RoomSceneBinder>(
+            FindObjectsInactive.Include,
+            FindObjectsSortMode.None);
+        for (int i = 0; i < binders.Length; i++)
+            if (binders[i] != null && binders[i].RoomNumber == roomNumber)
+                return binders[i];
+        return null;
+    }
+
+    private static Vector3 RoomWorldPosition(int roomNumber)
+    {
+        RoomSceneBinder binder = FindRoomBinder(roomNumber);
+        if (binder != null) return binder.transform.position;
+        Room2DEntity entity = FindRoomEntity(roomNumber);
+        return entity != null ? entity.transform.position : Vector3.zero;
+    }
+
+    private static string FormatRate(float amount) =>
+        amount >= 10f ? amount.ToString("0") : amount.ToString("0.0");
+
+    private static string OpenWord(bool open) =>
+        open ? L("OPEN", "已开放") : L("LOCKED", "未开放");
+
+    private static string FormatPayback(int minutes)
+    {
+        if (minutes >= 99999) return L("NO RETURN", "无法回本");
+        if (minutes <= 120) return minutes + L(" min", " 分钟");
+        float days = minutes / HotelEconomyPresentation.RealMinutesPerGameDay;
+        return days.ToString(days < 10f ? "0.0" : "0") + L(" days", " 个营业日");
+    }
+
+    private IEnumerator FlyRevenueToCash(Vector3 worldOrigin, string label)
+    {
+        Camera camera = Camera.main;
+        if (camera == null || _cashLabel == null) yield break;
+
+        Vector2 screen = camera.WorldToScreenPoint(worldOrigin);
+        if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                _safeRoot,
+                screen,
+                null,
+                out Vector2 start))
+            yield break;
+
+        TextMeshProUGUI fly = CreateText(
+            "RevenueFlow",
+            _safeRoot,
+            16f,
+            Gold,
+            TextAlignmentOptions.Center,
+            true);
+        fly.text = label;
+        RectTransform rect = fly.rectTransform;
+        rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
+        rect.sizeDelta = new Vector2(120f, 34f);
+        rect.anchoredPosition = start;
+
+        Vector3 cashWorld = _cashLabel.rectTransform.TransformPoint(
+            _cashLabel.rectTransform.rect.center);
+        Vector2 target = _safeRoot.InverseTransformPoint(cashWorld);
+        const float duration = 0.62f;
+        float elapsed = 0f;
+        while (elapsed < duration)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            float t = Mathf.Clamp01(elapsed / duration);
+            float eased = 1f - Mathf.Pow(1f - t, 3f);
+            rect.anchoredPosition = Vector2.Lerp(start, target, eased)
+                                    + Vector2.up * Mathf.Sin(t * Mathf.PI) * 42f;
+            fly.alpha = 1f - Mathf.Clamp01((t - 0.72f) / 0.28f);
+            yield return null;
+        }
+
+        Destroy(fly.gameObject);
+        StartCoroutine(BumpCash());
     }
 
     private void StartFreeClearing(int roomNumber)
@@ -1471,12 +2816,16 @@ public sealed class WorldManagementHud : MonoBehaviour
         {
             _contextSheet.gameObject.SetActive(false);
             _alertStrip.gameObject.SetActive(false);
+            _opportunityBar.gameObject.SetActive(false);
         }
         _roomCard.gameObject.SetActive(!open
                                        && !_contextSheet.gameObject.activeSelf
-                                       && RoomSelection.Selected > 0
                                        && Sim != null
-                                       && Sim.Rooms.Contains(RoomSelection.Selected));
+                                       && ((RoomSelection.Selected > 0
+                                            && Sim.Rooms.Contains(RoomSelection.Selected))
+                                           || _selectedBusiness != null
+                                           || (_opportunityCardOpen
+                                               && _pinnedOpportunity != null)));
         if (open)
         {
             _drawerStateKey = "";
@@ -1777,6 +3126,7 @@ public sealed class WorldManagementHud : MonoBehaviour
         Stretch(_safeRoot);
         BuildTop();
         BuildAlertStrip();
+        BuildOpportunityBar();
         BuildBottomNavigation();
         BuildDrawer();
         BuildRoomCard();
@@ -1862,6 +3212,197 @@ public sealed class WorldManagementHud : MonoBehaviour
     private void BuildTop()
     {
         _topPanel = CreatePanel("EconomyHeader", _safeRoot, Glass);
+        SetAnchors(
+            _topPanel,
+            new Vector2(0f, 1f),
+            new Vector2(1f, 1f),
+            new Vector2(8f, -154f),
+            new Vector2(-8f, -8f));
+        AddOutline(_topPanel, BrassLine, 1.2f);
+
+        var accent = CreatePanel("Accent", _topPanel, Gold);
+        SetAnchors(
+            accent,
+            new Vector2(0f, 1f),
+            Vector2.one,
+            Vector2.zero,
+            new Vector2(0f, -4f));
+        accent.GetComponent<Image>().raycastTarget = false;
+
+        _dayTimeLabel = CreateText(
+            "DayTime",
+            _topPanel,
+            12.5f,
+            Cream,
+            TextAlignmentOptions.TopLeft,
+            true);
+        _dayTimeLabel.enableAutoSizing = true;
+        _dayTimeLabel.fontSizeMin = 9.5f;
+        _dayTimeLabel.fontSizeMax = 12.5f;
+        _dayTimeLabel.enableWordWrapping = false;
+        _dayTimeLabel.overflowMode = TextOverflowModes.Ellipsis;
+        SetAnchors(
+            _dayTimeLabel.rectTransform,
+            new Vector2(0f, 0.73f),
+            new Vector2(0.50f, 1f),
+            new Vector2(14f, 0f),
+            new Vector2(-4f, -10f));
+
+        _cashLabel = CreateText(
+            "Cash",
+            _topPanel,
+            22f,
+            Gold,
+            TextAlignmentOptions.TopRight,
+            true);
+        _cashLabel.enableAutoSizing = true;
+        _cashLabel.fontSizeMin = 15f;
+        _cashLabel.fontSizeMax = 22f;
+        SetAnchors(
+            _cashLabel.rectTransform,
+            new Vector2(0.50f, 0.70f),
+            Vector2.one,
+            new Vector2(4f, 0f),
+            new Vector2(-14f, -8f));
+
+        _netRateLabel = CreateText(
+            "NetRate",
+            _topPanel,
+            14f,
+            TealSoft,
+            TextAlignmentOptions.MidlineLeft,
+            true);
+        SetAnchors(
+            _netRateLabel.rectTransform,
+            new Vector2(0f, 0.49f),
+            new Vector2(0.48f, 0.75f),
+            new Vector2(14f, 0f),
+            Vector2.zero);
+
+        _todayProgressLabel = CreateText(
+            "TodayProgress",
+            _topPanel,
+            11.5f,
+            Cream,
+            TextAlignmentOptions.MidlineRight,
+            true);
+        SetAnchors(
+            _todayProgressLabel.rectTransform,
+            new Vector2(0.42f, 0.49f),
+            new Vector2(0.70f, 0.75f),
+            Vector2.zero,
+            new Vector2(-14f, 0f));
+
+        var todayTrack = CreatePanel(
+            "TodayTrack",
+            _topPanel,
+            new Color(0f, 0f, 0f, 0.32f));
+        SetAnchors(
+            todayTrack,
+            new Vector2(0f, 0.47f),
+            new Vector2(1f, 0.47f),
+            new Vector2(14f, -2f),
+            new Vector2(-14f, 2f));
+        _todayProgressFill = CreatePanel("TodayFill", todayTrack, Teal).GetComponent<Image>();
+        Stretch(_todayProgressFill.rectTransform);
+        _todayProgressFill.raycastTarget = false;
+
+        RectTransform goalRect;
+        TextMeshProUGUI unusedGoalLabel;
+        _goalButton = CreateButton(
+            "NextGoal",
+            _topPanel,
+            out goalRect,
+            out unusedGoalLabel,
+            "",
+            Paper,
+            OpenOpportunity);
+        SetAnchors(
+            goalRect,
+            new Vector2(0f, 0f),
+            new Vector2(1f, 0.44f),
+            new Vector2(10f, 8f),
+            new Vector2(-10f, -2f));
+        unusedGoalLabel.gameObject.SetActive(false);
+
+        _goalTitleLabel = CreateText(
+            "GoalTitle",
+            goalRect,
+            13.5f,
+            Gold,
+            TextAlignmentOptions.TopLeft,
+            true);
+        SetAnchors(
+            _goalTitleLabel.rectTransform,
+            new Vector2(0f, 0.48f),
+            Vector2.one,
+            new Vector2(10f, 1f),
+            new Vector2(-8f, -5f));
+
+        _goalBenefitLabel = CreateText(
+            "GoalBenefit",
+            goalRect,
+            10.5f,
+            InkSoft,
+            TextAlignmentOptions.TopLeft,
+            false);
+        _goalBenefitLabel.enableWordWrapping = false;
+        _goalBenefitLabel.overflowMode = TextOverflowModes.Ellipsis;
+        SetAnchors(
+            _goalBenefitLabel.rectTransform,
+            Vector2.zero,
+            new Vector2(1f, 0.56f),
+            new Vector2(10f, 5f),
+            new Vector2(-8f, -1f));
+
+        var goalTrack = CreatePanel(
+            "GoalTrack",
+            goalRect,
+            new Color(0f, 0f, 0f, 0.35f));
+        SetAnchors(
+            goalTrack,
+            Vector2.zero,
+            new Vector2(1f, 0f),
+            new Vector2(8f, 2f),
+            new Vector2(-8f, 5f));
+        _goalProgressFill = CreatePanel("GoalFill", goalTrack, GoldDark).GetComponent<Image>();
+        Stretch(_goalProgressFill.rectTransform);
+        _goalProgressFill.raycastTarget = false;
+
+        RectTransform safeRect;
+        _safeboxButton = CreateButton(
+            "Safebox",
+            _topPanel,
+            out safeRect,
+            out _safeboxLabel,
+            "",
+            Gold,
+            CollectSafebox);
+        _safeboxButtonImage = _safeboxButton.GetComponent<Image>();
+        SetAnchors(
+            safeRect,
+            new Vector2(0.68f, 0.50f),
+            new Vector2(1f, 0.70f),
+            Vector2.zero,
+            new Vector2(-12f, 0f));
+        var safeTrack = CreatePanel(
+            "SafeboxTrack",
+            safeRect,
+            new Color(0f, 0f, 0f, 0.22f));
+        SetAnchors(
+            safeTrack,
+            Vector2.zero,
+            new Vector2(1f, 0f),
+            new Vector2(7f, 3f),
+            new Vector2(-7f, 6f));
+        _safeboxFill = CreatePanel("Fill", safeTrack, Teal).GetComponent<Image>();
+        Stretch(_safeboxFill.rectTransform);
+        _safeboxFill.raycastTarget = false;
+    }
+
+    private void BuildLegacyTop()
+    {
+        _topPanel = CreatePanel("EconomyHeader", _safeRoot, Glass);
         SetAnchors(_topPanel, new Vector2(0f, 1f), new Vector2(1f, 1f),
             new Vector2(8f, -114f), new Vector2(-8f, -8f));
         AddOutline(_topPanel, BrassLine, 1.2f);
@@ -1908,7 +3449,114 @@ public sealed class WorldManagementHud : MonoBehaviour
         _safeboxFill.raycastTarget = false;
     }
 
+    private void BuildOpportunityBar()
+    {
+        RectTransform barRect;
+        TextMeshProUGUI unused;
+        _opportunityButton = CreateButton(
+            "OpportunityBar",
+            _safeRoot,
+            out barRect,
+            out unused,
+            "",
+            Paper,
+            OpenOpportunity);
+        _opportunityBar = barRect;
+        SetAnchors(
+            _opportunityBar,
+            new Vector2(0f, 0f),
+            new Vector2(1f, 0f),
+            new Vector2(8f, 72f),
+            new Vector2(-8f, 132f));
+        AddOutline(_opportunityBar, BrassLine, 1f);
+        unused.gameObject.SetActive(false);
+
+        var icon = CreateText(
+            "AdvisorIcon",
+            _opportunityBar,
+            18f,
+            Gold,
+            TextAlignmentOptions.Center,
+            true);
+        icon.text = "◆";
+        SetAnchors(
+            icon.rectTransform,
+            Vector2.zero,
+            new Vector2(0.12f, 1f),
+            new Vector2(4f, 4f),
+            new Vector2(0f, -4f));
+
+        _opportunityTitle = CreateText(
+            "Title",
+            _opportunityBar,
+            13.5f,
+            Cream,
+            TextAlignmentOptions.TopLeft,
+            true);
+        SetAnchors(
+            _opportunityTitle.rectTransform,
+            new Vector2(0.12f, 0.43f),
+            new Vector2(0.92f, 1f),
+            Vector2.zero,
+            new Vector2(0f, -5f));
+
+        _opportunityDetail = CreateText(
+            "Detail",
+            _opportunityBar,
+            10.5f,
+            InkSoft,
+            TextAlignmentOptions.TopLeft,
+            false);
+        _opportunityDetail.enableWordWrapping = false;
+        _opportunityDetail.overflowMode = TextOverflowModes.Ellipsis;
+        SetAnchors(
+            _opportunityDetail.rectTransform,
+            new Vector2(0.12f, 0f),
+            new Vector2(0.92f, 0.52f),
+            new Vector2(0f, 4f),
+            Vector2.zero);
+
+        var arrow = CreateText(
+            "Arrow",
+            _opportunityBar,
+            21f,
+            Gold,
+            TextAlignmentOptions.Center,
+            true);
+        arrow.text = "›";
+        SetAnchors(
+            arrow.rectTransform,
+            new Vector2(0.92f, 0f),
+            Vector2.one,
+            Vector2.zero,
+            Vector2.zero);
+    }
+
     private void BuildBottomNavigation()
+    {
+        _bottomNav = CreatePanel("BottomNavigation", _safeRoot, Glass);
+        SetAnchors(
+            _bottomNav,
+            new Vector2(0f, 0f),
+            new Vector2(1f, 0f),
+            new Vector2(8f, 8f),
+            new Vector2(-8f, 66f));
+        AddOutline(_bottomNav, BrassLine, 1.2f);
+        var layout = _bottomNav.gameObject.AddComponent<HorizontalLayoutGroup>();
+        layout.padding = new RectOffset(5, 5, 5, 5);
+        layout.spacing = 5f;
+        layout.childControlWidth = true;
+        layout.childForceExpandWidth = true;
+        layout.childControlHeight = true;
+        layout.childForceExpandHeight = true;
+
+        AddNavButton(DeskTab.Overview, L("HOTEL", "酒店"));
+        AddNavButton(DeskTab.Pricing, L("RATES", "房价"));
+        AddNavButton(DeskTab.Staff, L("TEAM", "员工"));
+        AddNavButton(DeskTab.Assets, L("EMPIRE", "帝国"));
+    }
+
+    private void BuildLegacyBottomNavigation()
     {
         _bottomNav = CreatePanel("BottomNavigation", _safeRoot, Glass);
         SetAnchors(_bottomNav, new Vector2(0f, 0f), new Vector2(1f, 0f),
@@ -1932,7 +3580,7 @@ public sealed class WorldManagementHud : MonoBehaviour
     {
         _alertStrip = CreatePanel("IncidentStrip", _safeRoot, Walnut);
         SetAnchors(_alertStrip, new Vector2(0f, 1f), new Vector2(1f, 1f),
-            new Vector2(8f, -166f), new Vector2(-8f, -120f));
+            new Vector2(8f, -204f), new Vector2(-8f, -160f));
         AddOutline(_alertStrip, BrassLine, 1f);
 
         var accent = CreatePanel("Accent", _alertStrip, Coral);
@@ -2029,7 +3677,7 @@ public sealed class WorldManagementHud : MonoBehaviour
     {
         _roomCard = CreatePanel("SelectedRoomInvestment", _safeRoot, Ledger);
         SetAnchors(_roomCard, new Vector2(0f, 0f), new Vector2(1f, 0f),
-            new Vector2(8f, 72f), new Vector2(-8f, 262f));
+            new Vector2(8f, 136f), new Vector2(-8f, 430f));
         AddOutline(_roomCard, BrassLine, 1.4f);
 
         var accent = CreatePanel("Accent", _roomCard, Gold);
@@ -2038,37 +3686,38 @@ public sealed class WorldManagementHud : MonoBehaviour
 
         _roomTitle = CreateText("RoomTitle", _roomCard, 18f, Gold,
             TextAlignmentOptions.TopLeft, true);
-        SetAnchors(_roomTitle.rectTransform, new Vector2(0f, 0.72f), new Vector2(0.76f, 1f),
+        SetAnchors(_roomTitle.rectTransform, new Vector2(0f, 0.82f), new Vector2(0.82f, 1f),
             new Vector2(16f, 0f), new Vector2(0f, -10f));
 
         _roomHeadline = CreateText("RoomHeadline", _roomCard, 18f, Cream,
             TextAlignmentOptions.TopLeft, true);
-        SetAnchors(_roomHeadline.rectTransform, new Vector2(0f, 0.51f), new Vector2(1f, 0.78f),
+        SetAnchors(_roomHeadline.rectTransform, new Vector2(0f, 0.66f), new Vector2(1f, 0.84f),
             new Vector2(16f, 0f), new Vector2(-14f, 0f));
 
         _roomDetail = CreateText("RoomDetail", _roomCard, 12.5f, InkSoft,
             TextAlignmentOptions.TopLeft, false);
         _roomDetail.enableWordWrapping = true;
-        SetAnchors(_roomDetail.rectTransform, new Vector2(0f, 0.27f), new Vector2(1f, 0.57f),
-            new Vector2(16f, 0f), new Vector2(-14f, 0f));
+        SetAnchors(_roomDetail.rectTransform, new Vector2(0f, 0.22f), new Vector2(1f, 0.68f),
+            new Vector2(16f, 5f), new Vector2(-14f, -2f));
+        _roomDetail.overflowMode = TextOverflowModes.Truncate;
 
         RectTransform closeRect;
         TextMeshProUGUI closeText;
         CreateButton("CloseRoom", _roomCard, out closeRect, out closeText,
-            "×", Walnut, RoomSelection.Clear);
+            "×", Walnut, CloseDetailCard);
         SetAnchors(closeRect, new Vector2(1f, 1f), new Vector2(1f, 1f),
             new Vector2(-49f, -43f), new Vector2(-10f, -8f));
 
         RectTransform primaryRect;
         _roomPrimary = CreateButton("Primary", _roomCard, out primaryRect,
             out _roomPrimaryLabel, "", Teal, null);
-        SetAnchors(primaryRect, new Vector2(0f, 0f), new Vector2(0.55f, 0.25f),
+        SetAnchors(primaryRect, new Vector2(0f, 0f), new Vector2(0.58f, 0.20f),
             new Vector2(14f, 10f), new Vector2(-4f, 0f));
 
         RectTransform secondaryRect;
         _roomSecondary = CreateButton("Secondary", _roomCard, out secondaryRect,
             out _roomSecondaryLabel, "", Ink, null);
-        SetAnchors(secondaryRect, new Vector2(0.55f, 0f), new Vector2(1f, 0.25f),
+        SetAnchors(secondaryRect, new Vector2(0.58f, 0f), new Vector2(1f, 0.20f),
             new Vector2(4f, 10f), new Vector2(-12f, 0f));
     }
 

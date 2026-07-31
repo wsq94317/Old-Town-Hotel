@@ -375,6 +375,11 @@ public class HotelSimSceneBridge : MonoBehaviour
     {
         if (Sim == null) return;
 
+        // Every acquired hotel contributes real portfolio revenue before settlement.
+        // Keeping this in the same ledger as room income makes the HUD projection,
+        // morning report and safebox agree.
+        Sim.RecordMiscIncome(HotelEmpireProgress.DailyIncome);
+
         // 走 Sim 的完整日结（固定成本前置、家具老化、故障判定、装修推进、声誉收口），
         // 而不只是推一下管线——世界场景里现在跑的是同一套经济。
         Sim.SettleDay();

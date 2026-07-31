@@ -21,7 +21,7 @@ public class FacilitySystem : MonoBehaviour
     [SerializeField] private int rngSeed = 5150;
 
     // ★ 调试开关：接动画/场景期间全解锁；出正式版改回 false（用户 2026-07-17 要求）
-    public const bool DebugUnlockAll = true;
+    public const bool DebugUnlockAll = false;
 
     // "真解锁"（花钱买的）与调试放行分开存：存档只记真解锁，
     // 调试期的临时放行不会毒化存档（翻回 false 后档案照旧上锁）。
@@ -90,6 +90,60 @@ public class FacilitySystem : MonoBehaviour
                 msg = "";
                 return true;
         }
+    }
+
+    public static bool TryUnlockWithSim(int floor, HotelSim sim, out string msg)
+    {
+        int cost;
+        int prestigeRequired;
+        switch (floor)
+        {
+            case GymFloor:
+                cost = GymCost;
+                prestigeRequired = 0;
+                break;
+            case CasinoFloor:
+                cost = CasinoCost;
+                prestigeRequired = CasinoPrestigeReq;
+                break;
+            case PoolFloor:
+                cost = PoolCost;
+                prestigeRequired = PoolPrestigeReq;
+                break;
+            default:
+                msg = "";
+                return true;
+        }
+
+        if (ManagerReputation.Prestige < prestigeRequired)
+        {
+            msg = "Prestige " + ManagerReputation.Prestige + "/" + prestigeRequired;
+            return false;
+        }
+
+        if (sim == null || !sim.TrySpendCash(cost))
+        {
+            msg = "Not enough available cash. ($" + cost + ")";
+            return false;
+        }
+
+        switch (floor)
+        {
+            case GymFloor:
+                _gymEarned = true;
+                msg = "GYM OPEN - higher guest satisfaction.";
+                break;
+            case CasinoFloor:
+                _casinoEarned = true;
+                msg = "CASINO OPEN - a new nightly revenue stream.";
+                break;
+            default:
+                _poolEarned = true;
+                msg = "ROOFTOP POOL OPEN - premium demand unlocked.";
+                break;
+        }
+
+        return true;
     }
 
     private System.Random _rng;

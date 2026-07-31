@@ -45,6 +45,7 @@ public class BreakdownSystem : MonoBehaviour
     private bool _restoredRoomStateApplied = true;
 
     public bool PanelOpen => _panelIncident != null;
+    public int ActiveCount => _active.Count;
     public string PanelTitle => _panelIncident == null
         ? ""
         : BreakdownLogic.SeverityLabel(_panelIncident.Severity) + " - " + _panelIncident.Kind;
@@ -60,6 +61,67 @@ public class BreakdownSystem : MonoBehaviour
     public bool CanLockPanelRoom => _panelIncident != null
                                     && _panelIncident.Room != null
                                     && _panelIncident.Room.currentState != Room2DState.Occupied;
+
+    public float EstimatedLossPerMinute(HotelSim sim)
+    {
+        float loss = 0f;
+        for (int i = 0; i < _active.Count; i++)
+            loss += EstimatedIncidentLossPerMinute(_active[i], sim);
+        return loss;
+    }
+
+    public bool TryGetHighestLossIncident(
+        HotelSim sim,
+        out Vector3 anchor,
+        out int roomNumber,
+        out string title,
+        out float lossPerMinute)
+    {
+        Incident best = null;
+        float bestLoss = -1f;
+        for (int i = 0; i < _active.Count; i++)
+        {
+            Incident candidate = _active[i];
+            float candidateLoss = EstimatedIncidentLossPerMinute(candidate, sim);
+            if (candidateLoss <= bestLoss) continue;
+            best = candidate;
+            bestLoss = candidateLoss;
+        }
+
+        if (best == null)
+        {
+            anchor = Vector3.zero;
+            roomNumber = 0;
+            title = "";
+            lossPerMinute = 0f;
+            return false;
+        }
+
+        anchor = InteractionPoint(best);
+        roomNumber = best.Room != null ? best.Room.roomNumber : 0;
+        title = best.Kind;
+        lossPerMinute = Mathf.Max(0f, bestLoss);
+        return true;
+    }
+
+    private static float EstimatedIncidentLossPerMinute(Incident incident, HotelSim sim)
+    {
+        if (incident == null) return 0f;
+
+        float severityMultiplier = 0.45f + (int)incident.Severity * 0.35f;
+        if (sim != null && incident.Room != null
+            && sim.Rooms.Contains(incident.Room.roomNumber))
+        {
+            RoomRecord room = sim.Rooms.At(incident.Room.roomNumber);
+            return HotelEconomyPresentation.RoomRevenuePerMinute(
+                sim,
+                room.tier,
+                HotelEconomyPresentation.ExpectedOccupancy(sim))
+                * severityMultiplier;
+        }
+
+        return (0.35f + (int)incident.Severity * 0.25f) * severityMultiplier;
+    }
 
     public void CaptureTo(WorldState w)
     {
@@ -177,13 +239,24 @@ public class BreakdownSystem : MonoBehaviour
             }
             _lockedRoomNumbers.Clear();
 
-            foreach (var taped in _tapedForTomorrow)
-                Spawn(taped.Pos, FindRoomByNumber(taped.RoomNumber), taped.Kind, BreakdownSeverity.Moderate);
+            bool recurringIncident = _tapedForTomorrow.Count > 0
+                                     && IncidentDailyBudget.TryClaim(day, "breakdown-recurring");
+            if (recurringIncident)
+            {
+                DeferredIncident taped = _tapedForTomorrow[0];
+                Spawn(
+                    taped.Pos,
+                    FindRoomByNumber(taped.RoomNumber),
+                    taped.Kind,
+                    BreakdownSeverity.Moderate);
+            }
             _tapedForTomorrow.Clear();
 
             _lastPeriod = (DayPeriod)(-1);
             _spawnPeriodToday = (DayPeriod)_rng.Next(0, 4);
-            _spawnedToday = false;
+            // A normal day has zero or one breakdown. A recurring taped repair
+            // consumes that day's incident budget instead of stacking another alert.
+            _spawnedToday = recurringIncident || _rng.NextDouble() >= 0.65;
         }
 
         var period = DayPeriodLogic.PeriodFor(hour);
@@ -260,7 +333,10 @@ public class BreakdownSystem : MonoBehaviour
                 break;
             default:
                 Spawn(new Vector3(_rng.Next(-8, 8), FloorMath.BaseYFor(_rng.NextDouble() < 0.5 ? 0 : 3), _rng.Next(-4, 4)),
-                    null, "SPARKING WIRES", BreakdownSeverity.Moderate);
+                    null, "SPARKING WIRES",
+                    dayController.CurrentDay % 5 == 0
+                        ? BreakdownSeverity.Moderate
+                        : BreakdownSeverity.Minor);
                 break;
         }
     }

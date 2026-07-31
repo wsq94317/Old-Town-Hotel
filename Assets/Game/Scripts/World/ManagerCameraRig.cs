@@ -114,6 +114,16 @@ public class ManagerCameraRig : MonoBehaviour
         _snapNextFrame = instant;
     }
 
+    public void FocusOnPoint(Vector3 worldPoint, bool instant = false)
+    {
+        EnsureFocusInitialized();
+        _focusPoint = ClampFocus(worldPoint);
+        _focusInitialized = true;
+        _followingTarget = false;
+        _dragging = false;
+        _snapNextFrame = instant;
+    }
+
     private void LateUpdate()
     {
         EnsureFocusInitialized();
