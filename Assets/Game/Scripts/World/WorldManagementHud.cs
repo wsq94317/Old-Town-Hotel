@@ -7,6 +7,22 @@ using UnityEngine.EventSystems;
 using UnityEngine.InputSystem.UI;
 using UnityEngine.UI;
 
+public enum WorldHudMode
+{
+    Hidden,
+    Operations,
+    MorningReport
+}
+
+public static class WorldHudVisibilityPolicy
+{
+    public static WorldHudMode Resolve(bool simulationReady, bool awaitingMorningReport)
+    {
+        if (!simulationReady) return WorldHudMode.Hidden;
+        return awaitingMorningReport ? WorldHudMode.MorningReport : WorldHudMode.Operations;
+    }
+}
+
 /// <summary>
 /// Scene-first management HUD for the v3 simulation. The hotel remains visible,
 /// while economy decisions are grouped by the question the player is answering.
@@ -55,6 +71,9 @@ public sealed class WorldManagementHud : MonoBehaviour
     private RectTransform _contextSheet;
     private RectTransform _contextContent;
     private RectTransform _toastPanel;
+    private RectTransform _morningBackdrop;
+    private RectTransform _morningReport;
+    private RectTransform _morningContent;
     private CanvasGroup _toastGroup;
 
     private TextMeshProUGUI _dayTimeLabel;
@@ -71,6 +90,9 @@ public sealed class WorldManagementHud : MonoBehaviour
     private TextMeshProUGUI _alertLabel;
     private TextMeshProUGUI _alertGoLabel;
     private TextMeshProUGUI _toastLabel;
+    private TextMeshProUGUI _morningTitle;
+    private TextMeshProUGUI _morningSubtitle;
+    private TextMeshProUGUI _openDoorsLabel;
 
     private Image _safeboxFill;
     private Image _safeboxButtonImage;
@@ -78,6 +100,7 @@ public sealed class WorldManagementHud : MonoBehaviour
     private Button _roomPrimary;
     private Button _roomSecondary;
     private Button _alertGoButton;
+    private Button _openDoorsButton;
 
     private readonly List<Button> _navButtons = new List<Button>();
     private readonly List<TextMeshProUGUI> _navLabels = new List<TextMeshProUGUI>();
@@ -99,6 +122,8 @@ public sealed class WorldManagementHud : MonoBehaviour
     private Rect _lastSafeArea;
     private Coroutine _toastRoutine;
     private ManagerPhone.Note _displayedNote;
+    private WorldHudMode _hudMode = WorldHudMode.Hidden;
+    private string _morningStateKey = "";
 
     private sealed class ContextAction
     {
@@ -214,23 +239,55 @@ public sealed class WorldManagementHud : MonoBehaviour
         UpdateSafeArea();
 
         var bridge = HotelSimSceneBridge.Instance;
-        bool visible = Sim != null && (bridge == null || !bridge.AwaitingMorningReport);
-        if (_safeRoot.gameObject.activeSelf != visible)
-            _safeRoot.gameObject.SetActive(visible);
-        if (!visible) return;
+        WorldHudMode mode = WorldHudVisibilityPolicy.Resolve(
+            Sim != null,
+            bridge != null && bridge.AwaitingMorningReport);
+        if (_safeRoot.gameObject.activeSelf != (mode != WorldHudMode.Hidden))
+            _safeRoot.gameObject.SetActive(mode != WorldHudMode.Hidden);
+        if (mode == WorldHudMode.Hidden) return;
+
+        ApplyHudMode(mode);
 
         TickSimulationSpeed();
-        DetectMoneyChanges();
+        if (mode == WorldHudMode.Operations)
+            DetectMoneyChanges();
 
         _refreshTimer -= Time.unscaledDeltaTime;
         if (_refreshTimer > 0f) return;
         _refreshTimer = 0.12f;
+
+        if (mode == WorldHudMode.MorningReport)
+        {
+            RefreshMorningReport();
+            return;
+        }
 
         RefreshTop();
         RefreshAlerts();
         RefreshContextSheet();
         RefreshRoomCard();
         RefreshDrawerIfChanged();
+    }
+
+    private void ApplyHudMode(WorldHudMode mode)
+    {
+        if (_hudMode == mode) return;
+        _hudMode = mode;
+
+        bool operations = mode == WorldHudMode.Operations;
+        _topPanel.gameObject.SetActive(operations);
+        _bottomNav.gameObject.SetActive(operations);
+        _drawer.gameObject.SetActive(operations && _drawerOpen);
+        _roomCard.gameObject.SetActive(false);
+        _alertStrip.gameObject.SetActive(false);
+        _contextSheet.gameObject.SetActive(false);
+        _morningBackdrop.gameObject.SetActive(mode == WorldHudMode.MorningReport);
+        _morningReport.gameObject.SetActive(mode == WorldHudMode.MorningReport);
+
+        if (mode == WorldHudMode.MorningReport)
+            _morningStateKey = "";
+        else if (operations)
+            ForceAllRefresh();
     }
 
     private void TickSimulationSpeed()
@@ -1454,6 +1511,8 @@ public sealed class WorldManagementHud : MonoBehaviour
     {
         _roomStateKey = "";
         _drawerStateKey = "";
+        _contextStateKey = "";
+        _morningStateKey = "";
         _refreshTimer = 0f;
     }
 
@@ -1461,6 +1520,239 @@ public sealed class WorldManagementHud : MonoBehaviour
     {
         _drawerStateKey = "";
         _refreshTimer = 0f;
+    }
+
+    private void RefreshMorningReport()
+    {
+        if (Sim == null) return;
+
+        EconomySystem economy = FindFirstObjectByType<EconomySystem>();
+        int loanBalance = economy != null && economy.Loan != null ? economy.Loan.Balance : 0;
+        int firstRefund = Sim.PendingRefunds.Count > 0 ? Sim.PendingRefunds[0].requestId : 0;
+        string key = string.Join("|",
+            Sim.Clock.CurrentDay,
+            Sim.Cash,
+            Sim.Safebox.Balance,
+            Sim.Overflow.Balance,
+            Sim.Payroll.Owed,
+            Sim.Payroll.Cycle,
+            Sim.PendingRefunds.Count,
+            firstRefund,
+            loanBalance,
+            Sim.Credit.PaidToday);
+        if (_morningStateKey == key) return;
+        _morningStateKey = key;
+
+        for (int i = _morningContent.childCount - 1; i >= 0; i--)
+            Destroy(_morningContent.GetChild(i).gameObject);
+
+        int closedDay = Mathf.Max(1, Sim.Clock.CurrentDay - 1);
+        _morningTitle.text = L("YESTERDAY'S LEDGER", "昨日账本");
+        _morningSubtitle.text = L(
+            "DAY " + closedDay + " CLOSED  ·  DAY " + Sim.Clock.CurrentDay + " READY",
+            "第 " + closedDay + " 天已结算  ·  第 " + Sim.Clock.CurrentDay + " 天等待开门");
+
+        DaySettlementResult last = Sim.LastSettlement;
+        int net = last.NetProfit;
+        AddMorningInfo(
+            net >= 0
+                ? L("THE HOTEL MADE +$", "酒店昨日赚了 +$") + net
+                : L("THE HOTEL LOST -$", "酒店昨日亏了 -$") + Mathf.Abs(net),
+            L("Room income  +$", "客房收入  +$") + Sim.GrossIncomeToday
+            + "\n" + L("Channel fees  -$", "平台佣金  -$") + Sim.CommissionToday
+            + "\n" + L("Profit into safebox  +$", "进入保险箱的利润  +$") + last.netToSafebox
+            + (last.cashPaidFromReserve > 0
+                ? "\n" + L("Cash used to cover loss  -$", "现金垫付亏损  -$")
+                  + last.cashPaidFromReserve
+                : ""),
+            net >= 0 ? Teal : Coral,
+            last.cashPaidFromReserve > 0 ? 118f : 96f);
+
+        AddMorningInfo(
+            L("OPERATIONS", "昨日经营"),
+            L("Checked in ", "办理入住 ") + Sim.ArrivalsCheckedInToday
+            + L("  ·  turned away ", "  ·  流失 ") + Sim.ArrivalsTurnedAwayToday
+            + L("\nQueue waiting ", "\n排队等待 ") + Sim.TotalCheckInWaitToday
+            + L(" min  ·  rating ", " 分钟  ·  评分 ") + Sim.Reputation.Stars.ToString("0.00") + "★",
+            Gold,
+            82f);
+
+        if (Sim.Safebox.Balance > 0)
+            AddMorningAction(
+                L("COLLECT PROFIT  +$", "收取保险箱利润  +$") + Sim.Safebox.Balance,
+                CollectSafebox,
+                Gold,
+                true);
+
+        if (Sim.Overflow.Balance > 0)
+            AddMorningAction(
+                L("SALVAGE OVERFLOW CASH  +$", "抢救溢出现金  +$") + Sim.Overflow.Balance,
+                RecoverOverflowForReport,
+                Coral,
+                true);
+
+        int owed = Sim.Payroll.Owed;
+        if (owed > 0)
+        {
+            bool weekly = Sim.Payroll.Cycle == PayrollCycle.Weekly;
+            AddMorningInfo(
+                L("PAYROLL DUE", "员工工资"),
+                L("Owed $", "待付 $") + owed
+                + (weekly
+                    ? L("  ·  payday in ", "  ·  距离发薪日 ")
+                      + Sim.Payroll.DaysUntilPayday(Sim.Clock.CurrentDay)
+                      + L(" day(s)", " 天")
+                    : L("  ·  paid daily", "  ·  日结工资")),
+                owed <= Sim.Cash + Sim.Safebox.Balance ? Teal : Coral,
+                68f);
+            AddMorningAction(
+                L("PAY WAGES  -$", "支付工资  -$") + owed,
+                PayWagesForReport,
+                Coral,
+                Sim.Cash + Sim.Safebox.Balance > 0);
+            AddMorningAction(
+                weekly ? L("SWITCH TO DAILY PAY", "改为每日发薪")
+                       : L("SWITCH TO WEEKLY PAY", "改为每周发薪"),
+                TogglePayrollCycleForReport,
+                Ink,
+                true);
+        }
+
+        if (loanBalance > 0)
+        {
+            int suggested = DebtPolicy.ScheduledRepaymentFor(
+                loanBalance,
+                last.netToSafebox,
+                Sim.Cash + Sim.Safebox.Balance,
+                150);
+            AddMorningInfo(
+                L("BANK DEBT", "银行债务"),
+                L("Balance $", "余额 $") + loanBalance
+                + L("  ·  credit ", "  ·  信用 ") + Sim.Credit.Score + "/100"
+                + "\n" + GameText.T(CreditPolicy.LabelOf(Sim.Credit.Rating)),
+                Sim.Credit.PaidToday ? Teal : Gold,
+                82f);
+            if (!Sim.Credit.PaidToday && suggested > 0)
+                AddMorningAction(
+                    L("PAY THE BANK  -$", "偿还银行  -$") + suggested,
+                    () => PayBank(suggested),
+                    Coral,
+                    Sim.Cash > 0);
+        }
+
+        IReadOnlyList<HotelSim.RefundRequest> refunds = Sim.PendingRefunds;
+        if (refunds.Count > 0)
+        {
+            AddMorningSection(
+                L("GUEST CLAIMS MUST BE CLOSED", "必须先处理客人退款"),
+                L("The doors stay locked until every claim has a decision.",
+                  "所有退款申请作出决定后，酒店才能重新开门。"));
+            int shown = Mathf.Min(3, refunds.Count);
+            for (int i = 0; i < shown; i++)
+            {
+                HotelSim.RefundRequest request = refunds[i];
+                int requestId = request.requestId;
+                AddMorningInfo(
+                    L("ROOM ", "房间 ") + request.roomNumber
+                    + L(" CLAIM  $", " 退款要求  $") + request.amount,
+                    GameText.T(request.line),
+                    Coral,
+                    78f);
+                AddMorningAction(
+                    L("APPROVE REFUND  -$", "同意退款  -$") + request.amount,
+                    () => ResolveMorningRefund(requestId, true),
+                    Teal,
+                    Sim.Cash >= request.amount);
+                AddMorningAction(
+                    L("REFUSE  ·  RATING WILL DROP", "拒绝  ·  评分将下降"),
+                    () => ResolveMorningRefund(requestId, false),
+                    Coral,
+                    true);
+            }
+        }
+        else
+        {
+            AddMorningInfo(
+                L("READY FOR A NEW DAY", "新的一天可以开门"),
+                L("Review the money, collect what you need, then reopen the hotel.",
+                  "确认昨日收入与支出，收取需要的资金，然后重新开门营业。"),
+                Teal,
+                74f);
+        }
+
+        bool canOpen = refunds.Count == 0;
+        _openDoorsButton.interactable = canOpen;
+        _openDoorsButton.GetComponent<Image>().color = canOpen ? Gold : Slate;
+        _openDoorsLabel.color = ContrastText(canOpen ? Gold : Slate);
+        _openDoorsLabel.text = canOpen
+            ? L("OPEN THE DOORS  ·  START DAY ", "开门营业  ·  开始第 ") + Sim.Clock.CurrentDay
+            : L("RESOLVE ", "先处理 ") + refunds.Count + L(" CLAIM(S)", " 笔退款");
+
+        Canvas.ForceUpdateCanvases();
+        ScrollRect scroll = _morningReport.GetComponent<ScrollRect>();
+        if (scroll != null) scroll.verticalNormalizedPosition = 1f;
+    }
+
+    private void OpenNextDay()
+    {
+        if (Sim == null || Sim.PendingRefunds.Count > 0)
+        {
+            ShowToast(L("Resolve every guest claim first.", "请先处理全部客人退款。"));
+            return;
+        }
+
+        HotelSimSceneBridge bridge = HotelSimSceneBridge.Instance;
+        if (bridge != null) bridge.ContinueToNextDay();
+        ForceAllRefresh();
+    }
+
+    private void RecoverOverflowForReport()
+    {
+        int amount = Sim != null ? Sim.RecoverOverflow() : 0;
+        ShowToast(amount > 0
+            ? L("Recovered overflow cash  +$", "已抢救溢出现金  +$") + amount
+            : L("No overflow cash remains.", "没有可抢救的溢出现金。"));
+        ForceAllRefresh();
+    }
+
+    private void PayWagesForReport()
+    {
+        if (Sim == null) return;
+        PayrollPayment payment = Sim.PayWages();
+        ShowToast(payment.cleared
+            ? L("Payroll cleared  -$", "工资已结清  -$") + payment.paid
+            : L("Paid $", "已支付 $") + payment.paid
+              + L(", still owed $", "，仍欠 $") + payment.stillOwed);
+        ForceAllRefresh();
+    }
+
+    private void TogglePayrollCycleForReport()
+    {
+        if (Sim == null) return;
+        PayrollCycle next = Sim.Payroll.Cycle == PayrollCycle.Weekly
+            ? PayrollCycle.Daily
+            : PayrollCycle.Weekly;
+        bool changed = Sim.Payroll.TrySetCycle(next, out string reason);
+        ShowToast(changed
+            ? (next == PayrollCycle.Weekly
+                ? L("Payroll changed to weekly.", "工资已改为每周发放。")
+                : L("Payroll changed to daily.", "工资已改为每日发放。"))
+            : GameText.T(reason));
+        ForceAllRefresh();
+    }
+
+    private void ResolveMorningRefund(int requestId, bool approve)
+    {
+        if (Sim == null) return;
+        bool resolved = approve
+            ? Sim.ApproveRefund(requestId)
+            : Sim.RejectRefund(requestId);
+        ShowToast(resolved
+            ? (approve
+                ? L("Refund approved.", "退款已同意。")
+                : L("Refund refused. The rating will take the hit.", "退款已拒绝，评分将受到影响。"))
+            : L("Not enough cash for that refund.", "现金不足，无法完成退款。"));
+        ForceAllRefresh();
     }
 
     private void BuildUi()
@@ -1489,9 +1781,82 @@ public sealed class WorldManagementHud : MonoBehaviour
         BuildDrawer();
         BuildRoomCard();
         BuildContextSheet();
+        BuildMorningReport();
         BuildToast();
         UpdateSafeArea(force: true);
         SetDrawerOpen(false);
+    }
+
+    private void BuildMorningReport()
+    {
+        _morningBackdrop = CreatePanel("MorningReportBackdrop", _canvas.transform, Ink);
+        Stretch(_morningBackdrop);
+        Image backdropImage = _morningBackdrop.GetComponent<Image>();
+        backdropImage.sprite = null;
+        backdropImage.type = Image.Type.Simple;
+        _morningBackdrop.SetAsFirstSibling();
+        _morningBackdrop.gameObject.SetActive(false);
+
+        _morningReport = CreatePanel("MorningReport", _safeRoot, Glass);
+        Stretch(_morningReport);
+        AddOutline(_morningReport, BrassLine, 1.2f);
+
+        var topAccent = CreatePanel("TopAccent", _morningReport, Gold);
+        SetAnchors(topAccent, new Vector2(0f, 1f), Vector2.one,
+            Vector2.zero, new Vector2(0f, -5f));
+
+        _morningTitle = CreateText("Title", _morningReport, 25f, Gold,
+            TextAlignmentOptions.BottomLeft, true);
+        SetAnchors(_morningTitle.rectTransform, new Vector2(0f, 1f), Vector2.one,
+            new Vector2(20f, -70f), new Vector2(-18f, -16f));
+
+        _morningSubtitle = CreateText("Subtitle", _morningReport, 12.5f, InkSoft,
+            TextAlignmentOptions.TopLeft, false);
+        SetAnchors(_morningSubtitle.rectTransform, new Vector2(0f, 1f), Vector2.one,
+            new Vector2(20f, -98f), new Vector2(-18f, -70f));
+
+        var viewport = CreatePanel("Viewport", _morningReport, new Color(0f, 0f, 0f, 0f));
+        SetAnchors(viewport, Vector2.zero, Vector2.one,
+            new Vector2(14f, 90f), new Vector2(-14f, -106f));
+        viewport.gameObject.AddComponent<RectMask2D>();
+
+        _morningContent = CreateRect("Content", viewport);
+        _morningContent.anchorMin = new Vector2(0f, 1f);
+        _morningContent.anchorMax = new Vector2(1f, 1f);
+        _morningContent.pivot = new Vector2(0.5f, 1f);
+        _morningContent.anchoredPosition = Vector2.zero;
+        _morningContent.sizeDelta = Vector2.zero;
+        var layout = _morningContent.gameObject.AddComponent<VerticalLayoutGroup>();
+        layout.padding = new RectOffset(2, 2, 2, 20);
+        layout.spacing = 8f;
+        layout.childControlHeight = true;
+        layout.childControlWidth = true;
+        layout.childForceExpandHeight = false;
+        layout.childForceExpandWidth = true;
+        var fitter = _morningContent.gameObject.AddComponent<ContentSizeFitter>();
+        fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+        var scroll = _morningReport.gameObject.AddComponent<ScrollRect>();
+        scroll.viewport = viewport;
+        scroll.content = _morningContent;
+        scroll.horizontal = false;
+        scroll.vertical = true;
+        scroll.movementType = ScrollRect.MovementType.Clamped;
+        scroll.scrollSensitivity = 28f;
+
+        RectTransform openRect;
+        _openDoorsButton = CreateButton(
+            "OpenDoors",
+            _morningReport,
+            out openRect,
+            out _openDoorsLabel,
+            "",
+            Gold,
+            OpenNextDay);
+        SetAnchors(openRect, Vector2.zero, new Vector2(1f, 0f),
+            new Vector2(16f, 18f), new Vector2(-16f, 72f));
+
+        _morningReport.gameObject.SetActive(false);
     }
 
     private void BuildTop()
@@ -1822,6 +2187,73 @@ public sealed class WorldManagementHud : MonoBehaviour
         button.interactable = interactable;
         var element = button.gameObject.AddComponent<LayoutElement>();
         element.preferredHeight = 46f;
+    }
+
+    private void AddMorningSection(string title, string subtitle)
+    {
+        var item = CreateRect("ReportSection", _morningContent);
+        item.gameObject.AddComponent<LayoutElement>().preferredHeight = 62f;
+        var titleText = CreateText("Title", item, 16f, Gold,
+            TextAlignmentOptions.BottomLeft, true);
+        SetAnchors(titleText.rectTransform, new Vector2(0f, 0.42f), Vector2.one,
+            new Vector2(8f, 0f), new Vector2(-8f, 0f));
+        titleText.text = title;
+        var subtitleText = CreateText("Subtitle", item, 11.5f, InkSoft,
+            TextAlignmentOptions.TopLeft, false);
+        subtitleText.enableWordWrapping = true;
+        SetAnchors(subtitleText.rectTransform, Vector2.zero, new Vector2(1f, 0.47f),
+            new Vector2(8f, 0f), new Vector2(-8f, 0f));
+        subtitleText.text = subtitle;
+
+        var rule = CreatePanel("Rule", item, BrassLine);
+        SetAnchors(rule, Vector2.zero, new Vector2(1f, 0f),
+            new Vector2(8f, 0f), new Vector2(-8f, 1f));
+        rule.GetComponent<Image>().raycastTarget = false;
+    }
+
+    private void AddMorningInfo(string title, string body, Color accent, float height)
+    {
+        var item = CreatePanel("ReportCard", _morningContent, Paper);
+        item.gameObject.AddComponent<LayoutElement>().preferredHeight = height;
+        AddOutline(item, new Color(BrassLine.r, BrassLine.g, BrassLine.b, 0.35f), 0.8f);
+
+        var stripe = CreatePanel("Stripe", item, accent);
+        SetAnchors(stripe, Vector2.zero, new Vector2(0f, 1f),
+            Vector2.zero, new Vector2(5f, 0f));
+
+        var titleText = CreateText("Title", item, 15.5f, Cream,
+            TextAlignmentOptions.TopLeft, true);
+        SetAnchors(titleText.rectTransform, new Vector2(0f, 0.66f), Vector2.one,
+            new Vector2(14f, 2f), new Vector2(-10f, -8f));
+        titleText.text = title;
+
+        var bodyText = CreateText("Body", item, 12f, InkSoft,
+            TextAlignmentOptions.TopLeft, false);
+        bodyText.enableWordWrapping = true;
+        bodyText.overflowMode = TextOverflowModes.Truncate;
+        SetAnchors(bodyText.rectTransform, Vector2.zero, new Vector2(1f, 0.72f),
+            new Vector2(14f, 8f), new Vector2(-10f, 0f));
+        bodyText.text = body;
+    }
+
+    private void AddMorningAction(
+        string label,
+        Action action,
+        Color color,
+        bool interactable)
+    {
+        RectTransform rect;
+        TextMeshProUGUI text;
+        Button button = CreateButton(
+            "ReportAction",
+            _morningContent,
+            out rect,
+            out text,
+            label,
+            interactable ? color : Slate,
+            action);
+        button.interactable = interactable;
+        rect.gameObject.AddComponent<LayoutElement>().preferredHeight = 46f;
     }
 
     private void AddPlanButton(
