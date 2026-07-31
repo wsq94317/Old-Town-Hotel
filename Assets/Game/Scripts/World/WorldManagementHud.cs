@@ -407,7 +407,8 @@ public sealed class WorldManagementHud : MonoBehaviour
         }
 
         if (Sim.GrossIncomeToday > _lastGross)
-            ShowMoneyBurst("退房入账  +$" + (Sim.GrossIncomeToday - _lastGross), Gold);
+            ShowMoneyBurst(L("SETTLED REVENUE  +$", "已结算营收  +$")
+                           + (Sim.GrossIncomeToday - _lastGross), Gold);
 
         if (Sim.Cash != _lastCash)
         {
@@ -1656,7 +1657,9 @@ public sealed class WorldManagementHud : MonoBehaviour
         if (Sim == null) return "";
         string common = _tab + "|" + Sim.Clock.CurrentDay + "|" + Sim.Cash + "|"
                         + Sim.GrossIncomeToday + "|" + Sim.Safebox.Balance + "|"
-                        + Sim.Materials.Stock + "|" + RoomSelection.Selected;
+                        + Sim.RoomIncomeToday + "|" + Sim.MiscIncomeToday + "|"
+                        + Sim.UnsettledRoomRevenue + "|" + Sim.Materials.Stock + "|"
+                        + RoomSelection.Selected;
         switch (_tab)
         {
             case DeskTab.Pricing:
@@ -1716,21 +1719,26 @@ public sealed class WorldManagementHud : MonoBehaviour
     private void BuildOverviewDesk()
     {
         int gross = Sim.GrossIncomeToday;
+        int roomIncome = Sim.RoomIncomeToday;
+        int unsettledRoomRevenue = Sim.UnsettledRoomRevenue;
+        int miscIncome = Sim.MiscIncomeToday;
         int commission = Sim.CommissionToday;
         int wages = Sim.Shifts.DailyWageCost(Sim.Staff, Sim.Clock.CurrentDay);
         int runningMargin = gross - commission - wages;
         AddSection(L("TODAY'S MONEY", "今天的钱在哪里"),
-            L("Checkout income becomes profit only after operating costs.",
-              "退房收入扣除佣金和运营成本后，才会成为可收取利润。"));
+            L("Check-in reserves an order. Checkout settles its final value; day close moves profit into the safebox.",
+              "入住只锁定订单额；退房时结算最终房费，日结后利润才进入保险箱。"));
         AddInfoCard(
             L("CURRENT CASHFLOW", "当前现金流"),
-            L("Room income  +$", "客房收入  +$") + gross
+            L("Settled rooms  +$", "客房已结算  +$") + roomIncome
+            + "\n" + L("In-house bookings  ~$", "在住待结算  ~$") + unsettledRoomRevenue
+            + "\n" + L("Other income  +$", "其他收入  +$") + miscIncome
             + "\n" + L("Channel fees  -$", "平台佣金  -$") + commission
             + "\n" + L("Scheduled wages  -$", "预计工资  -$") + wages
             + "\n" + L("Running result  ", "当前结果  ")
             + (runningMargin >= 0 ? "+$" : "-$") + Mathf.Abs(runningMargin),
             runningMargin >= 0 ? Teal : Coral,
-            122f);
+            156f);
 
         var tonight = Sim.OccupancyForNight(Sim.Clock.CurrentDay);
         AddInfoCard(
@@ -2211,12 +2219,9 @@ public sealed class WorldManagementHud : MonoBehaviour
                                  * HotelEconomyPresentation.RealMinutesPerGameDay));
             FloatingTextFx.Spawn(
                 BusinessAnchor(HotelBusinessKind.Reception) + Vector3.up * 1.2f,
-                "CHECK-IN  +$" + bookingValue * count + " BOOKED",
+                "CHECK-IN  $" + bookingValue * count + " RESERVED",
                 new Color(0.90f, 0.69f, 0.28f),
                 1.15f);
-            StartCoroutine(FlyRevenueToCash(
-                BusinessAnchor(HotelBusinessKind.Reception),
-                "+$" + bookingValue * count));
         }
 
         if (Sim.ArrivalsTurnedAwayToday > _lastTurnedAway)
@@ -2251,7 +2256,7 @@ public sealed class WorldManagementHud : MonoBehaviour
                 int rate = Sim.Pricing.PriceFor(Sim.Clock.CurrentDay, room.tier);
                 FloatingTextFx.Spawn(
                     position + Vector3.up * 1.4f,
-                    "ROOM SOLD  +$" + rate,
+                    "ROOM BOOKED  $" + rate,
                     new Color(0.90f, 0.69f, 0.28f),
                     1.1f);
             }
@@ -2574,52 +2579,6 @@ public sealed class WorldManagementHud : MonoBehaviour
         if (minutes <= 120) return minutes + L(" min", " 分钟");
         float days = minutes / HotelEconomyPresentation.RealMinutesPerGameDay;
         return days.ToString(days < 10f ? "0.0" : "0") + L(" days", " 个营业日");
-    }
-
-    private IEnumerator FlyRevenueToCash(Vector3 worldOrigin, string label)
-    {
-        Camera camera = Camera.main;
-        if (camera == null || _cashLabel == null) yield break;
-
-        Vector2 screen = camera.WorldToScreenPoint(worldOrigin);
-        if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(
-                _safeRoot,
-                screen,
-                null,
-                out Vector2 start))
-            yield break;
-
-        TextMeshProUGUI fly = CreateText(
-            "RevenueFlow",
-            _safeRoot,
-            16f,
-            Gold,
-            TextAlignmentOptions.Center,
-            true);
-        fly.text = label;
-        RectTransform rect = fly.rectTransform;
-        rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
-        rect.sizeDelta = new Vector2(120f, 34f);
-        rect.anchoredPosition = start;
-
-        Vector3 cashWorld = _cashLabel.rectTransform.TransformPoint(
-            _cashLabel.rectTransform.rect.center);
-        Vector2 target = _safeRoot.InverseTransformPoint(cashWorld);
-        const float duration = 0.62f;
-        float elapsed = 0f;
-        while (elapsed < duration)
-        {
-            elapsed += Time.unscaledDeltaTime;
-            float t = Mathf.Clamp01(elapsed / duration);
-            float eased = 1f - Mathf.Pow(1f - t, 3f);
-            rect.anchoredPosition = Vector2.Lerp(start, target, eased)
-                                    + Vector2.up * Mathf.Sin(t * Mathf.PI) * 42f;
-            fly.alpha = 1f - Mathf.Clamp01((t - 0.72f) / 0.28f);
-            yield return null;
-        }
-
-        Destroy(fly.gameObject);
-        StartCoroutine(BumpCash());
     }
 
     private void StartFreeClearing(int roomNumber)

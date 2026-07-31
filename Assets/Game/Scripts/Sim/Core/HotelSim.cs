@@ -80,6 +80,8 @@ public sealed class HotelSim
     private readonly Queue<int> _pendingArrivals = new Queue<int>();
     private readonly Queue<int> _deskQueue = new Queue<int>();
     private int _grossIncomeToday;
+    private int _roomIncomeToday;
+    private int _miscIncomeToday;
     private int _commissionToday;
     private int _checkoutsToday;
 
@@ -190,6 +192,20 @@ public sealed class HotelSim
     public int ArrivalsTurnedAwayToday { get; private set; }
     public int CheckoutsToday => _checkoutsToday;
     public int GrossIncomeToday => _grossIncomeToday;
+    public int RoomIncomeToday => _roomIncomeToday;
+    public int MiscIncomeToday => _miscIncomeToday;
+
+    /// <summary>Checked-in room value awaiting checkout settlement.
+    /// This is the locked nightly rate before satisfaction adjustments and fees.</summary>
+    public int UnsettledRoomRevenue
+    {
+        get
+        {
+            int total = 0;
+            foreach (Stay stay in _stays.Values) total += Math.Max(0, stay.nightlyRate);
+            return total;
+        }
+    }
 
     /// <summary>今日渠道佣金（晨报要列明细：保险箱只收净额）。</summary>
     public int CommissionToday => _commissionToday;
@@ -864,6 +880,8 @@ public sealed class HotelSim
         // 先清零再跑退房潮——顺序反了会把刚结算的房费当场抹掉（踩过）。
         // 语义：晨间退房收的是昨夜的房费，计入**今天**的日结。
         _grossIncomeToday = 0;
+        _roomIncomeToday = 0;
+        _miscIncomeToday = 0;
         _commissionToday = 0;
         ArrivalsCheckedInToday = 0;
         ArrivalsTurnedAwayToday = 0;
@@ -1696,6 +1714,7 @@ public sealed class HotelSim
     {
         if (amount <= 0) return;
         _grossIncomeToday += amount;
+        _roomIncomeToday += amount;
         float rate = BookingChannels.Get(channelId).commission;
         _commissionToday += SimMath.RoundToInt(amount * SimMath.Clamp01(rate));
     }
@@ -1704,7 +1723,8 @@ public sealed class HotelSim
     public void RecordMiscIncome(int amount)
     {
         if (amount <= 0) return;
-        _grossIncomeToday += amount;   // 杂项不抽佣金
+        _grossIncomeToday += amount;
+        _miscIncomeToday += amount;   // 杂项不抽佣金
     }
 
     // ── 日结 ─────────────────────────────────────────────────────────────────

@@ -61,6 +61,8 @@ namespace OldTownHotel.Tests.EditMode
             Assert.That(sim.ArrivalsCheckedInToday, Is.GreaterThan(0), "入住高峰过后该有人住进来");
             Assert.That(sim.Rooms.CountOf(RoomSimState.Occupied), Is.EqualTo(sim.ArrivalsCheckedInToday));
             Assert.That(sim.GrossIncomeToday, Is.EqualTo(0), "房费在次日退房时才结算（过夜模型）");
+            Assert.That(sim.UnsettledRoomRevenue, Is.GreaterThan(0),
+                        "入住后应展示待结算订单额，但不能提前计入已结算营收");
         }
 
         [Test]
@@ -80,6 +82,8 @@ namespace OldTownHotel.Tests.EditMode
             Assert.That(sim.CheckoutsToday + stillIn, Is.EqualTo(stayed),
                         "在住的人打烊时要么退房要么续住，一个都不能凭空消失");
             Assert.That(sim.GrossIncomeToday, Is.GreaterThan(0), "打烊结算房费——晨报上就有钱可收");
+            Assert.That(sim.RoomIncomeToday, Is.EqualTo(sim.GrossIncomeToday),
+                        "没有杂项收入时，毛收入应全部来自已结算客房");
             Assert.That(sim.Rooms.CountOf(RoomSimState.Dirty), Is.GreaterThanOrEqualTo(sim.CheckoutsToday),
                         "退房后房间变脏，次晨打扫");
         }
