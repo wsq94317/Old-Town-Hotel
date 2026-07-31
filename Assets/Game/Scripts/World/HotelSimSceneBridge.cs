@@ -331,6 +331,7 @@ public class HotelSimSceneBridge : MonoBehaviour
         }
 
         Pipeline.ManagerOnFloor = ComputeManagerOnFloor();
+        Sim.FrontDeskCoverageAvailable = ComputeFrontDeskCoverage();
 
         Clock.Advance(Time.deltaTime);
         int budget = Mathf.Max(1, maxTicksPerFrame);
@@ -338,6 +339,23 @@ public class HotelSimSceneBridge : MonoBehaviour
         {
             Sim.StepMinute();
         }
+    }
+
+    /// <summary>
+    /// 入住必须由场景里真正站在柜台后的 Reception 办理，不能只看 Sim 花名册。
+    /// StaffAgent 自己拥有岗位、班次和距离判定，这里只负责把事实喂给经济模拟。
+    /// </summary>
+    private bool ComputeFrontDeskCoverage()
+    {
+        if (spawner == null) spawner = FindFirstObjectByType<StaffAgentSpawner>();
+        if (spawner == null) return false;
+
+        foreach (var agent in spawner.Agents)
+        {
+            if (agent != null && agent.isActiveAndEnabled && agent.ProvidesFrontDeskCoverage)
+                return true;
+        }
+        return false;
     }
 
     /// <summary>经理是否和某个在班员工同层——巡查层向 Sim 上报的"被盯着"事实。</summary>

@@ -162,6 +162,16 @@ public sealed class HotelSim
     /// （解雇前台后玩家一脸茫然的那个 bug 修完就轮到这个可读性问题）。</summary>
     public int DeskQueueLength => _deskQueue.Count;
 
+    /// <summary>
+    /// 场景层上报的真实前台覆盖。纯模拟和离线结算默认视为开放；运行中的世界场景会按
+    /// Reception 实体是否真的站在岗位上逐帧覆盖，避免“账面在岗、柜台没人”仍自动入住。
+    /// </summary>
+    public bool FrontDeskCoverageAvailable { get; set; } = true;
+
+    /// <summary>当前真实可用的入住吞吐；经营 UI 和入住队列必须读取同一个权威值。</summary>
+    public float CurrentCheckInsPerHour =>
+        FrontDeskCoverageAvailable ? ServiceCapacityModel.CheckInsPerHour(Staff) : 0f;
+
     /// <summary>今日所有入住客承受的等待分钟总和——满意度实际吃的就是它。</summary>
     public int TotalCheckInWaitToday { get; private set; }
 
@@ -1257,10 +1267,12 @@ public sealed class HotelSim
             return;
         }
 
-        float perHour = ServiceCapacityModel.CheckInsPerHour(Staff);
+        float perHour = CurrentCheckInsPerHour;
         if (perHour <= 0f)
         {
             // 前台无人：队伍只会变长（前台空岗惩罚已在 v2 的 StaffFacilitySystem 里有先例）
+            // 柜台中断后不保留“幽灵办理进度”，否则员工返岗时可能立刻把客人送进房间。
+            _deskCredit = 0d;
             PeakCheckInWaitToday = Math.Max(PeakCheckInWaitToday, EstimatedWaitMinutes(perHour));
             return;
         }

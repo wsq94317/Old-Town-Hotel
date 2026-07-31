@@ -466,7 +466,7 @@ public class V3PrototypeSession : MonoBehaviour
         GUI.Label(new Rect(20, y, w - 40, 20),
             GameText.F("Clean capacity {0}/h   check-ins {1}/h",
                        ServiceCapacityModel.CleanRoomsPerHour(_sim.Staff, 1f).ToString("0.0"),
-                       ServiceCapacityModel.CheckInsPerHour(_sim.Staff).ToString("0.0"))); y += 26;
+                       _sim.CurrentCheckInsPerHour.ToString("0.0"))); y += 26;
 
         if (GuiInput.Button(new Rect(20, y, w - 40, 26), GameText.T("HIRE A HOUSEKEEPER  ($200 signing)")))
         {

@@ -540,7 +540,7 @@ public class WorldOperationsPanel : MonoBehaviour
         panel.Add(GameText.F("Turned away         {0}   (no clean room)", Sim.ArrivalsTurnedAwayToday));
 
         // 前台那一行：没有它的话"解雇前台"表现为客人凭空不来，玩家查不出原因
-        float perHour = ServiceCapacityModel.CheckInsPerHour(Sim.Staff);
+        float perHour = Sim.CurrentCheckInsPerHour;
         int onDesk = Sim.Staff.ProductiveCountOfRole(StaffRole.Reception);
         if (perHour <= 0f && Sim.DeskQueueLength > 0)
             panel.Add(GameText.F("FRONT DESK UNMANNED - {0} guests waiting, nobody checking them in.",
@@ -765,7 +765,7 @@ public class WorldOperationsPanel : MonoBehaviour
         GUI.Label(new Rect(14, y, w - 28, 20),
             GameText.F("Clean capacity {0}/h   check-ins {1}/h",
                        ServiceCapacityModel.CleanRoomsPerHour(Sim.Staff, 1f).ToString("0.0"),
-                       ServiceCapacityModel.CheckInsPerHour(Sim.Staff).ToString("0.0")));
+                       Sim.CurrentCheckInsPerHour.ToString("0.0")));
     }
 
     /// <summary>装修 + 破败房复原共用一页（施工队是同一支）。</summary>

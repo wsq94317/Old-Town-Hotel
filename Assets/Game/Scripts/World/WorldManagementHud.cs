@@ -913,7 +913,7 @@ public sealed class WorldManagementHud : MonoBehaviour
             L("On duty ", "在岗 ") + Sim.Staff.OnDutyCount + "/" + Sim.Staff.Count
             + L(" · wages $", " · 工资 $") + wages
             + "\n" + L("Check-ins ", "入住办理 ")
-            + ServiceCapacityModel.CheckInsPerHour(Sim.Staff).ToString("0.0") + "/h"
+            + Sim.CurrentCheckInsPerHour.ToString("0.0") + "/h"
             + L(" · cleaning ", " · 清洁 ")
             + ServiceCapacityModel.CleanRoomsPerHour(Sim.Staff, 1f).ToString("0.0") + "/h",
             Teal,
