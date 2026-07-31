@@ -45410,7 +45410,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: OldTownHotel.Game::WorldInputController
   manager: {fileID: 128087638}
   cameraRig: {fileID: 1696817223}
-  dragThresholdPixels: 30
+  dragThresholdPixels: 10
 --- !u!1 &736213683
 GameObject:
   m_ObjectHideFlags: 0
@@ -103715,8 +103715,6 @@ MonoBehaviour:
   target: {fileID: 128087641}
   floors: {fileID: 734262739}
   followLerp: 6
-  peekReturnLerp: 8
-  peekHoldSeconds: 1.5
   cameraOffset: {x: -8, y: 10, z: -8}
   worldMinXZ: {x: -10, y: -6}
   worldMaxXZ: {x: 10, y: 6}

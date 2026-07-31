@@ -10,9 +10,10 @@ public class WorldInputController : MonoBehaviour
 {
     [SerializeField] private ManagerController manager;
     [SerializeField] private ManagerCameraRig cameraRig;
-    [SerializeField] private float dragThresholdPixels = 30f;
+    [SerializeField] private float dragThresholdPixels = 10f;
 
     private TapDragClassifier _classifier;
+    private Vector2 _pressPos;
     private Vector2 _lastPos;
     private bool _pressedLastFrame;
     private bool _pressStartedOverUi;
@@ -51,7 +52,7 @@ public class WorldInputController : MonoBehaviour
             {
                 _heldStillSeconds = 0f;
                 _ignoreTouchUntilRelease = true;
-                if (cameraRig != null) cameraRig.SetPeeking(false);
+                if (cameraRig != null) cameraRig.EndFreeLook();
                 _pressedLastFrame = false;
                 TapDebug = "stuck touch force-cancelled";
                 return;
@@ -72,22 +73,31 @@ public class WorldInputController : MonoBehaviour
             _pressStartedOverImGui = GuiInput.IsInReservedZone(pos);
             _pressStartedOverUi = IsOverUi() || _pressStartedOverImGui;
             if (!_pressStartedOverUi) _classifier.Press(pos);
+            _pressPos = pos;
             _lastPos = pos;
         }
         else if (pressed && _pressedLastFrame && !_pressStartedOverUi)
         {
             if (_classifier == null) return; // 热重载发生在按压中途：这次按压作废
+            bool wasDragging = _classifier.IsDragging;
             _classifier.Move(pos);
             if (_classifier.IsDragging && cameraRig != null)
             {
-                cameraRig.SetPeeking(true);
-                cameraRig.ApplyPeekScreenDrag(_lastPos, pos);
+                if (!wasDragging)
+                {
+                    cameraRig.BeginFreeLook();
+                    cameraRig.ApplyScreenDrag(_pressPos, pos);
+                }
+                else
+                {
+                    cameraRig.ApplyScreenDrag(_lastPos, pos);
+                }
             }
             _lastPos = pos;
         }
         else if (!pressed && _pressedLastFrame)
         {
-            if (cameraRig != null) cameraRig.SetPeeking(false);
+            if (cameraRig != null) cameraRig.EndFreeLook();
             if (!_pressStartedOverUi && _classifier != null)
             {
                 var result = _classifier.Release(_lastPos);

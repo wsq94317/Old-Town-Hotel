@@ -1,26 +1,26 @@
 using UnityEngine;
 
-// 固定 45° 正交跟随相机。输入判定在 WorldInputController，这里只接收窥视增量：
-//   窥视中：ApplyPeekDelta 累积偏移（上限 peekRadius）
-//   松手后：以较慢的 peekReturnLerp 回正到经理位置（用户要求"回去慢一点"）
-//   楼层切换：瞬间跳到新层高度（不插值穿楼板）
+// Fixed-angle orthographic camera with explicit Follow and FreeLook modes.
+// Dragging enters FreeLook; releasing the pointer keeps the current world focus.
+[DefaultExecutionOrder(100)]
 public class ManagerCameraRig : MonoBehaviour
 {
-    [SerializeField] private Transform target;                 // Manager
+    [SerializeField] private Transform target;
     [SerializeField] private FloorVisibilityController floors;
     [SerializeField] private float followLerp = 6f;
-    [SerializeField] private float peekReturnLerp = 2.5f;      // 回正慢速
-    [SerializeField] private float peekHoldSeconds = 1.5f;     // 松手后视角停留时长，之后才开始回正
     [SerializeField] private Vector3 cameraOffset = new Vector3(-8f, 10f, -8f);
-    [Tooltip("窥视焦点允许到达的地图 XZ 边界（整层楼可达，但不出图）")]
     [SerializeField] private Vector2 worldMinXZ = new Vector2(-10f, -6f);
     [SerializeField] private Vector2 worldMaxXZ = new Vector2(10f, 6f);
 
     private Camera _cam;
-
-    private Vector3 _peekOffset;
-    private bool _peeking;
+    private Vector3 _focusPoint;
+    private bool _focusInitialized;
+    private bool _followingTarget = true;
+    private bool _dragging;
     private bool _snapNextFrame;
+
+    public bool IsFollowingTarget => _followingTarget;
+    public Vector3 FocusPoint => _focusPoint;
 
     private void Awake()
     {
@@ -29,67 +29,123 @@ public class ManagerCameraRig : MonoBehaviour
         if (floors != null) floors.OnFloorChanged += HandleFloorChanged;
     }
 
+    private void Start()
+    {
+        EnsureFocusInitialized();
+        _snapNextFrame = true;
+    }
+
     private void OnDestroy()
     {
         if (floors != null) floors.OnFloorChanged -= HandleFloorChanged;
     }
 
-    private void HandleFloorChanged(int _) => _snapNextFrame = true;
-
-    /// <summary>
-    /// 跟手窥视：把手指前后两个屏幕点投射到当前楼层地面平面，用世界差值平移——
-    /// 手指按住的地面点始终留在手指下，与分辨率/渲染倍率无关。
-    /// </summary>
-    public void ApplyPeekScreenDrag(Vector2 fromScreen, Vector2 toScreen)
+    private void HandleFloorChanged(int floorIndex)
     {
-        if (_cam == null || target == null) return;
-        var plane = new Plane(Vector3.up, new Vector3(0f, target.position.y, 0f));
-        Ray r1 = _cam.ScreenPointToRay(fromScreen);
-        Ray r2 = _cam.ScreenPointToRay(toScreen);
-        if (!plane.Raycast(r1, out float d1) || !plane.Raycast(r2, out float d2)) return;
+        EnsureFocusInitialized();
+        if (_followingTarget && target != null)
+        {
+            _focusPoint = ClampFocus(target.position);
+        }
+        else
+        {
+            _focusPoint.y = FloorMath.BaseYFor(floorIndex);
+        }
 
-        Vector3 delta = r1.GetPoint(d1) - r2.GetPoint(d2); // 世界随手指反向移动
-        delta.y = 0f;
-        _peekOffset += delta;
-
-        // 焦点钳制到地图边界：整层楼可达，但不出图。
-        Vector3 focus = target.position + _peekOffset;
-        focus.x = Mathf.Clamp(focus.x, worldMinXZ.x, worldMaxXZ.x);
-        focus.z = Mathf.Clamp(focus.z, worldMinXZ.y, worldMaxXZ.y);
-        _peekOffset = focus - target.position;
+        _snapNextFrame = true;
     }
 
-    private float _holdUntil;
-
-    /// <summary>是否处于窥视中；结束窥视后先停留 peekHoldSeconds，再慢速回正到经理。</summary>
-    public void SetPeeking(bool peeking)
+    public void BeginFreeLook()
     {
-        if (_peeking && !peeking)
+        EnsureFocusInitialized();
+        if (_followingTarget)
         {
-            _holdUntil = Time.time + peekHoldSeconds; // 松手瞬间起算停留窗口
+            // Preserve the exact framing when control changes hands.
+            _focusPoint = transform.position - cameraOffset;
+            if (target != null) _focusPoint.y = target.position.y;
+            _focusPoint = ClampFocus(_focusPoint);
         }
-        _peeking = peeking;
+
+        _followingTarget = false;
+        _dragging = true;
+    }
+
+    public void EndFreeLook()
+    {
+        _dragging = false;
+    }
+
+    public void ApplyScreenDrag(Vector2 fromScreen, Vector2 toScreen)
+    {
+        if (_cam == null) _cam = GetComponent<Camera>();
+        if (_cam == null) return;
+
+        EnsureFocusInitialized();
+        var plane = new Plane(Vector3.up, new Vector3(0f, _focusPoint.y, 0f));
+        Ray fromRay = _cam.ScreenPointToRay(fromScreen);
+        Ray toRay = _cam.ScreenPointToRay(toScreen);
+        if (!plane.Raycast(fromRay, out float fromDistance) ||
+            !plane.Raycast(toRay, out float toDistance))
+        {
+            return;
+        }
+
+        Vector3 delta = fromRay.GetPoint(fromDistance) - toRay.GetPoint(toDistance);
+        delta.y = 0f;
+        _focusPoint = ClampFocus(_focusPoint + delta);
+    }
+
+    // Hook this up to a future "locate manager" button or another explicit action.
+    public void ReturnToTarget(bool instant = false)
+    {
+        if (target == null) return;
+
+        _focusPoint = ClampFocus(target.position);
+        _focusInitialized = true;
+        _followingTarget = true;
+        _dragging = false;
+        _snapNextFrame = instant;
     }
 
     private void LateUpdate()
     {
-        if (target == null) return;
+        EnsureFocusInitialized();
+        if (!_focusInitialized) return;
 
-        if (!_peeking && Time.time >= _holdUntil)
+        if (_followingTarget && target != null)
         {
-            _peekOffset = Vector3.Lerp(_peekOffset, Vector3.zero, Time.deltaTime * peekReturnLerp);
+            _focusPoint = ClampFocus(target.position);
         }
 
-        Vector3 desired = target.position + cameraOffset + _peekOffset;
-        if (_snapNextFrame || _peeking)
+        Vector3 desired = _focusPoint + cameraOffset;
+        if (_snapNextFrame || _dragging)
         {
-            // 切层瞬跳；窥视拖动中直接贴合（插值会让手指下的地面点漂移，不跟手）。
             transform.position = desired;
             _snapNextFrame = false;
         }
         else
         {
-            transform.position = Vector3.Lerp(transform.position, desired, Time.deltaTime * followLerp);
+            transform.position = Vector3.Lerp(
+                transform.position,
+                desired,
+                Time.deltaTime * followLerp);
         }
+    }
+
+    private void EnsureFocusInitialized()
+    {
+        if (_focusInitialized) return;
+
+        _focusPoint = target != null
+            ? ClampFocus(target.position)
+            : ClampFocus(transform.position - cameraOffset);
+        _focusInitialized = true;
+    }
+
+    private Vector3 ClampFocus(Vector3 focus)
+    {
+        focus.x = Mathf.Clamp(focus.x, worldMinXZ.x, worldMaxXZ.x);
+        focus.z = Mathf.Clamp(focus.z, worldMinXZ.y, worldMaxXZ.y);
+        return focus;
     }
 }
