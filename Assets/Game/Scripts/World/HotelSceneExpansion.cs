@@ -93,23 +93,32 @@ public static class HotelSceneExpansion
             $"Opening stock remains 8 rooms; {StartingDerelictRooms} require reclamation.");
     }
 
+    /// <summary>
+    /// Materializes the complete guest-floor shell for prefab authoring. Room
+    /// simulation entities remain runtime-owned; visible rooms and doors are
+    /// stable prefab content that artists can edit outside Play Mode.
+    /// </summary>
+    public static void EnsureEditableGuestFloorVisuals(Transform floor2, Transform floor3)
+    {
+        if (floor2 == null || floor3 == null) return;
+
+        ExpandGuestFloorShell(floor2);
+        ExpandGuestFloorShell(floor3);
+        for (int i = 0; i < AddedRooms.Length; i++)
+            EnsureRoomVisual(AddedRooms[i], floor2, floor3, null);
+
+        RebindEditableDoorInteriors(floor2);
+        RebindEditableDoorInteriors(floor3);
+    }
+
     private static void AddRoom(
         RoomSpec spec,
         Transform floor2,
         Transform floor3,
         Transform roomData)
     {
-        Transform floor = spec.Floor == 2 ? floor2 : floor3;
-        bool north = spec.Z > 0f;
-
-        Transform visualSource = north
-            ? floor.Find(spec.Floor == 2 ? "Room_201" : "Room_301")
-            : floor2.Find("Room_205");
         Room2DEntity entitySource = FindRoomEntity(spec.Floor == 2 ? 201 : 301);
-        Transform doorSource = north
-            ? floor.Find(spec.Floor == 2 ? "Door_201" : "Door_301")
-            : floor2.Find("Door_205");
-        if (visualSource == null || entitySource == null || doorSource == null) return;
+        if (entitySource == null) return;
 
         GameObject entityObject = UnityEngine.Object.Instantiate(
             entitySource.gameObject, roomData, false);
@@ -122,18 +131,53 @@ public static class HotelSceneExpansion
         entity.SetIdentity(spec.Floor, spec.Number);
         entity.SetState(Room2DState.Ready);
 
-        GameObject roomObject = UnityEngine.Object.Instantiate(
-            visualSource.gameObject, floor, false);
-        roomObject.name = "Room_" + spec.Number;
+        EnsureRoomVisual(spec, floor2, floor3, entity);
+    }
+
+    private static void EnsureRoomVisual(
+        RoomSpec spec,
+        Transform floor2,
+        Transform floor3,
+        Room2DEntity entity)
+    {
+        Transform floor = spec.Floor == 2 ? floor2 : floor3;
+        bool north = spec.Z > 0f;
+        Transform visualSource = north
+            ? floor.Find(spec.Floor == 2 ? "Room_201" : "Room_301")
+            : floor2.Find("Room_205");
+        Transform doorSource = north
+            ? floor.Find(spec.Floor == 2 ? "Door_201" : "Door_301")
+            : floor2.Find("Door_205");
+        if (visualSource == null || doorSource == null) return;
+
+        Transform roomTransform = floor.Find("Room_" + spec.Number);
+        GameObject roomObject;
+        if (roomTransform == null)
+        {
+            roomObject = UnityEngine.Object.Instantiate(visualSource.gameObject, floor, false);
+            roomObject.name = "Room_" + spec.Number;
+        }
+        else
+        {
+            roomObject = roomTransform.gameObject;
+        }
         roomObject.transform.localPosition = new Vector3(spec.X, 0f, spec.Z);
         RoomSceneBinder binder = roomObject.GetComponent<RoomSceneBinder>();
         if (binder != null) binder.ConfigureRoomNumber(spec.Number);
         RoomFurnitureView furniture = roomObject.GetComponent<RoomFurnitureView>();
         if (furniture != null) furniture.ConfigureRoomNumber(spec.Number);
 
-        GameObject doorObject = UnityEngine.Object.Instantiate(
-            doorSource.gameObject, floor, false);
-        doorObject.name = "Door_" + spec.Number;
+        Transform doorTransform = floor.Find("Door_" + spec.Number);
+        GameObject doorObject;
+        if (doorTransform == null)
+        {
+            doorObject = UnityEngine.Object.Instantiate(doorSource.gameObject, floor, false);
+            doorObject.name = "Door_" + spec.Number;
+        }
+        else
+        {
+            doorObject = doorTransform.gameObject;
+        }
         doorObject.transform.localPosition = new Vector3(
             spec.X, 0f, north ? DoorRowZ : -DoorRowZ);
         RoomDoor door = doorObject.GetComponent<RoomDoor>();
@@ -196,22 +240,46 @@ public static class HotelSceneExpansion
         Transform plaqueSource = FindFirstNamed(art, "RoomPlaque");
         if (frameSource == null || lampSource == null || plaqueSource == null) return;
 
-        Transform frame = UnityEngine.Object.Instantiate(frameSource, art, false);
-        frame.name = "Frame_" + number;
+        Transform frame = art.Find("Frame_" + number);
+        if (frame == null)
+        {
+            frame = UnityEngine.Object.Instantiate(frameSource, art, false);
+            frame.name = "Frame_" + number;
+        }
         frame.localPosition = new Vector3(x, 0f, north ? DoorRowZ : -DoorRowZ);
         frame.localRotation = Quaternion.Euler(0f, north ? 0f : 180f, 0f);
 
-        Transform lamp = UnityEngine.Object.Instantiate(lampSource, art, false);
-        lamp.name = "WallLamp_" + number;
+        Transform lamp = art.Find("WallLamp_" + number);
+        if (lamp == null)
+        {
+            lamp = UnityEngine.Object.Instantiate(lampSource, art, false);
+            lamp.name = "WallLamp_" + number;
+        }
         lamp.localPosition = new Vector3(
             x + 1.65f, 0.82f, north ? DoorRowZ - 0.05f : -DoorRowZ + 0.05f);
         lamp.localRotation = Quaternion.Euler(0f, north ? 0f : 180f, 0f);
 
-        Transform plaque = UnityEngine.Object.Instantiate(plaqueSource, art, false);
-        plaque.name = "RoomPlaque_" + number;
+        Transform plaque = art.Find("RoomPlaque_" + number);
+        if (plaque == null)
+        {
+            plaque = UnityEngine.Object.Instantiate(plaqueSource, art, false);
+            plaque.name = "RoomPlaque_" + number;
+        }
         plaque.localPosition = new Vector3(
             x + 1.24f, 0f, north ? DoorRowZ - 0.06f : -DoorRowZ + 0.06f);
         plaque.localRotation = Quaternion.Euler(0f, north ? 0f : 180f, 0f);
+    }
+
+    private static void RebindEditableDoorInteriors(Transform floor)
+    {
+        RoomDoor[] doors = floor.GetComponentsInChildren<RoomDoor>(true);
+        for (int i = 0; i < doors.Length; i++)
+        {
+            RoomDoor door = doors[i];
+            int number = RoomSceneBinder.ParseRoomNumber(door.name);
+            Transform roomTransform = floor.Find("Room_" + number);
+            if (roomTransform != null) door.Configure(null, roomTransform.position);
+        }
     }
 
     private static void AddBrassInlay(Transform art, float x, string name)

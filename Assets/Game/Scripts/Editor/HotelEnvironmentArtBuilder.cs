@@ -51,6 +51,7 @@ public static class HotelEnvironmentArtBuilder
             return;
         }
 
+        HotelFloorPrefabExporter.UnpackSceneFloorPrefabs();
         EnsureFolders();
         EnsureMaterialAssets();
         AssetDatabase.SaveAssets();
@@ -78,6 +79,7 @@ public static class HotelEnvironmentArtBuilder
 
         MarkArtBatchingStatic();
         ValidateLowPolyHotelInternal(true);
+        HotelFloorPrefabExporter.ExportSceneFloors(true, false);
         EditorSceneManager.MarkSceneDirty(scene);
         EditorSceneManager.SaveScene(scene);
         Selection.activeObject = FindPath("World/Floor1/" + ArtRootName);
@@ -94,8 +96,10 @@ public static class HotelEnvironmentArtBuilder
     public static void RemoveLowPolyHotel()
     {
         Scene scene = SceneManager.GetActiveScene();
+        HotelFloorPrefabExporter.UnpackSceneFloorPrefabs();
         RemoveArtRoots();
         SetGreyboxReplacementRenderers(true);
+        HotelFloorPrefabExporter.ExportSceneFloors(true, false);
         EditorSceneManager.MarkSceneDirty(scene);
         EditorSceneManager.SaveScene(scene);
         Debug.Log("Low-poly hotel art removed; greybox renderers restored.");

@@ -9,7 +9,11 @@ using UnityEngine.AI;
 //   经理闯进【入住中】房间内部 → WrongRoomDrama（受惊客人+枕头+撵人）
 public class RoomDoor : MonoBehaviour
 {
-    [SerializeField] private Room2DEntity room;
+    // Room data lives outside the editable floor prefabs. Persist the stable room
+    // number and resolve the scene object at runtime instead of creating a
+    // cross-prefab scene reference that cannot be applied to the prefab asset.
+    [SerializeField, HideInInspector] private int roomNumber;
+    [System.NonSerialized] private Room2DEntity room;
     [SerializeField] private Vector3 interiorCenter;
     [SerializeField] private float doorSenseRadius = 0.9f;
     [SerializeField] private float autoCloseAfterOpen = 2f;
@@ -47,7 +51,14 @@ public class RoomDoor : MonoBehaviour
         ActivePrompt = null;
     }
 
-    public Room2DEntity Room => room;
+    public Room2DEntity Room
+    {
+        get
+        {
+            EnsureRoomReference();
+            return room;
+        }
+    }
     public Vector3 InteriorCenter => interiorCenter;
     public bool IsOpen => _openness > 0.7f;
     public Vector3 ExteriorInteractionPoint => DoorFrontPoint();
@@ -56,6 +67,9 @@ public class RoomDoor : MonoBehaviour
     public void Configure(Room2DEntity roomEntity, Vector3 newInteriorCenter)
     {
         room = roomEntity;
+        roomNumber = roomEntity != null
+            ? roomEntity.roomNumber
+            : RoomSceneBinder.ParseRoomNumber(gameObject.name);
         interiorCenter = newInteriorCenter;
     }
 
@@ -66,6 +80,7 @@ public class RoomDoor : MonoBehaviour
         go.transform.position = doorPos;
         var door = go.AddComponent<RoomDoor>();
         door.room = roomEntity;
+        door.roomNumber = roomEntity.roomNumber;
         door.interiorCenter = interior;
         door.BuildVisuals();
         return door;
@@ -125,6 +140,7 @@ public class RoomDoor : MonoBehaviour
 
     private void Start()
     {
+        EnsureRoomReference();
         _manager = FindFirstObjectByType<ManagerController>();
         _managerAgent = _manager != null ? _manager.GetComponent<NavMeshAgent>() : null;
         _spawner = FindFirstObjectByType<StaffAgentSpawner>();
@@ -157,6 +173,24 @@ public class RoomDoor : MonoBehaviour
             _openPanelCount++;
             AnyPanelOpen = true;
             ActivePrompt = this;
+        }
+    }
+
+    private void EnsureRoomReference()
+    {
+        if (room != null) return;
+        if (roomNumber <= 0)
+            roomNumber = RoomSceneBinder.ParseRoomNumber(gameObject.name);
+        if (roomNumber <= 0) return;
+
+        Room2DEntity[] rooms = FindObjectsByType<Room2DEntity>(
+            FindObjectsInactive.Include,
+            FindObjectsSortMode.None);
+        for (int i = 0; i < rooms.Length; i++)
+        {
+            if (rooms[i] == null || rooms[i].roomNumber != roomNumber) continue;
+            room = rooms[i];
+            return;
         }
     }
 
@@ -228,7 +262,7 @@ public class RoomDoor : MonoBehaviour
             FindObjectsInactive.Include,
             FindObjectsSortMode.None);
         foreach (RoomDoor door in doors)
-            if (door != null && door.room == roomEntity) return door.DoorFrontPoint();
+            if (door != null && door.Room == roomEntity) return door.DoorFrontPoint();
         return roomEntity.transform.position;
     }
 
