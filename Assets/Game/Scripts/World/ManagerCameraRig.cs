@@ -107,6 +107,7 @@ public class ManagerCameraRig : MonoBehaviour
     {
         if (target == null) return;
 
+        ShowFloorForPoint(target.position);
         _focusPoint = ClampFocus(target.position);
         _focusInitialized = true;
         _followingTarget = true;
@@ -117,11 +118,18 @@ public class ManagerCameraRig : MonoBehaviour
     public void FocusOnPoint(Vector3 worldPoint, bool instant = false)
     {
         EnsureFocusInitialized();
+        ShowFloorForPoint(worldPoint);
         _focusPoint = ClampFocus(worldPoint);
         _focusInitialized = true;
         _followingTarget = false;
         _dragging = false;
         _snapNextFrame = instant;
+    }
+
+    private void ShowFloorForPoint(Vector3 worldPoint)
+    {
+        if (floors == null) floors = FindFirstObjectByType<FloorVisibilityController>();
+        if (floors != null) floors.ShowFloor(FloorMath.FloorIndexForY(worldPoint.y));
     }
 
     private void LateUpdate()

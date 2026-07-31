@@ -73,11 +73,24 @@ namespace OldTownHotel.Tests.EditMode
     {
         private GameObject _cameraObject;
         private GameObject _targetObject;
+        private GameObject _floorRoot;
+        private GameObject[] _floorObjects;
+        private FloorVisibilityController _floors;
         private ManagerCameraRig _rig;
 
         [SetUp]
         public void SetUp()
         {
+            _floorRoot = new GameObject("Floors");
+            _floorObjects = new GameObject[3];
+            for (int i = 0; i < _floorObjects.Length; i++)
+            {
+                _floorObjects[i] = new GameObject("Floor" + (i + 1));
+                _floorObjects[i].transform.SetParent(_floorRoot.transform);
+            }
+            _floors = _floorRoot.AddComponent<FloorVisibilityController>();
+            _floors.SetFloorsForTesting(_floorObjects);
+
             _cameraObject = new GameObject("Camera");
             _cameraObject.AddComponent<Camera>().orthographic = true;
             _rig = _cameraObject.AddComponent<ManagerCameraRig>();
@@ -94,6 +107,7 @@ namespace OldTownHotel.Tests.EditMode
         {
             Object.DestroyImmediate(_cameraObject);
             Object.DestroyImmediate(_targetObject);
+            Object.DestroyImmediate(_floorRoot);
         }
 
         [Test]
@@ -128,6 +142,25 @@ namespace OldTownHotel.Tests.EditMode
 
             Assert.IsTrue(_rig.IsFollowingTarget);
             Assert.AreEqual(_targetObject.transform.position, _rig.FocusPoint);
+        }
+
+        [Test]
+        public void FocusOnPoint_SwitchesVisibleFloor_AndReturnRestoresManagerFloor()
+        {
+            Vector3 secondFloorRoom = new Vector3(4f, FloorMath.BaseYFor(1), 2f);
+
+            _rig.FocusOnPoint(secondFloorRoom, instant: true);
+
+            Assert.AreEqual(1, _floors.CurrentFloor);
+            Assert.IsFalse(_floorObjects[0].activeSelf);
+            Assert.IsTrue(_floorObjects[1].activeSelf);
+            Assert.AreEqual(secondFloorRoom, _rig.FocusPoint);
+
+            _rig.ReturnToTarget(instant: true);
+
+            Assert.AreEqual(0, _floors.CurrentFloor);
+            Assert.IsTrue(_floorObjects[0].activeSelf);
+            Assert.IsFalse(_floorObjects[1].activeSelf);
         }
 
         private void InvokeLateUpdate()
