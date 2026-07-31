@@ -230,7 +230,15 @@ public class WorldInputController : MonoBehaviour
         var room = hit.collider.GetComponentInParent<RoomSceneBinder>();
         if (room != null && room.RoomNumber > 0) RoomSelection.Select(room.RoomNumber);
 
-        if (manager != null) manager.MoveTo(hit.point);
-        ClickMarkerFx.Spawn(hit.point);
+        if (manager != null && manager.TryMoveTo(hit.point, out Vector3 destination))
+        {
+            ClickMarkerFx.Spawn(destination);
+        }
+        else
+        {
+            float managerY = manager != null ? manager.transform.position.y : hit.point.y;
+            ClickMarkerFx.SpawnRejected(
+                ManagerController.ProjectToCurrentFloor(hit.point, managerY));
+        }
     }
 }

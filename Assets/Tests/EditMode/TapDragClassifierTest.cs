@@ -143,4 +143,32 @@ namespace OldTownHotel.Tests.EditMode
                 ?.SetValue(instance, value);
         }
     }
+
+    [TestFixture]
+    public class ManagerControllerNavigationTest
+    {
+        [Test]
+        public void ProjectToCurrentFloor_RemovesRoomTapColliderHeight()
+        {
+            Vector3 roomColliderHit = new Vector3(2.5f, 10.4f, -1.25f);
+
+            Vector3 projected = ManagerController.ProjectToCurrentFloor(
+                roomColliderHit,
+                managerY: FloorMath.BaseYFor(2));
+
+            Assert.AreEqual(new Vector3(2.5f, 8f, -1.25f), projected);
+        }
+
+        [Test]
+        public void ProjectToCurrentFloor_UsesManagersFloorInsteadOfHitFloor()
+        {
+            Vector3 tallColliderHit = new Vector3(-3f, 4.2f, 2f);
+
+            Vector3 projected = ManagerController.ProjectToCurrentFloor(
+                tallColliderHit,
+                managerY: FloorMath.BaseYFor(0));
+
+            Assert.AreEqual(new Vector3(-3f, 0f, 2f), projected);
+        }
+    }
 }
