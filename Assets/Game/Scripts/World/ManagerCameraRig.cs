@@ -22,6 +22,13 @@ public class ManagerCameraRig : MonoBehaviour
     public bool IsFollowingTarget => _followingTarget;
     public Vector3 FocusPoint => _focusPoint;
 
+    public void SetWorldBounds(Vector2 minXZ, Vector2 maxXZ)
+    {
+        worldMinXZ = Vector2.Min(minXZ, maxXZ);
+        worldMaxXZ = Vector2.Max(minXZ, maxXZ);
+        if (_focusInitialized) _focusPoint = ClampFocus(_focusPoint);
+    }
+
     private void Awake()
     {
         _cam = GetComponent<Camera>();

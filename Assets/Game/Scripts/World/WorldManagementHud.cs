@@ -22,18 +22,23 @@ public sealed class WorldManagementHud : MonoBehaviour
         Assets
     }
 
-    private static readonly Color Ink = Hex("#1E2827");
-    private static readonly Color InkSoft = Hex("#52605D");
-    private static readonly Color Cream = Hex("#F4EBDD");
-    private static readonly Color Paper = Hex("#FFF9EF");
-    private static readonly Color Gold = Hex("#D7A63C");
-    private static readonly Color GoldDark = Hex("#A56F1E");
-    private static readonly Color Teal = Hex("#297A6E");
-    private static readonly Color TealSoft = Hex("#D9E9E4");
-    private static readonly Color Coral = Hex("#C65B46");
-    private static readonly Color Slate = Hex("#71807D");
-    private static readonly Color White = new Color(1f, 1f, 1f, 1f);
-    private static readonly Color Glass = new Color(0.08f, 0.11f, 0.11f, 0.94f);
+    // Old hotel front-desk language: smoked glass, walnut, oxidized brass and
+    // muted ledger paper. Parchment is reserved for type, never large surfaces.
+    private static readonly Color Ink = Hex("#1B1713");
+    private static readonly Color InkSoft = Hex("#B9AB96");
+    private static readonly Color Cream = Hex("#E9D9BC");
+    private static readonly Color Paper = new Color(0.16f, 0.13f, 0.105f, 0.97f);
+    private static readonly Color Gold = Hex("#C99A45");
+    private static readonly Color GoldDark = Hex("#765426");
+    private static readonly Color Teal = Hex("#2E6D61");
+    private static readonly Color TealSoft = Hex("#86A99D");
+    private static readonly Color Coral = Hex("#A64E40");
+    private static readonly Color Slate = Hex("#6E685E");
+    private static readonly Color White = Hex("#F5EAD4");
+    private static readonly Color Glass = new Color(0.075f, 0.065f, 0.055f, 0.95f);
+    private static readonly Color Ledger = new Color(0.105f, 0.087f, 0.07f, 0.98f);
+    private static readonly Color Walnut = new Color(0.19f, 0.135f, 0.10f, 0.97f);
+    private static readonly Color BrassLine = new Color(0.79f, 0.60f, 0.27f, 0.55f);
 
     private static WorldManagementHud _instance;
     private static Sprite _roundedSprite;
@@ -281,6 +286,7 @@ public sealed class WorldManagementHud : MonoBehaviour
             new Vector2(Mathf.Clamp01(Sim.Safebox.FillRatio), 1f);
         _safeboxButton.interactable = Sim.Safebox.Balance > 0;
         _safeboxButtonImage.color = Sim.Safebox.Balance > 0 ? Gold : Slate;
+        _safeboxLabel.color = ContrastText(_safeboxButtonImage.color);
     }
 
     private void RefreshRoomCard()
@@ -949,7 +955,7 @@ public sealed class WorldManagementHud : MonoBehaviour
         for (int i = 0; i < _navButtons.Count; i++)
         {
             bool active = _drawerOpen && i == (int)_tab;
-            _navButtons[i].GetComponent<Image>().color = active ? Gold : Ink;
+            _navButtons[i].GetComponent<Image>().color = active ? Gold : Paper;
             _navLabels[i].color = active ? Ink : Cream;
         }
     }
@@ -1001,6 +1007,7 @@ public sealed class WorldManagementHud : MonoBehaviour
         _topPanel = CreatePanel("EconomyHeader", _safeRoot, Glass);
         SetAnchors(_topPanel, new Vector2(0f, 1f), new Vector2(1f, 1f),
             new Vector2(8f, -114f), new Vector2(-8f, -8f));
+        AddOutline(_topPanel, BrassLine, 1.2f);
 
         var accent = CreatePanel("Accent", _topPanel, Gold);
         SetAnchors(accent, new Vector2(0f, 0f), new Vector2(0f, 1f),
@@ -1011,7 +1018,7 @@ public sealed class WorldManagementHud : MonoBehaviour
         SetAnchors(_dayTimeLabel.rectTransform, new Vector2(0f, 0.5f), new Vector2(0.64f, 1f),
             new Vector2(16f, 2f), new Vector2(-2f, -8f));
 
-        _cashLabel = CreateText("Cash", _topPanel, 27f, White,
+        _cashLabel = CreateText("Cash", _topPanel, 27f, Gold,
             TextAlignmentOptions.TopRight, true);
         SetAnchors(_cashLabel.rectTransform, new Vector2(0.62f, 0.48f), new Vector2(1f, 1f),
             new Vector2(0f, 0f), new Vector2(-16f, -8f));
@@ -1046,6 +1053,7 @@ public sealed class WorldManagementHud : MonoBehaviour
         _bottomNav = CreatePanel("BottomNavigation", _safeRoot, Glass);
         SetAnchors(_bottomNav, new Vector2(0f, 0f), new Vector2(1f, 0f),
             new Vector2(8f, 8f), new Vector2(-8f, 66f));
+        AddOutline(_bottomNav, BrassLine, 1.2f);
         var layout = _bottomNav.gameObject.AddComponent<HorizontalLayoutGroup>();
         layout.padding = new RectOffset(5, 5, 5, 5);
         layout.spacing = 5f;
@@ -1065,7 +1073,7 @@ public sealed class WorldManagementHud : MonoBehaviour
         RectTransform rect;
         TextMeshProUGUI text;
         Button button = CreateButton(tab.ToString(), _bottomNav, out rect, out text,
-            label, Ink, () => SelectTab(tab));
+            label, Paper, () => SelectTab(tab));
         var element = button.gameObject.AddComponent<LayoutElement>();
         element.flexibleWidth = 1f;
         _navButtons.Add(button);
@@ -1074,15 +1082,21 @@ public sealed class WorldManagementHud : MonoBehaviour
 
     private void BuildDrawer()
     {
-        _drawer = CreatePanel("ManagementDesk", _safeRoot, Cream);
+        _drawer = CreatePanel("ManagementDesk", _safeRoot, Ledger);
         SetAnchors(_drawer, new Vector2(0f, 0f), new Vector2(1f, 0.68f),
             new Vector2(8f, 72f), new Vector2(-8f, -8f));
+        AddOutline(_drawer, BrassLine, 1.4f);
+
+        var headerBand = CreatePanel("HeaderBand", _drawer, Walnut);
+        SetAnchors(headerBand, new Vector2(0f, 1f), new Vector2(1f, 1f),
+            new Vector2(0f, -58f), Vector2.zero);
+        headerBand.SetAsFirstSibling();
 
         var handle = CreatePanel("Handle", _drawer, Gold);
         SetAnchors(handle, new Vector2(0f, 1f), new Vector2(1f, 1f),
             new Vector2(0f, -4f), Vector2.zero);
 
-        _drawerTitle = CreateText("Title", _drawer, 22f, Ink,
+        _drawerTitle = CreateText("Title", _drawer, 22f, Cream,
             TextAlignmentOptions.MidlineLeft, true);
         SetAnchors(_drawerTitle.rectTransform, new Vector2(0f, 1f), new Vector2(0.82f, 1f),
             new Vector2(18f, -55f), new Vector2(0f, -8f));
@@ -1090,7 +1104,7 @@ public sealed class WorldManagementHud : MonoBehaviour
         RectTransform closeRect;
         TextMeshProUGUI closeText;
         CreateButton("Close", _drawer, out closeRect, out closeText,
-            "", Ink, () => SetDrawerOpen(false));
+            "", Walnut, () => SetDrawerOpen(false));
         SetAnchors(closeRect, new Vector2(1f, 1f), new Vector2(1f, 1f),
             new Vector2(-54f, -51f), new Vector2(-12f, -10f));
         AddCloseGlyph(closeRect);
@@ -1128,20 +1142,21 @@ public sealed class WorldManagementHud : MonoBehaviour
 
     private void BuildRoomCard()
     {
-        _roomCard = CreatePanel("SelectedRoomInvestment", _safeRoot, Paper);
+        _roomCard = CreatePanel("SelectedRoomInvestment", _safeRoot, Ledger);
         SetAnchors(_roomCard, new Vector2(0f, 0f), new Vector2(1f, 0f),
             new Vector2(8f, 72f), new Vector2(-8f, 262f));
+        AddOutline(_roomCard, BrassLine, 1.4f);
 
-        var accent = CreatePanel("Accent", _roomCard, Teal);
+        var accent = CreatePanel("Accent", _roomCard, Gold);
         SetAnchors(accent, new Vector2(0f, 0f), new Vector2(0f, 1f),
             Vector2.zero, new Vector2(6f, 0f));
 
-        _roomTitle = CreateText("RoomTitle", _roomCard, 18f, Ink,
+        _roomTitle = CreateText("RoomTitle", _roomCard, 18f, Gold,
             TextAlignmentOptions.TopLeft, true);
         SetAnchors(_roomTitle.rectTransform, new Vector2(0f, 0.72f), new Vector2(0.76f, 1f),
             new Vector2(16f, 0f), new Vector2(0f, -10f));
 
-        _roomHeadline = CreateText("RoomHeadline", _roomCard, 18f, Ink,
+        _roomHeadline = CreateText("RoomHeadline", _roomCard, 18f, Cream,
             TextAlignmentOptions.TopLeft, true);
         SetAnchors(_roomHeadline.rectTransform, new Vector2(0f, 0.51f), new Vector2(1f, 0.78f),
             new Vector2(16f, 0f), new Vector2(-14f, 0f));
@@ -1155,7 +1170,7 @@ public sealed class WorldManagementHud : MonoBehaviour
         RectTransform closeRect;
         TextMeshProUGUI closeText;
         CreateButton("CloseRoom", _roomCard, out closeRect, out closeText,
-            "×", Slate, RoomSelection.Clear);
+            "×", Walnut, RoomSelection.Clear);
         SetAnchors(closeRect, new Vector2(1f, 1f), new Vector2(1f, 1f),
             new Vector2(-49f, -43f), new Vector2(-10f, -8f));
 
@@ -1174,7 +1189,7 @@ public sealed class WorldManagementHud : MonoBehaviour
 
     private void BuildToast()
     {
-        _toastPanel = CreatePanel("Toast", _safeRoot, Ink);
+        _toastPanel = CreatePanel("Toast", _safeRoot, Walnut);
         SetAnchors(_toastPanel, new Vector2(0.08f, 0.73f), new Vector2(0.92f, 0.73f),
             new Vector2(0f, -26f), new Vector2(0f, 26f));
         _toastGroup = _toastPanel.gameObject.AddComponent<CanvasGroup>();
@@ -1198,6 +1213,7 @@ public sealed class WorldManagementHud : MonoBehaviour
         if (action != null) button.onClick.AddListener(() => action());
         button.interactable = interactable;
         button.GetComponent<Image>().color = interactable ? color : Slate;
+        label.color = ContrastText(interactable ? color : Slate);
     }
 
     private void AddSection(string title, string subtitle)
@@ -1205,7 +1221,7 @@ public sealed class WorldManagementHud : MonoBehaviour
         var item = CreateRect("Section", _drawerContent);
         var element = item.gameObject.AddComponent<LayoutElement>();
         element.preferredHeight = 58f;
-        var titleText = CreateText("Title", item, 17f, Ink,
+        var titleText = CreateText("Title", item, 17f, Cream,
             TextAlignmentOptions.BottomLeft, true);
         SetAnchors(titleText.rectTransform, new Vector2(0f, 0.42f), Vector2.one,
             new Vector2(8f, 0f), new Vector2(-8f, 0f));
@@ -1216,6 +1232,11 @@ public sealed class WorldManagementHud : MonoBehaviour
         SetAnchors(subText.rectTransform, Vector2.zero, new Vector2(1f, 0.45f),
             new Vector2(8f, 0f), new Vector2(-8f, 0f));
         subText.text = subtitle;
+
+        var rule = CreatePanel("LedgerRule", item, BrassLine);
+        SetAnchors(rule, new Vector2(0f, 0f), new Vector2(1f, 0f),
+            new Vector2(8f, 0f), new Vector2(-8f, 1f));
+        rule.GetComponent<Image>().raycastTarget = false;
     }
 
     private void AddInfoCard(
@@ -1227,10 +1248,11 @@ public sealed class WorldManagementHud : MonoBehaviour
         var item = CreatePanel("InfoCard", _drawerContent, Paper);
         var element = item.gameObject.AddComponent<LayoutElement>();
         element.preferredHeight = height;
+        AddOutline(item, new Color(BrassLine.r, BrassLine.g, BrassLine.b, 0.35f), 0.8f);
         var stripe = CreatePanel("Stripe", item, accent);
         SetAnchors(stripe, Vector2.zero, new Vector2(0f, 1f),
             Vector2.zero, new Vector2(5f, 0f));
-        var titleText = CreateText("Title", item, 15f, Ink,
+        var titleText = CreateText("Title", item, 15f, Cream,
             TextAlignmentOptions.TopLeft, true);
         SetAnchors(titleText.rectTransform, new Vector2(0f, 0.62f), Vector2.one,
             new Vector2(14f, 2f), new Vector2(-10f, -8f));
@@ -1274,12 +1296,13 @@ public sealed class WorldManagementHud : MonoBehaviour
         var element = button.gameObject.AddComponent<LayoutElement>();
         element.preferredHeight = 74f;
 
-        var titleText = CreateText("Title", rect, 15f, Cream,
+        Color planText = ContrastText(interactable ? color : Slate);
+        var titleText = CreateText("Title", rect, 15f, planText,
             TextAlignmentOptions.TopLeft, true);
         SetAnchors(titleText.rectTransform, new Vector2(0f, 0.52f), Vector2.one,
             new Vector2(14f, 0f), new Vector2(-12f, -8f));
         titleText.text = title;
-        var detailText = CreateText("Detail", rect, 11.5f, Cream,
+        var detailText = CreateText("Detail", rect, 11.5f, planText,
             TextAlignmentOptions.TopLeft, false);
         detailText.enableWordWrapping = true;
         SetAnchors(detailText.rectTransform, Vector2.zero, new Vector2(1f, 0.58f),
@@ -1452,6 +1475,7 @@ public sealed class WorldManagementHud : MonoBehaviour
         image.sprite = RoundedSprite;
         image.type = Image.Type.Sliced;
         image.color = color;
+        AddOutline(rect, new Color(BrassLine.r, BrassLine.g, BrassLine.b, 0.38f), 0.8f);
         var button = rect.gameObject.AddComponent<Button>();
         button.targetGraphic = image;
         button.transition = Selectable.Transition.ColorTint;
@@ -1463,7 +1487,7 @@ public sealed class WorldManagementHud : MonoBehaviour
         button.colors = colors;
         if (onClick != null) button.onClick.AddListener(() => onClick());
 
-        label = CreateText("Label", rect, 13.5f, Cream,
+        label = CreateText("Label", rect, 13.5f, ContrastText(color),
             TextAlignmentOptions.Center, true);
         label.text = text;
         Stretch(label.rectTransform, 6f);
@@ -1485,6 +1509,7 @@ public sealed class WorldManagementHud : MonoBehaviour
         text.color = color;
         text.alignment = alignment;
         text.fontStyle = bold ? FontStyles.Bold : FontStyles.Normal;
+        text.characterSpacing = 0.35f;
         text.raycastTarget = false;
         text.overflowMode = TextOverflowModes.Truncate;
         text.enableWordWrapping = false;
@@ -1503,6 +1528,23 @@ public sealed class WorldManagementHud : MonoBehaviour
         back.localRotation = Quaternion.Euler(0f, 0f, -45f);
         forward.GetComponent<Image>().raycastTarget = false;
         back.GetComponent<Image>().raycastTarget = false;
+    }
+
+    private static void AddOutline(RectTransform rect, Color color, float distance)
+    {
+        var outline = rect.gameObject.AddComponent<Outline>();
+        outline.effectColor = color;
+        outline.effectDistance = new Vector2(distance, -distance);
+        outline.useGraphicAlpha = true;
+    }
+
+    private static Color ContrastText(Color background)
+    {
+        float luminance =
+            background.r * 0.2126f +
+            background.g * 0.7152f +
+            background.b * 0.0722f;
+        return luminance > 0.43f ? Ink : Cream;
     }
 
     private static TMP_FontAsset RuntimeFont

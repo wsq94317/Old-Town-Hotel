@@ -1,5 +1,6 @@
 using System.Reflection;
 using NUnit.Framework;
+using Unity.AI.Navigation;
 using UnityEngine;
 
 // 世界输入路由的判定核心：按下→(位移小+松手)=Tap；位移超阈值=Drag（此后本次按压不再是 Tap）。
@@ -286,6 +287,46 @@ namespace OldTownHotel.Tests.EditMode
             Assert.AreEqual(999, RoomInvestmentMath.SoldNightsToPayback(
                 totalInvestment: 900,
                 nightlyGain: 0));
+        }
+    }
+
+    [TestFixture]
+    public class HotelSceneExpansionContractTest
+    {
+        [Test]
+        public void Expansion_PreservesSmallOpeningStock()
+        {
+            Assert.AreEqual(24, HotelSceneExpansion.ExpandedRoomCount);
+            Assert.AreEqual(
+                8,
+                HotelSceneExpansion.ExpandedRoomCount -
+                HotelSceneExpansion.StartingDerelictRooms);
+        }
+
+        [Test]
+        public void RoomTapArea_StaysAtDoorAndOutOfNavigationBuild()
+        {
+            var room = new GameObject("Room_209");
+            room.transform.localPosition = new Vector3(-12.5f, 0f, 4f);
+
+            try
+            {
+                RoomSceneBinder binder = room.AddComponent<RoomSceneBinder>();
+                binder.ConfigureRoomNumber(209);
+
+                BoxCollider box = room.GetComponent<BoxCollider>();
+                Assert.NotNull(box);
+                Assert.AreEqual(1.1f, box.size.z, 0.001f);
+                Assert.AreEqual(-2.05f, box.center.z, 0.001f);
+
+                NavMeshModifier modifier = room.GetComponent<NavMeshModifier>();
+                Assert.NotNull(modifier);
+                Assert.IsTrue(modifier.ignoreFromBuild);
+            }
+            finally
+            {
+                Object.DestroyImmediate(room);
+            }
         }
     }
 }

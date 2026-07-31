@@ -20,6 +20,12 @@ public class RoomFurnitureView : MonoBehaviour
     private float _refreshTimer;
     private bool _doorOnPositiveZ;
 
+    public void ConfigureRoomNumber(int number)
+    {
+        roomNumber = number;
+        _doorOnPositiveZ = transform.localPosition.z < 0f;
+    }
+
     private void OnEnable()
     {
         if (roomNumber <= 0) roomNumber = RoomSceneBinder.ParseRoomNumber(gameObject.name);

@@ -53,6 +53,12 @@ public class HotelSimSceneBridge : MonoBehaviour
     /// 这是"绞杀者迁移"里真正的权威翻转那一刀。</summary>
     public bool SimOwnsGuestFlow { get; private set; } = true;
 
+    public void SetDerelictRoomsAtStart(int count)
+    {
+        if (_built) return;
+        derelictRoomsAtStart = Mathf.Max(0, count);
+    }
+
     /// <summary>上一次同步里推给 v1 的房间数（调试/验收用）。</summary>
     public int LastPushedRoomCount { get; private set; }
 

@@ -49,6 +49,12 @@ public class RoomDoor : MonoBehaviour
     public Vector3 InteriorCenter => interiorCenter;
     public bool IsOpen => _openness > 0.7f;
 
+    public void Configure(Room2DEntity roomEntity, Vector3 newInteriorCenter)
+    {
+        room = roomEntity;
+        interiorCenter = newInteriorCenter;
+    }
+
     public static RoomDoor Build(Transform floorParent, Room2DEntity roomEntity, Vector3 doorPos, Vector3 interior)
     {
         var go = new GameObject("Door_" + roomEntity.roomNumber);

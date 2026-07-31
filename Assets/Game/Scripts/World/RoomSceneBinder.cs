@@ -1,4 +1,5 @@
 using UnityEngine;
+using Unity.AI.Navigation;
 
 // 把**看得见的房间**和**账上的房间**缝在一起（场景基础架构第一块）。
 //
@@ -23,8 +24,8 @@ public class RoomSceneBinder : MonoBehaviour
     /// <summary>房号。留空则从物体名 "Room_301" 里解析。</summary>
     [SerializeField] private int roomNumber;
 
-    /// <summary>点击热区的尺寸（房间大约 5×5，给一个略小的盒子避免和走廊抢点击）。</summary>
-    [SerializeField] private Vector3 tapBoxSize = new Vector3(4.2f, 2.4f, 4.2f);
+    /// <summary>Doorway interaction area. The room floor remains available for movement taps.</summary>
+    [SerializeField] private Vector3 tapBoxSize = new Vector3(3.2f, 2.4f, 1.1f);
 
     private TextMesh _label;
     private Renderer _stateChip;
@@ -35,6 +36,15 @@ public class RoomSceneBinder : MonoBehaviour
     private float _refreshTimer;
 
     public int RoomNumber => roomNumber;
+
+    public void ConfigureRoomNumber(int number)
+    {
+        roomNumber = number;
+        FindLabel();
+        EnsureStateChip();
+        EnsureTapCollider();
+        _shownState = (RoomSimState)(-1);
+    }
 
     private void OnEnable()
     {
@@ -86,7 +96,9 @@ public class RoomSceneBinder : MonoBehaviour
         {
             var quad = GameObject.CreatePrimitive(PrimitiveType.Quad);
             quad.name = "StateChip";
-            Destroy(quad.GetComponent<Collider>());       // 别抢点击
+            Collider chipCollider = quad.GetComponent<Collider>();
+            if (Application.isPlaying) Destroy(chipCollider);
+            else DestroyImmediate(chipCollider);
             quad.transform.SetParent(transform, worldPositionStays: false);
             // 贴在走廊那一侧的地面上（房间 5×5，走廊边在本地 z=±2.5）。
             // 用房间自己的 z 符号决定朝哪边——205-208 的朝向是镜像的。
@@ -106,15 +118,28 @@ public class RoomSceneBinder : MonoBehaviour
         if (_stateChip != null && _chipMaterial != null) _stateChip.sharedMaterial = _chipMaterial;
     }
 
-    /// <summary>房间要能被点到。原本整间房只有墙和床各自的碰撞体，
-    /// 点墙缝就落到地板上——加一个覆盖整间房的盒子，点哪儿都算点这间房。</summary>
+    /// <summary>
+    /// Keeps room selection on a compact doorway strip instead of covering the
+    /// full room floor, which must remain available for manager movement.
+    /// </summary>
     private void EnsureTapCollider()
     {
+        // Migrate the original room-sized click boxes without requiring a scene
+        // reserialize. Only the doorway plaque is an interaction target now.
+        tapBoxSize.x = Mathf.Min(tapBoxSize.x, 3.2f);
+        tapBoxSize.y = Mathf.Max(tapBoxSize.y, 2.4f);
+        tapBoxSize.z = Mathf.Min(tapBoxSize.z, 1.1f);
+
         var existing = GetComponent<BoxCollider>();
         if (existing == null) existing = gameObject.AddComponent<BoxCollider>();
         existing.size = tapBoxSize;
-        existing.center = new Vector3(0f, tapBoxSize.y * 0.5f, 0f);
+        float corridorSide = transform.localPosition.z >= 0f ? -1f : 1f;
+        existing.center = new Vector3(0f, tapBoxSize.y * 0.5f, corridorSide * 2.05f);
         existing.isTrigger = false;
+
+        var modifier = GetComponent<NavMeshModifier>();
+        if (modifier == null) modifier = gameObject.AddComponent<NavMeshModifier>();
+        modifier.ignoreFromBuild = true;
     }
 
     private void Update()
@@ -167,7 +192,9 @@ public class RoomSceneBinder : MonoBehaviour
 
     private void OnDestroy()
     {
-        if (_chipMaterial != null) Destroy(_chipMaterial);
+        if (_chipMaterial == null) return;
+        if (Application.isPlaying) Destroy(_chipMaterial);
+        else DestroyImmediate(_chipMaterial);
     }
 }
 
