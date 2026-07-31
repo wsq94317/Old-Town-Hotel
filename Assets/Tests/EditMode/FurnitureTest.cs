@@ -130,6 +130,20 @@ namespace OldTownHotel.Tests.EditMode
         }
 
         [Test]
+        public void VisualVariant_IsStoredWithoutChangingFurnitureKind()
+        {
+            var ledger = new FurnitureLedger();
+            FurnitureInstance sofa = ledger.Place(
+                201, FurnitureCatalog.Sofa, visualVariantId: 2);
+
+            Assert.That(sofa.kindId, Is.EqualTo(FurnitureCatalog.Sofa));
+            Assert.That(sofa.visualVariantId, Is.EqualTo(2));
+            Assert.That(ledger.TrySetVisualVariant(sofa.instanceId, 3), Is.True);
+            Assert.That(sofa.visualVariantId, Is.EqualTo(3));
+            Assert.That(ledger.TrySetVisualVariant(sofa.instanceId, -1), Is.False);
+        }
+
+        [Test]
         public void DerelictRoom_HasWorkingRequiredButTerribleDelivery()
         {
             var ledger = DerelictRoom();
@@ -200,6 +214,8 @@ namespace OldTownHotel.Tests.EditMode
         {
             var ledger = DerelictRoom();
             ledger.Place(201, FurnitureCatalog.BoxyTv, newness: 0.1f, health: 0.3f);
+            ledger.InRoom(201)[0].visualVariantId = 3;
+            ledger.InRoom(201)[2].visualVariantId = 2;
 
             ledger.RefurbishAndUpgradeRequired(201);
 
@@ -207,12 +223,55 @@ namespace OldTownHotel.Tests.EditMode
             foreach (var f in ledger.InRoom(201))
             {
                 var kind = FurnitureCatalog.Get(f.kindId);
-                if (kind.slot == FurnitureSlot.Bed) { beds++; Assert.That(f.kindId, Is.EqualTo(FurnitureCatalog.ProperBed)); }
-                if (kind.slot == FurnitureSlot.Entertainment) { tvs++; Assert.That(f.kindId, Is.EqualTo(FurnitureCatalog.BoxyTv), "可选家具不升档"); }
+                if (kind.slot == FurnitureSlot.Bed)
+                {
+                    beds++;
+                    Assert.That(f.kindId, Is.EqualTo(FurnitureCatalog.ProperBed));
+                    Assert.That(f.visualVariantId, Is.Zero, "品类升级后回到新家具的默认模型");
+                }
+                if (kind.slot == FurnitureSlot.Entertainment)
+                {
+                    tvs++;
+                    Assert.That(f.kindId, Is.EqualTo(FurnitureCatalog.BoxyTv), "可选家具不升档");
+                    Assert.That(f.visualVariantId, Is.EqualTo(2), "未换品类的外观配置应保留");
+                }
                 Assert.That(f.newness, Is.EqualTo(1f).Within(1e-4f), "但全部翻新");
             }
             Assert.That(beds, Is.EqualTo(1));
             Assert.That(tvs, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void RenovationCompletion_PreservesFurnitureChosenDuringThatJob()
+        {
+            var ledger = DerelictRoom();
+            FurnitureInstance chosenBed = ledger.InRoom(201)[0];
+            chosenBed.visualVariantId = 2;
+            ledger.MarkSelectedForRenovation(chosenBed.instanceId);
+
+            ledger.RefurbishAndUpgradeRequired(201);
+
+            Assert.That(chosenBed.kindId, Is.EqualTo(FurnitureCatalog.SaggingBed));
+            Assert.That(chosenBed.visualVariantId, Is.EqualTo(2));
+            Assert.That(chosenBed.newness, Is.EqualTo(1f));
+
+            ledger.ClearRenovationSelections(201);
+            Assert.That(chosenBed.selectedForRenovation, Is.False);
+        }
+
+        [Test]
+        public void LuxuryRenovation_FillsAroundFurnitureChosenDuringThatJob()
+        {
+            var ledger = DerelictRoom();
+            FurnitureInstance chosenBed = ledger.InRoom(201)[0];
+            ledger.MarkSelectedForRenovation(chosenBed.instanceId);
+
+            ledger.ReplaceRoomWithTopTier(201);
+
+            Assert.That(ledger.TryGet(chosenBed.instanceId, out FurnitureInstance preserved), Is.True);
+            Assert.That(preserved.kindId, Is.EqualTo(FurnitureCatalog.SaggingBed));
+            Assert.That(ledger.RequiredFurnitureWorking(201), Is.True);
+            Assert.That(ledger.InRoom(201).Count, Is.EqualTo(6));
         }
 
         [Test]
@@ -357,12 +416,14 @@ namespace OldTownHotel.Tests.EditMode
         {
             var ledger = new FurnitureLedger();
             ledger.RestoreInstance(instanceId: 77, kindId: FurnitureCatalog.Sofa, roomNumber: 305,
-                                   posX: 0.3f, posY: 0.7f, newness: 0.44f, health: 0.66f, faultLineIndex: 1);
+                                   posX: 0.3f, posY: 0.7f, newness: 0.44f, health: 0.66f,
+                                   faultLineIndex: 1, visualVariantId: 3);
 
             Assert.That(ledger.TryGet(77, out FurnitureInstance f), Is.True);
             Assert.That(f.newness, Is.EqualTo(0.44f).Within(1e-4f));
             Assert.That(f.health, Is.EqualTo(0.66f).Within(1e-4f));
             Assert.That(f.IsFaulted, Is.True);
+            Assert.That(f.visualVariantId, Is.EqualTo(3));
             Assert.That(ledger.InRoom(305).Count, Is.EqualTo(1));
 
             var next = ledger.Place(305, FurnitureCatalog.Rug);

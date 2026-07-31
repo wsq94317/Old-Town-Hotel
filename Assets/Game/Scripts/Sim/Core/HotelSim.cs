@@ -329,21 +329,29 @@ public sealed class HotelSim
         if (!FurnitureCatalog.TryGet(kindId, out FurnitureKind kind)) { reason = "No such furniture."; return false; }
 
         var existing = Furniture.InRoom(roomNumber);
-        if (kind.IsRequired)
+        for (int i = 0; i < existing.Count; i++)
         {
-            // 必备位是替换语义：先拆旧的（有残值）
-            for (int i = 0; i < existing.Count; i++)
+            FurnitureKind oldKind = FurnitureCatalog.Get(existing[i].kindId);
+            if (oldKind.slot != kind.slot) continue;
+            if (oldKind.kindId == kindId)
             {
-                if (FurnitureCatalog.Get(existing[i].kindId).slot != kind.slot) continue;
-                if (!TrySpendCash(kind.cashCost)) { reason = "That costs $" + kind.cashCost + "."; return false; }
-                Cash += FurnitureWearModel.SalvageValue(FurnitureCatalog.Get(existing[i].kindId).cashCost,
-                                                        existing[i].newness);
-                Furniture.Remove(existing[i].instanceId);
-                Furniture.Place(roomNumber, kindId);
-                return true;
+                reason = "That furniture is already selected.";
+                return false;
             }
+            if (!TrySpendCash(kind.cashCost))
+            {
+                reason = "That costs $" + kind.cashCost + ".";
+                return false;
+            }
+            Cash += FurnitureWearModel.SalvageValue(oldKind.cashCost, existing[i].newness);
+            Furniture.Remove(existing[i].instanceId);
+            FurnitureInstance replacement = Furniture.Place(roomNumber, kindId);
+            if (Renovations.IsRenovating(roomNumber))
+                Furniture.MarkSelectedForRenovation(replacement.instanceId);
+            return true;
         }
-        else
+
+        if (!kind.IsRequired)
         {
             int optional = 0;
             for (int i = 0; i < existing.Count; i++)
@@ -356,8 +364,29 @@ public sealed class HotelSim
         }
 
         if (!TrySpendCash(kind.cashCost)) { reason = "That costs $" + kind.cashCost + " and you have $" + Cash + "."; return false; }
-        Furniture.Place(roomNumber, kindId);
+        FurnitureInstance purchased = Furniture.Place(roomNumber, kindId);
+        if (Renovations.IsRenovating(roomNumber))
+            Furniture.MarkSelectedForRenovation(purchased.instanceId);
         return true;
+    }
+
+    public bool TrySetFurnitureVisual(int instanceId, int visualVariantId, out string reason)
+    {
+        reason = "";
+        if (!Furniture.TryGet(instanceId, out FurnitureInstance instance))
+        {
+            reason = "No such furniture.";
+            return false;
+        }
+        if (visualVariantId < 0)
+        {
+            reason = "No such visual option.";
+            return false;
+        }
+        bool changed = Furniture.TrySetVisualVariant(instance.instanceId, visualVariantId);
+        if (changed && Renovations.IsRenovating(instance.roomNumber))
+            Furniture.MarkSelectedForRenovation(instance.instanceId);
+        return changed;
     }
 
     /// <summary>卖掉一件家具（残值很低）。必备家具卖掉会让房间不可售。</summary>
@@ -1837,6 +1866,7 @@ public sealed class HotelSim
                         Furniture.ReplaceRoomWithTopTier(number);         // 全套换顶配
                         break;
                 }
+                Furniture.ClearRenovationSelections(number);
 
                 ref RoomRecord room = ref Rooms.At(number);
                 room.wear = 0f;
@@ -1981,6 +2011,8 @@ public sealed class HotelSim
                 instanceId = f.instanceId,
                 kindId = f.kindId,
                 roomNumber = f.roomNumber,
+                visualVariantId = f.visualVariantId,
+                selectedForRenovation = f.selectedForRenovation,
                 posX = f.posX,
                 posY = f.posY,
                 newness = f.newness,
@@ -2114,7 +2146,8 @@ public sealed class HotelSim
             Furniture.Clear();
             foreach (var f in state.furniture)
                 Furniture.RestoreInstance(f.instanceId, f.kindId, f.roomNumber, f.posX, f.posY,
-                                          f.newness, f.health, f.faultLineIndex, f.anchorId)
+                                          f.newness, f.health, f.faultLineIndex, f.anchorId,
+                                          f.visualVariantId, f.selectedForRenovation)
                          .repairDaysRemaining = f.repairDaysRemaining;
             Furniture.RestoreIdSeed(state.nextFurnitureId);
             // **必须在全部恢复之后**才补派锚点：旧档没有 anchorId，

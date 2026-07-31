@@ -114,6 +114,8 @@ public sealed class FurnitureSaveEntry
     public int instanceId;
     public int kindId;
     public int roomNumber;
+    public int visualVariantId; // v9: selected art option; zero remains old-save compatible.
+    public bool selectedForRenovation;
     public float posX, posY;
     public float newness = 1f;
     public float health = 1f;
@@ -234,7 +236,8 @@ public sealed class GameState
     // v6: + 预订簿（逐单 Reservation）、故意超售档、预订视野已铺开标记
     // v7: + 在建施工单（装修/复原）与房态——以前工单和房态都会在读档时丢
     // v8: + Sim 的声誉样本（星级以前每次读档归零）；仓库容量；工资账与信用
-    public const int CurrentVersion = 8;
+    // v9: per-furniture visual variant selection. Old saves naturally use variant zero.
+    public const int CurrentVersion = 9;
 
     public int version = CurrentVersion;
     public EconomyState economy = new EconomyState();

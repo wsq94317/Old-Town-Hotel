@@ -193,6 +193,8 @@ namespace OldTownHotel.Tests.EditMode
             tv.health = 0.11f;
             tv.faultLineIndex = 1;
             tv.repairDaysRemaining = 2;
+            tv.visualVariantId = 2;
+            tv.selectedForRenovation = true;
 
             var state = new SimState();
             original.CaptureTo(state);
@@ -214,6 +216,8 @@ namespace OldTownHotel.Tests.EditMode
             Assert.That(backTv.health, Is.EqualTo(0.11f).Within(1e-3f), "健康度");
             Assert.That(backTv.IsFaulted, Is.True, "故障状态");
             Assert.That(backTv.repairDaysRemaining, Is.EqualTo(2), "维修工期");
+            Assert.That(backTv.visualVariantId, Is.EqualTo(2), "家具外观方案");
+            Assert.That(backTv.selectedForRenovation, Is.True, "施工中的玩家家具选择");
 
             var fresh = restored.Furniture.Place(201, FurnitureCatalog.Rug);
             Assert.That(fresh.instanceId, Is.GreaterThan(tv.instanceId), "读档后新买的家具不能撞历史 id");

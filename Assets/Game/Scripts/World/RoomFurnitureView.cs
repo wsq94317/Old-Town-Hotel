@@ -14,6 +14,8 @@ public class RoomFurnitureView : MonoBehaviour
         new Dictionary<int, GameObject>();
     private readonly Dictionary<int, int> _kindByInstance =
         new Dictionary<int, int>();
+    private readonly Dictionary<int, int> _variantByInstance =
+        new Dictionary<int, int>();
     private readonly List<int> _scratchGone = new List<int>();
 
     private Transform _root;
@@ -69,13 +71,16 @@ public class RoomFurnitureView : MonoBehaviour
                            || model == null;
             bool changedKind = _kindByInstance.TryGetValue(item.instanceId, out int shownKind)
                                && shownKind != item.kindId;
-            if (missing || changedKind)
+            bool changedVariant = _variantByInstance.TryGetValue(item.instanceId, out int shownVariant)
+                                  && shownVariant != item.visualVariantId;
+            if (missing || changedKind || changedVariant)
             {
                 if (model != null) Destroy(model);
                 model = BuildModel(item);
                 if (model == null) continue;
                 _modelsByInstance[item.instanceId] = model;
                 _kindByInstance[item.instanceId] = item.kindId;
+                _variantByInstance[item.instanceId] = item.visualVariantId;
             }
             UpdateModel(model, item);
         }
@@ -100,13 +105,14 @@ public class RoomFurnitureView : MonoBehaviour
                 Destroy(model);
             _modelsByInstance.Remove(instanceId);
             _kindByInstance.Remove(instanceId);
+            _variantByInstance.Remove(instanceId);
         }
     }
 
     private GameObject BuildModel(FurnitureInstance item)
     {
         if (!FurnitureCatalog.TryGet(item.kindId, out FurnitureKind kind)) return null;
-        GameObject model = LowPolyHotelKit.CreateFurniture(kind);
+        GameObject model = FurnitureVisualLibrary.Create(kind, item.visualVariantId);
         model.name = kind.name + "_" + item.instanceId;
         model.transform.SetParent(_root, false);
         LowPolyHotelKit.SetLayerRecursively(model, LowPolyHotelKit.ArtLayer);

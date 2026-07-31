@@ -906,8 +906,8 @@ public sealed class WorldManagementHud : MonoBehaviour
             SetRoomButton(
                 _roomSecondary,
                 _roomSecondaryLabel,
-                L("CLOSE", "关闭"),
-                CloseDetailCard,
+                L("FURNITURE", "家具配置"),
+                OpenAssetsForSelectedRoom,
                 true,
                 Ink);
             return;
@@ -1032,8 +1032,8 @@ public sealed class WorldManagementHud : MonoBehaviour
         SetRoomButton(
             _roomSecondary,
             _roomSecondaryLabel,
-            L("FOCUS LOCATION", "查看位置"),
-            () => FocusRoom(number),
+            L("FURNITURE", "家具配置"),
+            OpenAssetsForSelectedRoom,
             true,
             Ink);
     }
@@ -1930,6 +1930,20 @@ public sealed class WorldManagementHud : MonoBehaviour
 
     private void BuildAssetsDesk()
     {
+        int selectedRoom = RoomSelection.Selected;
+        if (selectedRoom > 0 && Sim.Rooms.Contains(selectedRoom))
+        {
+            RoomRecord room = Sim.Rooms.At(selectedRoom);
+            if (room.state != RoomSimState.Ruined)
+            {
+                BuildFurnitureConfiguration(room);
+                AddSection(
+                    L("HOTEL-WIDE INVESTMENTS", "全酒店投资"),
+                    L("Continue below for room expansion, facilities and the next property.",
+                      "继续向下可查看客房扩张、设施与下一家酒店。"));
+            }
+        }
+
         AddSection(
             L("VISIBLE GROWTH", "肉眼可见的增长"),
             L("Every investment below changes capacity, guest activity or portfolio income.",
@@ -2142,6 +2156,7 @@ public sealed class WorldManagementHud : MonoBehaviour
                 + L(" day(s) remaining.", " 天后完工。"),
                 Gold,
                 64f);
+            BuildFurnitureConfiguration(room);
             return;
         }
 
@@ -2203,6 +2218,128 @@ public sealed class WorldManagementHud : MonoBehaviour
                 && gain > 0
                 && Sim.Cash >= cash
                 && Sim.Materials.Stock >= plan.materialsPerRoom);
+        }
+        BuildFurnitureConfiguration(room);
+    }
+
+    private void BuildFurnitureConfiguration(RoomRecord room)
+    {
+        bool occupied = room.state == RoomSimState.Occupied;
+        AddSection(
+            L("FURNITURE LOADOUT", "家具配置"),
+            occupied
+                ? L("The guest is using this room. Choose replacements after checkout.",
+                    "客人正在使用房间；退房后才能更换家具。")
+                : L("Replace models by slot. Gameplay stats stay tied to the furniture kind; visual variants are cosmetic.",
+                    "按位置替换家具。经营数值由家具品类决定，外观方案只改变模型和材质。"));
+
+        IReadOnlyList<FurnitureInstance> roomItems = Sim.Furniture.InRoom(room.number);
+        int optionalCount = 0;
+        for (int i = 0; i < roomItems.Count; i++)
+            if (!FurnitureCatalog.Get(roomItems[i].kindId).IsRequired) optionalCount++;
+
+        foreach (FurnitureSlot slot in Enum.GetValues(typeof(FurnitureSlot)))
+        {
+            FurnitureInstance current = FurnitureInSlot(roomItems, slot);
+            FurnitureKind currentKind = current == null
+                ? default
+                : FurnitureCatalog.Get(current.kindId);
+            string currentLabel = current == null
+                ? L("Empty slot", "空置")
+                : currentKind.name + L(" · condition ", " · 状态 ")
+                  + Mathf.RoundToInt(current.health * 100f) + "%";
+
+            AddInfoCard(
+                FurnitureSlotName(slot),
+                currentLabel,
+                current == null ? Slate : Teal,
+                60f);
+
+            foreach (FurnitureKind candidate in FurnitureCatalog.All)
+            {
+                if (candidate.slot != slot) continue;
+                FurnitureKind captured = candidate;
+                bool selected = current != null && current.kindId == candidate.kindId;
+                int salvage = current == null ? 0 : FurnitureWearModel.SalvageValue(
+                    currentKind.cashCost, current.newness);
+                FurnitureVisualCatalogSO visualCatalog = FurnitureVisualCatalogSO.LoadDefault();
+                int configuredStyles = visualCatalog == null
+                    ? 0
+                    : visualCatalog.ConfiguredVariantsFor(candidate.kindId).Count;
+                bool hasCapacity = candidate.IsRequired || current != null
+                                   || optionalCount < FurnitureCatalog.OptionalSlotCount;
+                bool canBuy = !occupied && !selected && hasCapacity
+                              && Sim.Cash >= candidate.cashCost;
+                string title = selected
+                    ? L("SELECTED · ", "当前 · ") + candidate.name
+                    : candidate.name + "  $" + candidate.cashCost;
+                string detail = L("Decor +", "装饰 +") + candidate.decorPoints
+                                + (salvage > 0
+                                    ? L(" · trade-in +$", " · 旧家具回收 +$") + salvage
+                                    : "")
+                                + (configuredStyles > 1
+                                    ? L(" · styles ", " · 可选外观 ") + configuredStyles
+                                    : "");
+                AddPlanButton(
+                    title,
+                    detail,
+                    () => BuyFurniture(room.number, captured.kindId),
+                    selected ? Teal : Ink,
+                    canBuy);
+            }
+
+            if (current != null)
+                BuildFurnitureVisualOptions(current);
+        }
+
+        AddActionButton(
+            L("FOCUS ROOM IN HOTEL", "查看房间位置"),
+            () => FocusRoom(room.number),
+            Teal,
+            true);
+    }
+
+    private void BuildFurnitureVisualOptions(FurnitureInstance item)
+    {
+        FurnitureVisualCatalogSO catalog = FurnitureVisualCatalogSO.LoadDefault();
+        if (catalog == null) return;
+        List<FurnitureVisualVariant> variants = catalog.ConfiguredVariantsFor(item.kindId);
+        if (variants.Count <= 1) return;
+
+        for (int i = 0; i < variants.Count; i++)
+        {
+            FurnitureVisualVariant variant = variants[i];
+            int capturedVariant = variant.variantId;
+            bool selected = item.visualVariantId == capturedVariant;
+            AddActionButton(
+                (selected ? L("STYLE SELECTED · ", "外观已选 · ") : L("USE STYLE · ", "使用外观 · "))
+                + variant.displayName,
+                () => SetFurnitureVisual(item.instanceId, capturedVariant),
+                selected ? Teal : Ink,
+                !selected);
+        }
+    }
+
+    private static FurnitureInstance FurnitureInSlot(
+        IReadOnlyList<FurnitureInstance> items,
+        FurnitureSlot slot)
+    {
+        for (int i = 0; i < items.Count; i++)
+            if (FurnitureCatalog.Get(items[i].kindId).slot == slot) return items[i];
+        return null;
+    }
+
+    private static string FurnitureSlotName(FurnitureSlot slot)
+    {
+        switch (slot)
+        {
+            case FurnitureSlot.Bed: return L("BED", "床");
+            case FurnitureSlot.Bathroom: return L("BATHROOM", "卫浴");
+            case FurnitureSlot.Entertainment: return L("ENTERTAINMENT", "娱乐");
+            case FurnitureSlot.Seating: return L("SEATING", "座椅");
+            case FurnitureSlot.Desk: return L("DESK", "书桌");
+            case FurnitureSlot.Floor: return L("FLOOR DECOR", "地面装饰");
+            default: return L("WALL DECOR", "墙面装饰");
         }
     }
 
@@ -2617,6 +2754,38 @@ public sealed class WorldManagementHud : MonoBehaviour
         bool ok = Sim.TryStartRenovation(kind, new List<int> { roomNumber }, out string reason);
         ShowToast(ok
             ? L("Renovation started. The room is now off sale.", "装修已开工，房间已停止销售。")
+            : GameText.T(reason));
+        ForceAllRefresh();
+    }
+
+    private void BuyFurniture(int roomNumber, int kindId)
+    {
+        bool ok = Sim.TryBuyFurniture(roomNumber, kindId, out string reason);
+        ShowToast(ok
+            ? L("Furniture delivered and installed.", "家具已送达并完成安装。")
+            : GameText.T(reason));
+        ForceAllRefresh();
+    }
+
+    private void SetFurnitureVisual(int instanceId, int visualVariantId)
+    {
+        if (!Sim.Furniture.TryGet(instanceId, out FurnitureInstance item))
+        {
+            ShowToast(L("Furniture no longer exists.", "该家具已不存在。"));
+            return;
+        }
+
+        FurnitureVisualCatalogSO catalog = FurnitureVisualCatalogSO.LoadDefault();
+        if (catalog == null
+            || !catalog.TryGetVariant(item.kindId, visualVariantId, out FurnitureVisualVariant _))
+        {
+            ShowToast(L("That visual slot is not configured yet.", "该外观插槽尚未配置。"));
+            return;
+        }
+
+        bool ok = Sim.TrySetFurnitureVisual(instanceId, visualVariantId, out string reason);
+        ShowToast(ok
+            ? L("Furniture appearance updated.", "家具外观已更新。")
             : GameText.T(reason));
         ForceAllRefresh();
     }

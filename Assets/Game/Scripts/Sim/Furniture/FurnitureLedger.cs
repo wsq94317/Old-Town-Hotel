@@ -10,6 +10,8 @@ public sealed class FurnitureInstance
     public int instanceId;
     public int kindId;
     public int roomNumber;
+    public int visualVariantId; // Art-only option. Kind still owns gameplay stats and price.
+    public bool selectedForRenovation; // Protects a choice made while the current build job is active.
     public float posX, posY;      // 现在填槽位预设；将来的拖拽摆放直接用它
     public float newness = 1f;    // 只按衰减走，维修不能动
     public float health = 1f;     // 维修可回满
@@ -73,13 +75,14 @@ public sealed class FurnitureLedger
 
     /// <summary>放一件家具进房。newness/health 默认全新（新买/装修换新）。</summary>
     public FurnitureInstance Place(int roomNumber, int kindId, float newness = 1f, float health = 1f,
-                                   float posX = 0f, float posY = 0f)
+                                   float posX = 0f, float posY = 0f, int visualVariantId = 0)
     {
         var instance = new FurnitureInstance
         {
             instanceId = ++_nextId,
             kindId = kindId,
             roomNumber = roomNumber,
+            visualVariantId = Math.Max(0, visualVariantId),
             newness = SimMath.Clamp01(newness),
             health = SimMath.Clamp01(health),
             posX = posX,
@@ -100,6 +103,27 @@ public sealed class FurnitureLedger
         }
         list.Add(instance);
         return instance;
+    }
+
+    public bool TrySetVisualVariant(int instanceId, int visualVariantId)
+    {
+        if (visualVariantId < 0 || !_byId.TryGetValue(instanceId, out FurnitureInstance instance))
+            return false;
+        instance.visualVariantId = visualVariantId;
+        return true;
+    }
+
+    public bool MarkSelectedForRenovation(int instanceId)
+    {
+        if (!_byId.TryGetValue(instanceId, out FurnitureInstance instance)) return false;
+        instance.selectedForRenovation = true;
+        return true;
+    }
+
+    public void ClearRenovationSelections(int roomNumber)
+    {
+        IReadOnlyList<FurnitureInstance> items = InRoom(roomNumber);
+        for (int i = 0; i < items.Count; i++) items[i].selectedForRenovation = false;
     }
 
     /// <summary>这间房已经被占用的锚点。</summary>
@@ -421,7 +445,12 @@ public sealed class FurnitureLedger
         {
             var f = list[i];
             FurnitureKind kind = FurnitureCatalog.Get(f.kindId);
-            if (kind.IsRequired) f.kindId = FurnitureCatalog.UpgradedRequiredKind(f.kindId);
+            if (kind.IsRequired && !f.selectedForRenovation)
+            {
+                int upgradedKind = FurnitureCatalog.UpgradedRequiredKind(f.kindId);
+                if (upgradedKind != f.kindId) f.visualVariantId = 0;
+                f.kindId = upgradedKind;
+            }
             f.newness = 1f;
             f.health = 1f;
             f.faultLineIndex = -1;
@@ -432,9 +461,27 @@ public sealed class FurnitureLedger
     public void ReplaceRoomWithTopTier(int roomNumber)
     {
         var existing = new List<FurnitureInstance>(InRoom(roomNumber));
-        for (int i = 0; i < existing.Count; i++) Remove(existing[i].instanceId);
+        for (int i = 0; i < existing.Count; i++)
+            if (!existing[i].selectedForRenovation) Remove(existing[i].instanceId);
+
         int[] loadout = FurnitureCatalog.TopTierLoadout();
-        for (int i = 0; i < loadout.Length; i++) Place(roomNumber, loadout[i]);
+        for (int i = 0; i < loadout.Length; i++)
+        {
+            FurnitureKind desired = FurnitureCatalog.Get(loadout[i]);
+            IReadOnlyList<FurnitureInstance> current = InRoom(roomNumber);
+            bool slotFilled = false;
+            int optionalCount = 0;
+            for (int j = 0; j < current.Count; j++)
+            {
+                FurnitureKind currentKind = FurnitureCatalog.Get(current[j].kindId);
+                if (!currentKind.IsRequired) optionalCount++;
+                if (currentKind.slot == desired.slot) slotFilled = true;
+            }
+            if (slotFilled) continue;
+            if (!desired.IsRequired && optionalCount >= FurnitureCatalog.OptionalSlotCount) continue;
+            Place(roomNumber, desired.kindId);
+        }
+        RefurbishRoom(roomNumber);
     }
 
     /// <summary>给一间房装上**全新的必备家具**（床 + 卫浴，中间档）。破败房复原的 Refit 用。
@@ -481,13 +528,17 @@ public sealed class FurnitureLedger
     /// <summary>读档：按存下来的 id 原样恢复一件家具。</summary>
     public FurnitureInstance RestoreInstance(int instanceId, int kindId, int roomNumber,
                                             float posX, float posY, float newness, float health,
-                                            int faultLineIndex, int anchorId = FurnitureAnchors.Unassigned)
+                                            int faultLineIndex, int anchorId = FurnitureAnchors.Unassigned,
+                                            int visualVariantId = 0,
+                                            bool selectedForRenovation = false)
     {
         var instance = new FurnitureInstance
         {
             instanceId = instanceId,
             kindId = kindId,
             roomNumber = roomNumber,
+            visualVariantId = Math.Max(0, visualVariantId),
+            selectedForRenovation = selectedForRenovation,
             posX = posX,
             posY = posY,
             newness = SimMath.Clamp01(newness),

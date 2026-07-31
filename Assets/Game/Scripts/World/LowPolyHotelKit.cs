@@ -218,10 +218,21 @@ public static class LowPolyHotelKit
             renderer.SetPropertyBlock(block);
         }
 
-        Transform tape = root.transform.Find("Status_Tape");
+        Transform tape = FindDeep(root.transform, "Status_Tape");
         if (tape != null) tape.gameObject.SetActive(item.taped);
-        Transform fault = root.transform.Find("Status_Fault");
+        Transform fault = FindDeep(root.transform, "Status_Fault");
         if (fault != null) fault.gameObject.SetActive(item.IsFaulted && !item.taped);
+    }
+
+    private static Transform FindDeep(Transform root, string targetName)
+    {
+        if (root.name == targetName) return root;
+        for (int i = 0; i < root.childCount; i++)
+        {
+            Transform found = FindDeep(root.GetChild(i), targetName);
+            if (found != null) return found;
+        }
+        return null;
     }
 
     public static void BuildBreakRoom(Transform root)
