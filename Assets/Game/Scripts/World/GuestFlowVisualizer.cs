@@ -75,7 +75,7 @@ public class GuestFlowVisualizer : MonoBehaviour
             && demandLoop.successfulDemandCount == _lastServedCount && _waitingGuest != null)
         {
             var guest = _waitingGuest;
-            guest.TravelTo(doorPoint, () => Destroy(guest.gameObject));
+            guest.ExitVia(doorPoint, () => Destroy(guest.gameObject));
             _waitingGuest = null;
             _waitingSpawned = false;
         }
@@ -87,7 +87,7 @@ public class GuestFlowVisualizer : MonoBehaviour
         if (room == null) return;
         if (demandLoop != null && demandLoop.guestFlowOwnedBySim) return;
         var guest = GuestAgent.Spawn(room.transform.position, "departing_" + room.roomNumber);
-        guest.TravelTo(doorPoint, () => Destroy(guest.gameObject));
+        guest.ExitVia(doorPoint, () => Destroy(guest.gameObject));
     }
 
     private Room2DEntity FindRoom(string roomName)

@@ -134,7 +134,7 @@ public class StaffAgentSpawner : MonoBehaviour
         var walker = go.GetComponent<GuestAgent>();
         if (walker == null) walker = go.AddComponent<GuestAgent>();
         var walkerRef = walker;
-        walker.TravelTo(new Vector3(0f, 0f, -5.2f), () => Destroy(walkerRef.gameObject));
+        walker.ExitVia(new Vector3(0f, 0f, -5.2f), () => Destroy(walkerRef.gameObject));
     }
 
     private Vector3 IdleAnchorFor(StaffMember member)

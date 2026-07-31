@@ -152,7 +152,7 @@ public class GuestLifeDirector : MonoBehaviour
         agent.TravelTo(deskPoint, () =>
         {
             if (agent == null) return;
-            agent.TravelTo(doorPoint, () => { if (agent != null) Destroy(agent.gameObject); });
+            agent.ExitVia(doorPoint, () => { if (agent != null) Destroy(agent.gameObject); });
         });
     }
 
@@ -217,7 +217,7 @@ public class GuestLifeDirector : MonoBehaviour
         var agent = GuestAgent.Spawn(RoomPositionOf(resident.roomNumber), LabelFor(resident.segment));
         resident.agent = agent;
         var captured = resident;
-        agent.TravelTo(doorPoint, () =>
+        agent.ExitVia(doorPoint, () =>
         {
             captured.presence = Presence.OutOfHotel;
             if (agent != null) Destroy(agent.gameObject);

@@ -411,7 +411,7 @@ public sealed class StaffFacilitySystem : MonoBehaviour
     private static void SendGuestOffMap(GuestAgent guest)
     {
         if (guest == null) return;
-        guest.TravelTo(MapExit, () =>
+        guest.ExitVia(MapExit, () =>
         {
             if (guest != null) Destroy(guest.gameObject);
         });

@@ -171,4 +171,54 @@ namespace OldTownHotel.Tests.EditMode
             Assert.AreEqual(new Vector3(-3f, 0f, 2f), projected);
         }
     }
+
+    [TestFixture]
+    public class GuestExitPortalTest
+    {
+        private static readonly Vector3 Door = new Vector3(0f, 0f, -5.2f);
+
+        [Test]
+        public void GuestNearDoorButBlockedFromExactPoint_CanExit()
+        {
+            var crowdedPosition = new Vector3(0.72f, 0.05f, -4.48f);
+
+            Assert.IsTrue(GuestAgent.IsWithinExitPortal(
+                crowdedPosition,
+                Door,
+                Vector3.back));
+        }
+
+        [Test]
+        public void GuestStillInsideLobby_CannotExitEarly()
+        {
+            var lobbyPosition = new Vector3(0f, 0.05f, -3.8f);
+
+            Assert.IsFalse(GuestAgent.IsWithinExitPortal(
+                lobbyPosition,
+                Door,
+                Vector3.back));
+        }
+
+        [Test]
+        public void GuestOnAnotherFloor_CannotTriggerGroundFloorExit()
+        {
+            var upstairsPosition = new Vector3(0f, FloorMath.BaseYFor(1), -5.0f);
+
+            Assert.IsFalse(GuestAgent.IsWithinExitPortal(
+                upstairsPosition,
+                Door,
+                Vector3.back));
+        }
+
+        [Test]
+        public void GuestBesideDoorOpening_CannotExitThroughWall()
+        {
+            var besideDoor = new Vector3(1.8f, 0.05f, -5.0f);
+
+            Assert.IsFalse(GuestAgent.IsWithinExitPortal(
+                besideDoor,
+                Door,
+                Vector3.back));
+        }
+    }
 }

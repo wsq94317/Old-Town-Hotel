@@ -74,7 +74,7 @@ public class ComplaintInteraction : MonoBehaviour
     {
         var g = _angryGuest;
         _angryGuest = null;
-        if (g != null) g.TravelTo(doorPoint, () => Destroy(g.gameObject));
+        if (g != null) g.ExitVia(doorPoint, () => Destroy(g.gameObject));
     }
 
     private void Choose(ComplaintChoice choice)
