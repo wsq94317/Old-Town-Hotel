@@ -170,6 +170,44 @@ namespace OldTownHotel.Tests.EditMode
 
             Assert.AreEqual(new Vector3(-3f, 0f, 2f), projected);
         }
+
+        [Test]
+        public void FloorProjection_PreservesTheScreenRayInsteadOfWallHitCoordinates()
+        {
+            var ray = new Ray(
+                new Vector3(2f, 10f, 4f),
+                new Vector3(-0.2f, -1f, -0.4f).normalized);
+
+            bool projected = WorldInputController.TryProjectRayToFloor(ray, 0f, out Vector3 point);
+
+            Assert.IsTrue(projected);
+            Assert.AreEqual(0f, point.y, 0.0001f);
+            Assert.Less(Vector3.Cross(point - ray.origin, ray.direction).magnitude, 0.0001f);
+        }
+
+        [Test]
+        public void CommandSnap_RejectsAVisibleJumpIntoAnAdjacentRoom()
+        {
+            Vector3 requested = new Vector3(0f, 0f, 0f);
+            Vector3 adjacentRoom = new Vector3(1.2f, 0f, 0f);
+
+            Assert.IsFalse(ManagerController.IsAcceptableCommandSnap(
+                requested,
+                adjacentRoom,
+                0.75f));
+        }
+
+        [Test]
+        public void CommandSnap_AllowsMinorNavMeshEdgeCorrection()
+        {
+            Vector3 requested = new Vector3(0f, 0f, 0f);
+            Vector3 nearbyWalkable = new Vector3(0.3f, 0f, 0.2f);
+
+            Assert.IsTrue(ManagerController.IsAcceptableCommandSnap(
+                requested,
+                nearbyWalkable,
+                0.75f));
+        }
     }
 
     [TestFixture]
@@ -219,6 +257,35 @@ namespace OldTownHotel.Tests.EditMode
                 besideDoor,
                 Door,
                 Vector3.back));
+        }
+    }
+
+    [TestFixture]
+    public class RoomInvestmentMathTest
+    {
+        [Test]
+        public void TotalInvestment_IncludesMaterialMarketValue()
+        {
+            Assert.AreEqual(1580, RoomInvestmentMath.TotalInvestment(
+                cashCost: 1400,
+                materialUnits: 4,
+                materialUnitPrice: 45));
+        }
+
+        [Test]
+        public void Payback_UsesIncrementalRevenueAndRoundsUp()
+        {
+            Assert.AreEqual(20, RoomInvestmentMath.SoldNightsToPayback(
+                totalInvestment: 990,
+                nightlyGain: 50));
+        }
+
+        [Test]
+        public void Payback_ReportsNoReturnWhenRevenueDoesNotIncrease()
+        {
+            Assert.AreEqual(999, RoomInvestmentMath.SoldNightsToPayback(
+                totalInvestment: 900,
+                nightlyGain: 0));
         }
     }
 }

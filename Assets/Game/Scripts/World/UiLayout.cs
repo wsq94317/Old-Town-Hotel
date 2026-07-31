@@ -30,7 +30,7 @@ public static class UiLayout
 {
     // 全部为虚拟坐标（GuiScale.Begin 之后的坐标系，短边恒 460）
 
-    public const float TopBarHeight = 68f;
+    public static float TopBarHeight => WorldManagementHud.IsActive ? 118f : 68f;
 
     /// <summary>底部抽屉占屏比例（WorldOperationsPanel 用）。</summary>
     public const float DrawerShare = 0.46f;

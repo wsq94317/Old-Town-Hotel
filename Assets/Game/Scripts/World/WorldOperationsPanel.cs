@@ -45,6 +45,8 @@ public class WorldOperationsPanel : MonoBehaviour
 
     private void Update()
     {
+        if (WorldManagementHud.IsActive) return;
+
         // **不要**在这里调 GuiInput.PollSelfServed()：世界场景有 WorldInputController，
         // 它会在热区内把点击转发给 GUI（松手时）。若这里再按下沿自取一次，
         // 同一次点击就发布两遍——"买 10 份材料"会买两次（双通道双触发，v2 踩过的坑）。
@@ -94,12 +96,16 @@ public class WorldOperationsPanel : MonoBehaviour
     {
         if (Sim == null) return;
 
+        var bridge = HotelSimSceneBridge.Instance;
+        if (WorldManagementHud.IsActive
+            && (bridge == null || !bridge.AwaitingMorningReport))
+            return;
+
         Vector2 v = GuiScale.Begin();
         float w = v.x, h = v.y;
 
         // 日结 → **全屏晨报**：时间已被桥暂停，看完点"开门营业"才进新的一天。
         // 全屏 = 整个屏幕都是热区，世界这时收不到任何点击。
-        var bridge = HotelSimSceneBridge.Instance;
         if (bridge != null && bridge.AwaitingMorningReport)
         {
             GuiInput.ReserveZone(GuiScale.FullScreenVirtualRect());

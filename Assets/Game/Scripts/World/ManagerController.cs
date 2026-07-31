@@ -4,6 +4,8 @@ using UnityEngine.AI;
 [RequireComponent(typeof(NavMeshAgent))]
 public class ManagerController : MonoBehaviour
 {
+    private const float MaxPlayerCommandSnapDistance = 0.75f;
+
     [SerializeField] private float sampleMaxDistance = 2f;
 
     private NavMeshAgent _agent;
@@ -39,8 +41,16 @@ public class ManagerController : MonoBehaviour
         if (!NavMesh.SamplePosition(
                 resolvedDestination,
                 out NavMeshHit navHit,
-                sampleMaxDistance,
+                Mathf.Min(sampleMaxDistance, MaxPlayerCommandSnapDistance),
                 _agent.areaMask))
+        {
+            return false;
+        }
+
+        if (!IsAcceptableCommandSnap(
+                resolvedDestination,
+                navHit.position,
+                MaxPlayerCommandSnapDistance))
         {
             return false;
         }
@@ -55,6 +65,16 @@ public class ManagerController : MonoBehaviour
         // Direct player commands recover from interrupted door/elevator routines.
         _agent.isStopped = false;
         return _agent.SetDestination(resolvedDestination);
+    }
+
+    public static bool IsAcceptableCommandSnap(
+        Vector3 requested,
+        Vector3 resolved,
+        float maxDistance)
+    {
+        requested.y = 0f;
+        resolved.y = 0f;
+        return Vector3.Distance(requested, resolved) <= Mathf.Max(0f, maxDistance);
     }
 
     public static Vector3 ProjectToCurrentFloor(Vector3 worldPos, float managerY)

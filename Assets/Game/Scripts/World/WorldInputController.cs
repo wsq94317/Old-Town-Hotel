@@ -71,7 +71,9 @@ public class WorldInputController : MonoBehaviour
             // IMGUI 热区（操作台抽屉/顶栏）也算 UI：IsOverUi 只认 UGUI 的 EventSystem，
             // 不加这条的话按住抽屉拖动会转动相机（点穿的拖动版）
             _pressStartedOverImGui = GuiInput.IsInReservedZone(pos);
-            _pressStartedOverUi = IsOverUi() || _pressStartedOverImGui;
+            _pressStartedOverUi = IsOverUi()
+                                  || WorldManagementHud.ContainsScreenPoint(pos)
+                                  || _pressStartedOverImGui;
             if (!_pressStartedOverUi) _classifier.Press(pos);
             _pressPos = pos;
             _lastPos = pos;
@@ -195,6 +197,13 @@ public class WorldInputController : MonoBehaviour
         int mask = ~(1 << 2);
         if (!Physics.Raycast(ray, out RaycastHit hit, 200f, mask, QueryTriggerInteraction.Ignore)) return;
 
+        float currentFloorY = manager != null
+            ? FloorMath.BaseYFor(FloorMath.FloorIndexForY(manager.transform.position.y))
+            : FloorMath.BaseYFor(FloorMath.FloorIndexForY(hit.point.y));
+        Vector3 movementTarget = TryProjectRayToFloor(ray, currentFloorY, out Vector3 floorPoint)
+            ? floorPoint
+            : ManagerController.ProjectToCurrentFloor(hit.point, currentFloorY);
+
         // 指挥模式：这次点击=指定房间
         if (_interaction != null && _interaction.InCommandMode)
         {
@@ -230,15 +239,31 @@ public class WorldInputController : MonoBehaviour
         var room = hit.collider.GetComponentInParent<RoomSceneBinder>();
         if (room != null && room.RoomNumber > 0) RoomSelection.Select(room.RoomNumber);
 
-        if (manager != null && manager.TryMoveTo(hit.point, out Vector3 destination))
+        if (manager != null && manager.TryMoveTo(movementTarget, out Vector3 destination))
         {
-            ClickMarkerFx.Spawn(destination);
+            ClickMarkerFx.Spawn(movementTarget);
         }
         else
         {
-            float managerY = manager != null ? manager.transform.position.y : hit.point.y;
-            ClickMarkerFx.SpawnRejected(
-                ManagerController.ProjectToCurrentFloor(hit.point, managerY));
+            ClickMarkerFx.SpawnRejected(movementTarget);
         }
+    }
+
+    /// <summary>
+    /// Projects a screen ray onto the manager's current floor. Object colliders
+    /// remain useful for selection, but their height cannot move the destination.
+    /// </summary>
+    public static bool TryProjectRayToFloor(Ray ray, float floorY, out Vector3 point)
+    {
+        var floor = new Plane(Vector3.up, new Vector3(0f, floorY, 0f));
+        if (floor.Raycast(ray, out float distance) && distance >= 0f)
+        {
+            point = ray.GetPoint(distance);
+            point.y = floorY;
+            return true;
+        }
+
+        point = default;
+        return false;
     }
 }

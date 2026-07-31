@@ -67,6 +67,7 @@ public class SaveSlotPanel : MonoBehaviour
 
     private void OnGUI()
     {
+        if (WorldManagementHud.SuppressesWorldImGui) return;
         if (!_open) return;
         // 全屏晨报期间全体让位（IMGUI 没有 z 序，报告必须是唯一的画手）
         if (HotelSimSceneBridge.Instance != null && HotelSimSceneBridge.Instance.AwaitingMorningReport) return;
