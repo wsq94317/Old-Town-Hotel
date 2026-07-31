@@ -170,18 +170,20 @@ public class WorldInputController : MonoBehaviour
         if (_hiring == null) _hiring = FindFirstObjectByType<HiringInteraction>();
         if (_fire == null) _fire = FindFirstObjectByType<FireAlarmIncident>();
         if (_breakdowns == null) _breakdowns = FindFirstObjectByType<BreakdownSystem>();
+        bool legacyWorldModal = !WorldManagementHud.IsActive;
         bool panelOpen =
             // 存档面板：静态查询，因为它是按需自动装的（场景文件里没有这个物体）
-            SaveSlotPanel.AnyPanelOpen ||
-            (_interaction != null && _interaction.PanelOpen) ||
-            (_complaint != null && _complaint.PanelOpen) ||
-            (_events != null && _events.PanelOpen) ||
-            (_hiring != null && _hiring.PanelOpen) ||
-            (_fire != null && _fire.PanelOpen) ||
-            (_breakdowns != null && _breakdowns.PanelOpen) ||
-            RoomDoor.AnyPanelOpen ||
-            (ElevatorController.Instance != null && ElevatorController.Instance.PanelOpen) ||
-            (ManagerPhone.Instance != null && ManagerPhone.Instance.PanelOpen);
+            legacyWorldModal && (
+                SaveSlotPanel.AnyPanelOpen ||
+                (_interaction != null && _interaction.PanelOpen) ||
+                (_complaint != null && _complaint.PanelOpen) ||
+                (_events != null && _events.PanelOpen) ||
+                (_hiring != null && _hiring.PanelOpen) ||
+                (_fire != null && _fire.PanelOpen) ||
+                (_breakdowns != null && _breakdowns.PanelOpen) ||
+                RoomDoor.AnyPanelOpen ||
+                (ElevatorController.Instance != null && ElevatorController.Instance.PanelOpen) ||
+                (ManagerPhone.Instance != null && ManagerPhone.Instance.PanelOpen));
         if (panelOpen || GuiInput.IsInReservedZone(screenPos))
         {
             GuiInput.PublishTap(screenPos);

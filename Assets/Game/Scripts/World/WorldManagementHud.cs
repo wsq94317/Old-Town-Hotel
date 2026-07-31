@@ -51,6 +51,9 @@ public sealed class WorldManagementHud : MonoBehaviour
     private RectTransform _drawer;
     private RectTransform _drawerContent;
     private RectTransform _roomCard;
+    private RectTransform _alertStrip;
+    private RectTransform _contextSheet;
+    private RectTransform _contextContent;
     private RectTransform _toastPanel;
     private CanvasGroup _toastGroup;
 
@@ -65,6 +68,8 @@ public sealed class WorldManagementHud : MonoBehaviour
     private TextMeshProUGUI _roomDetail;
     private TextMeshProUGUI _roomPrimaryLabel;
     private TextMeshProUGUI _roomSecondaryLabel;
+    private TextMeshProUGUI _alertLabel;
+    private TextMeshProUGUI _alertGoLabel;
     private TextMeshProUGUI _toastLabel;
 
     private Image _safeboxFill;
@@ -72,6 +77,7 @@ public sealed class WorldManagementHud : MonoBehaviour
     private Button _safeboxButton;
     private Button _roomPrimary;
     private Button _roomSecondary;
+    private Button _alertGoButton;
 
     private readonly List<Button> _navButtons = new List<Button>();
     private readonly List<TextMeshProUGUI> _navLabels = new List<TextMeshProUGUI>();
@@ -85,12 +91,30 @@ public sealed class WorldManagementHud : MonoBehaviour
     private int _lastSelectedRoom = -1;
     private string _roomStateKey = "";
     private string _drawerStateKey = "";
+    private string _contextStateKey = "";
     private float _refreshTimer;
     private float _speed = 1f;
     private int _skipTargetMinute = -1;
     private int _skipDay = -1;
     private Rect _lastSafeArea;
     private Coroutine _toastRoutine;
+    private ManagerPhone.Note _displayedNote;
+
+    private sealed class ContextAction
+    {
+        public string Label;
+        public Action Invoke;
+        public bool Enabled;
+        public Color Color;
+    }
+
+    private sealed class ContextModel
+    {
+        public string Key;
+        public string Title;
+        public string Body;
+        public readonly List<ContextAction> Actions = new List<ContextAction>();
+    }
 
     private HotelSim Sim =>
         HotelSimSceneBridge.Instance != null ? HotelSimSceneBridge.Instance.Sim : null;
@@ -150,6 +174,8 @@ public sealed class WorldManagementHud : MonoBehaviour
         if (!IsActive || !instance._safeRoot.gameObject.activeInHierarchy) return false;
         if (Contains(instance._topPanel, screenPoint)) return true;
         if (Contains(instance._bottomNav, screenPoint)) return true;
+        if (Contains(instance._alertStrip, screenPoint)) return true;
+        if (Contains(instance._contextSheet, screenPoint)) return true;
         if (instance._drawerOpen && Contains(instance._drawer, screenPoint)) return true;
         return instance._roomCard.gameObject.activeInHierarchy
                && Contains(instance._roomCard, screenPoint);
@@ -201,6 +227,8 @@ public sealed class WorldManagementHud : MonoBehaviour
         _refreshTimer = 0.12f;
 
         RefreshTop();
+        RefreshAlerts();
+        RefreshContextSheet();
         RefreshRoomCard();
         RefreshDrawerIfChanged();
     }
@@ -272,7 +300,7 @@ public sealed class WorldManagementHud : MonoBehaviour
             + "  " + GameText.T(PhaseScheduler.Label(
                 PhaseScheduler.PhaseFor(clock.CurrentMinute)))
             + speed;
-        _cashLabel.text = "$" + Sim.Cash.ToString("N0");
+        _cashLabel.text = L("CASH  $", "现金  $") + Sim.Cash.ToString("N0");
         _earnedLabel.text = L("EARNED TODAY", "今日已赚")
                             + "  <color=#E8BB54>+$"
                             + Sim.GrossIncomeToday.ToString("N0") + "</color>";
@@ -280,8 +308,8 @@ public sealed class WorldManagementHud : MonoBehaviour
                                + "  " + tonight.Fraction;
 
         _safeboxLabel.text = Sim.Safebox.Balance > 0
-            ? L("COLLECT ", "收取 ") + "$" + Sim.Safebox.Balance.ToString("N0")
-            : L("SAFEBOX ", "保险箱 ") + "$0 / $" + Sim.Safebox.Capacity;
+            ? L("COLLECT PROFIT  +$", "收取利润  +$") + Sim.Safebox.Balance.ToString("N0")
+            : L("SAFEBOX PROFIT  $0", "保险箱利润  $0");
         _safeboxFill.rectTransform.anchorMax =
             new Vector2(Mathf.Clamp01(Sim.Safebox.FillRatio), 1f);
         _safeboxButton.interactable = Sim.Safebox.Balance > 0;
@@ -292,7 +320,8 @@ public sealed class WorldManagementHud : MonoBehaviour
     private void RefreshRoomCard()
     {
         int number = RoomSelection.Selected;
-        bool valid = !_drawerOpen && number > 0 && Sim.Rooms.Contains(number);
+        bool contextOpen = _contextSheet != null && _contextSheet.gameObject.activeSelf;
+        bool valid = !_drawerOpen && !contextOpen && number > 0 && Sim.Rooms.Contains(number);
         _roomCard.gameObject.SetActive(valid);
         if (!valid)
         {
@@ -325,47 +354,33 @@ public sealed class WorldManagementHud : MonoBehaviour
         if (Sim.Renovations.IsRenovating(number))
         {
             int days = Sim.Renovations.DaysRemainingFor(number);
-            _roomHeadline.text = L("BUILDING VALUE", "资产升级中");
+            _roomHeadline.text = L("WORK IN PROGRESS", "施工进行中");
             _roomDetail.text = L(
                 days + " day(s) until handover. Cleaning is required before sale.",
                 days + " 天后交付，完工后仍需清洁才能重新出售。");
-            SetRoomButton(_roomPrimary, _roomPrimaryLabel, L("IN PROGRESS", "施工中"),
-                null, false, Slate);
-            SetRoomButton(_roomSecondary, _roomSecondaryLabel, L("VIEW PORTFOLIO", "查看资产"),
+            SetRoomButton(_roomPrimary, _roomPrimaryLabel, L("GO TO ROOM", "前往房间"),
+                () => NavigateToRoom(number), true, Teal);
+            SetRoomButton(_roomSecondary, _roomSecondaryLabel, L("VIEW PROJECT", "查看项目"),
                 OpenAssetsForSelectedRoom, true, Ink);
             return;
         }
 
         if (room.state == RoomSimState.Ruined)
         {
-            var refit = ReclaimPlan.For(ReclaimPlanKind.Refit);
-            int cash = Sim.QuoteReclaim(ReclaimPlanKind.Refit, 1);
-            int total = RoomInvestmentMath.TotalInvestment(
-                cash, refit.materialsPerRoom, Sim.Materials.UnitPrice);
             int nightly = Sim.Pricing.PriceFor(Sim.Clock.CurrentDay, RoomTier.Basic);
-            int payback = RoomInvestmentMath.SoldNightsToPayback(total, nightly);
-            _roomHeadline.text = "<color=#C65B46>$0</color> / "
-                                 + L("night", "晚") + "  →  <color=#297A6E>$"
-                                 + nightly + "</color> / " + L("night", "晚");
+            _roomHeadline.text = L("OFF MARKET", "尚未营业")
+                                 + "  ·  <color=#297A6E>$" + nightly
+                                 + L("/night potential", "/晚潜力") + "</color>";
             _roomDetail.text = Sim.Clearing.IsClearing(number)
-                ? L("Free clearing ", "免费清理进行中  ")
-                  + Sim.Clearing.ProgressOf(number).ToString("P0")
+                ? L("Housekeeping recovery ", "客房部清理进度 ")
+                  + Sim.Clearing.ProgressOf(number).ToString("P0") + "."
                 : L(
-                    "Free: housekeeping trips.  Fast: $" + cash + " + "
-                    + refit.materialsPerRoom + " materials · " + refit.blockDays
-                    + " days · pays back in " + payback + " sold nights.",
-                    "免费路线：客房部往返清理。快速复原：$" + cash + " + "
-                    + refit.materialsPerRoom + " 材料 · " + refit.blockDays
-                    + " 天 · 约 " + payback + " 个售出夜回本。");
+                    "Inspect the room in the hotel. Investment plans stay in Assets.",
+                    "先在场景中查看房间；复原成本、停业时间和回本统一放在“资产”。");
 
-            SetRoomButton(
-                _roomPrimary,
-                _roomPrimaryLabel,
-                Sim.Clearing.IsClearing(number) ? L("CLEARING", "清理中") : L("CLEAR FREE", "免费清理"),
-                () => StartFreeClearing(number),
-                !Sim.Clearing.IsClearing(number),
-                Teal);
-            SetRoomButton(_roomSecondary, _roomSecondaryLabel, L("COMPARE PLANS", "比较复原方案"),
+            SetRoomButton(_roomPrimary, _roomPrimaryLabel, L("GO TO ROOM", "前往房间"),
+                () => NavigateToRoom(number), true, Teal);
+            SetRoomButton(_roomSecondary, _roomSecondaryLabel, L("INVESTMENT PLANS", "投资方案"),
                 OpenAssetsForSelectedRoom, true, Ink);
             return;
         }
@@ -373,55 +388,363 @@ public sealed class WorldManagementHud : MonoBehaviour
         if (room.state == RoomSimState.Blocked)
         {
             FurnitureInstance broken = FirstBrokenFurniture(number);
-            int repairCost = broken != null ? FurnitureCatalog.Get(broken.kindId).repairCost : 0;
-            int repairDays = broken != null ? FurnitureCatalog.Get(broken.kindId).repairDays : 0;
-            _roomHeadline.text = "<color=#C65B46>$0</color> / "
-                                 + L("night", "晚") + "  →  <color=#297A6E>$"
-                                 + currentRate + "</color> / " + L("night", "晚");
+            _roomHeadline.text = L("REVENUE STOPPED", "收入已中断")
+                                 + "  ·  <color=#C65B46>-$" + currentRate
+                                 + L("/sellable night", "/可售夜") + "</color>";
             _roomDetail.text = broken == null
-                ? L("Required furniture is blocking this room.", "必要家具故障，房间目前无法出售。")
+                ? L("This room is blocked. Go to the door to inspect the live problem.",
+                    "房间已封闭；前往门口查看现场问题。")
                 : L(
-                    "Repair $" + repairCost + " · " + repairDays
-                    + " day(s), or tape it free until tomorrow.",
-                    "维修 $" + repairCost + " · " + repairDays
-                    + " 天；也可免费胶带应急，但明天会再次故障。");
-            SetRoomButton(_roomPrimary, _roomPrimaryLabel,
-                L("REPAIR $" + repairCost, "维修 $" + repairCost),
-                () => RepairBroken(number), broken != null && !broken.wrecked, Teal);
-            SetRoomButton(_roomSecondary, _roomSecondaryLabel, L("TAPE FREE", "免费胶带应急"),
-                () => TapeBroken(number), broken != null && !broken.taped, Ink);
+                    "A required " + FurnitureCatalog.Get(broken.kindId).name
+                    + " is broken. Repair decisions are available from Assets.",
+                    "必要家具 " + FurnitureCatalog.Get(broken.kindId).name
+                    + " 已故障；维修支出统一在“资产”中处理。");
+            SetRoomButton(_roomPrimary, _roomPrimaryLabel, L("GO TO INCIDENT", "前往故障点"),
+                () => NavigateToRoom(number), true, Teal);
+            SetRoomButton(_roomSecondary, _roomSecondaryLabel, L("VIEW REPAIR", "查看维修"),
+                OpenAssetsForSelectedRoom, true, Ink);
             return;
         }
 
-        var plan = RenovationPlan.For(RenovationPlanKind.Economy);
-        int targetRate = Sim.Pricing.PriceFor(Sim.Clock.CurrentDay, plan.targetTier);
-        int gain = Mathf.Max(0, targetRate - currentRate);
-        int cashCost = Sim.QuoteRenovation(RenovationPlanKind.Economy, 1);
-        int investment = RoomInvestmentMath.TotalInvestment(
-            cashCost, plan.materialsPerRoom, Sim.Materials.UnitPrice);
-        int nights = RoomInvestmentMath.SoldNightsToPayback(investment, gain);
-
-        _roomHeadline.text = "$" + currentRate + " / " + L("night", "晚")
-                             + "  →  <color=#297A6E>$" + targetRate + "</color> / "
-                             + L("night", "晚");
-        _roomDetail.text = room.state == RoomSimState.Occupied
-            ? L("Guest in house. Renovation can start after checkout.",
-                "客人正在入住，退房后才能开始装修。")
-            : L(
-                "Economy upgrade $" + cashCost + " + " + plan.materialsPerRoom
-                + " materials · closed " + plan.blockDays + " days · +$" + gain
-                + "/night · payback " + nights + " sold nights.",
-                "经济装修 $" + cashCost + " + " + plan.materialsPerRoom
-                + " 材料 · 停业 " + plan.blockDays + " 天 · 每晚增收 $" + gain
-                + " · 约 " + nights + " 个售出夜回本。");
-        bool canRenovate = room.state != RoomSimState.Occupied && gain > 0;
+        _roomHeadline.text = "<color=#297A6E>$" + currentRate + "</color> / "
+                             + L("night", "晚") + "  ·  "
+                             + OperationalRoomHeadline(room.state);
+        _roomDetail.text = OperationalRoomDetail(room.state);
         SetRoomButton(_roomPrimary, _roomPrimaryLabel,
-            L("START $" + cashCost, "开始装修 $" + cashCost),
-            () => StartRenovation(number, RenovationPlanKind.Economy),
-            canRenovate,
+            room.state == RoomSimState.Occupied
+                ? L("GO TO DOOR", "前往门口")
+                : L("GO TO ROOM", "前往房间"),
+            () => NavigateToRoom(number),
+            true,
             Teal);
-        SetRoomButton(_roomSecondary, _roomSecondaryLabel, L("COMPARE PLANS", "比较方案"),
+        SetRoomButton(_roomSecondary, _roomSecondaryLabel, L("ROOM VALUE", "房间价值"),
             OpenAssetsForSelectedRoom, true, Ink);
+    }
+
+    private void RefreshAlerts()
+    {
+        ManagerPhone phone = ManagerPhone.Instance;
+        bool visible = phone != null && phone.Notes.Count > 0 && !_drawerOpen;
+        _alertStrip.gameObject.SetActive(visible);
+        if (!visible) return;
+
+        _displayedNote = phone.Notes[phone.Notes.Count - 1];
+        int count = phone.Notes.Count;
+        _alertLabel.text = "<color=#D5A447>"
+                           + (_displayedNote.Floor + 1) + "F</color>  "
+                           + GameText.T(_displayedNote.Title)
+                           + (count > 1 ? L("  ·  +", "  ·  另有 ") + (count - 1) : "");
+        _alertLabel.color = Color.Lerp(Cream, _displayedNote.Tint, 0.35f);
+        _alertGoLabel.text = L("GO", "前往");
+    }
+
+    private void NavigateToDisplayedAlert()
+    {
+        ManagerPhone.Instance?.NavigateTo(_displayedNote);
+        ShowToast(L("Route set to the latest incident.", "已规划前往最新事件的路线。"));
+    }
+
+    private void RefreshContextSheet()
+    {
+        ContextModel model = BuildContextModel();
+        bool visible = model != null && !_drawerOpen;
+        _contextSheet.gameObject.SetActive(visible);
+        if (!visible)
+        {
+            _contextStateKey = "";
+            return;
+        }
+        if (_contextStateKey == model.Key) return;
+
+        _contextStateKey = model.Key;
+        for (int i = _contextContent.childCount - 1; i >= 0; i--)
+            Destroy(_contextContent.GetChild(i).gameObject);
+
+        float height = 86f + model.Actions.Count * 42f;
+        SetAnchors(_contextSheet, new Vector2(0f, 0f), new Vector2(1f, 0f),
+            new Vector2(8f, 72f), new Vector2(-8f, 72f + Mathf.Min(390f, height)));
+
+        var title = CreateText("Title", _contextContent, 18f, Gold,
+            TextAlignmentOptions.Left, true);
+        title.text = model.Title;
+        title.enableWordWrapping = true;
+        title.overflowMode = TextOverflowModes.Overflow;
+        var titleLayout = title.gameObject.AddComponent<LayoutElement>();
+        titleLayout.preferredHeight = 28f;
+
+        var body = CreateText("Body", _contextContent, 12.5f, InkSoft,
+            TextAlignmentOptions.TopLeft, false);
+        body.text = model.Body;
+        body.enableWordWrapping = true;
+        body.overflowMode = TextOverflowModes.Truncate;
+        var bodyLayout = body.gameObject.AddComponent<LayoutElement>();
+        bodyLayout.preferredHeight = 38f;
+
+        foreach (ContextAction action in model.Actions)
+        {
+            ContextAction captured = action;
+            RectTransform rect;
+            TextMeshProUGUI label;
+            Button button = CreateButton(
+                "Action",
+                _contextContent,
+                out rect,
+                out label,
+                captured.Label,
+                captured.Color,
+                () =>
+                {
+                    captured.Invoke?.Invoke();
+                    _contextStateKey = "";
+                    ForceAllRefresh();
+                });
+            button.interactable = captured.Enabled;
+            var layout = rect.gameObject.AddComponent<LayoutElement>();
+            layout.preferredHeight = 34f;
+        }
+    }
+
+    private ContextModel BuildContextModel()
+    {
+        BreakdownSystem breakdown = FindFirstObjectByType<BreakdownSystem>();
+        if (breakdown != null && breakdown.PanelOpen)
+        {
+            var model = NewContext(
+                "breakdown|" + breakdown.PanelTitle + "|" + breakdown.PanelDetail,
+                breakdown.PanelTitle,
+                breakdown.PanelDetail);
+            AddContext(model, L("FIX IT YOURSELF", "经理亲自处理"),
+                () => breakdown.ResolvePanel(BreakdownFix.DIY), true, Gold);
+            AddContext(model, L("SEND HOUSEKEEPING", "派客房部处理"),
+                () => breakdown.ResolvePanel(BreakdownFix.SendStaff),
+                breakdown.HasHousekeeper, Teal);
+            AddContext(model, L("DUCT TAPE · TEMPORARY", "胶带应急 · 明天复发"),
+                () => breakdown.ResolvePanel(BreakdownFix.DuctTape), true, Ink);
+            if (breakdown.CanLockPanelRoom)
+                AddContext(model, L("CLOSE THE ROOM", "封闭房间"),
+                    () => breakdown.ResolvePanel(BreakdownFix.LockRoom), true, Coral);
+            return model;
+        }
+
+        FireAlarmIncident fire = FindFirstObjectByType<FireAlarmIncident>();
+        if (fire != null && fire.PanelOpen)
+        {
+            var model = NewContext(
+                "fire|" + fire.ActiveRoomNumber,
+                L("FIRE ALARM · ROOM ", "火警 · 房间 ") + fire.ActiveRoomNumber,
+                L("A guest is smoking in bed. The fire department is already writing the $"
+                  + FireAlarmIncident.FineAmount + " fine.",
+                  "住客在床上吸烟；消防部门已经开出 $" + FireAlarmIncident.FineAmount + " 罚单。"));
+            AddContext(model, L("REMOVE THE GUEST", "请住客离店"),
+                () => fire.ResolvePanel(true), true, Coral);
+            AddContext(model, L("LET IT SLIDE", "暂不追究"),
+                () => fire.ResolvePanel(false), true, Ink);
+            return model;
+        }
+
+        DailyEventInteraction daily = FindFirstObjectByType<DailyEventInteraction>();
+        if (daily != null && daily.PanelOpen && daily.HasActiveEvent)
+        {
+            var model = NewContext(
+                "event|" + daily.ActiveEventTitle,
+                GameText.T(daily.ActiveEventTitle),
+                GameText.T(daily.ActiveEventBlurb));
+            for (int i = 0; i < daily.ActiveOptionCount; i++)
+            {
+                int index = i;
+                AddContext(model, GameText.T(daily.ActiveOptionLabel(i)),
+                    () => daily.ChooseActiveOption(index), true, i == 0 ? Gold : Ink);
+            }
+            return model;
+        }
+
+        ComplaintInteraction complaint = FindFirstObjectByType<ComplaintInteraction>();
+        if (complaint != null && complaint.PanelOpen)
+        {
+            var model = NewContext(
+                "complaint",
+                L("ANGRY GUEST AT RECEPTION", "前台有愤怒住客"),
+                L("Choose a response. This affects cash, rating and staff morale.",
+                  "处理方式会影响现金、评分与员工士气。"));
+            AddContext(model, L("COMPENSATE HALF A NIGHT", "赔偿半晚房费"),
+                () => complaint.ResolvePanel(ComplaintChoice.Pay), true, Gold);
+            AddContext(model, L("REFUSE COMPENSATION", "拒绝赔偿"),
+                () => complaint.ResolvePanel(ComplaintChoice.ColdShoulder), true, Ink);
+            AddContext(model, L("ESCALATE THE ARGUMENT", "升级争执"),
+                () => complaint.ResolvePanel(ComplaintChoice.Fight), true, Coral);
+            return model;
+        }
+
+        ManagerInteraction staffInteraction = FindFirstObjectByType<ManagerInteraction>();
+        if (staffInteraction != null
+            && staffInteraction.ActiveHudState != ManagerInteraction.HudState.None)
+        {
+            StaffAgent agent = staffInteraction.ActiveHudAgent;
+            StaffMember member = agent != null ? agent.Member : null;
+            switch (staffInteraction.ActiveHudState)
+            {
+                case ManagerInteraction.HudState.ToiletGuest:
+                {
+                    var model = NewContext(
+                        "toilet_guest",
+                        L("PRIVACY COMPLAINT", "厕所隐私投诉"),
+                        L("You opened an occupied public-toilet stall. The guest demands an apology.",
+                          "你打开了有人使用的公共厕所隔间，住客要求正式道歉。"));
+                    AddContext(model, L("APOLOGIZE + $30", "道歉并赔偿 $30"),
+                        staffInteraction.ResolveToiletGuestWithCompensation, true, Gold);
+                    AddContext(model, L("APOLOGIZE ONLY", "只道歉"),
+                        staffInteraction.ResolveToiletGuestWithApology, true, Ink);
+                    AddContext(model, L("ARGUE WITH THE GUEST", "与住客争辩"),
+                        staffInteraction.ResolveToiletGuestByArguing, true, Coral);
+                    return model;
+                }
+                case ManagerInteraction.HudState.CaughtSlacking:
+                {
+                    var model = NewContext(
+                        "caught|" + member?.DisplayName,
+                        L("CAUGHT SLACKING · ", "抓到摸鱼 · ") + member?.DisplayName,
+                        RoleName(member != null ? member.Role : StaffRole.Manager)
+                        + L(" · morale ", " · 士气 ") + member?.Morale);
+                    AddContext(model, L("URGE BACK TO WORK", "督促返岗"),
+                        () => staffInteraction.ResolveCaughtStaff(CatchChoice.Urge), true, Teal);
+                    AddContext(model, L("SCOLD HARD", "严厉训斥"),
+                        () => staffInteraction.ResolveCaughtStaff(CatchChoice.Scold), true, Coral);
+                    AddContext(model, L("LOOK AWAY", "装作没看见"),
+                        () => staffInteraction.ResolveCaughtStaff(CatchChoice.Ignore), true, Ink);
+                    return model;
+                }
+                case ManagerInteraction.HudState.Staff:
+                {
+                    var model = NewContext(
+                        "staff|" + member?.DisplayName + "|" + agent?.ActivityState,
+                        (member?.DisplayName ?? L("EMPLOYEE", "员工"))
+                        + " · " + RoleName(member != null ? member.Role : StaffRole.Manager),
+                        (agent != null ? agent.ShiftState + " · " + agent.ActivityState : "")
+                        + L(" · morale ", " · 士气 ") + member?.Morale);
+                    AddContext(model, L("HURRY UP", "催促加快"),
+                        staffInteraction.HurryActiveStaff, true, Teal);
+                    AddContext(model, L("INTERROGATE DELAY", "质询延误"),
+                        staffInteraction.InterrogateActiveStaff,
+                        staffInteraction.ActiveStaffCanBeInterrogated, Gold);
+                    AddContext(model, L("ASSIGN A ROOM", "指定房间"),
+                        staffInteraction.BeginAssignActiveStaff, true, Ink);
+                    AddContext(model, L("FIRE EMPLOYEE", "解雇员工"),
+                        staffInteraction.FireActiveStaff, true, Coral);
+                    AddContext(model, L("CLOSE", "关闭"),
+                        staffInteraction.CloseActiveStaff, true, Slate);
+                    return model;
+                }
+                case ManagerInteraction.HudState.AssignRoom:
+                {
+                    IReadOnlyList<Room2DEntity> candidates = staffInteraction.CommandRoomCandidates;
+                    var model = NewContext(
+                        "assign|" + member?.DisplayName + "|" + candidates.Count,
+                        L("ASSIGN ROOM · ", "指定房间 · ") + member?.DisplayName,
+                        candidates.Count > 0
+                            ? L("Choose from the live queue. You can also tap another valid room in the hotel.",
+                                "从实时任务列表中选择；也可以直接点击场景中的其他有效房间。")
+                            : L("No rooms currently need this role.", "当前没有房间需要该岗位。"));
+                    int visibleCount = Mathf.Min(6, candidates.Count);
+                    for (int i = 0; i < visibleCount; i++)
+                    {
+                        Room2DEntity room = candidates[i];
+                        int floor = FloorMath.FloorIndexForY(room.transform.position.y) + 1;
+                        AddContext(model,
+                            L("ROOM ", "房间 ") + room.roomNumber + " · " + floor + "F · "
+                            + room.GetStateDisplayName(),
+                            () => staffInteraction.AssignCommandRoom(room), true, Teal);
+                    }
+                    AddContext(model, L("CANCEL", "取消"),
+                        staffInteraction.CancelCommandRoom, true, Ink);
+                    return model;
+                }
+                case ManagerInteraction.HudState.RoomFlaw:
+                {
+                    var model = NewContext(
+                        "room_flaw",
+                        L("INSPECTION FLAW FOUND", "验房发现问题"),
+                        L("Return the nearby room to housekeeping before it reaches a guest.",
+                          "在住客入住前，把附近房间退回客房部重新清洁。"));
+                    AddContext(model, L("RETURN TO CLEANING", "退回清洁"),
+                        staffInteraction.SendNearbyFlawedRoomBack, true, Coral);
+                    return model;
+                }
+            }
+        }
+
+        ElevatorController elevator = ElevatorController.Instance;
+        if (elevator != null && elevator.PanelOpen)
+        {
+            var model = NewContext(
+                "elevator|" + elevator.CurrentFloor,
+                L("ELEVATOR", "电梯"),
+                L("Choose a floor. Locked facilities show their opening cost.",
+                  "选择楼层；尚未开放的设施会显示开业成本。"));
+            for (int f = FloorMath.FloorCount - 1; f >= 0; f--)
+            {
+                int floor = f;
+                bool accessible = FacilitySystem.FloorAccessible(floor);
+                string label = (floor + 1) + "F  " + FloorMath.FloorNames[floor];
+                if (!accessible) label += L(" · OPEN $", " · 开放 $") + FacilityUnlockCost(floor);
+                else if (floor == elevator.CurrentFloor) label += L(" · HERE", " · 当前");
+                AddContext(model, label, () =>
+                {
+                    if (!elevator.SelectFloor(floor, out string message)
+                        && !string.IsNullOrEmpty(message))
+                        ShowToast(GameText.T(message));
+                }, floor != elevator.CurrentFloor, accessible ? Teal : Gold);
+            }
+            return model;
+        }
+
+        RoomDoor door = RoomDoor.ActivePrompt;
+        if (door != null && door.Room != null)
+        {
+            var model = NewContext(
+                "door|" + door.Room.roomNumber + "|" + door.Room.currentState,
+                L("ROOM ", "房间 ") + door.Room.roomNumber,
+                GameText.T(door.StateHint)
+                + (door.Room.currentState == Room2DState.Occupied
+                    ? L(" Entry is optional; incidents can be handled from the corridor.",
+                        " 无需为处理故障强行进入，门外即可维修。")
+                    : ""));
+            AddContext(model, L("SWIPE KEY & ENTER", "刷卡进入"),
+                door.ConfirmEntry, true,
+                door.Room.currentState == Room2DState.Occupied ? Coral : Teal);
+            AddContext(model, L("CANCEL", "取消"),
+                door.DeclineEntry, true, Ink);
+            return model;
+        }
+
+        return null;
+    }
+
+    private static ContextModel NewContext(string key, string title, string body)
+    {
+        return new ContextModel { Key = key, Title = title, Body = body };
+    }
+
+    private static void AddContext(
+        ContextModel model,
+        string label,
+        Action action,
+        bool enabled,
+        Color color)
+    {
+        model.Actions.Add(new ContextAction
+        {
+            Label = label,
+            Invoke = action,
+            Enabled = enabled,
+            Color = color,
+        });
+    }
+
+    private static int FacilityUnlockCost(int floor)
+    {
+        if (floor == FacilitySystem.GymFloor) return FacilitySystem.GymCost;
+        if (floor == FacilitySystem.CasinoFloor) return FacilitySystem.CasinoCost;
+        return FacilitySystem.PoolCost;
     }
 
     private void RefreshDrawerIfChanged()
@@ -641,6 +964,48 @@ public sealed class WorldManagementHud : MonoBehaviour
                 Ink,
                 true);
         }
+
+        HiringInteraction hiring = FindFirstObjectByType<HiringInteraction>();
+        if (hiring == null) return;
+
+        AddSection(L("RECRUITMENT", "今日招聘"),
+            L("Signing fee equals two days of wages. New hires join immediately.",
+              "签约费为两天工资；成功招聘后员工会立即到岗。"));
+        IReadOnlyList<StaffMember> candidates = hiring.Candidates;
+        if (candidates.Count == 0)
+        {
+            AddInfoCard(
+                L("NO CANDIDATES LEFT", "今日候选人已招完"),
+                L("The board refreshes tomorrow.", "招聘栏会在明天刷新。"),
+                Slate,
+                62f);
+            return;
+        }
+
+        for (int i = 0; i < candidates.Count; i++)
+        {
+            StaffMember captured = candidates[i];
+            int fee = hiring.SigningCostFor(captured);
+            string details = RoleName(captured.Role)
+                             + L(" · wage $", " · 日薪 $") + captured.DailyWage
+                             + L("/day", "/天")
+                             + "\nSPD " + captured.Attributes.Speed
+                             + "   QLT " + captured.Attributes.Quality
+                             + "   STA " + captured.Attributes.Stamina;
+            AddPlanButton(
+                captured.DisplayName + L("  · HIRE -$", "  · 招聘 -$") + fee,
+                details,
+                () =>
+                {
+                    hiring.HireCandidate(captured);
+                    ShowToast(string.IsNullOrEmpty(hiring.LatestStory)
+                        ? L("Recruitment decision recorded.", "招聘结果已处理。")
+                        : hiring.LatestStory);
+                    ForceDrawerRefresh();
+                },
+                Gold,
+                Sim.Cash >= fee);
+        }
     }
 
     private void BuildAssetsDesk()
@@ -719,7 +1084,32 @@ public sealed class WorldManagementHud : MonoBehaviour
                 suggested > 0 && Sim.Cash > 0);
         }
 
-        AddActionButton(L("SAVE / LOAD", "存档 / 读档"), SaveSlotPanel.Toggle, Slate, true);
+        AddSection(L("SAVE SLOTS", "存档槽位"),
+            L("Saving changes the active autosave slot. Loading rebuilds the scene cleanly.",
+              "保存后自动存档会跟随该槽位；读取会完整重载场景，避免残留角色和任务。"));
+        for (int slot = 1; slot <= SaveSlots.Count; slot++)
+        {
+            int capturedSlot = slot;
+            SaveSlotSummary summary = SaveService.SummaryOf(slot);
+            string slotName = L("SLOT ", "槽位 ") + slot;
+            string summaryText = summary.exists
+                ? L("Day ", "第 ") + summary.day + L(" · cash $", " 天 · 现金 $")
+                  + summary.cash + L(" · rating ", " · 评分 ") + summary.stars.ToString("0.0")
+                : L("Empty", "空槽位");
+            AddPlanButton(
+                slotName + (SaveSlots.ActiveSlot == slot ? L(" · ACTIVE", " · 当前") : ""),
+                summaryText + L("\nTap to save or overwrite this slot.",
+                                "\n点击保存或覆盖此槽位。"),
+                () => SaveIntoSlot(capturedSlot),
+                SaveSlots.ActiveSlot == slot ? Gold : Ink,
+                true);
+            if (summary.exists)
+                AddActionButton(
+                    L("LOAD SLOT ", "读取槽位 ") + slot,
+                    () => LoadFromSlot(capturedSlot),
+                    Slate,
+                    true);
+        }
     }
 
     private void BuildSelectedRoomPlans(RoomRecord room)
@@ -895,6 +1285,100 @@ public sealed class WorldManagementHud : MonoBehaviour
         ForceAllRefresh();
     }
 
+    private void NavigateToRoom(int roomNumber)
+    {
+        Room2DEntity entity = FindRoomEntity(roomNumber);
+        ManagerController manager = FindFirstObjectByType<ManagerController>();
+        if (entity == null || manager == null)
+        {
+            ShowToast(L("Room route is unavailable.", "暂时无法规划到该房间。"));
+            return;
+        }
+
+        Vector3 target = RoomDoor.ExteriorPointFor(entity);
+        manager.MoveTo(target);
+        ShowToast(L("Walking to Room ", "正在前往房间 ") + roomNumber + ".");
+        RoomSelection.Clear();
+    }
+
+    private static Room2DEntity FindRoomEntity(int roomNumber)
+    {
+        Room2DPrototypeDemandLoop loop = FindFirstObjectByType<Room2DPrototypeDemandLoop>();
+        if (loop == null || loop.rooms == null) return null;
+        foreach (Room2DEntity room in loop.rooms)
+            if (room != null && room.roomNumber == roomNumber) return room;
+        return null;
+    }
+
+    private static string OperationalRoomHeadline(RoomSimState state)
+    {
+        switch (state)
+        {
+            case RoomSimState.Occupied: return L("GUEST IN HOUSE", "住客入住中");
+            case RoomSimState.Dirty: return L("TURNOVER REQUIRED", "等待清洁");
+            case RoomSimState.Cleaning: return L("HOUSEKEEPING ACTIVE", "清洁进行中");
+            case RoomSimState.AwaitingInspection: return L("AWAITING INSPECTION", "等待验房");
+            default: return L("READY TO SELL", "可立即出售");
+        }
+    }
+
+    private static string OperationalRoomDetail(RoomSimState state)
+    {
+        switch (state)
+        {
+            case RoomSimState.Occupied:
+                return L(
+                    "The room is earning tonight. Entering may upset the guest.",
+                    "该房今晚正在产生收入；擅自进入可能激怒住客。");
+            case RoomSimState.Dirty:
+                return L(
+                    "Every minute dirty is lost selling time. Housekeeping assigns automatically.",
+                    "脏房每多停留一分钟都在损失可售时间；客房部会自动接活。");
+            case RoomSimState.Cleaning:
+                return L(
+                    "Housekeeping is turning this room over.",
+                    "客房部正在完成退房清洁。");
+            case RoomSimState.AwaitingInspection:
+                return L(
+                    "An inspector must release this room before it can be sold.",
+                    "验房员确认后，房间才能重新出售。");
+            default:
+                return L(
+                    "Clean, inspected and available for the next guest.",
+                    "房间已清洁并通过验房，可接待下一位住客。");
+        }
+    }
+
+    private void SaveIntoSlot(int slot)
+    {
+        SaveCoordinator coordinator = FindFirstObjectByType<SaveCoordinator>();
+        if (coordinator == null)
+        {
+            ShowToast(L("Save system unavailable.", "存档系统不可用。"));
+            return;
+        }
+
+        SaveService.SaveToSlot(slot, coordinator.Capture());
+        SaveSlots.SetActiveSlot(slot);
+        ShowToast(L("Saved into slot ", "已保存至槽位 ") + slot + ".");
+        ForceDrawerRefresh();
+    }
+
+    private void LoadFromSlot(int slot)
+    {
+        if (!SaveSlots.Exists(slot))
+        {
+            ShowToast(L("That slot is empty.", "该槽位为空。"));
+            return;
+        }
+
+        SaveSlots.RequestLoad(slot);
+        Time.timeScale = 1f;
+        var scene = UnityEngine.SceneManagement.SceneManager.GetActiveScene();
+        UnityEngine.SceneManagement.SceneManager.LoadScene(
+            scene.buildIndex >= 0 ? scene.name : scene.path);
+    }
+
     private void SkipToNextPhase()
     {
         if (_skipTargetMinute >= 0 || Sim == null) return;
@@ -926,7 +1410,13 @@ public sealed class WorldManagementHud : MonoBehaviour
     {
         _drawerOpen = open;
         _drawer.gameObject.SetActive(open);
+        if (open)
+        {
+            _contextSheet.gameObject.SetActive(false);
+            _alertStrip.gameObject.SetActive(false);
+        }
         _roomCard.gameObject.SetActive(!open
+                                       && !_contextSheet.gameObject.activeSelf
                                        && RoomSelection.Selected > 0
                                        && Sim != null
                                        && Sim.Rooms.Contains(RoomSelection.Selected));
@@ -994,9 +1484,11 @@ public sealed class WorldManagementHud : MonoBehaviour
         _safeRoot = CreateRect("SafeArea", canvasObject.transform);
         Stretch(_safeRoot);
         BuildTop();
+        BuildAlertStrip();
         BuildBottomNavigation();
         BuildDrawer();
         BuildRoomCard();
+        BuildContextSheet();
         BuildToast();
         UpdateSafeArea(force: true);
         SetDrawerOpen(false);
@@ -1018,9 +1510,12 @@ public sealed class WorldManagementHud : MonoBehaviour
         SetAnchors(_dayTimeLabel.rectTransform, new Vector2(0f, 0.5f), new Vector2(0.64f, 1f),
             new Vector2(16f, 2f), new Vector2(-2f, -8f));
 
-        _cashLabel = CreateText("Cash", _topPanel, 27f, Gold,
+        _cashLabel = CreateText("Cash", _topPanel, 22f, Gold,
             TextAlignmentOptions.TopRight, true);
-        SetAnchors(_cashLabel.rectTransform, new Vector2(0.62f, 0.48f), new Vector2(1f, 1f),
+        _cashLabel.enableAutoSizing = true;
+        _cashLabel.fontSizeMin = 16f;
+        _cashLabel.fontSizeMax = 22f;
+        SetAnchors(_cashLabel.rectTransform, new Vector2(0.54f, 0.48f), new Vector2(1f, 1f),
             new Vector2(0f, 0f), new Vector2(-16f, -8f));
 
         _earnedLabel = CreateText("Earned", _topPanel, 13f, Cream,
@@ -1066,6 +1561,31 @@ public sealed class WorldManagementHud : MonoBehaviour
         AddNavButton(DeskTab.Pricing, L("RATES", "房价"));
         AddNavButton(DeskTab.Staff, L("TEAM", "员工"));
         AddNavButton(DeskTab.Assets, L("ASSETS", "资产"));
+    }
+
+    private void BuildAlertStrip()
+    {
+        _alertStrip = CreatePanel("IncidentStrip", _safeRoot, Walnut);
+        SetAnchors(_alertStrip, new Vector2(0f, 1f), new Vector2(1f, 1f),
+            new Vector2(8f, -166f), new Vector2(-8f, -120f));
+        AddOutline(_alertStrip, BrassLine, 1f);
+
+        var accent = CreatePanel("Accent", _alertStrip, Coral);
+        SetAnchors(accent, Vector2.zero, new Vector2(0f, 1f),
+            Vector2.zero, new Vector2(5f, 0f));
+
+        _alertLabel = CreateText("Alert", _alertStrip, 12.5f, Cream,
+            TextAlignmentOptions.MidlineLeft, true);
+        SetAnchors(_alertLabel.rectTransform, Vector2.zero, new Vector2(0.79f, 1f),
+            new Vector2(14f, 4f), new Vector2(-4f, -4f));
+        _alertLabel.enableWordWrapping = true;
+
+        RectTransform goRect;
+        _alertGoButton = CreateButton("Go", _alertStrip, out goRect, out _alertGoLabel,
+            L("GO", "前往"), Gold, NavigateToDisplayedAlert);
+        SetAnchors(goRect, new Vector2(0.80f, 0f), Vector2.one,
+            new Vector2(0f, 6f), new Vector2(-8f, -6f));
+        _alertStrip.gameObject.SetActive(false);
     }
 
     private void AddNavButton(DeskTab tab, string label)
@@ -1185,6 +1705,30 @@ public sealed class WorldManagementHud : MonoBehaviour
             out _roomSecondaryLabel, "", Ink, null);
         SetAnchors(secondaryRect, new Vector2(0.55f, 0f), new Vector2(1f, 0.25f),
             new Vector2(4f, 10f), new Vector2(-12f, 0f));
+    }
+
+    private void BuildContextSheet()
+    {
+        _contextSheet = CreatePanel("WorldActionSheet", _safeRoot, Ledger);
+        SetAnchors(_contextSheet, new Vector2(0f, 0f), new Vector2(1f, 0f),
+            new Vector2(8f, 72f), new Vector2(-8f, 260f));
+        AddOutline(_contextSheet, BrassLine, 1.4f);
+
+        var accent = CreatePanel("Accent", _contextSheet, Gold);
+        SetAnchors(accent, Vector2.zero, new Vector2(0f, 1f),
+            Vector2.zero, new Vector2(6f, 0f));
+
+        _contextContent = CreateRect("Content", _contextSheet);
+        Stretch(_contextContent, 12f);
+        _contextContent.offsetMin += new Vector2(6f, 2f);
+        var layout = _contextContent.gameObject.AddComponent<VerticalLayoutGroup>();
+        layout.spacing = 5f;
+        layout.padding = new RectOffset(4, 4, 4, 4);
+        layout.childControlHeight = true;
+        layout.childControlWidth = true;
+        layout.childForceExpandHeight = false;
+        layout.childForceExpandWidth = true;
+        _contextSheet.gameObject.SetActive(false);
     }
 
     private void BuildToast()

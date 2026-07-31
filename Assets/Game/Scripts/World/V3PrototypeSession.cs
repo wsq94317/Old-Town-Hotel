@@ -131,6 +131,7 @@ public class V3PrototypeSession : MonoBehaviour
 
     private void OnGUI()
     {
+        if (WorldManagementHud.IsActive) return;
         if (_sim == null) return;
         Vector2 v = GuiScale.Begin();
         float w = v.x, h = v.y;

@@ -75,6 +75,7 @@ public class DebugHudOverlay : MonoBehaviour
 
     private void OnGUI()
     {
+        if (WorldManagementHud.IsActive) return;
         if (dayController == null) return;
         // 新操作台在场时调试 HUD 退居幕后：文字全叠在顶栏上（重叠灾难的一员）。
         // 只藏绘制——日结自动续天的逻辑还归它管，M-F 收编日结 UI 时一起退役。

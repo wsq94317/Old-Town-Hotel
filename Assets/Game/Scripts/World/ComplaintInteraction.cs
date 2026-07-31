@@ -123,6 +123,8 @@ public class ComplaintInteraction : MonoBehaviour
         SendGuestHome();
     }
 
+    public void ResolvePanel(ComplaintChoice choice) => Choose(choice);
+
     private System.Collections.IEnumerator KnockDownManager()
     {
         if (_managerVisual == null && manager != null)
@@ -135,7 +137,7 @@ public class ComplaintInteraction : MonoBehaviour
 
     private void OnGUI()
     {
-        if (WorldManagementHud.SuppressesWorldImGui) return;
+        if (WorldManagementHud.IsActive) return;
         // 全屏晨报期间全体让位：IMGUI 没有 z 序，谁画谁上；报告必须是唯一的画手，
         // 否则警报/HIRE/庆祝框会压在报告上，而且它们的按钮还会抢走转发的点击。
         if (HotelSimSceneBridge.Instance != null && HotelSimSceneBridge.Instance.AwaitingMorningReport) return;

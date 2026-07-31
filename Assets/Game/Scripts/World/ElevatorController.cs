@@ -21,6 +21,8 @@ public class ElevatorController : MonoBehaviour
     private static Material _doorMat;
 
     public bool PanelOpen => _panelOpen;
+    public int CurrentFloor => _manager != null ? CurrentManagerFloor() : 0;
+    public bool IsTraveling => _traveling;
 
     /// <summary>电梯轿厢在某层的世界坐标（手机 GO 引导用）。</summary>
     public Vector3 CabWorldPos(int floor) =>
@@ -133,6 +135,28 @@ public class ElevatorController : MonoBehaviour
         StartCoroutine(Travel(targetFloor));
     }
 
+    public bool SelectFloor(int targetFloor, out string message)
+    {
+        message = "";
+        if (_traveling || targetFloor < 0 || targetFloor >= FloorMath.FloorCount)
+            return false;
+        if (targetFloor == CurrentFloor)
+        {
+            _panelOpen = false;
+            return false;
+        }
+
+        if (!FacilitySystem.FloorAccessible(targetFloor))
+        {
+            EconomySystem economy = FindFirstObjectByType<EconomySystem>();
+            if (!FacilitySystem.TryUnlock(targetFloor, economy, out message))
+                return false;
+        }
+
+        GoToFloor(targetFloor);
+        return true;
+    }
+
     private System.Collections.IEnumerator Travel(int targetFloor)
     {
         _traveling = true;
@@ -155,7 +179,7 @@ public class ElevatorController : MonoBehaviour
 
     private void OnGUI()
     {
-        if (WorldManagementHud.SuppressesWorldImGui) return;
+        if (WorldManagementHud.IsActive) return;
         // 全屏晨报期间全体让位：IMGUI 没有 z 序，谁画谁上；报告必须是唯一的画手，
         // 否则警报/HIRE/庆祝框会压在报告上，而且它们的按钮还会抢走转发的点击。
         if (HotelSimSceneBridge.Instance != null && HotelSimSceneBridge.Instance.AwaitingMorningReport) return;

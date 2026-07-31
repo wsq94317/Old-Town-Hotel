@@ -36,7 +36,21 @@ public class DailyEventInteraction : MonoBehaviour
     // 手机通知中心轮询用
     public bool HasActiveEvent => _activeDef != null;
     public string ActiveEventTitle => _activeDef != null ? _activeDef.Title : "";
+    public string ActiveEventBlurb => _activeDef != null ? _activeDef.Blurb : "";
+    public int ActiveOptionCount => _activeDef != null && _activeDef.Options != null
+        ? _activeDef.Options.Length
+        : 0;
     public Vector3 ActiveEventAnchor => _activeAnchor;
+
+    public string ActiveOptionLabel(int index)
+    {
+        return _activeDef != null
+               && _activeDef.Options != null
+               && index >= 0
+               && index < _activeDef.Options.Length
+            ? _activeDef.Options[index].Label
+            : "";
+    }
 
     private void Awake()
     {
@@ -61,6 +75,8 @@ public class DailyEventInteraction : MonoBehaviour
             foreach (var d in EventCatalog.All)
                 if (FacilityAnchorAccessible(d.Anchor)) pool.Add(d);
             _todaysSchedule = EventScheduleLogic.ScheduleForDay(pool, _rng);
+            if (_todaysSchedule.Count > 1)
+                _todaysSchedule.RemoveRange(1, _todaysSchedule.Count - 1);
             _nextIndex = 0;
             ClearActive();
         }
@@ -73,7 +89,9 @@ public class DailyEventInteraction : MonoBehaviour
         {
             var def = _todaysSchedule[_nextIndex].Def;
             _nextIndex++;
-            if (FacilityAnchorAccessible(def.Anchor)) Activate(def);
+            if (FacilityAnchorAccessible(def.Anchor)
+                && IncidentDailyBudget.TryClaim(_scheduledForDay, "daily_event"))
+                Activate(def);
         }
 
         if (_activeDef == null) return;
@@ -183,6 +201,13 @@ public class DailyEventInteraction : MonoBehaviour
         ClearActive();
     }
 
+    public void ChooseActiveOption(int index)
+    {
+        if (_activeDef == null || _activeDef.Options == null
+            || index < 0 || index >= _activeDef.Options.Length) return;
+        Choose(_activeDef.Options[index]);
+    }
+
     private void ApplySpecial(EventSpecial special)
     {
         if (special == EventSpecial.None || economy == null || economy.Payroll == null) return;
@@ -198,7 +223,7 @@ public class DailyEventInteraction : MonoBehaviour
 
     private void OnGUI()
     {
-        if (WorldManagementHud.SuppressesWorldImGui) return;
+        if (WorldManagementHud.IsActive) return;
         // 全屏晨报期间全体让位：IMGUI 没有 z 序，谁画谁上；报告必须是唯一的画手，
         // 否则警报/HIRE/庆祝框会压在报告上，而且它们的按钮还会抢走转发的点击。
         if (HotelSimSceneBridge.Instance != null && HotelSimSceneBridge.Instance.AwaitingMorningReport) return;

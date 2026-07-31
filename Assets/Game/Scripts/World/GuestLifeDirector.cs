@@ -20,8 +20,11 @@ public class GuestLifeDirector : MonoBehaviour
     [SerializeField] private Vector3 doorPoint = new Vector3(0f, 0f, -5.2f);
     [SerializeField] private Vector3 deskPoint = new Vector3(0.9f, 0f, 2.2f);
 
-    [Tooltip("前台停留几秒（办入住/拿钥匙/结账都用它）")]
-    [SerializeField] private float deskDwellSeconds = 1.6f;
+    [Tooltip("每位客人在柜台办理入住或退房的真实秒数。")]
+    [SerializeField] private float deskDwellSeconds = 4.8f;
+    [Tooltip("队伍从柜台向外延伸的世界方向。")]
+    [SerializeField] private Vector3 deskQueueDirection = new Vector3(0.85f, 0f, -0.35f);
+    [SerializeField] private float deskQueueSpacing = 1.05f;
 
     /// <summary>一位住客的表现状态。模拟层只知道"这间房有人"，
     /// 这一层知道他此刻是在房里、在前台，还是压根不在酒店。</summary>
@@ -42,7 +45,16 @@ public class GuestLifeDirector : MonoBehaviour
 
     private readonly Dictionary<int, Resident> _residents = new Dictionary<int, Resident>();
     private readonly List<int> _scratchGone = new List<int>();
+    private readonly List<DeskQueueEntry> _deskQueue = new List<DeskQueueEntry>();
     private System.Random _rng;
+
+    private sealed class DeskQueueEntry
+    {
+        public GuestAgent agent;
+        public System.Action onServed;
+        public float serviceEndsAt;
+        public bool serviceStarted;
+    }
 
     private void OnEnable()
     {
@@ -61,6 +73,7 @@ public class GuestLifeDirector : MonoBehaviour
 
         SyncResidentsWithLedger(bridge);
         RefreshPlansForNewDay(bridge.Sim.Clock.CurrentDay);
+        TickDeskQueue();
         TickPresence(bridge.Sim.Clock.CurrentMinute);
     }
 
@@ -85,7 +98,7 @@ public class GuestLifeDirector : MonoBehaviour
             };
             resident.agent = GuestAgent.Spawn(doorPoint, LabelFor(stay.segment));
             var captured = resident;
-            resident.agent.TravelTo(deskPoint, () => ArriveAtDesk(captured));
+            JoinDeskQueue(resident.agent, () => FinishDeskVisit(captured));
             _residents[stay.roomNumber] = resident;
         }
 
@@ -149,17 +162,20 @@ public class GuestLifeDirector : MonoBehaviour
             : GuestAgent.Spawn(start, LabelFor(resident.segment));
 
         // 先到前台结个账，再走——玩家要看得见"钱是从客人身上来的"
-        agent.TravelTo(deskPoint, () =>
+        JoinDeskQueue(agent, () =>
         {
             if (agent == null) return;
             agent.ExitVia(doorPoint, () => { if (agent != null) Destroy(agent.gameObject); });
         });
     }
 
-    private void ArriveAtDesk(Resident resident)
+    private void FinishDeskVisit(Resident resident)
     {
-        resident.presence = Presence.AtDesk;
-        resident.dwellUntil = Time.time + deskDwellSeconds;
+        if (resident == null || resident.agent == null) return;
+        resident.presence = Presence.WalkingToRoom;
+        var agent = resident.agent;
+        var captured = resident;
+        agent.TravelTo(RoomPositionOf(resident.roomNumber), () => EnterRoom(captured));
     }
 
     private void TickPresence(int currentMinute)
@@ -170,18 +186,6 @@ public class GuestLifeDirector : MonoBehaviour
 
             switch (resident.presence)
             {
-                case Presence.AtDesk:
-                    // 办完手续上楼
-                    if (Time.time < resident.dwellUntil) break;
-                    resident.presence = Presence.WalkingToRoom;
-                    if (resident.agent != null)
-                    {
-                        var agent = resident.agent;
-                        var captured = resident;
-                        agent.TravelTo(RoomPositionOf(resident.roomNumber), () => EnterRoom(captured));
-                    }
-                    break;
-
                 case Presence.InRoom:
                     // 该出门了吗
                     if (resident.outingIndex >= resident.outings.Count) break;
@@ -234,7 +238,82 @@ public class GuestLifeDirector : MonoBehaviour
 
         // 回来先去前台拿钥匙（大堂因此一整天都有人），再上楼
         resident.presence = Presence.WalkingToDesk;
-        agent.TravelTo(deskPoint, () => ArriveAtDesk(captured));
+        JoinDeskQueue(agent, () => FinishDeskVisit(captured));
+    }
+
+    private void JoinDeskQueue(GuestAgent agent, System.Action onServed)
+    {
+        if (agent == null) return;
+        _deskQueue.Add(new DeskQueueEntry
+        {
+            agent = agent,
+            onServed = onServed,
+        });
+        ReflowDeskQueue();
+    }
+
+    private void TickDeskQueue()
+    {
+        for (int i = _deskQueue.Count - 1; i >= 0; i--)
+        {
+            if (_deskQueue[i].agent != null) continue;
+            _deskQueue.RemoveAt(i);
+            ReflowDeskQueue();
+        }
+        if (_deskQueue.Count == 0) return;
+
+        DeskQueueEntry front = _deskQueue[0];
+        Vector3 delta = front.agent.transform.position - deskPoint;
+        delta.y = 0f;
+        if (front.agent.IsTraveling || delta.magnitude > 0.45f) return;
+
+        if (!front.serviceStarted)
+        {
+            front.serviceStarted = true;
+            front.serviceEndsAt = Time.time + Mathf.Max(2.5f, deskDwellSeconds);
+            FloatingTextFx.Spawn(
+                deskPoint,
+                "CHECKING DETAILS...",
+                new Color(0.95f, 0.78f, 0.35f),
+                Mathf.Max(1.5f, deskDwellSeconds - 0.5f));
+            return;
+        }
+
+        if (Time.time < front.serviceEndsAt) return;
+        _deskQueue.RemoveAt(0);
+        System.Action callback = front.onServed;
+        front.onServed = null;
+        callback?.Invoke();
+        ReflowDeskQueue();
+    }
+
+    private void ReflowDeskQueue()
+    {
+        for (int i = 0; i < _deskQueue.Count; i++)
+        {
+            DeskQueueEntry entry = _deskQueue[i];
+            if (entry.agent == null) continue;
+            if (i == 0 && entry.serviceStarted) continue;
+            entry.serviceStarted = false;
+            entry.agent.TravelTo(
+                DeskQueuePosition(
+                    deskPoint,
+                    deskQueueDirection,
+                    deskQueueSpacing,
+                    i),
+                null);
+        }
+    }
+
+    public static Vector3 DeskQueuePosition(
+        Vector3 counter,
+        Vector3 direction,
+        float spacing,
+        int index)
+    {
+        direction.y = 0f;
+        if (direction.sqrMagnitude < 0.001f) direction = Vector3.back;
+        return counter + direction.normalized * Mathf.Max(0f, spacing) * Mathf.Max(0, index);
     }
 
     /// <summary>房间的世界坐标。找不到那间房（场景房号不匹配）时退回大门，

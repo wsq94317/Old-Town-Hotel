@@ -33,6 +33,7 @@ public class FireAlarmIncident : MonoBehaviour
     private float _storyUntil;
 
     public bool PanelOpen => _panelOpen;
+    public int ActiveRoomNumber => _room != null ? _room.roomNumber : -1;
 
     private void Awake()
     {
@@ -101,6 +102,7 @@ public class FireAlarmIncident : MonoBehaviour
         foreach (var r in demandLoop.rooms)
             if (r != null && r.currentState == Room2DState.Occupied) occupied.Add(r);
         if (occupied.Count == 0) return; // 今天没得烧
+        if (!IncidentDailyBudget.TryClaim(_scheduledDay, "fire_alarm")) return;
 
         _room = occupied[_rng.Next(occupied.Count)];
         _expireHour = dayController.Clock.CurrentHour + 2f;
@@ -171,6 +173,8 @@ public class FireAlarmIncident : MonoBehaviour
         EndIncident(true);
     }
 
+    public void ResolvePanel(bool beatThemOut) => Choose(beatThemOut);
+
     private void EndIncident(bool resolved)
     {
         if (_smoke != null) Destroy(_smoke);
@@ -185,7 +189,7 @@ public class FireAlarmIncident : MonoBehaviour
 
     private void OnGUI()
     {
-        if (WorldManagementHud.SuppressesWorldImGui) return;
+        if (WorldManagementHud.IsActive) return;
         // 全屏晨报期间全体让位：IMGUI 没有 z 序，谁画谁上；报告必须是唯一的画手，
         // 否则警报/HIRE/庆祝框会压在报告上，而且它们的按钮还会抢走转发的点击。
         if (HotelSimSceneBridge.Instance != null && HotelSimSceneBridge.Instance.AwaitingMorningReport) return;

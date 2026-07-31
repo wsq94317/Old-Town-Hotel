@@ -36,6 +36,8 @@ public class BreakdownSystem : MonoBehaviour
     private readonly List<int> _lockedRoomNumbers = new List<int>();
     private int _scheduledDay = -1;
     private DayPeriod _lastPeriod = (DayPeriod)(-1);
+    private DayPeriod _spawnPeriodToday;
+    private bool _spawnedToday;
     private Incident _panelIncident;
     private string _story = "";
     private float _storyUntil;
@@ -43,6 +45,21 @@ public class BreakdownSystem : MonoBehaviour
     private bool _restoredRoomStateApplied = true;
 
     public bool PanelOpen => _panelIncident != null;
+    public string PanelTitle => _panelIncident == null
+        ? ""
+        : BreakdownLogic.SeverityLabel(_panelIncident.Severity) + " - " + _panelIncident.Kind;
+    public string PanelDetail => _panelIncident == null
+        ? ""
+        : (_panelIncident.Room != null
+            ? "Room " + _panelIncident.Room.roomNumber
+              + (_panelIncident.Room.currentState == Room2DState.Occupied
+                  ? " · guest occupied · repair from the corridor"
+                  : "")
+            : "Public area");
+    public bool HasHousekeeper => FindHousekeeper() != null;
+    public bool CanLockPanelRoom => _panelIncident != null
+                                    && _panelIncident.Room != null
+                                    && _panelIncident.Room.currentState != Room2DState.Occupied;
 
     public void CaptureTo(WorldState w)
     {
@@ -165,14 +182,20 @@ public class BreakdownSystem : MonoBehaviour
             _tapedForTomorrow.Clear();
 
             _lastPeriod = (DayPeriod)(-1);
+            _spawnPeriodToday = (DayPeriod)_rng.Next(0, 4);
+            _spawnedToday = false;
         }
 
         var period = DayPeriodLogic.PeriodFor(hour);
         if (period != _lastPeriod)
         {
             _lastPeriod = period;
-            int count = 1 + (_rng.NextDouble() < 0.4 ? 1 : 0);
-            for (int i = 0; i < count; i++) SpawnForPeriod(period);
+            if (!_spawnedToday && (int)period >= (int)_spawnPeriodToday)
+            {
+                _spawnedToday = true;
+                if (IncidentDailyBudget.TryClaim(day, "breakdown"))
+                    SpawnForPeriod(period);
+            }
         }
 
         foreach (var incident in _active)
@@ -193,8 +216,10 @@ public class BreakdownSystem : MonoBehaviour
             Vector3 managerPos = manager.transform.position;
             foreach (var incident in _active)
             {
-                if (FloorMath.FloorIndexForY(managerPos.y) != FloorMath.FloorIndexForY(incident.Pos.y)) continue;
-                if (Mathf.Abs(managerPos.x - incident.Pos.x) < 2.2f && Mathf.Abs(managerPos.z - incident.Pos.z) < 2.2f)
+                Vector3 interactionPoint = InteractionPoint(incident);
+                if (FloorMath.FloorIndexForY(managerPos.y) != FloorMath.FloorIndexForY(interactionPoint.y)) continue;
+                if (Mathf.Abs(managerPos.x - interactionPoint.x) < 2.2f
+                    && Mathf.Abs(managerPos.z - interactionPoint.z) < 2.2f)
                 {
                     _panelIncident = incident;
                     break;
@@ -204,9 +229,10 @@ public class BreakdownSystem : MonoBehaviour
         else if (_panelIncident != null && manager != null)
         {
             Vector3 managerPos = manager.transform.position;
-            if (Mathf.Abs(managerPos.x - _panelIncident.Pos.x) > 3.2f
-                || Mathf.Abs(managerPos.z - _panelIncident.Pos.z) > 3.2f
-                || FloorMath.FloorIndexForY(managerPos.y) != FloorMath.FloorIndexForY(_panelIncident.Pos.y))
+            Vector3 interactionPoint = InteractionPoint(_panelIncident);
+            if (Mathf.Abs(managerPos.x - interactionPoint.x) > 3.2f
+                || Mathf.Abs(managerPos.z - interactionPoint.z) > 3.2f
+                || FloorMath.FloorIndexForY(managerPos.y) != FloorMath.FloorIndexForY(interactionPoint.y))
             {
                 _panelIncident = null;
                 GuiModal.End(this);
@@ -304,12 +330,21 @@ public class BreakdownSystem : MonoBehaviour
 
     private void PushPhone(Incident incident)
     {
+        Vector3 anchor = InteractionPoint(incident);
         ManagerPhone.Push(
             incident.Id,
             "ALERT " + BreakdownLogic.SeverityLabel(incident.Severity) + " " + incident.Kind
             + (incident.Room != null ? " @ Room " + incident.Room.roomNumber : ""),
-            incident.Pos,
+            anchor,
             BreakdownLogic.SeverityColor(incident.Severity));
+    }
+
+    private static Vector3 InteractionPoint(Incident incident)
+    {
+        if (incident == null) return Vector3.zero;
+        return incident.Room != null
+            ? RoomDoor.ExteriorPointFor(incident.Room)
+            : incident.Pos;
     }
 
     private void Remove(Incident incident)
@@ -385,9 +420,20 @@ public class BreakdownSystem : MonoBehaviour
         _storyUntil = Time.time + 4.5f;
     }
 
+    public void ResolvePanel(BreakdownFix fix) => Choose(fix);
+
+    private StaffAgent FindHousekeeper()
+    {
+        if (spawner == null) return null;
+        foreach (StaffAgent agent in spawner.Agents)
+            if (agent?.Member != null && agent.Member.Role == StaffRole.Housekeeper)
+                return agent;
+        return null;
+    }
+
     private void OnGUI()
     {
-        if (WorldManagementHud.SuppressesWorldImGui) return;
+        if (WorldManagementHud.IsActive) return;
         // 全屏晨报期间全体让位：IMGUI 没有 z 序，谁画谁上；报告必须是唯一的画手，
         // 否则警报/HIRE/庆祝框会压在报告上，而且它们的按钮还会抢走转发的点击。
         if (HotelSimSceneBridge.Instance != null && HotelSimSceneBridge.Instance.AwaitingMorningReport) return;

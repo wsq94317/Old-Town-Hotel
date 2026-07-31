@@ -27,6 +27,7 @@ public class GuestAgent : MonoBehaviour
 
     public static System.Collections.Generic.IReadOnlyList<GuestAgent> All => _all;
     public int CurrentFloor => FloorMath.FloorIndexForY(transform.position.y);
+    public bool IsTraveling => _traveling;
 
     private void Awake() => _agent = GetComponent<NavMeshAgent>();
 

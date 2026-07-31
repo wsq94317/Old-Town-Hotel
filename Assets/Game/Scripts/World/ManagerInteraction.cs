@@ -3,6 +3,16 @@ using UnityEngine;
 
 public class ManagerInteraction : MonoBehaviour
 {
+    public enum HudState
+    {
+        None,
+        ToiletGuest,
+        CaughtSlacking,
+        Staff,
+        AssignRoom,
+        RoomFlaw,
+    }
+
     [SerializeField] private ManagerController manager;
     [SerializeField] private Room2DPrototypeDemandLoop demandLoop;
     [SerializeField] private EconomySystem economy;
@@ -21,6 +31,25 @@ public class ManagerInteraction : MonoBehaviour
 
     public bool PanelOpen => _caughtAgent != null || _panelAgent != null || _commandAgent != null || _angryToiletGuest;
     public bool InCommandMode => _commandAgent != null;
+    public HudState ActiveHudState
+    {
+        get
+        {
+            if (_angryToiletGuest) return HudState.ToiletGuest;
+            if (_caughtAgent != null) return HudState.CaughtSlacking;
+            if (_panelAgent != null) return HudState.Staff;
+            if (_commandAgent != null) return HudState.AssignRoom;
+            return FlawedRoomNearby() != null ? HudState.RoomFlaw : HudState.None;
+        }
+    }
+    public StaffAgent ActiveHudAgent => _caughtAgent ?? _panelAgent ?? _commandAgent;
+    public bool ActiveStaffCanBeInterrogated => _panelAgent != null && _panelAgent.HasDelayMark;
+    public IReadOnlyList<Room2DEntity> CommandRoomCandidates =>
+        _commandAgent != null
+            ? GetCommandRoomCandidates(
+                demandLoop != null ? demandLoop.rooms : null,
+                _commandAgent.Member != null ? _commandAgent.Member.Role : StaffRole.Manager)
+            : new List<Room2DEntity>();
 
     public void CommandTarget(Vector3 worldPoint)
     {
@@ -184,7 +213,7 @@ public class ManagerInteraction : MonoBehaviour
 
     private void OnGUI()
     {
-        if (WorldManagementHud.SuppressesWorldImGui) return;
+        if (WorldManagementHud.IsActive) return;
         // 全屏晨报期间全体让位：IMGUI 没有 z 序，谁画谁上；报告必须是唯一的画手，
         // 否则警报/HIRE/庆祝框会压在报告上，而且它们的按钮还会抢走转发的点击。
         if (HotelSimSceneBridge.Instance != null && HotelSimSceneBridge.Instance.AwaitingMorningReport) return;
@@ -308,6 +337,88 @@ public class ManagerInteraction : MonoBehaviour
         GuiModal.End(this);
         agent.ApplyCatchChoice(choice);
         Say(message);
+    }
+
+    public void ResolveCaughtStaff(CatchChoice choice)
+    {
+        if (_caughtAgent == null) return;
+        ResolveCatch(_caughtAgent, choice, "Staff response recorded.");
+    }
+
+    public void HurryActiveStaff()
+    {
+        if (_panelAgent == null) return;
+        _panelAgent.Hurry();
+        Say("Hurried.");
+        _panelAgent = null;
+        GuiModal.End(this);
+    }
+
+    public void InterrogateActiveStaff()
+    {
+        if (_panelAgent == null || !_panelAgent.HasDelayMark) return;
+        StaffAgent agent = _panelAgent;
+        _panelAgent = null;
+        GuiModal.End(this);
+        if (agent.Interrogate() == InterrogationVerdict.Caught) _caughtAgent = agent;
+        else Say($"WRONG ACCUSATION! {agent.Member?.DisplayName} is furious.");
+    }
+
+    public void BeginAssignActiveStaff()
+    {
+        if (_panelAgent == null) return;
+        _commandAgent = _panelAgent;
+        _panelAgent = null;
+        GuiModal.End(this);
+        Say("Pick a room from the live list or tap it in the hotel.");
+    }
+
+    public void FireActiveStaff()
+    {
+        if (_panelAgent == null) return;
+        StaffAgent agent = _panelAgent;
+        _panelAgent = null;
+        GuiModal.End(this);
+        if (economy == null || agent.Member == null) return;
+        FloatingTextFx.Spawn(agent.transform.position, "FIRED!", new Color(1f, 0.25f, 0.2f), 1.2f);
+        economy.FireStaff(agent.Member);
+        Say($"{agent.Member.DisplayName} is packing.");
+    }
+
+    public void CloseActiveStaff()
+    {
+        _panelAgent = null;
+        GuiModal.End(this);
+    }
+
+    public void AssignCommandRoom(Room2DEntity room)
+    {
+        if (_commandAgent == null || room == null) return;
+        CommandRoom(_commandAgent, room);
+    }
+
+    public void CancelCommandRoom()
+    {
+        _commandAgent = null;
+        GuiModal.End(this);
+    }
+
+    public void ResolveToiletGuestWithCompensation() =>
+        ResolveToiletGuestIncident(30, 2, 0, "Guest accepts the apology and compensation.");
+
+    public void ResolveToiletGuestWithApology() =>
+        ResolveToiletGuestIncident(0, -1, 0, "Guest leaves annoyed.");
+
+    public void ResolveToiletGuestByArguing() =>
+        ResolveToiletGuestIncident(0, -5, -2, "The argument becomes a terrible review.");
+
+    public void SendNearbyFlawedRoomBack()
+    {
+        Room2DEntity flawed = FlawedRoomNearby();
+        if (flawed == null) return;
+        RoomFlaw.Clear(flawed);
+        flawed.SetState(Room2DState.Dirty);
+        Say($"Room {flawed.roomNumber} sent back to cleaning.");
     }
 
     private void ResolveToiletGuestIncident(int compensation, int satisfaction, int prestige, string message)

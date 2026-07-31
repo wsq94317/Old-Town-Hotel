@@ -21,6 +21,15 @@ public class HiringInteraction : MonoBehaviour
     private GUIStyle _candidateHeaderStyle;
 
     public bool PanelOpen => _panelOpen;
+    public IReadOnlyList<StaffMember> Candidates
+    {
+        get
+        {
+            EnsurePool();
+            return _pool;
+        }
+    }
+    public string LatestStory => Time.time < _storyUntil ? _story : "";
 
     private void Awake()
     {
@@ -40,6 +49,7 @@ public class HiringInteraction : MonoBehaviour
     }
 
     private int SigningCost(StaffMember member) => member.DailyWage * 2;
+    public int SigningCostFor(StaffMember member) => SigningCost(member);
 
     private void Hire(StaffMember member)
     {
@@ -59,6 +69,8 @@ public class HiringInteraction : MonoBehaviour
 
         _storyUntil = Time.time + 4f;
     }
+
+    public void HireCandidate(StaffMember member) => Hire(member);
 
     private static string TraitsOf(StaffMember member)
     {
@@ -105,7 +117,7 @@ public class HiringInteraction : MonoBehaviour
 
     private void OnGUI()
     {
-        if (WorldManagementHud.SuppressesWorldImGui) return;
+        if (WorldManagementHud.IsActive) return;
         // 全屏晨报期间全体让位：IMGUI 没有 z 序，谁画谁上；报告必须是唯一的画手，
         // 否则警报/HIRE/庆祝框会压在报告上，而且它们的按钮还会抢走转发的点击。
         if (HotelSimSceneBridge.Instance != null && HotelSimSceneBridge.Instance.AwaitingMorningReport) return;

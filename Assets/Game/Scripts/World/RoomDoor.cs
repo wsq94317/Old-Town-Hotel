@@ -36,6 +36,7 @@ public class RoomDoor : MonoBehaviour
 
     /// <summary>任意房门面板打开（WorldInputController 拦截世界点击用）。</summary>
     public static bool AnyPanelOpen { get; private set; }
+    public static RoomDoor ActivePrompt { get; private set; }
     private static int _openPanelCount;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
@@ -43,11 +44,14 @@ public class RoomDoor : MonoBehaviour
     {
         _openPanelCount = 0;
         AnyPanelOpen = false;
+        ActivePrompt = null;
     }
 
     public Room2DEntity Room => room;
     public Vector3 InteriorCenter => interiorCenter;
     public bool IsOpen => _openness > 0.7f;
+    public Vector3 ExteriorInteractionPoint => DoorFrontPoint();
+    public string StateHint => RoomStateHint();
 
     public void Configure(Room2DEntity roomEntity, Vector3 newInteriorCenter)
     {
@@ -100,6 +104,7 @@ public class RoomDoor : MonoBehaviour
             panelRenderer.sharedMaterial = _doorMat;
         }
         panel.AddComponent<BillboardSprite>();
+        AlignDoorPanel(panel.transform, transform.position, interiorCenter);
 
         var ov = GameObject.CreatePrimitive(PrimitiveType.Quad);
         KillCollider(ov);
@@ -128,6 +133,7 @@ public class RoomDoor : MonoBehaviour
         if (panelT != null)
         {
             _doorVisual = panelT.gameObject;
+            AlignDoorPanel(panelT, transform.position, interiorCenter);
             _doorClosedPos = _doorVisual.transform.localPosition;
         }
         var ovT = transform.Find("Darkness");
@@ -144,12 +150,29 @@ public class RoomDoor : MonoBehaviour
     // _panelOpen 字段存活）都走这对钩子，计数不会漂成负数把 AnyPanelOpen 卡死。
     private void OnEnable()
     {
-        if (_panelOpen) { _openPanelCount++; AnyPanelOpen = true; }
+        Transform panel = transform.Find("DoorPanel");
+        if (panel != null) AlignDoorPanel(panel, transform.position, interiorCenter);
+        if (_panelOpen)
+        {
+            _openPanelCount++;
+            AnyPanelOpen = true;
+            ActivePrompt = this;
+        }
     }
 
     private void OnDisable()
     {
-        if (_panelOpen) { _openPanelCount = Mathf.Max(0, _openPanelCount - 1); AnyPanelOpen = _openPanelCount > 0; }
+        if (_panelOpen)
+        {
+            _openPanelCount = Mathf.Max(0, _openPanelCount - 1);
+            AnyPanelOpen = _openPanelCount > 0;
+            if (ActivePrompt == this) ActivePrompt = null;
+        }
+    }
+
+    private void OnDestroy()
+    {
+        if (ActivePrompt == this) ActivePrompt = null;
     }
 
     private bool InteriorContains(Vector3 pos) =>
@@ -174,9 +197,50 @@ public class RoomDoor : MonoBehaviour
     private void SetPanel(bool open)
     {
         if (_panelOpen == open) return;
+        if (open && ActivePrompt != null && ActivePrompt != this)
+            ActivePrompt.SetPanel(false);
         _panelOpen = open;
         _openPanelCount = Mathf.Max(0, _openPanelCount + (open ? 1 : -1));
         AnyPanelOpen = _openPanelCount > 0;
+        if (open) ActivePrompt = this;
+        else if (ActivePrompt == this) ActivePrompt = null;
+    }
+
+    public void ConfirmEntry()
+    {
+        if (!_panelOpen) return;
+        SetPanel(false);
+        StartCoroutine(SwipeAndOpen());
+    }
+
+    public void DeclineEntry()
+    {
+        if (!_panelOpen) return;
+        SetPanel(false);
+        _declined = true;
+        _hasPendingDest = false;
+    }
+
+    public static Vector3 ExteriorPointFor(Room2DEntity roomEntity)
+    {
+        if (roomEntity == null) return Vector3.zero;
+        var doors = FindObjectsByType<RoomDoor>(
+            FindObjectsInactive.Include,
+            FindObjectsSortMode.None);
+        foreach (RoomDoor door in doors)
+            if (door != null && door.room == roomEntity) return door.DoorFrontPoint();
+        return roomEntity.transform.position;
+    }
+
+    private static void AlignDoorPanel(Transform panel, Vector3 doorPosition, Vector3 roomInterior)
+    {
+        if (panel == null) return;
+        var billboard = panel.GetComponent<BillboardSprite>();
+        if (billboard != null) billboard.enabled = false;
+
+        Vector3 outward = doorPosition - roomInterior;
+        outward.y = 0f;
+        panel.localRotation = Quaternion.Euler(0f, outward.z > 0f ? 180f : 0f, 0f);
     }
 
     private void Update()
@@ -323,7 +387,7 @@ public class RoomDoor : MonoBehaviour
 
     private void OnGUI()
     {
-        if (WorldManagementHud.SuppressesWorldImGui) return;
+        if (WorldManagementHud.IsActive) return;
         // 全屏晨报期间全体让位：IMGUI 没有 z 序，谁画谁上；报告必须是唯一的画手，
         // 否则警报/HIRE/庆祝框会压在报告上，而且它们的按钮还会抢走转发的点击。
         if (HotelSimSceneBridge.Instance != null && HotelSimSceneBridge.Instance.AwaitingMorningReport) return;
@@ -334,19 +398,28 @@ public class RoomDoor : MonoBehaviour
             "ROOM " + room.roomNumber + "\n" + RoomStateHint());
         if (GuiInput.Button(new Rect(w * 0.5f - 110, h * 0.42f + 40, 220, 24), "Swipe & enter 🔑"))
         {
-            SetPanel(false);
-            StartCoroutine(SwipeAndOpen());
+            ConfirmEntry();
         }
         if (GuiInput.Button(new Rect(w * 0.5f - 110, h * 0.42f + 68, 220, 24), "Never mind"))
         {
-            SetPanel(false);
-            _declined = true;
-            _hasPendingDest = false;
+            DeclineEntry();
         }
     }
 
     private string RoomStateHint()
     {
+        if (GameText.UseChinese)
+        {
+            switch (room.currentState)
+            {
+                case Room2DState.Occupied: return "住客在内。进入可能触发投诉。";
+                case Room2DState.Dirty: return "房间等待清洁。";
+                case Room2DState.AwaitingInspection: return "房间等待验房。";
+                case Room2DState.Ready: return "房间已准备好接待住客。";
+                default: return GameText.T(room.currentState.ToString());
+            }
+        }
+
         switch (room.currentState)
         {
             case Room2DState.Occupied: return "Guest inside. Enter at your own risk.";

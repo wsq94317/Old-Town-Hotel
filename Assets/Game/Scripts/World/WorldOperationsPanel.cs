@@ -94,6 +94,7 @@ public class WorldOperationsPanel : MonoBehaviour
 
     private void OnGUI()
     {
+        if (WorldManagementHud.IsActive) return;
         if (Sim == null) return;
 
         var bridge = HotelSimSceneBridge.Instance;
