@@ -80,6 +80,7 @@ public sealed class WorldManagementHud : MonoBehaviour
     private RectTransform _roomCard;
     private RectTransform _alertStrip;
     private RectTransform _opportunityBar;
+    private RectTransform _returnToManager;
     private RectTransform _contextSheet;
     private RectTransform _contextContent;
     private RectTransform _toastPanel;
@@ -275,6 +276,7 @@ public sealed class WorldManagementHud : MonoBehaviour
         if (Contains(instance._bottomNav, screenPoint)) return true;
         if (Contains(instance._opportunityBar, screenPoint)) return true;
         if (Contains(instance._alertStrip, screenPoint)) return true;
+        if (Contains(instance._returnToManager, screenPoint)) return true;
         if (Contains(instance._contextSheet, screenPoint)) return true;
         if (instance._drawerOpen && Contains(instance._drawer, screenPoint)) return true;
         return instance._roomCard.gameObject.activeInHierarchy
@@ -342,6 +344,7 @@ public sealed class WorldManagementHud : MonoBehaviour
         RefreshTop();
         RefreshSceneEconomyFeedback();
         RefreshAlerts();
+        RefreshCameraReturn();
         RefreshContextSheet();
         RefreshRoomCard();
         RefreshDrawerIfChanged();
@@ -356,6 +359,7 @@ public sealed class WorldManagementHud : MonoBehaviour
         _topPanel.gameObject.SetActive(operations);
         _bottomNav.gameObject.SetActive(operations);
         _opportunityBar.gameObject.SetActive(operations);
+        _returnToManager.gameObject.SetActive(false);
         _drawer.gameObject.SetActive(operations && _drawerOpen);
         _roomCard.gameObject.SetActive(false);
         _alertStrip.gameObject.SetActive(false);
@@ -1275,6 +1279,16 @@ public sealed class WorldManagementHud : MonoBehaviour
             _alertLabel.color = Gold;
         }
         _alertGoLabel.text = L("REVIEW", "查看");
+    }
+
+    private void RefreshCameraReturn()
+    {
+        ManagerCameraRig rig = FindFirstObjectByType<ManagerCameraRig>();
+        bool visible = _hudMode == WorldHudMode.Operations
+                       && rig != null
+                       && !rig.IsFollowingTarget
+                       && !_drawerOpen;
+        _returnToManager.gameObject.SetActive(visible);
     }
 
     private void RefreshLegacyAlerts()
@@ -2386,6 +2400,20 @@ public sealed class WorldManagementHud : MonoBehaviour
         ForceAllRefresh();
     }
 
+    private void ReturnToManagerView()
+    {
+        ManagerCameraRig rig = FindFirstObjectByType<ManagerCameraRig>();
+        if (rig != null) rig.ReturnToTarget();
+
+        RoomSelection.Clear();
+        _selectedBusiness = null;
+        _pinnedOpportunity = null;
+        _opportunityCardOpen = false;
+        _roomStateKey = "";
+        ShowToast(L("Back with the manager.", "已返回经理位置。"));
+        ForceAllRefresh();
+    }
+
     private void FocusOpportunity(OpportunityModel opportunity)
     {
         if (opportunity == null) return;
@@ -3126,6 +3154,7 @@ public sealed class WorldManagementHud : MonoBehaviour
         Stretch(_safeRoot);
         BuildTop();
         BuildAlertStrip();
+        BuildReturnToManagerButton();
         BuildOpportunityBar();
         BuildBottomNavigation();
         BuildDrawer();
@@ -3599,6 +3628,31 @@ public sealed class WorldManagementHud : MonoBehaviour
         SetAnchors(goRect, new Vector2(0.80f, 0f), Vector2.one,
             new Vector2(0f, 6f), new Vector2(-8f, -6f));
         _alertStrip.gameObject.SetActive(false);
+    }
+
+    private void BuildReturnToManagerButton()
+    {
+        RectTransform rect;
+        TextMeshProUGUI label;
+        CreateButton(
+            "ReturnToManager",
+            _safeRoot,
+            out rect,
+            out label,
+            L("<  MANAGER", "<  返回经理"),
+            Teal,
+            ReturnToManagerView);
+        _returnToManager = rect;
+        SetAnchors(
+            _returnToManager,
+            Vector2.one,
+            Vector2.one,
+            new Vector2(-158f, -252f),
+            new Vector2(-8f, -210f));
+        AddOutline(_returnToManager, BrassLine, 1f);
+        label.fontSize = 12.5f;
+        label.fontStyle = FontStyles.Bold;
+        _returnToManager.gameObject.SetActive(false);
     }
 
     private void AddNavButton(DeskTab tab, string label)
