@@ -68,32 +68,49 @@ public partial class WorkerPoolCard : PanelContainer
         col.AddChild(_line3);
     }
 
-    /// <summary>这张卡负责哪个角色，以及它盯的是哪条房间队列。</summary>
-    public void Configure(StaffRole role, string displayName, RoomSimState queueState, string portraitPath)
+    /// <summary>
+    /// 这张卡负责哪个角色，以及它盯的是哪条**积压**队列。
+    ///
+    /// backlogState 必须是「等着被处理」的状态，不能是「正在处理中」的状态。
+    /// 一开始我给客房组接的是 Cleaning，那是错的：SimPipeline 把 CountOf(Cleaning)
+    /// 硬顶在「在岗清洁工人数」上，所以那个数**结构上不可能超过人手数**，再脏的酒店
+    /// 也显示不出积压，而且下午 16:00 之后会被强制清空。真正的积压是 Dirty
+    /// （见 RoomLedger.DirtyBacklog 的注释：「在清洁中的不算」）。
+    ///
+    /// 更糟的是巡检卡接的 AwaitingInspection 本来就是真积压，于是同一行的两张卡
+    /// 用着两种口径——正是这个项目栽过三次的那个形态。
+    /// </summary>
+    public void Configure(StaffRole role, string displayName, RoomSimState backlogState, string portraitPath)
     {
         _boundRole = role;
-        _queueState = queueState;
+        _queueState = backlogState;
         _role.Text = displayName;
         _portrait.Texture = GD.Load<Texture2D>(portraitPath);
     }
 
     public void UpdateFrom(HotelSim sim)
     {
-        int onDuty = 0, working = 0;
+        // 不显示 IsProductive（"在干活"）。SimPipeline.RollStaffStates 在每天第一个 tick
+        // 无条件把所有 Available 提升成 Working，之后再没有东西把它降回去——不管有没有活。
+        // 所以 IsProductive 恒等于「在班且没摸鱼」，不携带任何信息，而且会在卡片上打架：
+        // 「2 人在干活」正上方跟着「积压 0 间」，两行互相矛盾。
+        // 摸鱼是真机制（SlackFsm，产能归零、可被抓），报它才有意义。
+        int onDuty = 0, slacking = 0;
         var entries = sim.Staff.Entries;
         for (int i = 0; i < entries.Count; i++)
         {
             var e = entries[i];
             if (e.member == null || e.member.Role != _boundRole) continue;
-            if (e.IsOnDuty) onDuty++;
-            if (e.IsProductive) working++;
+            if (!e.IsOnDuty) continue;
+            onDuty++;
+            if (e.state == StaffOperationalState.Slacking) slacking++;
         }
 
-        int queue = sim.Rooms.CountOf(_queueState);
+        int backlog = sim.Rooms.CountOf(_queueState);
         List<int> next = sim.Rooms.RoomNumbersInState(_queueState, 3);
 
-        _line1.Text = $"{onDuty} on duty, {working} working";
-        _line2.Text = $"Queue: {queue} room{(queue == 1 ? "" : "s")}";
+        _line1.Text = slacking > 0 ? $"{onDuty} on duty, {slacking} slacking" : $"{onDuty} on duty";
+        _line2.Text = $"Backlog: {backlog} room{(backlog == 1 ? "" : "s")}";
         _line3.Text = next.Count > 0 ? $"Next: {string.Join(", ", next)}" : "Next: none";
     }
 }

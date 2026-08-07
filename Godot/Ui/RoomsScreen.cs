@@ -97,9 +97,11 @@ public partial class RoomsScreen : Control
 
     private void BuildLegend()
     {
-        // 原版图例写的是 "S: Standard"，但枚举成员叫 Single，而首字母是从枚举名取的——
-        // 字母对上纯属巧合。这里统一成 Single。
-        var legend = UiTokens.MakeLabel("K: King    T: Twin    F: Family    S: Single",
+        // 图例只列真实存在的房型。Room2DRoomCategory 只有 Single/Twin/Family 三个成员，
+        // 而首字母是 BedLetter 从枚举名运行时取的——所以原版图例里的 "K: King" 是**永远
+        // 不可能出现**的一行，不是暂时没用上。同理原版写 "S: Standard" 而枚举叫 Single，
+        // 字母对上纯属巧合。两处一起改掉。
+        var legend = UiTokens.MakeLabel("S: Single    T: Twin    F: Family",
                                         UiTokens.FontLegend, UiTokens.SecondaryGrey,
                                         hAlign: HorizontalAlignment.Center);
         legend.SetAnchorsAndOffsetsPreset(LayoutPreset.TopWide);
@@ -121,9 +123,12 @@ public partial class RoomsScreen : Control
         row.AddThemeConstantOverride("separation", UiTokens.CardGutter);
         AddChild(row);
 
+        // 客房组盯 Dirty 而不是 Cleaning：Cleaning 是「正在打扫」，被 SimPipeline 顶死在
+        // 在岗人数上，永远显示不出积压。Dirty 才是等着被处理的队列，和巡检卡的
+        // AwaitingInspection 口径一致——两张卡必须同口径。
         _hskCard = new WorkerPoolCard();
         row.AddChild(_hskCard);
-        _hskCard.Configure(StaffRole.Housekeeper, "HOUSEKEEPING", RoomSimState.Cleaning,
+        _hskCard.Configure(StaffRole.Housekeeper, "HOUSEKEEPING", RoomSimState.Dirty,
                            "res://art/staff/worker_housekeeper.png");
 
         _inspCard = new WorkerPoolCard();
@@ -137,7 +142,12 @@ public partial class RoomsScreen : Control
         // 保险箱不和现金并排。它是「已赚未收」，口径和 Cash 不同（不能直接花），
         // 两个数字挨在一起会诱人相加——这个项目已经在「两个数字看着矛盾」上栽过三次。
         // 做成金色可点胶囊，视觉上明确是个动作而不是一个余额读数。
-        _safeboxPill = new Button { Flat = true };
+        // 注意**不能**设 Flat = true。Godot 的 Button 把 normal/hover/pressed 三个 stylebox
+        // 的绘制包在 if (!flat) 里，所以 Flat + 自定义 StyleBox = 什么都不画，只剩子节点的文字。
+        // （更阴的是 focus 那个 stylebox 在守卫**外面**，于是按钮平时隐形、拿到焦点时突然变金色，
+        // 看起来像渲染故障。）RoomTile 和 BottomNav 里的 Flat = true 是对的——它们配的是
+        // StyleBoxEmpty，本来就不该画东西。
+        _safeboxPill = new Button();
         var style = new StyleBoxFlat { BgColor = UiTokens.ButtonGold };
         style.SetCornerRadiusAll(UiTokens.Radius);
         style.CornerDetail = UiTokens.CornerDetail;

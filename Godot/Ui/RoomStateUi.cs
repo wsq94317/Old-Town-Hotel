@@ -60,12 +60,22 @@ public static class RoomStateUi
         return string.IsNullOrEmpty(name) ? "?" : name.Substring(0, 1).ToUpperInvariant();
     }
 
-    /// <summary>房型内景图。四类都有专图——侦察一度报告 King 没有分支，实为误读。</summary>
+    /// <summary>
+    /// 房型内景图。
+    ///
+    /// Room2DRoomCategory 目前只有 Single/Twin/Family 三个成员，所以 default 分支
+    /// 实际不可达。它存在是为了「以后加房型时不要静默显示错图」——落到 fallback
+    /// 说明有人加了枚举成员却没加图，用 Single 顶着比崩掉好，但那是个 TODO 信号。
+    ///
+    /// 注意 room_king.png 已经拷进 art/rooms/ 但当前无法被引用到：Unity 侧的
+    /// GeneratedPlaceholderArt.RoomInterior 有一个 room_king 的 default 分支，
+    /// 我一度据此以为枚举里有 King —— 没有。留着这个文件是为了将来真加 King 房型。
+    /// </summary>
     public static string InteriorPath(Room2DRoomCategory category) => category switch
     {
         Room2DRoomCategory.Single => "res://art/rooms/room_single.png",
         Room2DRoomCategory.Twin   => "res://art/rooms/room_twin.png",
         Room2DRoomCategory.Family => "res://art/rooms/room_family.png",
-        _                         => "res://art/rooms/room_king.png",
+        _                         => "res://art/rooms/room_single.png",
     };
 }
