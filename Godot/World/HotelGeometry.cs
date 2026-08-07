@@ -29,6 +29,7 @@ public partial class HotelGeometry : Node3D
     private readonly Dictionary<string, Mesh> _meshes = new Dictionary<string, Mesh>();
 
     public readonly List<Node3D> Floors = new List<Node3D>();
+    public readonly List<NavigationRegion3D> NavRegions = new List<NavigationRegion3D>();
     public int PartCount { get; private set; }
 
     /// <summary>场景里的房间锚点。房号/房型/楼层来自 Unity 实体，不在两边各维护一份房表。</summary>
@@ -66,9 +67,15 @@ public partial class HotelGeometry : Node3D
         for (int i = 0; i < floors.Count; i++)
         {
             var floor = floors[i].AsGodotDictionary();
-            var holder = new Node3D { Name = floor["name"].AsString() };
+            // 楼层节点本身就是导航区：几何是它的子节点，烘焙时天然就是源。
+            //
+            // 每层各烘一张、互不相连是对的——Unity 那边跨楼层根本不走导航网格，
+            // StairZone 和 ElevatorController 都是直接 NavMeshAgent.Warp 过去
+            // （场景里 OffMeshLink 数量为 0 就是这个原因）。所以这里也不需要跨层连接。
+            var holder = new NavigationRegion3D { Name = floor["name"].AsString() };
             AddChild(holder);
             Floors.Add(holder);
+            NavRegions.Add(holder);
 
             // 楼层高度：预制体里的几何都在局部原点，垂直堆叠是场景实例给的，
             // 导出器从活场景读出来放在 baseY 里。y 不用翻符号——上下方向两个引擎一致。

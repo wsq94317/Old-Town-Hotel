@@ -65,7 +65,12 @@ public partial class WorldSimHost : Node
 
         // 见文件头：Unity 那边这里是 false，Godot 这边房态归 Sim。
         Sim.Pipeline.ServiceEnabled = true;
+        // 默认 2x 与 Unity bridge 对齐（那边是为了让 v1 和 Sim 同时收工）。
+        // --speed= 只影响 tick 产出速率，不改任何游戏时间语义，所以快进出来的房态是真状态。
         Sim.Clock.SpeedMultiplier = DaySpeed;
+        foreach (string arg in OS.GetCmdlineUserArgs())
+            if (arg.StartsWith("--speed="))
+                Sim.Clock.SpeedMultiplier = arg.Substring(8).ToFloat();
 
         Sim.FurnishInheritedRooms();
         Sim.Warehouse.SetCapacity(Warehouse.DefaultCapacity);

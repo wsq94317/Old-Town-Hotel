@@ -20,6 +20,8 @@ public partial class World3DRoot : Node3D
     private ManagerCamera _camera;
     private WorldSimHost _sim;
     private RoomMarkers _markers;
+    private FloorNavBaker _nav;
+    private readonly System.Collections.Generic.List<StaffWalker> _staff = new System.Collections.Generic.List<StaffWalker>();
     private double _markerAccumulator;
 
     private double _shotAfter = -1;
@@ -57,6 +59,18 @@ public partial class World3DRoot : Node3D
         AddChild(_sim);
         _sim.Build(_geometry.RoomAnchors);
 
+        _nav = new FloorNavBaker { Name = "NavBaker" };
+        AddChild(_nav);
+        _nav.BakeAll(_geometry.NavRegions);
+        for (int i = 0; i < _geometry.NavRegions.Count; i++)
+        {
+            int polys = FloorNavBaker.PolygonCount(_geometry.NavRegions[i]);
+            // 0 个多边形 = 这层完全走不了。宁可在启动时喊出来，也不要等到
+            // 「agent 站着不动」再去猜是寻路挂了还是目标点给错了。
+            if (polys == 0) GD.PushWarning($"[nav] Floor{i + 1} baked 0 polygons — nothing walkable");
+            else GD.Print($"[nav] Floor{i + 1}: {polys} polygons");
+        }
+
         _markers = new RoomMarkers { Name = "RoomMarkers" };
         AddChild(_markers);
         _markers.Build(_geometry.RoomAnchors, _geometry.Floors);
@@ -84,6 +98,17 @@ public partial class World3DRoot : Node3D
         // 所有楼层共用同一个缩放：切层时画面大小跳变比楼层偏移更让人晕。
         _floorZoom = widest > 0f ? widest : 12f;
 
+        // 员工生成必须**等一个物理帧**再做。
+        //
+        // NavigationServer3D 是异步的：region 注册进地图后要到物理帧末尾才真正可查询。
+        // 在 _Ready 里直接调 MapGetClosestPoint，会把每一个点都返回成 (0,0,0)——
+        // 地图在查询者看来是空的，尽管 MapGetRegions 已经报了 7 个区域、每层都有上百个
+        // 多边形。MapForceUpdate 也救不回来。那个症状极具误导性：员工全被吸到世界原点，
+        // 看起来像坐标换算错了，实际是问早了一帧。
+        //
+        // 也顺带解释了为什么岗位必须按楼层中心算完之后再摆——两个前置条件叠在这里。
+        CallDeferred(nameof(SpawnStaffDeferred));
+
         _camera = new ManagerCamera { Name = "Camera" };
         AddChild(_camera);
         // 世界边界用几何实际范围，不照抄 Unity 那组 X[-10,10]/Z[-6,6]——
@@ -102,6 +127,55 @@ public partial class World3DRoot : Node3D
         else { _floors.ShowFloor(startFloor); ExitOverview(startFloor); }
 
         if (_shotAfter > 0) GetViewport().GuiDisableInput = true;   // 截图必须可复现
+    }
+
+    /// <summary>
+    /// 每个有客房的楼层放一名客房清洁和一名巡检。
+    ///
+    /// 只在有房间锚点的层放人——把人扔到泳池层没有意义，而且那层没有它们要处理的房。
+    /// 员工挂在所属楼层节点下，楼层显隐自动带上，不需要另写显隐规则。
+    /// 跨楼层不做：Unity 那边是 Warp 传送（StairZone / ElevatorController），
+    /// 等电梯移植过来再接，现在不假装能跨层。
+    /// </summary>
+    private async void SpawnStaffDeferred()
+    {
+        await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+        SpawnStaff();
+    }
+
+    private void SpawnStaff()
+    {
+        var floorsWithRooms = new System.Collections.Generic.HashSet<int>();
+        foreach (var a in _geometry.RoomAnchors) floorsWithRooms.Add(a.Floor);
+
+        foreach (int floor in floorsWithRooms)
+        {
+            if (floor < 0 || floor >= _geometry.Floors.Count) continue;
+            Node3D parent = _geometry.Floors[floor];
+            Vector3 baseY = new Vector3(0, FloorMath.BaseYFor(floor), 0);
+
+            Add(parent, baseY, floor,
+                new[] { RoomSimState.Dirty, RoomSimState.Cleaning },
+                RoomStateUi.Dirty, "HSK", new Vector3(-1.5f, 0, 0));
+            Add(parent, baseY, floor,
+                new[] { RoomSimState.AwaitingInspection },
+                RoomStateUi.Insp, "INSP", new Vector3(1.5f, 0, 0));
+        }
+
+        void Add(Node3D parent, Vector3 baseY, int floor, RoomSimState[] wants, Color colour,
+                 string label, Vector3 postOffset)
+        {
+            // 岗位设在该层的几何中心附近——走廊通常在中间，落在导航网格上的概率最高。
+            Vector3 home = new Vector3(_floorCentres[floor].X, FloorMath.BaseYFor(floor), _floorCentres[floor].Z) + postOffset;
+
+            var w = new StaffWalker { Name = $"{label}_F{floor + 1}" };
+            parent.AddChild(w);
+            w.GlobalPosition = home;
+            w.Configure(_sim.Sim, floor, wants, colour, label, home, _geometry.RoomAnchors);
+            _staff.Add(w);
+        }
+
+        GD.Print($"[world] {_staff.Count} staff walkers on {floorsWithRooms.Count} floors");
     }
 
     private void BuildLighting()
@@ -227,6 +301,8 @@ public partial class World3DRoot : Node3D
         {
             _markerAccumulator = 0;
             _markers?.Refresh(_sim?.Sim);
+            // 目标重挑和房态刷新同频。每帧重算路径既浪费，也会让走位一直抖。
+            foreach (var s in _staff) s.RetargetFromSim();
         }
 
         if (_shotAfter <= 0 || _shotTaken) return;
@@ -239,6 +315,18 @@ public partial class World3DRoot : Node3D
     private async void Capture()
     {
         await ToSignal(RenderingServer.Singleton, RenderingServer.SignalName.FramePostDraw);
+        // 把截图时刻的模拟状态一并打出来：一张静态图看不出「现在是第几天、几点、
+        // 有没有脏房」，而这些恰恰决定了画面里该有什么。
+        var sim = _sim?.Sim;
+        if (sim != null)
+        {
+            GD.Print($"[shot] day {sim.Clock.CurrentDay} {sim.Clock.TimeFormatted} " +
+                     $"| ready={sim.Rooms.CountOf(RoomSimState.Ready)} occ={sim.Rooms.CountOf(RoomSimState.Occupied)} " +
+                     $"dirty={sim.Rooms.CountOf(RoomSimState.Dirty)} clean={sim.Rooms.CountOf(RoomSimState.Cleaning)} " +
+                     $"insp={sim.Rooms.CountOf(RoomSimState.AwaitingInspection)} ruined={sim.Rooms.CountOf(RoomSimState.Ruined)}");
+            foreach (var s in _staff) GD.Print("[shot] " + s.Describe());
+        }
+
         string path = ProjectSettings.GlobalizePath("res://Dev/world3d.png");
         Error err = GetViewport().GetTexture().GetImage().SavePng(path);
         GD.Print(err == Error.Ok ? $"[shot] {path}" : $"[shot] FAILED {err}");
