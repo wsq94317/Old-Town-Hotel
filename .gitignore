@@ -129,8 +129,18 @@ production/
 # ---------------------------------------------------------------------------
 !/Sim/OldTownHotel.Sim.csproj
 !/Sim.Tests/OldTownHotel.Sim.Tests.csproj
+!/Godot/OldTownHotel.Godot.csproj
 
 /Sim/[Bb]in/
 /Sim/[Oo]bj/
 /Sim.Tests/[Bb]in/
 /Sim.Tests/[Oo]bj/
+
+# Godot 工程：.godot/ 是它的 Library/ 等价物（导入缓存 + 编译中间件），不进库。
+# parity-output.txt 是每次跑出来的产物，比对对象是 Sim/golden/parity-ledger.txt，
+# 后者才是要提交的基准。
+/Godot/.godot/
+/Godot/[Bb]in/
+/Godot/[Oo]bj/
+/Godot/parity-output.txt
+/Godot/*.sln

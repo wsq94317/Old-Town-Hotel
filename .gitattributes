@@ -169,3 +169,19 @@ Packages/packages-lock.json linguist-generated
 
 # Exceptions for .asset files such as lightning pre-baking
 LightingData.asset     binary
+
+# ---------------------------------------------------------------------------
+# Godot 移植：跨引擎一致性基准
+#
+# golden 账本要跟 Godot 无头跑出来的文件做 **逐字节** 比对（SHA256）。
+# 如果任由 autocrlf 把它在检出时改成 CRLF，而 Godot 写出的是 LF，
+# 比对就会失败——但失败原因是行尾，不是数字。那种误报比不检查更糟：
+# 它会训练人忽略这个检查。这里把它钉死成 LF。
+# （parity-check.ps1 里还有第二道防线：比对前先归一化行尾。）
+Sim/golden/*.txt        text eol=lf
+
+# Godot 工程文件全是纯文本，统一 LF，避免和 .tscn 里的资源 UID 混出跨平台 diff
+*.godot                 text eol=lf
+*.tscn                  text eol=lf
+*.tres                  text eol=lf
+*.uid                   text eol=lf

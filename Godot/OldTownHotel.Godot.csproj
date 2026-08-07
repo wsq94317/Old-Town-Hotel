@@ -1,0 +1,26 @@
+<Project Sdk="Godot.NET.Sdk/4.7.1">
+
+  <!--
+    Godot 移植工程（Phase 1：只验证接线，还没有画面）。
+
+    关键的一行是下面那个 ProjectReference —— 它指向 Unity 那边正在用的**同一个**
+    OldTownHotel.Sim.csproj，而那个工程 glob 的又是 Assets/ 下的同一批 .cs 源文件。
+    所以此刻 Unity 和 Godot 跑的规则层是同一份源码，不是两份拷贝。
+
+    这正是「不要新建仓库」的原因：一旦分成两个仓库，这条相对路径就断了，
+    只能复制 Sim 或者上 submodule —— 复制必然漂移，而两份会漂移的规则层
+    就是整个移植里最贵的 bug 来源。
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <RootNamespace>OldTownHotelGodot</RootNamespace>
+    <Nullable>disable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Sim\OldTownHotel.Sim.csproj" />
+  </ItemGroup>
+
+</Project>
