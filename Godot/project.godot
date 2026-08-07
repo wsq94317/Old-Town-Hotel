@@ -33,3 +33,13 @@ window/handheld/orientation=1
 [dotnet]
 
 project/assembly_name="OldTownHotel.Godot"
+
+[editor_plugins]
+
+; Godot AI (MIT, addons/godot_ai) —— 给 Godot 编辑器装一个 MCP server，
+; 相当于 Unity MCP 的对位物：让 AI 能直接读节点树、改属性、在编辑器里查证状态，
+; 而不是只能「写代码 → 编译 → 跑 → 截图 → 看」。
+;
+; 只影响编辑器，不进游戏运行时——parity-check 和 --shot 截图都不经过它。
+; 注意 MCP server 是在会话启动时加载的：装好之后要**重启一次 Claude Code 会话**才生效。
+enabled=PackedStringArray("res://addons/godot_ai/plugin.cfg")
