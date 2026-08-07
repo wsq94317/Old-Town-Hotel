@@ -1,8 +1,10 @@
-; Godot 工程配置（Phase 1：无画面，只跑一致性基准）。
+; Engine configuration file.
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
 ;
-; 这个文件本身就是「Godot 对 AI 更友好」那条论点的证据：它是纯文本、可手写、可 diff。
-; Unity 的 .unity / .prefab 是带 GUID+fileID 的 YAML，人和 AI 都没法直接手写——
-; 这正是 Assets/Game/Scripts/Editor 下那 2,351 行编辑器脚手架存在的唯一原因。
+; Format:
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
 
 config_version=5
 
