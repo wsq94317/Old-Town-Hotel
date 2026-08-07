@@ -1,0 +1,79 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    OldTownHotel.Sim — 引擎无关的模拟内核。
+
+    源文件仍然物理存放在 Assets/Game/Scripts/Sim/ 下，由 Unity 的
+    OldTownHotel.Game.asmdef 正常编译；本工程通过 <Compile Include> 链接同一批
+    .cs 文件，用 dotnet 独立编译。
+
+    「同一份源码，两个编译器」是刻意的：不产生任何需要手动同步的中间产物
+    （DLL），因此不存在「引擎里跑的和测试里跑的不是同一份代码」这种失效模式。
+
+    等 Godot 工程建起来之后，它用 <ProjectReference> 指向本工程即可；到那时再把
+    源文件物理移出 Assets/ 是一次独立的、机械的提交。
+
+    铁律（见 SimMath.cs）：Sim/ 下任何文件都不得 using UnityEngine。
+    netstandard2.1 这个 target 就是这条铁律的自动化守卫——Unity 6 的 API 兼容级别
+    是 netstandard2.1，凡是在这里能编过的，Unity 里一定也能编过。
+  -->
+
+  <PropertyGroup>
+    <TargetFrameworks>netstandard2.1;net8.0</TargetFrameworks>
+    <LangVersion>9.0</LangVersion>
+    <AssemblyName>OldTownHotel.Sim</AssemblyName>
+    <RootNamespace>OldTownHotel.Sim</RootNamespace>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Assets\Game\Scripts\Sim\**\*.cs" LinkBase="Sim" />
+  </ItemGroup>
+
+  <!--
+    Sim 依赖但物理上还住在 Gameplay/ 下的纯类型。
+
+    这批文件本身零 Unity 依赖（枚举、数据类、存档 DTO），只是当初落盘位置跟着
+    功能走而没跟着依赖走，于是 Sim/ 这个文件夹名并不等于真实的引擎无关边界。
+    它们是被编译器指出来的，不是猜的——首次编译的 128 个 CS0246 全部指向这里。
+
+    注意 GameState.cs：DTO 是干净的，脏的是 SaveService.cs 里的 JsonUtility 调用。
+    这个切口刚好落在正确的位置，Phase 2 换序列化器时只需要动 SaveService。
+
+    TODO(Phase 3)：物理移进 Sim/，让文件夹边界和依赖边界重合。现在不动是为了让
+    这次提交的 diff 保持「只加不改」，Unity 侧零风险。
+  -->
+  <ItemGroup>
+    <Compile Include="..\Assets\Game\Scripts\Gameplay\Economy\StaffRole.cs"    LinkBase="Adjacent" />
+    <Compile Include="..\Assets\Game\Scripts\Gameplay\Economy\StaffMember.cs"  LinkBase="Adjacent" />
+    <Compile Include="..\Assets\Game\Scripts\Gameplay\Economy\RoomTier.cs"     LinkBase="Adjacent" />
+    <Compile Include="..\Assets\Game\Scripts\Gameplay\Room2DRoomCategory.cs"   LinkBase="Adjacent" />
+    <Compile Include="..\Assets\Game\Scripts\Gameplay\Room2DState.cs"          LinkBase="Adjacent" />
+    <Compile Include="..\Assets\Game\Scripts\Gameplay\Save\GameState.cs"       LinkBase="Adjacent" />
+    <Compile Include="..\Assets\Game\Scripts\Gameplay\Economy\StaffTrait.cs"       LinkBase="Adjacent" />
+    <Compile Include="..\Assets\Game\Scripts\Gameplay\Economy\StaffAttributes.cs"  LinkBase="Adjacent" />
+    <Compile Include="..\Assets\Game\Scripts\Gameplay\Economy\ReputationLedger.cs" LinkBase="Adjacent" />
+    <Compile Include="..\Assets\Game\Scripts\World\WorldHudVisibilityPolicy.cs"    LinkBase="Adjacent" />
+    <Compile Include="..\Assets\Game\Scripts\World\SupervisionTuning.cs"           LinkBase="Adjacent" />
+    <Compile Include="..\Assets\Game\Scripts\World\SlackFsm.cs"                    LinkBase="Adjacent" />
+    <Compile Include="..\Assets\Game\Scripts\Core\GameClock.cs"                    LinkBase="Adjacent" />
+    <Compile Include="..\Assets\Game\Scripts\Gameplay\Economy\DayLedger.cs"        LinkBase="Adjacent" />
+    <Compile Include="..\Assets\Game\Scripts\Gameplay\Economy\PayrollLedger.cs"    LinkBase="Adjacent" />
+    <Compile Include="..\Assets\Game\Scripts\Gameplay\Economy\StaffTraits.cs"      LinkBase="Adjacent" />
+    <Compile Include="..\Assets\Game\Scripts\World\CatchResolution.cs"             LinkBase="Adjacent" />
+    <Compile Include="..\Assets\Game\Scripts\World\DayPeriodLogic.cs"              LinkBase="Adjacent" />
+    <Compile Include="..\Assets\Game\Scripts\World\DayVerdictLogic.cs"             LinkBase="Adjacent" />
+    <Compile Include="..\Assets\Game\Scripts\World\GameText.cs"                    LinkBase="Adjacent" />
+    <Compile Include="..\Assets\Game\Scripts\World\HotelEvents.cs"                 LinkBase="Adjacent" />
+    <Compile Include="..\Assets\Game\Scripts\World\StaffRoutineLogic.cs"           LinkBase="Adjacent" />
+
+    <!-- 本轮从 Mathf/无用 using/引擎属性中解放出来的纯逻辑（改动见各文件顶部注释） -->
+    <Compile Include="..\Assets\Game\Scripts\World\FloorMath.cs"                   LinkBase="Adjacent" />
+    <Compile Include="..\Assets\Game\Scripts\World\IncidentDailyBudget.cs"         LinkBase="Adjacent" />
+  </ItemGroup>
+
+</Project>

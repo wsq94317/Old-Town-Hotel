@@ -7,21 +7,8 @@ using UnityEngine.EventSystems;
 using UnityEngine.InputSystem.UI;
 using UnityEngine.UI;
 
-public enum WorldHudMode
-{
-    Hidden,
-    Operations,
-    MorningReport
-}
-
-public static class WorldHudVisibilityPolicy
-{
-    public static WorldHudMode Resolve(bool simulationReady, bool awaitingMorningReport)
-    {
-        if (!simulationReady) return WorldHudMode.Hidden;
-        return awaitingMorningReport ? WorldHudMode.MorningReport : WorldHudMode.Operations;
-    }
-}
+// WorldHudMode / WorldHudVisibilityPolicy 已拆到 WorldHudVisibilityPolicy.cs
+// （纯逻辑，脱离 Unity 可测）。同一程序集，调用方无需改动。
 
 /// <summary>
 /// Scene-first management HUD for the v3 simulation. The hotel remains visible,

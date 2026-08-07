@@ -1,4 +1,5 @@
-using UnityEngine;
+// 数学工具走 SimMath 而非 Mathf——本文件是纯换算，进 OldTownHotel.Sim.csproj 后
+// FloorMathTest 可脱离 Unity 运行。见 SimMath.cs 的铁律。
 
 // 楼层数学（v2 世界层唯一的高度换算来源）：层高 4，index 0..6 =
 // 1F 大堂+Lounge / 2F 客房 / 3F VIP / 4F 餐厅酒吧 / 5F 健身房 / 6F 赌场 / 7F 屋顶泳池。
@@ -14,11 +15,11 @@ public static class FloorMath
     /// <summary>世界 y 坐标 → 楼层 index（钳制 0..FloorCount-1）。</summary>
     public static int FloorIndexForY(float y)
     {
-        int index = Mathf.FloorToInt(y / FloorHeight);
-        return Mathf.Clamp(index, 0, FloorCount - 1);
+        int index = SimMath.FloorToInt(y / FloorHeight);
+        return SimMath.Clamp(index, 0, FloorCount - 1);
     }
 
     /// <summary>楼层 index → 该层地板基准 y（index 越界时钳制）。</summary>
     public static float BaseYFor(int floorIndex) =>
-        Mathf.Clamp(floorIndex, 0, FloorCount - 1) * FloorHeight;
+        SimMath.Clamp(floorIndex, 0, FloorCount - 1) * FloorHeight;
 }

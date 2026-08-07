@@ -10,8 +10,16 @@ public static class IncidentDailyBudget
     private static int _day = int.MinValue;
     private static int _limit;
 
+    // 本文件其余部分是纯 C#，唯一的引擎耦合就是这个属性：Unity 关闭 domain reload 后
+    // 静态状态会跨 play 场次残留，靠它在进入运行时清零。引擎外（dotnet test / 将来的
+    // Godot）不存在这个问题——每次都是全新进程——所以条件编译掉即可。
+    //
+    // UNITY_5_3_OR_NEWER 由 Unity 恒定义、被 OldTownHotel.Sim.csproj 恒不定义，
+    // 因此两边各取所需，而共享的是同一份源码。
+#if UNITY_5_3_OR_NEWER
     [UnityEngine.RuntimeInitializeOnLoadMethod(
         UnityEngine.RuntimeInitializeLoadType.SubsystemRegistration)]
+#endif
     private static void ResetRuntime() => ResetForTests();
 
     public static int LimitForDay(int day)

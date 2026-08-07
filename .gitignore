@@ -117,3 +117,20 @@ design/
 Docs/
 docs/
 production/
+
+# ---------------------------------------------------------------------------
+# 引擎无关的 .NET 工程（Sim 内核 + 脱离引擎运行的测试）
+#
+# 上面第 51/53 行把 *.csproj / *.sln 全局忽略了——那是 Unity 模板的正确做法，
+# 因为 Unity 会自动生成并覆盖它们。但下面这两个 csproj 是手写的真源码，不是生成物，
+# 必须进版本库，所以在这里反向放行。
+#
+# 跑法：dotnet test Sim.Tests/OldTownHotel.Sim.Tests.csproj
+# ---------------------------------------------------------------------------
+!/Sim/OldTownHotel.Sim.csproj
+!/Sim.Tests/OldTownHotel.Sim.Tests.csproj
+
+/Sim/[Bb]in/
+/Sim/[Oo]bj/
+/Sim.Tests/[Bb]in/
+/Sim.Tests/[Oo]bj/

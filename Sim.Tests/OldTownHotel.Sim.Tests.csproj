@@ -1,0 +1,110 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    OldTownHotel.Sim.Tests — 在任何引擎之外运行的 Sim 内核测试。
+
+    跑法：  dotnet test Sim.Tests/OldTownHotel.Sim.Tests.csproj
+
+    源文件仍然是 Assets/Tests/EditMode/ 下那一批，由 Unity Test Runner 正常运行；
+    本工程链接同一批 .cs 用 dotnet 跑。同一份测试，两个运行器，没有中间产物。
+
+    为什么这件事值得单独做一遍：Unity Test Runner 会在程序集过期时拿旧的跑并报全绿
+    （历史上已经骗过我们不止一次）。dotnet test 每次都从源码重编，没有编辑器状态、
+    没有程序集重载、没有可以过期的东西。这里的绿灯是真绿灯。
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <RootNamespace>OldTownHotel.Tests.EditMode</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Sim\OldTownHotel.Sim.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="NUnit" Version="3.14.0" />
+    <PackageReference Include="NUnit3TestAdapter" Version="4.5.0" />
+  </ItemGroup>
+
+  <!--
+    刻意用「全量 glob + 显式排除」而不是「显式列出纯测试」。
+
+    这样新加的测试默认就会被这里收进来：如果它是纯逻辑，白捡一份引擎外验证；
+    如果它碰了 Unity，编译会当场报错，逼你显式决定它的归属。
+    反过来（显式白名单）的话，新测试会安静地不参与 dotnet test——那是无声的
+    覆盖率缺口，跟假绿灯是同一类毛病。响亮地失败胜过安静地漏。
+  -->
+  <ItemGroup>
+    <Compile Include="..\Assets\Tests\EditMode\**\*.cs" LinkBase="EditMode" />
+
+    <!-- 依赖 MonoBehaviour / ScriptableObject / UnityEditor 的测试，只能留在 Unity 里跑 -->
+    <Compile Remove="..\Assets\Tests\EditMode\BreakdownSystemRestoreTest.cs" />
+    <Compile Remove="..\Assets\Tests\EditMode\CandidateGeneratorTest.cs" />
+    <Compile Remove="..\Assets\Tests\EditMode\DayClockPhaseFlowTest.cs" />
+    <Compile Remove="..\Assets\Tests\EditMode\DayEndClosureTest.cs" />
+    <Compile Remove="..\Assets\Tests\EditMode\DayPhaseStateMachineTest.cs" />
+    <Compile Remove="..\Assets\Tests\EditMode\DemandLoopClosingTest.cs" />
+    <Compile Remove="..\Assets\Tests\EditMode\DemandLoopMultiSlotTest.cs" />
+    <Compile Remove="..\Assets\Tests\EditMode\DepartureFlowTest.cs" />
+    <Compile Remove="..\Assets\Tests\EditMode\EconomyCheckoutTest.cs" />
+    <Compile Remove="..\Assets\Tests\EditMode\EconomyConfigSoTest.cs" />
+    <Compile Remove="..\Assets\Tests\EditMode\EconomySystemTest.cs" />
+    <Compile Remove="..\Assets\Tests\EditMode\FinanceTest.cs" />
+    <Compile Remove="..\Assets\Tests\EditMode\FloorPrefabAuthoringTest.cs" />
+    <Compile Remove="..\Assets\Tests\EditMode\FloorVisibilityTest.cs" />
+    <Compile Remove="..\Assets\Tests\EditMode\FrontDesk2D_UiAccessors_Test.cs" />
+    <Compile Remove="..\Assets\Tests\EditMode\FurnitureVisualConfigurationTest.cs" />
+    <Compile Remove="..\Assets\Tests\EditMode\GuestDeskQueueTest.cs" />
+    <Compile Remove="..\Assets\Tests\EditMode\GuestProfileGenerationTest.cs" />
+    <Compile Remove="..\Assets\Tests\EditMode\Housekeeper2D_UiAccessors_Test.cs" />
+    <Compile Remove="..\Assets\Tests\EditMode\Inspector2D_UiAccessors_Test.cs" />
+    <Compile Remove="..\Assets\Tests\EditMode\LevelConfigSoTest.cs" />
+    <Compile Remove="..\Assets\Tests\EditMode\Lounge2D_InventoryExpansion_Test.cs" />
+    <Compile Remove="..\Assets\Tests\EditMode\ManagerInteractionTest.cs" />
+    <Compile Remove="..\Assets\Tests\EditMode\OvernightSaveTest.cs" />
+    <Compile Remove="..\Assets\Tests\EditMode\PreAssignmentRulesTest.cs" />
+    <Compile Remove="..\Assets\Tests\EditMode\ReclaimTest.cs" />
+    <Compile Remove="..\Assets\Tests\EditMode\RenovationSystemTest.cs" />
+    <Compile Remove="..\Assets\Tests\EditMode\RenovationTest.cs" />
+    <Compile Remove="..\Assets\Tests\EditMode\Room2DDayPhaseStateMachine_UiAccessors_Test.cs" />
+    <Compile Remove="..\Assets\Tests\EditMode\Room2DDemoDayController_UiAccessors_Test.cs" />
+    <Compile Remove="..\Assets\Tests\EditMode\Room2DPrototypeDemandLoop_RoomSuitability_Test.cs" />
+    <Compile Remove="..\Assets\Tests\EditMode\RoomActionsModalTest.cs" />
+    <Compile Remove="..\Assets\Tests\EditMode\RoomSceneBindingTest.cs" />
+    <Compile Remove="..\Assets\Tests\EditMode\SaveSystemTest.cs" />
+    <Compile Remove="..\Assets\Tests\EditMode\SimSaveMigrationTest.cs" />
+    <Compile Remove="..\Assets\Tests\EditMode\StaffAgentSpawnerLabelTest.cs" />
+    <Compile Remove="..\Assets\Tests\EditMode\TapDragClassifierTest.cs" />
+    <Compile Remove="..\Assets\Tests\EditMode\TaskDispatchLogicTest.cs" />
+    <Compile Remove="..\Assets\Tests\EditMode\UiLayoutTest.cs" />
+    <Compile Remove="..\Assets\Tests\EditMode\WorldSaveTest.cs" />
+
+    <!--
+      第二类排除：测试本身是纯的，但它测的被测类还卡着一个「真」引擎依赖。
+      这些不是搬运问题，是设计决策，需要人来拍板——所以刻意留在这里而不是硬搬：
+
+        FlawPolicyTest          FlawPolicy      用 UnityEngine.Random  -> 换 RNG 会改变确定性
+        ComplaintDecisionTest   ComplaintDecision 同上
+        FloorRouteTest          FloorNavigator  用 Vector3            -> 需要可移植向量类型
+        BreakdownLogicTest      BreakdownLogic  用 Color              -> 表现层漏进逻辑层
+        SaveSlotTest            SaveSlots       用 Application.persistentDataPath -> 归 Phase 2
+        HotelEconomyPresentationTest            仅 Mathf，但依赖链牵到 WorldState，本轮未追
+
+      每解决一个，把对应行删掉即可，测试会自动进来。
+    -->
+    <Compile Remove="..\Assets\Tests\EditMode\FlawPolicyTest.cs" />
+    <Compile Remove="..\Assets\Tests\EditMode\ComplaintDecisionTest.cs" />
+    <Compile Remove="..\Assets\Tests\EditMode\FloorRouteTest.cs" />
+    <Compile Remove="..\Assets\Tests\EditMode\BreakdownLogicTest.cs" />
+    <Compile Remove="..\Assets\Tests\EditMode\SaveSlotTest.cs" />
+    <Compile Remove="..\Assets\Tests\EditMode\HotelEconomyPresentationTest.cs" />
+  </ItemGroup>
+
+</Project>

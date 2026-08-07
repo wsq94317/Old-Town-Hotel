@@ -1,6 +1,8 @@
-using UnityEngine;
+using System;
 
 // 游戏内日时钟（纯 C#，不依赖 MonoBehaviour，EditMode 可测）。
+// 数学工具走 System.Math / SimMath 而非 Mathf——见 SimMath.cs 的铁律：
+// 这样本文件能进 OldTownHotel.Sim.csproj，测试可脱离 Unity 运行。
 // 一天 = dayStartHour → dayEndHour 的游戏时间，均匀映射到 dayLengthRealSeconds 真实秒。
 // 到达 dayEndHour 后钟面停住（clamp），日结由 Room2DDemoDayController 负责触发。
 public sealed class GameClock
@@ -12,9 +14,9 @@ public sealed class GameClock
 
     public GameClock(float dayLengthRealSeconds, float dayStartHour, float dayEndHour)
     {
-        _dayLengthRealSeconds = Mathf.Max(1f, dayLengthRealSeconds);
+        _dayLengthRealSeconds = Math.Max(1f, dayLengthRealSeconds);
         _dayStartHour = dayStartHour;
-        _dayEndHour = Mathf.Max(dayStartHour + 0.01f, dayEndHour);
+        _dayEndHour = Math.Max(dayStartHour + 0.01f, dayEndHour);
         _currentHour = _dayStartHour;
     }
 
@@ -29,8 +31,8 @@ public sealed class GameClock
     {
         get
         {
-            int hour = Mathf.FloorToInt(_currentHour);
-            int minute = Mathf.FloorToInt((_currentHour - hour) * 60f);
+            int hour = SimMath.FloorToInt(_currentHour);
+            int minute = SimMath.FloorToInt((_currentHour - hour) * 60f);
             return hour.ToString("00") + ":" + minute.ToString("00");
         }
     }
@@ -40,14 +42,14 @@ public sealed class GameClock
     {
         if (realDeltaSeconds <= 0f) return;
         float hoursPerRealSecond = (_dayEndHour - _dayStartHour) / _dayLengthRealSeconds;
-        _currentHour = Mathf.Min(_dayEndHour, _currentHour + realDeltaSeconds * hoursPerRealSecond);
+        _currentHour = Math.Min(_dayEndHour, _currentHour + realDeltaSeconds * hoursPerRealSecond);
     }
 
     /// <summary>直接推进 N 个游戏小时（事件用：如进警局跳过营业时间）。到打烊即 clamp。</summary>
     public void AdvanceGameHours(float gameHours)
     {
         if (gameHours <= 0f) return;
-        _currentHour = Mathf.Min(_dayEndHour, _currentHour + gameHours);
+        _currentHour = Math.Min(_dayEndHour, _currentHour + gameHours);
     }
 
     /// <summary>回到当日开始时刻（新一天用）。</summary>
