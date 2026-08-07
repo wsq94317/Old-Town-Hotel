@@ -145,3 +145,4 @@ production/
 /Godot/parity-output.txt
 /Godot/*.sln
 /Godot/Dev/*.png
+/Godot/Dev/*.png.import
