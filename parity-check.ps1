@@ -43,7 +43,10 @@ Write-Host '[2/3] godot --headless (Godot host)' -ForegroundColor Cyan
 if (-not (Test-Path $Godot)) { Fail "Godot not found: $Godot  (pass -Godot <path>)" }
 if (Test-Path $actual) { Remove-Item $actual -Force }
 
-& $Godot --headless --path (Join-Path $repo 'Godot') 2>&1 |
+# Name the scene explicitly rather than relying on project.godot's main_scene -- that
+# now points at the game (Main.tscn), and a parity check that silently runs the wrong
+# scene would report a stale ledger as a pass.
+& $Godot --headless --path (Join-Path $repo 'Godot') 'res://ParityCheck.tscn' 2>&1 |
     Select-String '\[parity\]|ERROR|Exception' | ForEach-Object { "      $($_.Line)" }
 if (-not (Test-Path $actual)) { Fail "Godot produced no output at $actual" }
 

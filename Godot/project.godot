@@ -12,7 +12,7 @@ config_version=5
 
 config/name="Old Town Hotel (Godot port)"
 config/description="Phase 1 wiring check: runs ParityScenario and writes the ledger for diffing."
-run/main_scene="res://ParityCheck.tscn"
+run/main_scene="res://Main.tscn"
 config/features=PackedStringArray("4.7", "C#", "Forward Plus")
 
 [display]
