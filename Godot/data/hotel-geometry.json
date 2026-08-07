@@ -1434,6 +1434,20 @@
       ]
     }
   ],
+  "rooms": [
+    {"num":203,"cat":"Single","floor":1,"p":[2.5,4,3.5]},
+    {"num":204,"cat":"Single","floor":1,"p":[7.5,4,3.5]},
+    {"num":202,"cat":"Single","floor":1,"p":[-2.5,4,3.5]},
+    {"num":302,"cat":"Single","floor":2,"p":[-2.5,8,3.5]},
+    {"num":304,"cat":"Single","floor":2,"p":[7.5,8,3.5]},
+    {"num":208,"cat":"Single","floor":1,"p":[7.5,4,-3.5]},
+    {"num":207,"cat":"Single","floor":1,"p":[2.5,4,-3.5]},
+    {"num":301,"cat":"Single","floor":2,"p":[-7.5,8,3.5]},
+    {"num":205,"cat":"Single","floor":1,"p":[-7.5,4,-3.5]},
+    {"num":201,"cat":"Single","floor":1,"p":[-7.5,4,3.5]},
+    {"num":303,"cat":"Single","floor":2,"p":[2.5,8,3.5]},
+    {"num":206,"cat":"Single","floor":1,"p":[-2.5,4,-3.5]}
+  ],
   "exportedParts": 1390,
   "skippedNonPrimitive": 0,
   "skippedMeshes": {}

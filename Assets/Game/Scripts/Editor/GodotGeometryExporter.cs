@@ -120,6 +120,13 @@ public static class GodotGeometryExporter
         }
 
         sb.Append("  ],\n");
+
+        // 房间锚点：Godot 侧要用它们建 RoomLedger 并在世界里定位房态标记。
+        // 房号 / 房型 / 楼层全部从场景实体读，不在两边各写一份房表。
+        sb.Append("  \"rooms\": [\n");
+        sb.Append(string.Join(",\n", ExportRoomAnchors(inv)));
+        sb.Append("\n  ],\n");
+
         sb.Append("  \"exportedParts\": ").Append(total.ToString(inv)).Append(",\n");
         sb.Append("  \"skippedNonPrimitive\": ").Append(skipped.ToString(inv)).Append(",\n");
         sb.Append("  \"skippedMeshes\": {");
@@ -135,6 +142,46 @@ public static class GodotGeometryExporter
 
         Debug.Log($"[GodotExport] {total} primitive parts from {floors.Count} floors -> {OutPath}" +
                   (skipped > 0 ? $"  |  SKIPPED {skipped} non-primitive meshes: {string.Join(", ", entries)}" : "  |  no non-primitive meshes"));
+    }
+
+    /// <summary>
+    /// 场景里的房间锚点（RoomData/Room_NNN_Anchor 上的 Room2DEntity）。
+    ///
+    /// Godot 侧靠这批数据建 RoomLedger 并把房态标记摆到世界里。房号、房型、楼层
+    /// 一律从场景实体读——不在两个引擎里各维护一份房表，那种东西一定会改岔。
+    /// 用反射取字段是为了不让这个编辑器工具依赖 Room2DEntity 的具体程序集。
+    /// </summary>
+    private static List<string> ExportRoomAnchors(CultureInfo inv)
+    {
+        var rows = new List<string>();
+        GameObject rd = GameObject.Find("RoomData");
+        if (rd == null)
+        {
+            Debug.LogWarning("[GodotExport] RoomData not found in the open scene — no room anchors exported. " +
+                             "Open Hotel_Manager_25D and re-export.");
+            return rows;
+        }
+
+        foreach (Transform child in rd.transform)
+        {
+            Component entity = child.GetComponent("Room2DEntity");
+            if (entity == null) continue;
+
+            var type = entity.GetType();
+            object num = type.GetField("roomNumber")?.GetValue(entity);
+            object cat = type.GetField("roomCategory")?.GetValue(entity);
+            if (num == null) continue;
+
+            Vector3 p = child.position;
+            rows.Add(string.Format(inv,
+                "    {{\"num\":{0},\"cat\":\"{1}\",\"floor\":{2},\"p\":[{3:0.####},{4:0.####},{5:0.####}]}}",
+                num, cat != null ? cat.ToString() : "Single",
+                Mathf.Clamp(Mathf.FloorToInt(p.y / 4f), 0, 6),   // FloorMath.FloorIndexForY
+                p.x, p.y, p.z));
+        }
+
+        Debug.Log($"[GodotExport] {rows.Count} room anchors");
+        return rows;
     }
 
     /// <summary>楼层在场景里的实际高度。场景没开就退回 FloorMath 的约定并告警。</summary>

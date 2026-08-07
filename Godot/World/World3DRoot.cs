@@ -18,16 +18,21 @@ public partial class World3DRoot : Node3D
     private HotelGeometry _geometry;
     private FloorVisibility _floors;
     private ManagerCamera _camera;
+    private WorldSimHost _sim;
+    private RoomMarkers _markers;
+    private double _markerAccumulator;
 
     private double _shotAfter = -1;
     private bool _shotTaken;
     private bool _overview;
 
-    // 单层视角用 Unity 那台相机的实测正交半高 6（Godot 全高 = 12）。
-    // 总览要看下 27 米高的整栋楼，按包围盒算，不写死。
-    private const float FloorZoom = 12f;
+    // Unity 那台相机的正交半高是 6（Godot 全高 12），但那是「跟着经理走」的贴身视角。
+    // Godot 这边经理还没移植，用同样的 12 只能看见楼层的一个角。改成按楼层实际范围取景，
+    // 等经理接上之后再切回贴身跟随。
+    private float _floorZoom = 12f;
     private float _overviewZoom = 40f;
     private Vector3 _hotelCentre;
+    private readonly System.Collections.Generic.List<Vector3> _floorCentres = new System.Collections.Generic.List<Vector3>();
 
     public override void _Ready()
     {
@@ -46,11 +51,38 @@ public partial class World3DRoot : Node3D
         AddChild(_floors);
         _floors.Bind(_geometry.Floors);
 
+        // Sim 用**场景锚点**建房，和 Unity 侧 HotelSimSceneBridge 同一个原则：
+        // 用真实的房建内核，不另造一套假房表。
+        _sim = new WorldSimHost { Name = "Sim" };
+        AddChild(_sim);
+        _sim.Build(_geometry.RoomAnchors);
+
+        _markers = new RoomMarkers { Name = "RoomMarkers" };
+        AddChild(_markers);
+        _markers.Build(_geometry.RoomAnchors, _geometry.Floors);
+        _markers.Refresh(_sim.Sim);
+
         BuildLighting();
 
         Aabb bounds = ComputeBounds(_geometry);
         _hotelCentre = bounds.GetCenter();
         _overviewZoom = FitOrthoSize(bounds);
+
+        // 每层单独算中心和取景。各层 footprint 并不一样（Floor5 只有 119 个零件、
+        // Floor3 有 242），统一对准整栋楼的中心会让小楼层偏到画面角落。
+        float widest = 0f;
+        foreach (var floor in _geometry.Floors)
+        {
+            Aabb fb = ComputeBounds(floor);
+            _floorCentres.Add(fb.Size == Vector3.Zero ? _hotelCentre : fb.GetCenter());
+            if (fb.Size == Vector3.Zero) continue;
+            // 压扁 Y：单层取景该由平面尺寸决定，不该被层内高度左右
+            var flat = new Aabb(new Vector3(fb.Position.X, 0, fb.Position.Z),
+                                new Vector3(fb.Size.X, 4f, fb.Size.Z));
+            widest = Mathf.Max(widest, FitOrthoSize(flat));
+        }
+        // 所有楼层共用同一个缩放：切层时画面大小跳变比楼层偏移更让人晕。
+        _floorZoom = widest > 0f ? widest : 12f;
 
         _camera = new ManagerCamera { Name = "Camera" };
         AddChild(_camera);
@@ -131,9 +163,9 @@ public partial class World3DRoot : Node3D
     private void ExitOverview(int floorIndex)
     {
         _overview = false;
-        _camera.Size = FloorZoom;
-        _camera.FocusOn(new Vector3(_hotelCentre.X, FloorMath.BaseYFor(floorIndex), _hotelCentre.Z),
-                        instant: true);
+        _camera.Size = _floorZoom;
+        Vector3 c = floorIndex >= 0 && floorIndex < _floorCentres.Count ? _floorCentres[floorIndex] : _hotelCentre;
+        _camera.FocusOn(new Vector3(c.X, FloorMath.BaseYFor(floorIndex), c.Z), instant: true);
     }
 
     /// <summary>
@@ -188,6 +220,15 @@ public partial class World3DRoot : Node3D
 
     public override void _Process(double delta)
     {
+        // 房态刷新节流到 4Hz。和 Rooms 屏一样：Sim 一分钟能吐上百个 tick，
+        // 每个 tick 都去比对 12 间房的材质纯属浪费。
+        _markerAccumulator += delta;
+        if (_markerAccumulator >= 0.25)
+        {
+            _markerAccumulator = 0;
+            _markers?.Refresh(_sim?.Sim);
+        }
+
         if (_shotAfter <= 0 || _shotTaken) return;
         _shotAfter -= delta;
         if (_shotAfter > 0) return;

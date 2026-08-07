@@ -31,6 +31,17 @@ public partial class HotelGeometry : Node3D
     public readonly List<Node3D> Floors = new List<Node3D>();
     public int PartCount { get; private set; }
 
+    /// <summary>场景里的房间锚点。房号/房型/楼层来自 Unity 实体，不在两边各维护一份房表。</summary>
+    public sealed class RoomAnchor
+    {
+        public int Number;
+        public Room2DRoomCategory Category;
+        public int Floor;
+        public Vector3 Position;   // 已换到 Godot 坐标系
+    }
+
+    public readonly List<RoomAnchor> RoomAnchors = new List<RoomAnchor>();
+
     public override void _Ready() => Build();
 
     public void Build()
@@ -69,8 +80,27 @@ public partial class HotelGeometry : Node3D
                 AddPart(holder, parts[p].AsGodotDictionary());
         }
 
+        if (root.ContainsKey("rooms"))
+        {
+            var rooms = root["rooms"].AsGodotArray();
+            for (int i = 0; i < rooms.Count; i++)
+            {
+                var r = rooms[i].AsGodotDictionary();
+                var p = r["p"].AsGodotArray();
+                RoomAnchors.Add(new RoomAnchor
+                {
+                    Number = (int)r["num"],
+                    Category = System.Enum.TryParse(r["cat"].AsString(), out Room2DRoomCategory cat)
+                        ? cat : Room2DRoomCategory.Single,
+                    Floor = (int)r["floor"],
+                    // 和几何同一套换算：位置翻 z
+                    Position = new Vector3((float)p[0], (float)p[1], -(float)p[2]),
+                });
+            }
+        }
+
         GD.Print($"[world] rebuilt {PartCount} parts across {Floors.Count} floors, " +
-                 $"{_materials.Count} distinct materials");
+                 $"{_materials.Count} distinct materials, {RoomAnchors.Count} room anchors");
     }
 
     private void AddPart(Node3D parent, Godot.Collections.Dictionary part)
