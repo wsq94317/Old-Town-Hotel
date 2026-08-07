@@ -13,7 +13,9 @@ public partial class Main : Node
 {
     private HotelSim _sim;
     private RoomsScreen _rooms;
+    private FrontDeskScreen _frontDesk;
     private BottomNav _nav;
+    private BottomNav.Tab _tab = BottomNav.Tab.Rooms;
 
     private double _uiAccumulator;
     private const double UiRefreshSeconds = 0.25;   // 与 Unity 的轮询间隔一致
@@ -26,10 +28,23 @@ public partial class Main : Node
 
     public override void _Ready()
     {
-        _sim = BuildHotel();
+        // 先解析影响开局配置的参数，再建 Sim——房间数这类东西必须在构造时就定下来。
+        int rooms = 12;
+        foreach (string arg in OS.GetCmdlineUserArgs())
+            if (arg.StartsWith("--rooms="))
+                rooms = arg.Substring(8).ToInt();
+
+        _sim = BuildHotel(rooms);
 
         var layer = new CanvasLayer();
         AddChild(layer);
+
+        // 各屏是彼此重叠的兄弟节点，靠 Visible 切换——和 Unity 那边
+        // HotelUIFlow.SwitchToTab 的做法一致（三个屏 prefab 叠在一起，切显隐）。
+        _frontDesk = new FrontDeskScreen();
+        layer.AddChild(_frontDesk);
+        _frontDesk.Bind(_sim);
+        _frontDesk.DecisionResolved += what => GD.Print($"[ui] {what}");
 
         _rooms = new RoomsScreen();
         layer.AddChild(_rooms);
@@ -42,18 +57,34 @@ public partial class Main : Node
         _nav.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.BottomWide);
         _nav.OffsetTop = -UiTokens.NavHeight;
         _nav.OffsetBottom = 0;
-        _nav.Select(BottomNav.Tab.Rooms);
+        _nav.TabSelected += t => SwitchTab((BottomNav.Tab)t);
+        _nav.Select(_tab);
+        SwitchTab(_tab);
 
         _sim.BeginDay();
 
         foreach (string arg in OS.GetCmdlineUserArgs())
         {
             if (arg.StartsWith("--shot="))
+            {
                 _shotAfter = arg.Substring(7).ToFloat();
+                // 截图运行必须屏蔽 GUI 输入，否则抓到的不是一个确定的状态。
+                // 实测过一次：一轮 110 秒的截图跑里凭空出现了 room 201..208 的点击
+                // （正好是网格的蛇形焦点导航序）、一次收款、和十几次标签切换——
+                // 大概率是手柄轴漂移在驱动 Godot 内置的 ui_left/ui_right/ui_accept。
+                // 界面能被键盘/手柄导航是好事，但截图harness 需要的是可复现，不是可操作。
+                GetViewport().GuiDisableInput = true;
+            }
             // 倍速走 SimClock 自己的 SpeedMultiplier：它只改 tick 产出速率，
             // 不改任何游戏时间语义（一天仍是 840 分钟），所以快进出来的状态是真状态。
             else if (arg.StartsWith("--speed="))
                 _sim.Clock.SpeedMultiplier = arg.Substring(8).ToFloat();
+            // 故意超售是真实的游戏策略（OverbookingAllowance 是公开设置），调高它产生的是
+            // Sim 真正生成的超售事件，不是塞给界面的假数据——这样截图验证的才是真链路。
+            else if (arg.StartsWith("--overbook="))
+                _sim.OverbookingAllowance = arg.Substring(11).ToInt();
+            else if (arg == "--tab=frontdesk")
+                { _nav.Select(BottomNav.Tab.FrontDesk); SwitchTab(BottomNav.Tab.FrontDesk); }
         }
     }
 
@@ -71,7 +102,9 @@ public partial class Main : Node
         if (_uiAccumulator >= UiRefreshSeconds)
         {
             _uiAccumulator = 0;
-            _rooms.Refresh();
+            // 只刷当前可见的那一屏。隐藏的屏没人看，刷它纯属浪费。
+            if (_tab == BottomNav.Tab.Rooms) _rooms.Refresh();
+            else if (_tab == BottomNav.Tab.FrontDesk) _frontDesk.Refresh();
         }
 
         if (_shotAfter > 0 && !_shotTaken)
@@ -79,6 +112,24 @@ public partial class Main : Node
             _shotAfter -= delta;
             if (_shotAfter <= 0) { _shotTaken = true; Capture(); }
         }
+    }
+
+    private void SwitchTab(BottomNav.Tab tab)
+    {
+        _tab = tab;
+        _rooms.Visible = tab == BottomNav.Tab.Rooms;
+        _frontDesk.Visible = tab == BottomNav.Tab.FrontDesk;
+        // Lounge 还没做——先留在 Rooms 上，而不是切到一片空白。
+        if (tab == BottomNav.Tab.Lounge)
+        {
+            GD.Print("[ui] Lounge screen not built yet");
+            _rooms.Visible = true;
+            _tab = BottomNav.Tab.Rooms;
+            _nav.Select(BottomNav.Tab.Rooms);
+        }
+
+        if (_tab == BottomNav.Tab.Rooms) _rooms.Refresh();
+        else _frontDesk.Refresh();
     }
 
     private async void Capture()
@@ -119,11 +170,15 @@ public partial class Main : Node
             sim.TryRepairFurniture(repairable[i], out _);
     }
 
-    /// <summary>与 ParityScenario 相同的开局配置，方便把屏幕上的数字和账本对上。</summary>
-    private static HotelSim BuildHotel()
+    /// <summary>
+    /// 默认与 ParityScenario 相同的开局配置（12 房），方便把屏幕上的数字和账本对上。
+    /// rooms 可由 --rooms=N 覆盖：房间少于当日客量时会真的挤出超售事件，
+    /// 那是验证前台决策卡最省事的真实路径。
+    /// </summary>
+    private static HotelSim BuildHotel(int rooms)
     {
         var defs = new List<RoomDefinition>();
-        for (int i = 0; i < 12; i++)
+        for (int i = 0; i < rooms; i++)
             defs.Add(new RoomDefinition(201 + i, floor: 1, zone: 1, Room2DRoomCategory.Single,
                                         RoomTier.Old, RoomSimState.Ready));
 
