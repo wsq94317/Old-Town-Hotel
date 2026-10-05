@@ -171,17 +171,14 @@ Packages/packages-lock.json linguist-generated
 LightingData.asset     binary
 
 # ---------------------------------------------------------------------------
-# Godot 移植：跨引擎一致性基准
+# Sim 内核的确定性回归基准
 #
-# golden 账本要跟 Godot 无头跑出来的文件做 **逐字节** 比对（SHA256）。
-# 如果任由 autocrlf 把它在检出时改成 CRLF，而 Godot 写出的是 LF，
-# 比对就会失败——但失败原因是行尾，不是数字。那种误报比不检查更糟：
-# 它会训练人忽略这个检查。这里把它钉死成 LF。
-# （parity-check.ps1 里还有第二道防线：比对前先归一化行尾。）
+# Sim/golden/parity-ledger.txt 是固定种子跑 14 天的逐行账本，SimParityTest 断言
+# 当前输出与它逐字符相同。规则被无意改动时这条会红——那是它存在的意义。
+#
+# 钉成 LF 是因为比对的是文本内容：autocrlf 在检出时改了行尾的话，失败原因会变成
+# 行尾而不是数字，而那种误报会训练人忽略这个检查。
+# （SimParityTest 读取时还会再归一化一次行尾，双保险。）
+# ---------------------------------------------------------------------------
 Sim/golden/*.txt        text eol=lf
 
-# Godot 工程文件全是纯文本，统一 LF，避免和 .tscn 里的资源 UID 混出跨平台 diff
-*.godot                 text eol=lf
-*.tscn                  text eol=lf
-*.tres                  text eol=lf
-*.uid                   text eol=lf
