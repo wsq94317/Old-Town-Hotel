@@ -17,7 +17,7 @@ using UnityEngine;
 public class GuestLifeDirector : MonoBehaviour
 {
     [SerializeField] private Room2DPrototypeDemandLoop demandLoop;
-    [SerializeField] private Vector3 doorPoint = new Vector3(0f, 0f, -5.2f);
+    private Vector3 doorPoint => HotelFloorPlan.Entrance;
     [SerializeField] private Vector3 deskPoint = new Vector3(0.9f, 0f, 2.2f);
 
     [Tooltip("每位客人在柜台办理入住或退房的真实秒数。")]

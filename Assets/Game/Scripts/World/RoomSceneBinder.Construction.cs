@@ -35,7 +35,7 @@ public partial class RoomSceneBinder
     {
         _constructionRoot = new GameObject("ConstructionFeedback");
         _constructionRoot.transform.SetParent(transform, false);
-        float side = transform.localPosition.z >= 0f ? -1f : 1f;
+        float side = HotelFloorPlan.LocalDoorSide(transform);
         // Outside the door darkness mask. No colliders: movement and room taps stay usable.
         _constructionRoot.transform.localPosition = new Vector3(0f, 0f, side * 2.7f);
         Shader shader = Shader.Find("Universal Render Pipeline/Unlit");

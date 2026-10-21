@@ -110,7 +110,7 @@ public sealed class StaffFacilityNode : MonoBehaviour
 [DisallowMultipleComponent]
 public sealed class StaffFacilitySystem : MonoBehaviour
 {
-    private static readonly Vector3 MapExit = new Vector3(0f, 0f, -5.2f);
+    private static readonly Vector3 MapExit = HotelFloorPlan.Entrance;
     private static StaffFacilitySystem _instance;
 
     private readonly Dictionary<int, StaffFacilityNode> _supportByFloor = new Dictionary<int, StaffFacilityNode>();
@@ -281,7 +281,7 @@ public sealed class StaffFacilitySystem : MonoBehaviour
                 StaffFacilityKind.FloorSupport,
                 floor == 1 ? "LINEN" : "HSK LOUNGE / LINEN",
                 anchor,
-                floor == 1 ? new Vector3(1.3f, 0.1f, 1.6f) : new Vector3(2.6f, 0.1f, 2.0f),
+                new Vector3(3.2f, 0.1f, 2.2f),
                 new Color(0.33f, 0.42f, 0.31f));
             _supportByFloor[floor] = node;
         }
@@ -393,7 +393,7 @@ public sealed class StaffFacilitySystem : MonoBehaviour
         if (_dayController == null || _dayController.Clock.CurrentHour < 10f || _dayController.Clock.DayEndReached) return;
 
         _nextGuestVisit = Time.time + Random.Range(18f, 32f);
-        var guest = GuestAgent.Spawn(new Vector3(0f, 0f, -4.8f), "toilet guest");
+        var guest = GuestAgent.Spawn(HotelFloorPlan.Entrance + Vector3.forward*.4f, "toilet guest");
         guest.TravelTo(PublicToilet.Anchor, () => BeginGuestToiletUse(guest));
     }
 

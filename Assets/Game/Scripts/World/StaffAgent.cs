@@ -268,7 +268,7 @@ public class StaffAgent : MonoBehaviour
         HasDelayMark = false;
         SetVisible(true);
 
-        Vector3 entry = _facilities != null ? _facilities.ExitPoint : new Vector3(0f, 0f, -5.2f);
+        Vector3 entry = _facilities != null ? _facilities.ExitPoint : HotelFloorPlan.Entrance;
         if (_agent != null && _agent.enabled && _agent.isOnNavMesh
             && NavMesh.SamplePosition(entry, out NavMeshHit entryHit, 2.5f, NavMesh.AllAreas))
             _agent.Warp(entryHit.position);
@@ -282,9 +282,10 @@ public class StaffAgent : MonoBehaviour
     private void CompleteArrival()
     {
         _shiftState = StaffShiftState.OnDuty;
-        if (Member.Role == StaffRole.Housekeeper && _facilities != null && _facilities.Kitchen != null)
+        if (Member.Role == StaffRole.Housekeeper && _facilities != null)
         {
-            StartRoutineTravel(_facilities.Kitchen.Anchor, RoutineTravelPurpose.Restock);
+            // Housekeeping supplies belong in the guest-floor linen room, not the restaurant kitchen.
+            StartRoutineTravel(_facilities.SupportAnchorForFloor(Mathf.Clamp(CurrentFloor,1,2),GetInstanceID()), RoutineTravelPurpose.Restock);
             return;
         }
 
@@ -296,7 +297,7 @@ public class StaffAgent : MonoBehaviour
         _facilities?.ReleaseToilet(this);
         _shiftState = StaffShiftState.LeavingMap;
         _activityState = StaffActivityState.Leaving;
-        Vector3 exit = _facilities != null ? _facilities.ExitPoint : new Vector3(0f, 0f, -5.2f);
+        Vector3 exit = _facilities != null ? _facilities.ExitPoint : HotelFloorPlan.Entrance;
         StartRoutineTravel(exit, RoutineTravelPurpose.Exit);
     }
 
@@ -544,6 +545,8 @@ public class StaffAgent : MonoBehaviour
         _state = AgentState.Idle;
         _activityState = StaffRoutineLogic.DefaultActivityFor(Member.Role);
         _nextRoutineAt = Time.time + RandomRange(5f, 10f);
+        // A longer return trip must not immediately send the worker on another personal break.
+        _nextPersonalNeedAt = Time.time + StaffRoutineLogic.NextPersonalNeedDelaySeconds(Member.Role, _rng);
         ResetAgentPath();
     }
 

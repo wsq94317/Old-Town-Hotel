@@ -12,7 +12,7 @@ public class ComplaintInteraction : MonoBehaviour
     [SerializeField] private StaffAgentSpawner spawner;
     [SerializeField] private ManagerController manager;
     [SerializeField] private Vector3 complaintPoint = new Vector3(-0.9f, 0f, 2.2f); // 前台另一侧
-    [SerializeField] private Vector3 doorPoint = new Vector3(0f, 0f, -5.2f);
+    private Vector3 doorPoint => HotelFloorPlan.Entrance;
     [SerializeField] private int rngSeed = 777;
 
     private System.Random _rng;

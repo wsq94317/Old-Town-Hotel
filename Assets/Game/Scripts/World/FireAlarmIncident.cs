@@ -159,7 +159,7 @@ public class FireAlarmIncident : MonoBehaviour
             {
                 var s = _smoker;
                 _smoker = null;
-                s.ExitVia(new Vector3(0f, 0f, -5.2f), () => Destroy(s.gameObject)); // 打出大门
+                s.ExitVia(HotelFloorPlan.Entrance, () => Destroy(s.gameObject)); // 打出大门
             }
             _room.SetState(Room2DState.Dirty); // 人走房脏（烟味）
             ManagerReputation.Add(1);

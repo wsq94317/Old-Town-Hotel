@@ -21,7 +21,7 @@ namespace OldTownHotel.Tests.PlayMode
         [UnityTest]
         public IEnumerator TexturedRoomFurnitureAndFoldedCurtainsSurviveSceneLoading()
         {
-            var rig=Object.FindFirstObjectByType<ManagerCameraRig>();rig.FocusOnPoint(new Vector3(7.5f,4,4),true);
+            var rig=Object.FindFirstObjectByType<ManagerCameraRig>();rig.FocusOnPoint(HotelFloorPlan.Room(204).Centre,true);
             yield return new WaitForSecondsRealtime(.6f);
             var room=Object.FindObjectsByType<RoomSceneBinder>(FindObjectsSortMode.None).First(x=>x.RoomNumber==204);
             var furniture=room.transform.Find("Furniture").GetComponentsInChildren<MeshRenderer>();
@@ -39,7 +39,7 @@ namespace OldTownHotel.Tests.PlayMode
             yield return new WaitForSecondsRealtime(.5f);
             var lobbyLights=Object.FindObjectsByType<Light>(FindObjectsSortMode.None).Where(x=>x.type==LightType.Spot&&x.enabled).ToArray();
             Assert.That(lobbyLights.Length,Is.InRange(1,8));
-            rig.FocusOnPoint(new Vector3(7.5f,4,4),true);yield return new WaitForSecondsRealtime(.5f);
+            rig.FocusOnPoint(HotelFloorPlan.Room(204).Centre,true);yield return new WaitForSecondsRealtime(.5f);
             var floor=GameObject.Find("World/Floor2").transform;
             var roomLights=Object.FindObjectsByType<Light>(FindObjectsSortMode.None).Where(x=>x.type==LightType.Spot&&x.enabled).ToArray();
             Assert.That(roomLights.Length,Is.InRange(1,8));

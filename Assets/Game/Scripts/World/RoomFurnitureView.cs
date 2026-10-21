@@ -25,7 +25,7 @@ public class RoomFurnitureView : MonoBehaviour
     public void ConfigureRoomNumber(int number)
     {
         roomNumber = number;
-        _doorOnPositiveZ = transform.localPosition.z < 0f;
+        _doorOnPositiveZ = HotelFloorPlan.LocalDoorSide(transform)>0;
     }
 
     private void OnEnable()
@@ -33,7 +33,7 @@ public class RoomFurnitureView : MonoBehaviour
         var preview = transform.Find("RevivalFurniturePreview");
         if (Application.isPlaying && preview != null) preview.gameObject.SetActive(false);
         if (roomNumber <= 0) roomNumber = RoomSceneBinder.ParseRoomNumber(gameObject.name);
-        _doorOnPositiveZ = transform.localPosition.z < 0f;
+        _doorOnPositiveZ = HotelFloorPlan.LocalDoorSide(transform)>0;
         EnsureRoot();
         _refreshTimer = 0f;
     }

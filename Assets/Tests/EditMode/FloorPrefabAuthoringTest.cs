@@ -37,8 +37,8 @@ public class FloorPrefabAuthoringTest
     {
         GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(Paths[guestFloorIndex]);
         Assert.That(prefab, Is.Not.Null);
-        Assert.That(prefab.GetComponentsInChildren<RoomSceneBinder>(true).Length, Is.EqualTo(12));
-        Assert.That(prefab.GetComponentsInChildren<RoomDoor>(true).Length, Is.EqualTo(12));
+        Assert.That(prefab.GetComponentsInChildren<RoomSceneBinder>(true).Length, Is.EqualTo(50));
+        Assert.That(prefab.GetComponentsInChildren<RoomDoor>(true).Length, Is.EqualTo(50));
     }
 }
 #endif

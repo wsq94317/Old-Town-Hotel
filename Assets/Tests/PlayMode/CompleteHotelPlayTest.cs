@@ -34,7 +34,7 @@ namespace OldTownHotel.Tests.PlayMode
             Assert.That(bridge.Rooms.Count, Is.EqualTo(100));
             Assert.That(Object.FindObjectsByType<RoomSceneBinder>(FindObjectsInactive.Include,FindObjectsSortMode.None)
                 .Select(x=>x.RoomNumber).Distinct().Count(), Is.EqualTo(100));
-            Assert.That(NavMesh.SamplePosition(new Vector3(-110,4,0),out _,.75f,NavMesh.AllAreas), Is.True);
+            Assert.That(NavMesh.SamplePosition(HotelFloorPlan.Room(250).Door-HotelFloorPlan.Room(250).Outward,out _,.75f,NavMesh.AllAreas), Is.True);
             foreach(var actor in Object.FindObjectsByType<StaffAgent>(FindObjectsSortMode.None))
                 {
                     var art=actor.GetComponentInChildren<HotelCharacterArt>();
@@ -115,7 +115,7 @@ namespace OldTownHotel.Tests.PlayMode
             int cash=sim.Cash,stock=sim.Materials.Stock;
             Assert.That(sim.TryExpandWarehouse(out var reason),Is.True,reason);
             Assert.That(cash-sim.Cash,Is.EqualTo(1500));
-            Object.FindFirstObjectByType<ManagerCameraRig>().FocusOnPoint(new Vector3(-8.3f,0,4.8f),true);
+            Object.FindFirstObjectByType<ManagerCameraRig>().FocusOnPoint(new Vector3(-35,0,-16),true);
             yield return null;
             var view=Object.FindFirstObjectByType<WarehouseWorldView>(FindObjectsInactive.Include);
             int shelves=0;
@@ -140,7 +140,7 @@ namespace OldTownHotel.Tests.PlayMode
             int cash = sim.Cash;
             Assert.That(sim.TryStartReclaim(ReclaimPlanKind.Refit,new[]{room},out var reason),Is.True,reason);
             Assert.That(cash-sim.Cash,Is.EqualTo(sim.QuoteReclaim(ReclaimPlanKind.Refit,1)));
-            Object.FindFirstObjectByType<ManagerCameraRig>().FocusOnPoint(new Vector3(-22.5f,4,4),true);
+            Object.FindFirstObjectByType<ManagerCameraRig>().FocusOnPoint(HotelFloorPlan.Room(213).Centre,true);
             yield return new WaitForSeconds(.3f);
             var binder = Object.FindObjectsByType<RoomSceneBinder>(FindObjectsInactive.Include,FindObjectsSortMode.None).First(x=>x.RoomNumber==room);
             Assert.That(binder.transform.Find("ConstructionFeedback").gameObject.activeSelf,Is.True);

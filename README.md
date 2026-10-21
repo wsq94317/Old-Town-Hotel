@@ -4,7 +4,7 @@
 
 ![Unity](https://img.shields.io/badge/Unity-6000.3-black?logo=unity)
 ![C%23](https://img.shields.io/badge/C%23-90%2B%20scripts-239120?logo=csharp&logoColor=white)
-![Tests](https://img.shields.io/badge/EditMode%20tests-796%20passing-6A9F5C)
+![Tests](https://img.shields.io/badge/EditMode%20tests-802%20passing-6A9F5C)
 ![Platform](https://img.shields.io/badge/target-mobile%20portrait-C99A4A)
 
 <sub>Solo portfolio project by **Percy Wu**. The mechanics are real hotel-operations domain knowledge — front desk, housekeeping, room turnover, RevPAR-style economics — turned into a warm, fun-first management game. See the [changelog](CHANGELOG.md) for development history.</sub>
@@ -17,6 +17,24 @@
 
 ## 🎮 The game
 
+
+### Courtyard hotel layout — 22 October 2026
+
+The hotel is now an **86 × 40 building with four guest wings and two open courtyards**. Every storey uses the same structural footprint and aligned lift shaft. Each guest floor has four 12-room wings (A–D) and two garden-end rooms; consecutive room numbers face each other across a short corridor. Both outer galleries connect the north and south wings, providing loops instead of one 125-metre dead end.
+
+The ground floor occupies the same building: reception and lifts sit in the central hall, with separate reading/lounge, café seating, group/luggage waiting and staff/storage wings. Linen rooms on both guest floors occupy enclosed service alcoves beside the central hall, clear of the through routes. The material warehouse and staff break room now sit in the southwest service wing. Shared ground-level gardens remain visible through the upper light wells.
+
+**Room Navigation / 房间导航** is a spatial floor plan with courtyard, hall and linen landmarks. Its targets match the actual room positions; **Camera → Floor Overview / 镜头 → 整层俯瞰** shows the complete floor. Room identities, furniture and construction progress stay intact, and earlier camera/manager coordinates migrate onto the new circulation routes.
+
+| Ground-floor plan | Guest-floor plan |
+|:---:|:---:|
+| ![Ground floor](Assets/Screenshots/courtyard-lobby-plan.png) | ![Guest floor](Assets/Screenshots/courtyard-guest-plan.png) |
+
+| Spatial room navigation | Linen room off the corridor |
+|:---:|:---:|
+| ![Navigation](Assets/Screenshots/courtyard-navigation.png) | ![Linen room](Assets/Screenshots/courtyard-linen.png) |
+
+Validation: 802 EditMode, 28 PlayMode and 480 simulation tests pass, including every room entry/interior path, both linen approaches, light-well safety, aligned floor plates and physical housekeeping in the new wings. A live 6× review restored sellable stock from 3 to 5 rooms and reached the next morning with the source save files unchanged.
 
 ### Director controls and free camera — 22 October 2026
 

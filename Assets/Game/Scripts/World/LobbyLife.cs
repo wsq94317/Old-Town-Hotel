@@ -127,7 +127,7 @@ public class LobbyLife : MonoBehaviour
             if (guest != null)
             {
                 var leavingGuest = guest;
-                leavingGuest.ExitVia(new Vector3(0f, 0f, -5.2f), () =>
+                leavingGuest.ExitVia(HotelFloorPlan.Entrance, () =>
                 {
                     if (leavingGuest != null) Destroy(leavingGuest.gameObject);
                 });

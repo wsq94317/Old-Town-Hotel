@@ -19,7 +19,7 @@ public class ManagerCameraRig : MonoBehaviour
     public float Yaw=>_yaw;
     public float Pitch=>_pitch;
     public float Zoom=>_zoom;
-    public const float MinimumZoom=3.5f, MaximumZoom=24f;
+    public const float MinimumZoom=3.5f, MaximumZoom=68f;
     private void Awake()
     {
         _cam=GetComponent<Camera>();
@@ -76,6 +76,7 @@ public class ManagerCameraRig : MonoBehaviour
         _focusPoint=ClampFocus(_focusPoint+(right*direction.x+forward*direction.y)*(_zoom*.9f*seconds));EndFreeLook();
     }
     public void SetOverhead(bool overhead) { _pitch=overhead ? 80 : 50;_followingTarget=false; }
+    public void ViewEntireFloor() { _yaw=90;_pitch=82;_followingTarget=false;SetZoom(62);FocusOnPoint(new Vector3(0,FloorMath.BaseYFor(ViewedFloor),0),true); }
     public void ResetView() { _yaw=45;_pitch=50;SetZoom(7.5f);_followingTarget=false; }
     public void ViewFloor(int floor)
     {
@@ -135,8 +136,7 @@ public class ManagerCameraRig : MonoBehaviour
     }
     private Vector3 ClampFocus(Vector3 focus)
     {
-        bool guest=ViewedFloor==1||ViewedFloor==2;
-        focus.x=Mathf.Clamp(focus.x,guest ? worldMinXZ.x : Mathf.Max(-11,worldMinXZ.x),guest ? worldMaxXZ.x : Mathf.Min(11,worldMaxXZ.x));
+        focus.x=Mathf.Clamp(focus.x,worldMinXZ.x,worldMaxXZ.x);
         focus.z=Mathf.Clamp(focus.z,worldMinXZ.y,worldMaxXZ.y);return focus;
     }
 }

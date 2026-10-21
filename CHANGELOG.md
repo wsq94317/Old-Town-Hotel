@@ -4,6 +4,16 @@ All notable changes to **Old Town Hotel** are documented here, newest first.
 
 ---
 
+## 2026-10-22 — Courtyard hotel floor plan
+
+- Replaced the 125-metre strip with four 12-room wings and two garden-end rooms on each guest floor, connected by central and outer circulation loops.
+- Aligned all seven 86 × 40 floor plates, lift shafts and structural columns; added genuine upper light wells and shared ground-level courtyard gardens.
+- Expanded the ground floor with distinct reception, reading/lounge, café seating, group waiting and southwest staff/storage zones. Moved linen facilities into enclosed alcoves outside the through corridors.
+- Rebuilt room/door/decor transforms, navigation and editable floor prefabs. Made door-side presentation and furniture independent of world-axis position.
+- Replaced the room grid with a spatial navigation map, added whole-floor camera overview and migrated legacy manager/camera positions without changing hotel economics or room identities.
+- Directed housekeeping replenishment to the guest-floor linen room and restarted personal-break timing after returning to the post, avoiding repeated break trips after longer journeys.
+- Passed 802 EditMode, 28 PlayMode and 480 simulation tests, including all room paths, linen approaches, courtyard voids and physical room cleaning.
+
 ## 2026-10-22 — Director experience
 
 - Made remote hotel direction the default: select whole rooms, inspect staff across floors and prioritize cleaning/inspection without walking the manager to every action. Kept personal movement as a separate Walk mode.

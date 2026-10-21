@@ -49,7 +49,7 @@ public sealed partial class WorldManagementHud
         AddSceneCameraButton("RotateRight",L("45° ↷","右转 45°"),1,0,()=>_sceneRig?.OrbitBy(45));
         AddSceneCameraButton("ZoomIn",L("ZOOM +","放大 +"),0,1,()=>_sceneRig?.ZoomBy(-1.25f));
         AddSceneCameraButton("ZoomOut",L("ZOOM −","缩小 −"),1,1,()=>_sceneRig?.ZoomBy(1.25f));
-        AddSceneCameraButton("OverheadView",L("TOP VIEW","俯视 / 斜视"),0,2,()=>{if(_sceneRig!=null)_sceneRig.SetOverhead(_sceneRig.Pitch<70);});
+        AddSceneCameraButton("OverheadView",L("FLOOR OVERVIEW","整层俯瞰"),0,2,()=>{if(_sceneRig!=null){_sceneRig.ViewEntireFloor();CloseScenePanels();}});
         AddSceneCameraButton("ResetView",L("RESET","恢复构图"),1,2,()=>_sceneRig?.ResetView());
         AddSceneCameraButton("LocateManager",L("MANAGER","定位经理"),0,3,()=>{_sceneRig?.ReturnToTarget();CloseScenePanels();});
         AddSceneCameraButton("HideCameraControls",L("DONE","收起"),1,3,CloseScenePanels);
@@ -84,30 +84,55 @@ public sealed partial class WorldManagementHud
     {
         _sceneNavigator=CreatePanel("RoomNavigationOverlay",_safeRoot,RevivalPaper);
         SetAnchors(_sceneNavigator,Vector2.zero,Vector2.one,new Vector2(10,88),new Vector2(-10,-176));
-        _sceneNavigatorTitle=CreateText("Title",_sceneNavigator,19,RevivalInk,TextAlignmentOptions.MidlineLeft,true);
+        _sceneNavigatorTitle=CreateText("Title",_sceneNavigator,17,RevivalInk,TextAlignmentOptions.MidlineLeft,true);
         SetAnchors(_sceneNavigatorTitle.rectTransform,Vector2.up,Vector2.one,new Vector2(12,-39),new Vector2(-50,-7));
         RectTransform rect;TextMeshProUGUI label;
         CreateButton("CloseRoomNavigator",_sceneNavigator,out rect,out label,"",Walnut,CloseScenePanels);
         SetAnchors(rect,Vector2.one,Vector2.one,new Vector2(-40,-39),new Vector2(-8,-7));AddCloseGlyph(rect);label.gameObject.SetActive(false);
         var hint=CreateText("Legend",_sceneNavigator,10,Slate,TextAlignmentOptions.MidlineLeft,false);
-        hint.text=L("Tap a room to fly there · green ready / gold service / dark ruins","点击房间直达现场 · 绿：可售　金：待服务　深色：破败");
-        SetAnchors(hint.rectTransform,Vector2.up,Vector2.one,new Vector2(12,-65),new Vector2(-10,-40));
-        var grid=CreateRect("Rooms",_sceneNavigator);
-        SetAnchors(grid,Vector2.zero,Vector2.one,new Vector2(10,10),new Vector2(-10,-70));
-        var layout=grid.gameObject.AddComponent<GridLayoutGroup>();layout.constraint=GridLayoutGroup.Constraint.FixedColumnCount;layout.constraintCount=5;
-        layout.spacing=new Vector2(5,5);layout.childAlignment=TextAnchor.UpperCenter;
-        grid.gameObject.AddComponent<HotelResponsiveRoomGrid>();
+        hint.text=L("Actual floor plan · tap a room · N →","真实楼层平面 · 点击房间直达 · 北 →");
+        SetAnchors(hint.rectTransform,Vector2.up,Vector2.one,new Vector2(12,-63),new Vector2(-10,-40));
+        var map=CreatePanel("SpatialFloorPlan",_sceneNavigator,new Color(.79f,.76f,.65f));
+        SetAnchors(map,Vector2.zero,Vector2.one,new Vector2(12,13),new Vector2(-12,-70));
+        AddPlanBlock(map,"Core",Vector3.zero,new Vector2(20,40),new Color(.89f,.85f,.72f));
+        foreach(int side in new[]{-1,1}) {
+            AddPlanBlock(map,"Courtyard",new Vector3(side*22.5f,0,0),new Vector2(25,11),new Color(.58f,.69f,.54f));
+            AddPlanCaption(map,side<0?L("WEST GARDEN","西庭院"):L("EAST GARDEN","东庭院"),new Vector3(side*22.5f,0,0),10);
+            AddPlanBlock(map,"EndGallery",new Vector3(side*41,0,0),new Vector2(2,27),new Color(.94f,.90f,.77f));
+            foreach(int z in new[]{-1,1})AddPlanBlock(map,"WingCorridor",new Vector3(side*25,0,z*12),new Vector2(32,2.4f),new Color(.94f,.90f,.77f));
+        }
+        AddPlanCaption(map,L("LIFTS / HALL","电梯 / 中央厅"),new Vector3(0,0,0),10);
+        AddPlanCaption(map,L("LINEN","布草间"),HotelFloorPlan.Linen,8);
         for(int i=1;i<=50;i++) {
             int offset=i;
-            var button=CreateButton("NavigateRoom_"+i,grid,out rect,out label,"",Teal,()=>{
+            var button=CreateButton("NavigateRoom_"+i,map,out rect,out label,"",Teal,()=>{
                 if(_sceneRig==null)return;
                 int room=(_sceneRig.ViewedFloor+1)*100+offset;
                 CloseScenePanels();SelectRoom(room);FocusRoom(room);_sceneRig.SetZoom(6.2f);
             });
-            label.fontSize=12;label.textWrappingMode=TextWrappingModes.Normal;label.enableAutoSizing=true;label.fontSizeMin=8;label.fontSizeMax=12;
+            var point=HotelFloorPlan.MapPoint(HotelFloorPlan.Room(200+i).Centre);
+            rect.anchorMin=point-new Vector2(2.35f/HotelFloorPlan.Depth,2.35f/HotelFloorPlan.Width);
+            rect.anchorMax=point+new Vector2(2.35f/HotelFloorPlan.Depth,2.35f/HotelFloorPlan.Width);
+            rect.offsetMin=Vector2.one;rect.offsetMax=-Vector2.one;
+            Stretch(label.rectTransform,1);
+            label.fontSize=11;label.textWrappingMode=TextWrappingModes.Normal;label.enableAutoSizing=false;
+            label.overflowMode=TextOverflowModes.Overflow;
             _sceneRoomButtons.Add(i,button);
         }
         _sceneNavigator.gameObject.SetActive(false);
+    }
+    private void AddPlanBlock(RectTransform map,string name,Vector3 centre,Vector2 size,Color colour)
+    {
+        var block=CreatePanel(name,map,colour);var point=HotelFloorPlan.MapPoint(centre);
+        block.anchorMin=point-new Vector2(size.y/HotelFloorPlan.Depth,size.x/HotelFloorPlan.Width)*.5f;
+        block.anchorMax=point+new Vector2(size.y/HotelFloorPlan.Depth,size.x/HotelFloorPlan.Width)*.5f;
+        block.offsetMin=block.offsetMax=Vector2.zero;block.GetComponent<Image>().raycastTarget=false;
+    }
+    private void AddPlanCaption(RectTransform map,string text,Vector3 centre,int size)
+    {
+        var label=CreateText("PlanLabel",map,size,RevivalInk,TextAlignmentOptions.Center,true);label.text=text;
+        var point=HotelFloorPlan.MapPoint(centre);label.rectTransform.anchorMin=label.rectTransform.anchorMax=point;
+        label.rectTransform.sizeDelta=new Vector2(90,24);label.rectTransform.anchoredPosition=Vector2.zero;
     }
     private void ToggleScenePanel(RectTransform panel)
     {
@@ -136,7 +161,7 @@ public sealed partial class WorldManagementHud
     }
     private static string SceneFloorName(int floor)
     {
-        string[] names=GameText.UseChinese ? new[]{"大堂","客房 · 东西翼","客房 · 新翼","餐厅","健身房","赌场","泳池"}
+        string[] names=GameText.UseChinese ? new[]{"大堂 / 庭院","客房 · 四翼","客房 · 四翼","餐厅","健身房","赌场","泳池"}
             : new[]{"Lobby","Guest rooms","Upper rooms","Restaurant","Gym","Casino","Pool"};
         return (floor+1)+"F · "+names[Mathf.Clamp(floor,0,names.Length-1)];
     }
@@ -160,7 +185,7 @@ public sealed partial class WorldManagementHud
             long states=17;for(int i=1;i<=50;i++){int n=(floor+1)*100+i;if(Sim.Rooms.Contains(n))states=unchecked(states*31+(int)Sim.Rooms.At(n).state);}
             string key=floor+"|"+states+"|"+Sim.Rooms.OpenRoomCount+"|"+Sim.Renovations.RoomsUnderRenovation+"|"+ServicePriorityRevision;
             if(key==_sceneNavigationKey)return;_sceneNavigationKey=key;
-            _sceneNavigatorTitle.text=SceneFloorName(floor)+L(" / ROOMS"," / 房间导航");
+            _sceneNavigatorTitle.text=SceneFloorName(floor)+L(" / PLAN"," / 楼层平面");
             foreach(var pair in _sceneRoomButtons) {
                 int number=(floor+1)*100+pair.Key;var button=pair.Value;
                 bool exists=Sim.Rooms.Contains(number);button.interactable=exists;if(!exists)continue;

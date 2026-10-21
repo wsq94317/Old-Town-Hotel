@@ -25,7 +25,7 @@ public static class HotelArtDirection
         }
         if(room.Find("RevivalArchitecture")!=null)return;
         var root=HotelCharacterArt.Joint(room,"RevivalArchitecture",Vector3.zero);
-        float back=room.localPosition.z>=0?1:-1;
+        float back=-HotelFloorPlan.LocalDoorSide(room);
         // The cutaway keeps the corridor open and frames the room with tactile woodwork.
         B(root,"OakFloor",new Vector3(0,.018f,0),new Vector3(4.78f,.035f,4.8f),"#AF8A5D");
         for(int i=0;i<9;i++)B(root,"FloorboardSeam",new Vector3(-2.13f+i*.53f,.039f,0),new Vector3(.018f,.009f,4.8f),"#8B6949");

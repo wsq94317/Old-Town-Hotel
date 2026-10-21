@@ -1,460 +1,87 @@
-using System;
 using System.Collections.Generic;
 using Unity.AI.Navigation;
 using UnityEngine;
-using UnityEngine.SceneManagement;
 
-/// <summary>
-/// Adds the derelict west guest wing before gameplay systems discover rooms.
-/// The extension is runtime-only, so rebuilding navigation never overwrites the
-/// checked-in NavMesh asset or hand-authored scene changes.
-/// </summary>
+/// <summary>Preserves the room ledger while materializing the shared courtyard floor plan.</summary>
 public static class HotelSceneExpansion
 {
-    public const int ExpandedRoomCount = 100;
-    public const int StartingDerelictRooms = 92;
-
-    private const float WestEdge = -115f;
-    private const float EastEdge = 10f;
-    private const float ShellCenterX = -52.5f;
-    private const float ShellWidth = 125f;
-    private const float RoomRowZ = 4f;
-    private const float DoorRowZ = 1.5f;
-    private const float NorthSouthEdge = 6.5f;
-    private const float ShellDepth = 13f;
-
-    private readonly struct RoomSpec
-    {
-        public readonly int Number;
-        public readonly int Floor;
-        public readonly float X;
-        public readonly float Z;
-
-        public RoomSpec(int number, int floor, float x, float z)
-        {
-            Number = number;
-            Floor = floor;
-            X = x;
-            Z = z;
-        }
-    }
-
-    private static readonly RoomSpec[] OriginalAddedRooms =
-    {
-        new RoomSpec(209, 2, -12.5f, RoomRowZ),
-        new RoomSpec(210, 2, -17.5f, RoomRowZ),
-        new RoomSpec(211, 2, -12.5f, -RoomRowZ),
-        new RoomSpec(212, 2, -17.5f, -RoomRowZ),
-        new RoomSpec(305, 3, -12.5f, RoomRowZ),
-        new RoomSpec(306, 3, -17.5f, RoomRowZ),
-        new RoomSpec(307, 3, -17.5f, -RoomRowZ),
-        new RoomSpec(308, 3, -12.5f, -RoomRowZ),
-        new RoomSpec(309, 3, -7.5f, -RoomRowZ),
-        new RoomSpec(310, 3, -2.5f, -RoomRowZ),
-        new RoomSpec(311, 3, 2.5f, -RoomRowZ),
-        new RoomSpec(312, 3, 7.5f, -RoomRowZ)
-    };
-
-    private static readonly RoomSpec[] AddedRooms = BuildAddedRooms();
-    private static RoomSpec[] BuildAddedRooms()
-    {
-        var rooms = new List<RoomSpec>(OriginalAddedRooms);
-        for (int floor = 2; floor <= 3; floor++)
-            for (int n = 13; n <= 50; n++)
-                rooms.Add(new RoomSpec(floor * 100 + n, floor,
-                    -22.5f - ((n - 13) / 2) * 5f, n % 2 == 1 ? RoomRowZ : -RoomRowZ));
-        return rooms.ToArray();
-    }
-
+    public const int ExpandedRoomCount=100, StartingDerelictRooms=92;
     internal static void Install()
     {
-        HotelSimSceneBridge bridge = UnityEngine.Object.FindFirstObjectByType<HotelSimSceneBridge>();
-        if (bridge == null) return;
-
-        Scene scene = SceneManager.GetActiveScene();
-        Transform world = FindRoot(scene, "World");
-        Transform roomData = FindRoot(scene, "RoomData");
-        if (world == null || roomData == null) return;
-        if (FindRoomEntity(350) != null) return;
-
-        Transform floor2 = world.Find("Floor2");
-        Transform floor3 = world.Find("Floor3");
-        if (floor2 == null || floor3 == null) return;
-
-        ExpandGuestFloorShell(floor2);
-        ExpandGuestFloorShell(floor3);
-        WidenExistingRoomData(roomData);
-
-        for (int i = 0; i < AddedRooms.Length; i++)
-            AddRoom(AddedRooms[i], floor2, floor3, roomData);
-
-        RebindDoors(floor2);
-        RebindDoors(floor3);
-        bridge.SetDerelictRoomsAtStart(StartingDerelictRooms);
-
-        ManagerCameraRig cameraRig = UnityEngine.Object.FindFirstObjectByType<ManagerCameraRig>();
-        if (cameraRig != null)
-            cameraRig.SetWorldBounds(new Vector2(-113.5f, -5.2f), new Vector2(8.5f, 5.2f));
-
-        RefreshRoomConsumers();
-        RebuildRuntimeNavigation(world);
-        Debug.Log(
-            $"[HotelExpansion] Guest wings expanded to {ExpandedRoomCount} rooms. " +
-            $"Opening stock remains 8 rooms; {StartingDerelictRooms} require reclamation.");
-    }
-
-    /// <summary>
-    /// Materializes the complete guest-floor shell for prefab authoring. Room
-    /// simulation entities remain runtime-owned; visible rooms and doors are
-    /// stable prefab content that artists can edit outside Play Mode.
-    /// </summary>
-    public static void EnsureEditableGuestFloorVisuals(Transform floor2, Transform floor3)
-    {
-        if (floor2 == null || floor3 == null) return;
-
-        ExpandGuestFloorShell(floor2);
-        ExpandGuestFloorShell(floor3);
-        for (int i = 0; i < AddedRooms.Length; i++)
-            EnsureRoomVisual(AddedRooms[i], floor2, floor3, null);
-
-        RebindEditableDoorInteriors(floor2);
-        RebindEditableDoorInteriors(floor3);
-    }
-
-    private static void AddRoom(
-        RoomSpec spec,
-        Transform floor2,
-        Transform floor3,
-        Transform roomData)
-    {
-        Room2DEntity entitySource = FindRoomEntity(spec.Floor == 2 ? 201 : 301);
-        if (entitySource == null) return;
-
-        GameObject entityObject = UnityEngine.Object.Instantiate(
-            entitySource.gameObject, roomData, false);
-        entityObject.name = "Room_" + spec.Number + "_Anchor";
-        entityObject.transform.position = new Vector3(
-            spec.X,
-            FloorMath.BaseYFor(spec.Floor - 1),
-            spec.Z);
-        Room2DEntity entity = entityObject.GetComponent<Room2DEntity>();
-        entity.SetIdentity(spec.Floor, spec.Number);
-        if (spec.Number % 100 > 12) {
-            int mix = (spec.Number % 100 - 1) % 6;
-            entity.roomCategory = mix < 3 ? Room2DRoomCategory.Single : mix < 5 ? Room2DRoomCategory.Twin : Room2DRoomCategory.Family;
-        }
-        entity.SetState(Room2DState.Ready);
-
-        EnsureRoomVisual(spec, floor2, floor3, entity);
-    }
-
-    private static void EnsureRoomVisual(
-        RoomSpec spec,
-        Transform floor2,
-        Transform floor3,
-        Room2DEntity entity)
-    {
-        Transform floor = spec.Floor == 2 ? floor2 : floor3;
-        bool north = spec.Z > 0f;
-        Transform visualSource = north
-            ? floor.Find(spec.Floor == 2 ? "Room_201" : "Room_301")
-            : floor2.Find("Room_205");
-        Transform doorSource = north
-            ? floor.Find(spec.Floor == 2 ? "Door_201" : "Door_301")
-            : floor2.Find("Door_205");
-        if (visualSource == null || doorSource == null) return;
-
-        Transform roomTransform = floor.Find("Room_" + spec.Number);
-        GameObject roomObject;
-        if (roomTransform == null)
-        {
-            roomObject = UnityEngine.Object.Instantiate(visualSource.gameObject, floor, false);
-            roomObject.name = "Room_" + spec.Number;
-        }
-        else
-        {
-            roomObject = roomTransform.gameObject;
-        }
-        roomObject.transform.localPosition = new Vector3(spec.X, 0f, spec.Z);
-        RoomSceneBinder binder = roomObject.GetComponent<RoomSceneBinder>();
-        if (binder != null) binder.ConfigureRoomNumber(spec.Number);
-        RoomFurnitureView furniture = roomObject.GetComponent<RoomFurnitureView>();
-        if (furniture != null) furniture.ConfigureRoomNumber(spec.Number);
-
-        Transform doorTransform = floor.Find("Door_" + spec.Number);
-        GameObject doorObject;
-        if (doorTransform == null)
-        {
-            doorObject = UnityEngine.Object.Instantiate(doorSource.gameObject, floor, false);
-            doorObject.name = "Door_" + spec.Number;
-        }
-        else
-        {
-            doorObject = doorTransform.gameObject;
-        }
-        doorObject.transform.localPosition = new Vector3(
-            spec.X, 0f, north ? DoorRowZ : -DoorRowZ);
-        RoomDoor door = doorObject.GetComponent<RoomDoor>();
-        if (door != null) door.Configure(entity, roomObject.transform.position);
-
-        AddRoomDecor(floor, spec.Number, spec.X, north);
-    }
-
-    private static void ExpandGuestFloorShell(Transform floor)
-    {
-        SetLocalXAndWidth(floor.Find("Ground"), ShellCenterX, ShellWidth);
-        SetLocalZAndDepth(floor.Find("Ground"), 0f, ShellDepth);
-        SetLocalXAndWidth(floor.Find("Wall_N"), ShellCenterX, ShellWidth);
-        SetLocalXAndWidth(floor.Find("Wall_S"), ShellCenterX, ShellWidth);
-        SetLocalZ(floor.Find("Wall_N"), NorthSouthEdge);
-        SetLocalZ(floor.Find("Wall_S"), -NorthSouthEdge);
-        SetLocalX(floor.Find("Wall_W"), WestEdge);
-        SetLocalX(floor.Find("Wall_E"), EastEdge);
-        SetLocalZAndDepth(floor.Find("Wall_W"), 0f, ShellDepth);
-        SetLocalZAndDepth(floor.Find("Wall_E"), 0f, ShellDepth);
-        WidenExistingVisualRooms(floor);
-
-        Transform support = floor.Find(
-            floor.name == "Floor2" ? "Floor2HskSupportAnchor" : "Floor3HskSupportAnchor");
-        if (support != null) SetLocalX(support, -18.3f);
-        Transform facility = floor.Find("Facility_FloorSupport");
-        if (facility != null) SetLocalX(facility, -18.3f);
-
-        Transform art = floor.Find("ArtPass_LowPoly");
-        if (art == null) return;
-
-        SetLocalXAndWidth(art.Find("CutawayTrim_S"), ShellCenterX, ShellWidth - .28f);
-        SetLocalZ(art.Find("CutawayTrim_S"), -6.36f);
-        SetLocalX(art.Find("CutawayTrim_W"), WestEdge + .14f);
-        SetLocalZAndDepth(art.Find("CutawayTrim_W"), 0f, 12.7f);
-        SetLocalXAndWidth(art.Find("CorridorRunner"), ShellCenterX - .35f, ShellWidth - 2.8f);
-        SetLocalZAndDepth(art.Find("CorridorRunner"), 0f, 2.22f);
-        WidenExistingDecor(art);
-
-        foreach (Transform child in art)
-        {
-            if (!child.name.StartsWith("BrassInlay", StringComparison.Ordinal)) continue;
-            SetLocalZ(child, -6.43f);
-        }
-
-        Transform cart = art.Find("HousekeepingCart");
-        if (cart != null) SetLocalX(cart, -18.65f);
-
-        AddBrassInlay(art, -15.6f, "BrassInlay_W2");
-        AddBrassInlay(art, -11.7f, "BrassInlay_W1");
-    }
-
-    private static void AddRoomDecor(Transform floor, int number, float x, bool north)
-    {
-        Transform art = floor.Find("ArtPass_LowPoly");
-        if (art == null) return;
-
-        Transform frameSource = FindFirstNamed(art, "Frame_");
-        Transform lampSource = FindFirstNamed(art, "WallLamp");
-        Transform plaqueSource = FindFirstNamed(art, "RoomPlaque");
-        if (frameSource == null || lampSource == null || plaqueSource == null) return;
-
-        Transform frame = art.Find("Frame_" + number);
-        if (frame == null)
-        {
-            frame = UnityEngine.Object.Instantiate(frameSource, art, false);
-            frame.name = "Frame_" + number;
-        }
-        frame.localPosition = new Vector3(x, 0f, north ? DoorRowZ : -DoorRowZ);
-        frame.localRotation = Quaternion.Euler(0f, north ? 0f : 180f, 0f);
-
-        Transform lamp = art.Find("WallLamp_" + number);
-        if (lamp == null)
-        {
-            lamp = UnityEngine.Object.Instantiate(lampSource, art, false);
-            lamp.name = "WallLamp_" + number;
-        }
-        lamp.localPosition = new Vector3(
-            x + 1.65f, 0.82f, north ? DoorRowZ - 0.05f : -DoorRowZ + 0.05f);
-        lamp.localRotation = Quaternion.Euler(0f, north ? 0f : 180f, 0f);
-
-        Transform plaque = art.Find("RoomPlaque_" + number);
-        if (plaque == null)
-        {
-            plaque = UnityEngine.Object.Instantiate(plaqueSource, art, false);
-            plaque.name = "RoomPlaque_" + number;
-        }
-        plaque.localPosition = new Vector3(
-            x + 1.24f, 0f, north ? DoorRowZ - 0.06f : -DoorRowZ + 0.06f);
-        plaque.localRotation = Quaternion.Euler(0f, north ? 0f : 180f, 0f);
-    }
-
-    private static void RebindEditableDoorInteriors(Transform floor)
-    {
-        RoomDoor[] doors = floor.GetComponentsInChildren<RoomDoor>(true);
-        for (int i = 0; i < doors.Length; i++)
-        {
-            RoomDoor door = doors[i];
-            int number = RoomSceneBinder.ParseRoomNumber(door.name);
-            Transform roomTransform = floor.Find("Room_" + number);
-            if (roomTransform != null) door.Configure(null, roomTransform.position);
-        }
-    }
-
-    private static void AddBrassInlay(Transform art, float x, string name)
-    {
-        if (art.Find(name) != null) return;
-        Transform source = art.Find("BrassInlay_0");
-        if (source == null) return;
-        Transform clone = UnityEngine.Object.Instantiate(source, art, false);
-        clone.name = name;
-        SetLocalX(clone, x);
-    }
-
-    private static void WidenExistingVisualRooms(Transform floor)
-    {
-        foreach (Transform child in floor)
-        {
-            if (child.GetComponent<RoomSceneBinder>() != null)
-            {
-                SetLocalZ(child, child.localPosition.z >= 0f ? RoomRowZ : -RoomRowZ);
-                continue;
+        var bridge=Object.FindFirstObjectByType<HotelSimSceneBridge>();
+        var world=GameObject.Find("World");var data=GameObject.Find("RoomData");
+        if(bridge==null||world==null||data==null)return;
+        EnsureEditableGuestFloorVisuals(world.transform.Find("Floor2"),world.transform.Find("Floor3"));
+        var entities=new Dictionary<int,Room2DEntity>();
+        foreach(var entity in data.GetComponentsInChildren<Room2DEntity>(true))entities[entity.roomNumber]=entity;
+        foreach(int floor in new[]{2,3})for(int n=1;n<=50;n++){
+            int number=floor*100+n;
+            if(!entities.TryGetValue(number,out var entity)){
+                var clone=Object.Instantiate(entities[floor*100+1].gameObject,data.transform,false);
+                clone.name="Room_"+number+"_Anchor";entity=clone.GetComponent<Room2DEntity>();
+                entity.SetIdentity(floor,number);entity.SetState(Room2DState.Ready);
+                if(n>12){int mix=(n-1)%6;entity.roomCategory=mix<3?Room2DRoomCategory.Single:mix<5?Room2DRoomCategory.Twin:Room2DRoomCategory.Family;}
+                entities[number]=entity;
             }
-
-            if (child.GetComponent<RoomDoor>() != null)
-                SetLocalZ(child, child.localPosition.z >= 0f ? DoorRowZ : -DoorRowZ);
+            entity.transform.position=HotelFloorPlan.Room(number).Centre;
+            var root=world.transform.Find("Floor"+floor);
+            root.Find("Door_"+number).GetComponent<RoomDoor>().Configure(entity,entity.transform.position);
+        }
+        bridge.SetDerelictRoomsAtStart(StartingDerelictRooms);
+        var rig=Object.FindFirstObjectByType<ManagerCameraRig>();if(rig!=null)rig.SetWorldBounds(HotelFloorPlan.Min,HotelFloorPlan.Max);
+        var demand=Object.FindFirstObjectByType<Room2DPrototypeDemandLoop>();if(demand!=null)demand.FindRoomsInScene();
+        var overview=Object.FindFirstObjectByType<Room2DOverview>();if(overview!=null)overview.FindRoomsInScene();
+        RebuildNavigation(world.transform);
+        Debug.Log("[HotelExpansion] Courtyard hotel: 100 rooms, four wings per guest floor, aligned 86 x 40 floor plates. Opening stock remains 8 rooms; 92 require reclamation.");
+    }
+    public static void EnsureEditableGuestFloorVisuals(Transform floor2,Transform floor3)
+    {
+        if(floor2==null||floor3==null)return;
+        foreach(var floor in new[]{floor2,floor3}){
+            int prefix=floor==floor2?200:300;
+            var roomSource=floor2.Find("Room_201");var doorSource=floor2.Find("Door_201");var art=floor.Find("ArtPass_LowPoly");
+            for(int n=1;n<=50;n++){
+                int number=prefix+n;var pose=HotelFloorPlan.Room(number);var room=floor.Find("Room_"+number);
+                if(room==null){room=Object.Instantiate(roomSource,floor,false);room.name="Room_"+number;}
+                float localBack=-HotelFloorPlan.LocalDoorSide(room);
+                room.position=pose.Centre;room.rotation=Quaternion.LookRotation(pose.Outward*localBack);
+                room.GetComponent<RoomSceneBinder>().ConfigureRoomNumber(number);
+                var furniture=room.GetComponent<RoomFurnitureView>();if(furniture!=null)furniture.ConfigureRoomNumber(number);
+                var door=floor.Find("Door_"+number);
+                if(door==null){door=Object.Instantiate(doorSource,floor,false);door.name="Door_"+number;}
+                door.position=pose.Door;door.rotation=room.rotation;
+                var component=door.GetComponent<RoomDoor>();component.Configure(null,pose.Centre);component.RefreshDoorVisuals();
+                var dark=door.Find("Darkness");if(dark!=null){dark.position=pose.Centre+Vector3.up*.07f;dark.rotation=Quaternion.Euler(90,0,0);}
+                if(art!=null)PlaceDoorDecor(art,number,pose);
+            }
+            // The original eight-room strip used unnamed lamps and plaques. Keeping them
+            // would leave a second row of fittings floating across the new central hall.
+            if(art!=null){
+                var obsolete=new List<Transform>();
+                foreach(Transform child in art)if(child.name=="WallLamp"||child.name=="RoomPlaque")obsolete.Add(child);
+                foreach(var child in obsolete){child.gameObject.SetActive(false);if(Application.isPlaying)Object.Destroy(child.gameObject);else Object.DestroyImmediate(child.gameObject);}
+            }
+        }
+        HotelBuildingLayout.Apply(floor2.parent);
+    }
+    private static void PlaceDoorDecor(Transform art,int number,HotelFloorPlan.RoomPose pose)
+    {
+        var direction=Quaternion.LookRotation(pose.Outward);
+        foreach(string prefix in new[]{"Frame_","WallLamp_","RoomPlaque_"}){
+            var target=art.Find(prefix+number);Transform source=art.Find(prefix+"201");
+            if(source==null)foreach(Transform child in art)if(child.name.StartsWith(prefix)){source=child;break;}
+            if(target==null&&source!=null){target=Object.Instantiate(source,art,false);target.name=prefix+number;}
+            if(target==null)continue;
+            Vector3 offset=prefix=="Frame_"?Vector3.zero:prefix=="WallLamp_"?new Vector3(1.65f,.82f,-.05f):new Vector3(1.24f,0,-.06f);
+            target.position=pose.Door+direction*offset;target.rotation=direction;
         }
     }
-
-    private static void WidenExistingRoomData(Transform roomData)
+    public static void RebuildNavigation(Transform world)
     {
-        Room2DEntity[] rooms = roomData.GetComponentsInChildren<Room2DEntity>(true);
-        for (int i = 0; i < rooms.Length; i++)
-        {
-            Room2DEntity room = rooms[i];
-            if (room == null || (room.floorNumber != 2 && room.floorNumber != 3)) continue;
-            Vector3 position = room.transform.position;
-            position.z = position.z >= 0f ? RoomRowZ : -RoomRowZ;
-            room.transform.position = position;
-        }
-    }
-
-    private static void RebindDoors(Transform floor)
-    {
-        RoomDoor[] doors = floor.GetComponentsInChildren<RoomDoor>(true);
-        for (int i = 0; i < doors.Length; i++)
-        {
-            RoomDoor door = doors[i];
-            int number = RoomSceneBinder.ParseRoomNumber(door.name);
-            Room2DEntity entity = FindRoomEntity(number);
-            Transform room = floor.Find("Room_" + number);
-            if (entity != null && room != null)
-                door.Configure(entity, room.position);
-        }
-    }
-
-    private static void WidenExistingDecor(Transform art)
-    {
-        foreach (Transform child in art)
-        {
-            if (child.name.StartsWith("Frame_", StringComparison.Ordinal))
-                SetLocalZ(child, child.localPosition.z >= 0f ? DoorRowZ : -DoorRowZ);
-            else if (child.name.StartsWith("WallLamp", StringComparison.Ordinal))
-                SetLocalZ(child, child.localPosition.z >= 0f
-                    ? DoorRowZ - 0.05f
-                    : -DoorRowZ + 0.05f);
-            else if (child.name.StartsWith("RoomPlaque", StringComparison.Ordinal))
-                SetLocalZ(child, child.localPosition.z >= 0f
-                    ? DoorRowZ - 0.06f
-                    : -DoorRowZ + 0.06f);
-        }
-    }
-
-    private static void RefreshRoomConsumers()
-    {
-        Room2DPrototypeDemandLoop demand =
-            UnityEngine.Object.FindFirstObjectByType<Room2DPrototypeDemandLoop>();
-        if (demand != null) demand.FindRoomsInScene();
-
-        Room2DOverview overview = UnityEngine.Object.FindFirstObjectByType<Room2DOverview>();
-        if (overview != null) overview.FindRoomsInScene();
-    }
-
-    private static void RebuildRuntimeNavigation(Transform world)
-    {
-        NavMeshSurface surface = world.GetComponentInChildren<NavMeshSurface>(true);
-        if (surface == null) return;
-
-        var activeStates = new List<KeyValuePair<GameObject, bool>>();
-        foreach (Transform child in world)
-        {
-            if (!child.name.StartsWith("Floor", StringComparison.Ordinal)) continue;
-            activeStates.Add(new KeyValuePair<GameObject, bool>(
-                child.gameObject, child.gameObject.activeSelf));
-            child.gameObject.SetActive(true);
-        }
-
-        surface.size = new Vector3(140f, 35f, 20f);
-        surface.center = new Vector3(ShellCenterX, 12f, 0f);
-        surface.BuildNavMesh();
-
-        for (int i = 0; i < activeStates.Count; i++)
-            activeStates[i].Key.SetActive(activeStates[i].Value);
-    }
-
-    private static Room2DEntity FindRoomEntity(int roomNumber)
-    {
-        Room2DEntity[] rooms = UnityEngine.Object.FindObjectsByType<Room2DEntity>(
-            FindObjectsInactive.Include,
-            FindObjectsSortMode.None);
-        for (int i = 0; i < rooms.Length; i++)
-            if (rooms[i] != null && rooms[i].roomNumber == roomNumber)
-                return rooms[i];
-        return null;
-    }
-
-    private static Transform FindRoot(Scene scene, string name)
-    {
-        GameObject[] roots = scene.GetRootGameObjects();
-        for (int i = 0; i < roots.Length; i++)
-            if (roots[i].name == name) return roots[i].transform;
-        return null;
-    }
-
-    private static Transform FindFirstNamed(Transform parent, string prefix)
-    {
-        foreach (Transform child in parent)
-            if (child.name.StartsWith(prefix, StringComparison.Ordinal))
-                return child;
-        return null;
-    }
-
-    private static void SetLocalX(Transform target, float x)
-    {
-        if (target == null) return;
-        Vector3 position = target.localPosition;
-        position.x = x;
-        target.localPosition = position;
-    }
-
-    private static void SetLocalXAndWidth(Transform target, float x, float width)
-    {
-        if (target == null) return;
-        SetLocalX(target, x);
-        Vector3 scale = target.localScale;
-        scale.x = width;
-        target.localScale = scale;
-    }
-
-    private static void SetLocalZ(Transform target, float z)
-    {
-        if (target == null) return;
-        Vector3 position = target.localPosition;
-        position.z = z;
-        target.localPosition = position;
-    }
-
-    private static void SetLocalZAndDepth(Transform target, float z, float depth)
-    {
-        if (target == null) return;
-        SetLocalZ(target, z);
-        Vector3 scale = target.localScale;
-        scale.z = depth;
-        target.localScale = scale;
+        var surface=world.GetComponentInChildren<NavMeshSurface>(true);if(surface==null)return;
+        var states=new List<KeyValuePair<GameObject,bool>>();
+        foreach(Transform floor in world)if(floor.name.StartsWith("Floor")){states.Add(new KeyValuePair<GameObject,bool>(floor.gameObject,floor.gameObject.activeSelf));floor.gameObject.SetActive(true);}
+        surface.size=new Vector3(92,35,46);surface.center=new Vector3(0,12,0);surface.BuildNavMesh();
+        foreach(var pair in states)pair.Key.SetActive(pair.Value);
     }
 }

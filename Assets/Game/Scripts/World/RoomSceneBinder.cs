@@ -115,12 +115,13 @@ public partial class RoomSceneBinder : MonoBehaviour
             quad.transform.SetParent(transform, worldPositionStays: false);
             // 贴在走廊那一侧的地面上（房间 5×5，走廊边在本地 z=±2.5）。
             // 用房间自己的 z 符号决定朝哪边——205-208 的朝向是镜像的。
-            float corridorSide = transform.localPosition.z >= 0f ? -1f : 1f;
+            float corridorSide = HotelFloorPlan.LocalDoorSide(transform);
             quad.transform.localPosition = new Vector3(0f, 0.06f, corridorSide * 2.15f);
             quad.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
             quad.transform.localScale = new Vector3(2.6f, 0.55f, 1f);
             existing = quad.transform;
         }
+        existing.localPosition = new Vector3(0f, .06f, HotelFloorPlan.LocalDoorSide(transform)*2.15f);
         _stateChip = existing.GetComponent<Renderer>();
         _chipBaseScale = existing.localScale;
 
@@ -141,7 +142,7 @@ public partial class RoomSceneBinder : MonoBehaviour
         var existing = GetComponent<BoxCollider>();
         if (existing == null) existing = gameObject.AddComponent<BoxCollider>();
         existing.size = TapBoxSize;
-        float corridorSide = transform.localPosition.z >= 0f ? -1f : 1f;
+        float corridorSide = HotelFloorPlan.LocalDoorSide(transform);
         existing.center = new Vector3(
             0f,
             TapBoxSize.y * 0.5f,
@@ -152,6 +153,7 @@ public partial class RoomSceneBinder : MonoBehaviour
         var modifier = GetComponent<NavMeshModifier>();
         if (modifier == null) modifier = gameObject.AddComponent<NavMeshModifier>();
         modifier.ignoreFromBuild = true;
+        modifier.applyToChildren = false;
     }
 
     /// <summary>

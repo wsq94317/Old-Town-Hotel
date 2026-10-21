@@ -14,7 +14,7 @@ public sealed class HotelLightingDirector : MonoBehaviour
         if(existing==null)existing=new GameObject("HotelInteriorLighting").AddComponent<HotelLightingDirector>();
         foreach(var binder in Object.FindObjectsByType<RoomSceneBinder>(FindObjectsInactive.Include,FindObjectsSortMode.None)){
             if(binder.transform.Find("InteriorFixtures")!=null)continue;
-            var root=HotelCharacterArt.Joint(binder.transform,"InteriorFixtures",Vector3.zero);float side=binder.transform.localPosition.z>=0?1:-1;
+            var root=HotelCharacterArt.Joint(binder.transform,"InteriorFixtures",Vector3.zero);float side=-HotelFloorPlan.LocalDoorSide(binder.transform);
             AddSpot(root,"WindowDaylight",new Vector3(.3f,2.35f,side*2.08f),new Vector3(-.4f,.1f,-side*.3f),new Color(.86f,.93f,1),9f,6,83,true);
             AddSpot(root,"BedsideWarmLight",new Vector3(-1.7f,1.08f,side*1.25f),new Vector3(-1.7f,0,side*1.25f),new Color(1,.63f,.29f),2.4f,2.8f,115,false);
         }

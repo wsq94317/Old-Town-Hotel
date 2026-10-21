@@ -20,7 +20,7 @@ public sealed class HotelAdaptiveCutaway : MonoBehaviour
         _walls.Clear();
         foreach(var room in FindObjectsByType<RoomSceneBinder>(FindObjectsInactive.Include,FindObjectsSortMode.None))
             foreach(var renderer in room.GetComponentsInChildren<MeshRenderer>(true))
-                if(WindowGroups.Contains(renderer.name)) _walls.Add(new Wall {Renderer=renderer,Normal=room.transform.position.z>=0 ? Vector3.forward : Vector3.back});
+                if(WindowGroups.Contains(renderer.name)) _walls.Add(new Wall {Renderer=renderer,Normal=room.transform.TransformDirection(Vector3.forward*-HotelFloorPlan.LocalDoorSide(room.transform))});
         var world=GameObject.Find("World"); if(world==null)return;
         foreach(var renderer in world.GetComponentsInChildren<MeshRenderer>(true)) {
             Vector3 normal=renderer.name=="Wall_N" ? Vector3.forward : renderer.name=="Wall_S" ? Vector3.back

@@ -116,6 +116,7 @@ public sealed class SaveCoordinator : MonoBehaviour
     {
         var gs = new GameState();
         gs.presentation = HotelSessionState.Current;
+        gs.presentation.layoutRevision = HotelFloorPlan.Revision;
         FindFirstObjectByType<ManagerCameraRig>()?.CaptureView(gs.presentation);
         var manager = FindFirstObjectByType<ManagerController>();
         if (manager != null) {
@@ -188,6 +189,18 @@ public sealed class SaveCoordinator : MonoBehaviour
         if (gs == null) return;
         _lastLoaded = gs;
         HotelSessionState.Current = gs.presentation ?? new HotelPresentationState();
+        var presentation=HotelSessionState.Current;
+        if(presentation.layoutRevision<HotelFloorPlan.Revision) {
+            if(presentation.hasManagerPosition) {
+                var point=HotelFloorPlan.MigrateLegacyPoint(new Vector3(presentation.managerX,presentation.managerY,presentation.managerZ));
+                presentation.managerX=point.x;presentation.managerY=point.y;presentation.managerZ=point.z;
+            }
+            if(presentation.hasCameraView) {
+                var point=HotelFloorPlan.MigrateLegacyPoint(new Vector3(presentation.cameraX,presentation.cameraY,presentation.cameraZ));
+                presentation.cameraX=point.x;presentation.cameraY=point.y;presentation.cameraZ=point.z;
+            }
+            presentation.layoutRevision=HotelFloorPlan.Revision;
+        }
         if (HotelSessionState.Current.hasManagerPosition) {
             var manager = FindFirstObjectByType<ManagerController>();
             manager?.TryRestorePosition(new Vector3(gs.presentation.managerX, gs.presentation.managerY, gs.presentation.managerZ));

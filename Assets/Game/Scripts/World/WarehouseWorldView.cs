@@ -12,7 +12,7 @@ public sealed class WarehouseWorldView : MonoBehaviour
         var world = GameObject.Find("World"); var floor = world != null ? world.transform.Find("Floor1") : null;
         if (floor == null || floor.Find("MaterialsWarehouse") != null) return;
         var root = new GameObject("MaterialsWarehouse"); root.transform.SetParent(floor,false);
-        root.transform.localPosition = new Vector3(-8.3f,0,4.8f); root.AddComponent<WarehouseWorldView>();
+        root.transform.localPosition = new Vector3(-35f,0,-16f); root.AddComponent<WarehouseWorldView>();
     }
 
     private void Awake()

@@ -33,8 +33,8 @@ public static class HotelFloorPrefabExporter
     private static readonly FloorSpec[] Floors =
     {
         new FloorSpec(1, "Floor1", "Floor1", "Lobby and staff facilities"),
-        new FloorSpec(2, "Floor2", "Floor2", "Guest rooms 201-212"),
-        new FloorSpec(3, "Floor3", "Floor3", "Guest rooms 301-312"),
+        new FloorSpec(2, "Floor2", "Floor2", "Courtyard guest wings 201-250"),
+        new FloorSpec(3, "Floor3", "Floor3", "Courtyard guest wings 301-350"),
         new FloorSpec(4, "Floor4", "Floor4", "Restaurant and kitchen"),
         new FloorSpec(5, "Floor5", "Floor5", "Gym"),
         new FloorSpec(6, "Floor6", "Floor6", "Casino"),
@@ -119,6 +119,7 @@ public static class HotelFloorPrefabExporter
         }
 
         int exported = 0;
+        var garden=world.Find("CourtyardGround");if(garden!=null)EnsurePortableRendererMaterials(garden,0);
         for (int i = 0; i < Floors.Length; i++)
         {
             Transform floor = world.Find(Floors[i].RootName);
@@ -216,13 +217,13 @@ public static class HotelFloorPrefabExporter
 
             if (spec.Number == 2 || spec.Number == 3)
             {
-                const int expectedRooms = 12;
+                const int expectedRooms = 50;
                 int roomCount = prefab.GetComponentsInChildren<RoomSceneBinder>(true).Length;
                 int doorCount = prefab.GetComponentsInChildren<RoomDoor>(true).Length;
                 if (roomCount != expectedRooms)
-                    errors.Add(spec.AssetPath + " has " + roomCount + " room binders; expected 12");
+                    errors.Add(spec.AssetPath + " has " + roomCount + " room binders; expected 50");
                 if (doorCount != expectedRooms)
-                    errors.Add(spec.AssetPath + " has " + doorCount + " room doors; expected 12");
+                    errors.Add(spec.AssetPath + " has " + doorCount + " room doors; expected 50");
             }
         }
 
@@ -319,6 +320,17 @@ public static class HotelFloorPrefabExporter
     private static void EnsurePortableRendererMaterials(Transform floorRoot, int floorNumber)
     {
         EnsureFolder(PortableMaterialFolder);
+        string meshFolder="Assets/Game/Materials/FloorMaps/ArchitecturalMeshes";
+        foreach(var filter in floorRoot.GetComponentsInChildren<MeshFilter>(true)) {
+            var mesh=filter.sharedMesh;
+            if(mesh==null||!string.IsNullOrEmpty(AssetDatabase.GetAssetPath(mesh)))continue;
+            EnsureFolder(meshFolder);
+            string path=meshFolder+"/Mesh_"+Hash128.Compute(mesh.name+"|"+mesh.vertexCount)+".asset";
+            var saved=AssetDatabase.LoadAssetAtPath<Mesh>(path);
+            if(saved==null){saved=UnityEngine.Object.Instantiate(mesh);AssetDatabase.CreateAsset(saved,path);}
+            filter.sharedMesh=saved;
+            var collider=filter.GetComponent<MeshCollider>();if(collider!=null&&collider.sharedMesh==mesh)collider.sharedMesh=saved;
+        }
         Renderer[] renderers = floorRoot.GetComponentsInChildren<Renderer>(true);
         for (int rendererIndex = 0; rendererIndex < renderers.Length; rendererIndex++)
         {

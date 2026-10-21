@@ -204,7 +204,7 @@ namespace OldTownHotel.Tests.EditMode
             Assert.That(_targetObject.transform.position,Is.EqualTo(manager));
         }
         [TestCase(-100,3.5f)]
-        [TestCase(100,24)]
+        [TestCase(100,68)]
         [TestCase(6,6)]
         public void ZoomStaysWithinPlayableLimits(float requested,float expected)
         { _rig.SetZoom(requested);Assert.That(_rig.Zoom,Is.EqualTo(expected)); }

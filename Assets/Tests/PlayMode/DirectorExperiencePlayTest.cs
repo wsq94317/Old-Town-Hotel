@@ -50,7 +50,7 @@ namespace OldTownHotel.Tests.PlayMode
             typeof(WorldManagementHud).GetField("_sessionInitialized",Private).SetValue(_hud,true);
             Hud("CloseSessionMenu");HotelSimSceneBridge.Instance.IsSuspended=true;RoomSelection.Clear();
             Object.FindFirstObjectByType<WorldInputController>().SetDirectorMode(true);
-            _rig=Object.FindFirstObjectByType<ManagerCameraRig>();_rig.FocusOnPoint(new Vector3(-7.5f,4,4),true);
+            _rig=Object.FindFirstObjectByType<ManagerCameraRig>();_rig.FocusOnPoint(HotelFloorPlan.Room(201).Centre,true);
             yield return null;Hud("RefreshSceneControls");
         }
         [UnityTearDown]
@@ -70,7 +70,7 @@ namespace OldTownHotel.Tests.PlayMode
             var cam=_rig.GetComponent<Camera>();
             foreach(float angle in new[]{0f,90f,180f,270f}) {
                 _rig.OrbitBy(Mathf.DeltaAngle(_rig.Yaw,angle));yield return new WaitForSecondsRealtime(.15f);
-                var point=new Vector3(-7.5f,4,4);
+                var point=HotelFloorPlan.Room(201).Centre;
                 Assert.That(WorldInputController.TryFindDirectorRoom(cam.ScreenPointToRay(cam.WorldToScreenPoint(point)),1,out var room),Is.True);
                 Assert.That(room.RoomNumber,Is.EqualTo(201));
             }
@@ -95,7 +95,7 @@ namespace OldTownHotel.Tests.PlayMode
             Assert.That(hits[0].gameObject.GetComponentInParent<Button>(),Is.SameAs(button));
             button.onClick.Invoke();yield return null;
             Assert.That(RoomSelection.Selected,Is.EqualTo(250));
-            Assert.That(_rig.FocusPoint.x,Is.LessThan(-100));Assert.That(_rig.Zoom,Is.EqualTo(6.2f));
+            Assert.That(Vector3.Distance(_rig.FocusPoint,HotelFloorPlan.Room(250).Centre),Is.LessThan(.1f));Assert.That(_rig.Zoom,Is.EqualTo(6.2f));
             Assert.That(navigator.gameObject.activeSelf,Is.False);
         }
 

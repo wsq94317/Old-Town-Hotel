@@ -14,7 +14,7 @@ using UnityEngine;
 public class GuestFlowVisualizer : MonoBehaviour
 {
     [SerializeField] private Room2DPrototypeDemandLoop demandLoop;
-    [SerializeField] private Vector3 doorPoint = new Vector3(0f, 0f, -5.2f);
+    private Vector3 doorPoint => HotelFloorPlan.Entrance;
     [SerializeField] private Vector3 deskQueuePoint = new Vector3(0.9f, 0f, 2.2f);
 
     private GuestAgent _waitingGuest;      // 当前在前台排队的可视化客人
