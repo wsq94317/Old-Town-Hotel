@@ -65,6 +65,8 @@ public class GuestLifeDirector : MonoBehaviour
 
     private void Update()
     {
+        var worldHost = HotelSimSceneBridge.Instance;
+        if (worldHost != null && (worldHost.IsSuspended || worldHost.AwaitingMorningReport)) return;
         var bridge = HotelSimSceneBridge.Instance;
         if (bridge == null || bridge.Sim == null) return;
         // 晨报期间世界冻结，别让客人在报告后面继续走

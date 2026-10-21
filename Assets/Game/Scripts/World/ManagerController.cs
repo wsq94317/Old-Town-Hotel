@@ -20,8 +20,20 @@ public class ManagerController : MonoBehaviour
 
     private void Awake()
     {
+        if (GetComponent<AgentFloorVisibility>() == null) gameObject.AddComponent<AgentFloorVisibility>();
         _agent = GetComponent<NavMeshAgent>();
         _path = new NavMeshPath();
+    }
+
+    public bool TryRestorePosition(Vector3 saved)
+    {
+        EnsureRuntimeReferences();
+        if (_agent == null || !_agent.enabled || !NavMesh.SamplePosition(saved, out NavMeshHit hit, .75f, _agent.areaMask)
+            || Mathf.Abs(hit.position.y - saved.y) > .75f) return false;
+        if (!_agent.Warp(hit.position)) return false;
+        _agent.ResetPath();
+        FindFirstObjectByType<ManagerCameraRig>()?.ReturnToTarget(true);
+        return true;
     }
 
     public void MoveTo(Vector3 worldPos)
@@ -32,6 +44,8 @@ public class ManagerController : MonoBehaviour
     public bool TryMoveTo(Vector3 worldPos, out Vector3 resolvedDestination)
     {
         resolvedDestination = ProjectToCurrentFloor(worldPos, transform.position.y);
+        if (FloorMath.FloorIndexForY(worldPos.y) != FloorMath.FloorIndexForY(transform.position.y))
+            return false;
         EnsureRuntimeReferences();
         if (_agent == null || !_agent.enabled || !EnsureAgentOnNavMesh())
         {
@@ -72,6 +86,7 @@ public class ManagerController : MonoBehaviour
         Vector3 resolved,
         float maxDistance)
     {
+        if (Mathf.Abs(requested.y - resolved.y) > Mathf.Max(0f, maxDistance)) return false;
         requested.y = 0f;
         resolved.y = 0f;
         return Vector3.Distance(requested, resolved) <= Mathf.Max(0f, maxDistance);

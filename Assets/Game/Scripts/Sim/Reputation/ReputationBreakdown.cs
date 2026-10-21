@@ -24,7 +24,9 @@ public enum ReputationCause
     OverbookingUpgraded,// 超售客升级安顿（正面）
     NightDeskClosed,    // 夜里到店发现前台没人（比"没来"更伤：人家真到了门口）
     NightDeskSaved,     // 夜班前台通宵接住了客人（正面）
-    GuestInjured        // 家具塌了压伤客人（送医 + 赔偿）
+    GuestInjured,       // 家具塌了压伤客人（送医 + 赔偿）
+    FacilityComfort = 100,
+
 }
 
 public sealed class ReputationBreakdown
@@ -116,6 +118,7 @@ public sealed class ReputationBreakdown
     {
         switch (cause)
         {
+            case ReputationCause.FacilityComfort: return "Facilities matched the guest";
             case ReputationCause.PriceExpectation: return "Priced above market";
             case ReputationCause.BandVsDelivered: return "What you promised vs delivered";
             case ReputationCause.SegmentStandards: return "Guests' own standards";

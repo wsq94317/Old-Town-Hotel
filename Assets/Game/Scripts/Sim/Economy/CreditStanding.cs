@@ -129,10 +129,10 @@ public sealed class CreditStanding
         PaidToday = false;
     }
 
-    public void Restore(int score, int missedPayments)
+    public void Restore(int score, int missedPayments, bool paidToday = false)
     {
         Score = SimMath.Clamp(score, 0, CreditPolicy.MaxScore);
         MissedPayments = missedPayments < 0 ? 0 : missedPayments;
-        PaidToday = false;
+        PaidToday = paidToday;
     }
 }

@@ -93,16 +93,7 @@ public class StaffAgentSpawner : MonoBehaviour
         cap.radius = 0.35f;
         cap.center = new Vector3(0f, 0.8f, 0f);
 
-        var quad = GameObject.CreatePrimitive(PrimitiveType.Quad);
-        Destroy(quad.GetComponent<Collider>());
-        quad.name = "Visual";
-        quad.transform.SetParent(go.transform);
-        quad.transform.localPosition = new Vector3(0f, 0.8f, 0f);
-        var quadRenderer = quad.GetComponent<Renderer>();
-        quad.transform.localScale = new Vector3(0.7f, 1.5f, 1f);
-        if (!GeneratedPlaceholderArt.ApplyStaffSprite(quad.transform, quadRenderer, member.Role))
-            quadRenderer.sharedMaterial = MaterialFor(member.Role);
-        quad.AddComponent<BillboardSprite>();
+        HotelCharacterArt.Create(go.transform, member.Role, false, _agents.Count);
 
         var label = new GameObject("Label");
         label.transform.SetParent(go.transform, false);
@@ -113,6 +104,7 @@ public class StaffAgentSpawner : MonoBehaviour
         agent.Init(member, new System.Random(_agents.Count * 7919 + 12345));
         agent.SetIdleAnchor(idleAnchor);
         go.AddComponent<AgentFloorVisibility>();
+        go.AddComponent<WorkerTaskFeedback>();
 
         _agents.Add(agent);
         _byMember[member] = go;
@@ -388,8 +380,8 @@ public static class GeneratedPlaceholderArt
             case StaffRole.Reception:
                 spriteName = "staff_reception";
                 break;
-            default:
-                return false;
+            case StaffRole.Manager: spriteName = "staff_manager"; break;
+            default: return false;
         }
 
         return ApplySpriteToQuad(quadTransform, renderer, LoadWorldSprite(spriteName), 1.75f);
@@ -468,7 +460,8 @@ public static class GeneratedPlaceholderArt
         string key = sprite.name;
         if (MaterialCache.TryGetValue(key, out Material cached) && cached != null) return cached;
 
-        Shader shader = Shader.Find("Sprites/Default");
+        Shader shader = Shader.Find("OldTownHotel/Paper");
+        if (shader == null) shader = Shader.Find("Sprites/Default");
         if (shader == null) shader = Shader.Find("Universal Render Pipeline/Unlit");
         if (shader == null) shader = Shader.Find("Unlit/Transparent");
         if (shader == null) shader = Shader.Find("Standard");
@@ -487,6 +480,14 @@ public static class GeneratedPlaceholderArt
         if (SpriteCache.TryGetValue(path, out Sprite cached)) return cached;
 
         var sprite = Resources.Load<Sprite>(path);
+        if (sprite == null)
+        {
+            var texture = Resources.Load<Texture2D>(path);
+            if (texture != null) {
+                sprite = Sprite.Create(texture, new Rect(0, 0, texture.width, texture.height), new Vector2(.5f, .5f), 100f);
+                sprite.name = path;
+            }
+        }
         SpriteCache[path] = sprite;
         return sprite;
     }

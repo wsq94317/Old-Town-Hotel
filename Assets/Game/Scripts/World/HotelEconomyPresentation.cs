@@ -31,13 +31,15 @@ public readonly struct HotelEconomySnapshot
 
 public static class HotelEconomyPresentation
 {
+    // A stable rate normalisation unit, NOT wall-clock duration. UI converts all
+    // rates back to an operating day; acceleration never changes investment value.
     public const float RealMinutesPerGameDay = 120f;
     public const float DefaultOccupancy = 0.72f;
 
     public static HotelEconomySnapshot Build(
         HotelSim sim,
         float incidentLossPerMinute = 0f,
-        float portfolioIncomePerMinute = 0f)
+        float portfolioIncomePerMinute = 0f, int dailyInterest = 0, int dailyOperatingCosts = 0)
     {
         if (sim == null)
             return new HotelEconomySnapshot(0, 0, 100, 0f, 0f, 0f, DefaultOccupancy);
@@ -78,7 +80,7 @@ public static class HotelEconomyPresentation
             Mathf.Max(0f, portfolioIncomePerMinute) * RealMinutesPerGameDay);
         int expectedGross = expectedRoomGross + expectedPortfolioGross;
         int expectedCommission = Mathf.RoundToInt(expectedRoomGross * sim.CommissionRate);
-        int expectedNet = expectedGross - expectedCommission - wages;
+        int expectedNet = expectedGross - expectedCommission - wages - Mathf.Max(0, dailyInterest) - Mathf.Max(0, dailyOperatingCosts);
         float grossPerMinute = expectedGross / RealMinutesPerGameDay;
         float lossPerMinute = roomLoss / RealMinutesPerGameDay
                               + Mathf.Max(0f, incidentLossPerMinute);

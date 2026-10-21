@@ -1,0 +1,17 @@
+{
+  "mode": "built-in image_gen",
+  "assets": [
+    {
+      "asset": "Assets/Game/Resources/HotelArt/Surfaces/Walnut.png",
+      "prompt": "Use case: stylized-concept. Asset type: seamless tileable PBR base-color texture for 3D furniture and hotel wood paneling. A full-frame flat orthographic scan of medium-dark warm honey walnut wood, flowing elegant fine longitudinal woodgrain with occasional subtle knots, hand-finished antique hotel joinery, rich warm brown but readable midtones, tactile and detailed, refined semi-realistic game texture. Entire square is one continuous wood surface, grain runs vertically. Neutral diffuse color only, no baked lighting, no cast shadows, no perspective, no borders, no objects, no text. Must tile seamlessly on all four edges. Square 1024x1024."
+    },
+    {
+      "asset": "Assets/Game/Resources/HotelArt/Surfaces/Plaster.png",
+      "prompt": "Use case: stylized-concept. Asset type: seamless tileable PBR base-color texture for hotel plaster walls. Full-frame flat orthographic scan of aged warm ivory lime plaster, extremely subtle mineral mottling, fine pores, delicate hairline wear and softly brushed surface, elegant old European hotel, charming and maintained, refined semi-realistic game material. Low contrast warm cream ivory colors suitable for tinting sage green in a 3D shader. Entire square one continuous plaster surface. Diffuse albedo only, no directional lighting, no baked shadows, no cracks larger than a hairline, no perspective, no borders, no objects, no text. Seamless tiling on all four edges. Square 1024x1024."
+    },
+    {
+      "asset": "Assets/Game/Resources/HotelArt/Surfaces/Linen.png",
+      "prompt": "Use case: stylized-concept. Asset type: seamless tileable PBR base-color texture for upholstered sofas, curtains and bed linen in a hotel game. Full-frame flat orthographic scan of natural neutral oatmeal linen fabric, clearly legible fine woven warp and weft, subtle irregular thread thickness and tiny fibers, soft tactile textile, refined semi-realistic game material. Neutral warm light gray beige suitable for tinting teal and burgundy in a 3D material. No folds, no directional light or shadows, no perspective, no border, no object, no text. Entire square continuous cloth. Must tile seamlessly on all four edges. Square 1024x1024."
+    }
+  ]
+}

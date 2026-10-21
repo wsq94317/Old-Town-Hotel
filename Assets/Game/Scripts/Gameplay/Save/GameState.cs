@@ -83,6 +83,7 @@ public sealed class WorldState
     public bool casinoUnlocked;
     public bool poolUnlocked;
     public int hotelCount = 1;
+    public List<int> portfolioKinds = new List<int>();
     public int prestige;
     public List<TapedBreakdownEntry> tapedBreakdowns = new List<TapedBreakdownEntry>();
     public List<int> lockedRooms = new List<int>(); // 次晨自动转 Dirty
@@ -154,6 +155,7 @@ public sealed class BuildJobEntry
     public int planKind;        // RenovationPlanKind
     public int targetTier;      // RoomTier
     public int daysRemaining;
+    public int totalDays;
     public bool isReclaim;
     public int reclaimKind;     // ReclaimPlanKind
     public List<int> rooms = new List<int>();
@@ -167,6 +169,10 @@ public sealed class RoomStateEntry { public int room; public int state; }   // s
 [Serializable]
 public sealed class SimState
 {
+    public HotelJourneyState journey;
+    public int operatingStyle = 1;
+    public bool clearRuinsFirst;
+    public SimRuntimeCheckpoint runtime;
     // 时钟（离线连续时间制需要它们全部）
     public int day = 1;
     public int minute = 8 * 60;
@@ -221,6 +227,7 @@ public sealed class SimState
     public int payrollMissedPaydays;
     public int creditScore = CreditPolicy.StartingScore; // 信用 0-100
     public int creditMissedPayments;
+    public bool creditPaidToday;
     public List<JunkClearEntry> junkClearing = new List<JunkClearEntry>();   // 破败房清理进度
     public List<RoomStateEntry> roomStates = new List<RoomStateEntry>();
 }
@@ -231,13 +238,20 @@ public sealed class JunkClearEntry { public int room; public int workDone; }
 [Serializable]
 public sealed class GameState
 {
+    public HotelPresentationState presentation = new HotelPresentationState();
     // v2: + rooms（过夜占用）；v3: + world（经理模式世界层）；v4: + sim（模拟内核）
     // v5: + 家具（崭新度/健康度）、材料库存、每房挂牌档
     // v6: + 预订簿（逐单 Reservation）、故意超售档、预订视野已铺开标记
     // v7: + 在建施工单（装修/复原）与房态——以前工单和房态都会在读档时丢
     // v8: + Sim 的声誉样本（星级以前每次读档归零）；仓库容量；工资账与信用
-    // v9: per-furniture visual variant selection. Old saves naturally use variant zero.
-    public const int CurrentVersion = 9;
+    // v9: furniture visuals. v10: live checkpoints, journey, delegation and portfolio types.
+    public const int CurrentVersion = 10;
+    public DelegationReport delegationReport;
+    public bool resumeWorld;
+    public bool awaitingMorningReport;
+    public bool needsBeginDay;
+    public int lastInterestAccrued;
+    public int lastFacilityUpkeep;
 
     public int version = CurrentVersion;
     public EconomyState economy = new EconomyState();

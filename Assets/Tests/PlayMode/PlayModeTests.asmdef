@@ -3,7 +3,8 @@
     "rootNamespace": "OldTownHotel.Tests.PlayMode",
     "references": [
         "UnityEngine.TestRunner",
-        "UnityEditor.TestRunner"
+        "UnityEditor.TestRunner",
+        "OldTownHotel.Game"
     ],
     "includePlatforms": [],
     "excludePlatforms": [

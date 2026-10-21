@@ -36,7 +36,9 @@ public class TaskDispatcher : MonoBehaviour
             if (agent == null || !agent.IsIdle || agent.Member == null) continue;
             EnsureSubscribed(agent);
 
-            StaffTask? task = TaskDispatchLogic.NextTaskFor(agent.Member.Role, demandLoop.rooms, _claimed);
+            var sim = HotelSimSceneBridge.Instance != null ? HotelSimSceneBridge.Instance.Sim : null;
+            StaffTask? task = sim != null && sim.ClearRuinsFirst ? NextJunkClearingTask(agent.Member.Role) : null;
+            if (!task.HasValue) task = TaskDispatchLogic.NextTaskFor(agent.Member.Role, demandLoop.rooms, _claimed);
             // **脏房优先，清垃圾垫底**：客人在等今天的房，破败房不急一时。
             // 这就是"什么时候清破败房"的真代价——不是钱，是被挪走的工时。
             if (!task.HasValue) task = NextJunkClearingTask(agent.Member.Role);

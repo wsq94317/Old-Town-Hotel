@@ -133,6 +133,12 @@ public class Room2DDayPhaseStateMachine : MonoBehaviour
         RefreshHud(entering);
     }
 
+    public void RestorePhaseSilently(Room2DDayPhase phase)
+    {
+        _currentPhase = phase;
+        RefreshHud(phase);
+    }
+
     /// <summary>
     /// 重置到 Preparation 阶段（新一天流程用）。
     /// 先对当前阶段（若非 Ended）触发退出事件，再触发 Preparation 进入事件。

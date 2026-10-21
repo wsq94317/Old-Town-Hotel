@@ -78,14 +78,32 @@ public class Room2DDemoDayController : MonoBehaviour
     public GameClock Clock { get { EnsureClock(); return _clock; } }
 
     private float DayLengthRealSeconds => balanceConfig != null ? balanceConfig.dayLengthRealSeconds : 180f;
-    private float DayStartHour => balanceConfig != null ? balanceConfig.dayStartHour : 8f;
+    private float DayStartHour => HotelSimSceneBridge.Instance != null ? SimClock.DayStartMinute / 60f : balanceConfig != null ? balanceConfig.dayStartHour : 8f;
     private float OpenDoorsHour => balanceConfig != null ? balanceConfig.openDoorsHour : 10f;
     private float StopArrivalsHour => balanceConfig != null ? balanceConfig.stopArrivalsHour : 18f;
-    private float CloseHour => balanceConfig != null ? balanceConfig.closeHour : 22f;
+    private float CloseHour => HotelSimSceneBridge.Instance != null ? SimClock.DayEndMinute / 60f : balanceConfig != null ? balanceConfig.closeHour : 22f;
 
     private void EnsureClock()
     {
         if (_clock == null) _clock = new GameClock(DayLengthRealSeconds, DayStartHour, CloseHour);
+    }
+
+    public void RestoreOperationalClock(int day, int minute, bool report)
+    {
+        demoDayIndex = report ? Mathf.Max(1, day - 1) : day;
+        _clock = new GameClock(DayLengthRealSeconds, DayStartHour, CloseHour);
+        _clock.AdvanceGameHours((report ? CloseHour : minute / 60f) - DayStartHour);
+        _morningWaveFired = true;
+        _daySettled = report;
+        var phase = report ? Room2DDayPhaseStateMachine.Room2DDayPhase.Ended
+            : minute >= StopArrivalsHour * 60 ? Room2DDayPhaseStateMachine.Room2DDayPhase.Recovery
+            : minute >= OpenDoorsHour * 60 ? Room2DDayPhaseStateMachine.Room2DDayPhase.CheckInPeak
+            : Room2DDayPhaseStateMachine.Room2DDayPhase.Preparation;
+        if (phaseStateMachine != null) phaseStateMachine.RestorePhaseSilently(phase);
+        SetDemandRunning(!report);
+        SetAcceptingNewGuests(!report && minute >= OpenDoorsHour * 60 && minute < StopArrivalsHour * 60);
+        SetFrontDeskRunning(!report);
+        SetLoungeRunning(!report);
     }
 
     /// <summary>EditMode 测试接缝：完成 Start() 里做的事件订阅 + 时钟接线。</summary>
@@ -128,6 +146,7 @@ public class Room2DDemoDayController : MonoBehaviour
     private void Update()
     {
         FindReferencesIfNeeded();
+        if (HotelSimSceneBridge.Instance != null && HotelSimSceneBridge.Instance.IsSuspended) return;
         TickClock(Time.deltaTime);
     }
 

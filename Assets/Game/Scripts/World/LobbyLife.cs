@@ -47,6 +47,8 @@ public class LobbyLife : MonoBehaviour
 
     private void Update()
     {
+        var worldHost = HotelSimSceneBridge.Instance;
+        if (worldHost != null && (worldHost.IsSuspended || worldHost.AwaitingMorningReport)) return;
         UpdateLuggage();
         _wanderTimer -= Time.deltaTime;
         if (_wanderTimer <= 0f)

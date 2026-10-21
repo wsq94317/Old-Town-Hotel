@@ -46,6 +46,8 @@ public class FireAlarmIncident : MonoBehaviour
 
     private void Update()
     {
+        var worldHost = HotelSimSceneBridge.Instance;
+        if (worldHost != null && (worldHost.IsSuspended || worldHost.AwaitingMorningReport)) return;
         if (dayController == null) return;
         if (_rng == null) _rng = new System.Random(rngSeed); // 热重载自愈
 
@@ -225,7 +227,7 @@ public class SmokePuffs : MonoBehaviour
             _mat = new Material(Shader.Find("Universal Render Pipeline/Unlit")) { color = new Color(0.6f, 0.6f, 0.6f) };
         for (int i = 0; i < _puffs.Length; i++)
         {
-            var q = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            var q = GameObject.CreatePrimitive(PrimitiveType.Sphere);
             Destroy(q.GetComponent<Collider>());
             q.transform.SetParent(transform);
             q.transform.localScale = Vector3.one * Random.Range(0.2f, 0.4f);

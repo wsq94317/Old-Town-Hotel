@@ -64,6 +64,8 @@ public class DailyEventInteraction : MonoBehaviour
 
     private void Update()
     {
+        var worldHost = HotelSimSceneBridge.Instance;
+        if (worldHost != null && (worldHost.IsSuspended || worldHost.AwaitingMorningReport)) return;
         if (dayController == null) return;
         if (_rng == null) _rng = new System.Random(rngSeed); // 热重载自愈
 
@@ -183,20 +185,35 @@ public class DailyEventInteraction : MonoBehaviour
     private void Choose(EventOption option)
     {
         if (!_panelOpen || _activeDef == null) return; // 幂等：双通道双触发只结算一次
+        GameEffect effect = option.Effect;
+        string story = option.Story;
+        if (_activeDef.Id == "health_inspector" && _activeDef.Options.Length > 1
+            && ReferenceEquals(option, _activeDef.Options[1])) {
+            var sim = HotelSimSceneBridge.Instance != null ? HotelSimSceneBridge.Instance.Sim : null;
+            bool passed = sim != null && sim.Rooms.CountOf(RoomSimState.Blocked) == 0
+                && sim.Rooms.DirtyBacklog == 0;
+            effect = new GameEffect(0, passed ? 2 : -2, 0, passed ? 1 : 0);
+            story = passed ? "Inspection passed. Your actual cleaning and maintenance did the talking."
+                : "Inspection failed: dirty rooms or blocked rooms need attention.";
+        }
         // 效果结算
-        if (option.Effect.Cash < 0 && economy != null) economy.TrySpend(-option.Effect.Cash);
-        else if (option.Effect.Cash > 0 && economy != null) economy.RecordCheckout(option.Effect.Cash, 1f); // 计入当日收入
-        if (demandLoop != null) demandLoop.prototypeSatisfactionScore += option.Effect.Satisfaction;
-        if (option.Effect.StaffMorale != 0 && spawner != null)
-            foreach (var a in spawner.Agents) a?.Member?.AdjustMorale(option.Effect.StaffMorale);
-        ManagerReputation.Add(option.Effect.Prestige);
+        if (effect.Cash < 0 && (economy == null || !economy.TrySpend(-effect.Cash))) {
+            WorldManagementHud.NotifyMessage(GameText.UseChinese ? "现金不足，请选择其他处理方式。" : "Not enough cash. Choose another response.");
+            return;
+        }
+        else if (effect.Cash > 0 && economy != null) economy.RecordMiscIncome(effect.Cash); // 计入当日收入
+        if (demandLoop != null) demandLoop.prototypeSatisfactionScore += effect.Satisfaction;
+        if (effect.StaffMorale != 0 && spawner != null)
+            foreach (var a in spawner.Agents) a?.Member?.AdjustMorale(effect.StaffMorale);
+        ManagerReputation.Add(effect.Prestige);
         ApplySpecial(option.Special);
 
-        if (option.Effect.Cash != 0 && manager != null)
-            FloatingTextFx.Spawn(manager.transform.position, option.Effect.Cash.ToString("+#;-#") + "$",
-                option.Effect.Cash < 0 ? new Color(1f, 0.4f, 0.3f) : new Color(0.35f, 0.95f, 0.4f));
+        if (effect.Cash != 0 && manager != null)
+            FloatingTextFx.Spawn(manager.transform.position, effect.Cash.ToString("+#;-#") + "$",
+                effect.Cash < 0 ? new Color(1f, 0.4f, 0.3f) : new Color(0.35f, 0.95f, 0.4f));
 
-        _story = option.Story;
+        _story = story;
+        WorldManagementHud.NotifyMessage(GameText.T(story));
         _storyUntil = Time.time + 4.5f;
         ClearActive();
     }

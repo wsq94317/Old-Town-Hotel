@@ -91,7 +91,7 @@ public class RoomDoor : MonoBehaviour
         if (_overlayMat == null)
         {
             var unlit = Shader.Find("Universal Render Pipeline/Unlit");
-            _overlayMat = new Material(unlit) { color = new Color(0f, 0f, 0f, 0.78f) };
+            _overlayMat = new Material(unlit) { color = new Color(0f, 0f, 0f, 0.18f) };
             _overlayMat.SetFloat("_Surface", 1f);
             _overlayMat.SetFloat("_Blend", 0f);
             _overlayMat.renderQueue = 3000;
@@ -401,7 +401,7 @@ public class RoomDoor : MonoBehaviour
         if (_overlay != null)
         {
             var c = _overlay.material.color;
-            c.a = Mathf.Lerp(0.78f, 0f, _brightness);
+            c.a = Mathf.Lerp(0.18f, 0f, _brightness);
             _overlay.material.color = c;
         }
     }

@@ -9,7 +9,7 @@ using UnityEngine;
 //
 // 日号与 v1 锁死：订阅 OnDaySettled 后 BeginNextDay，Sim 的 CurrentDay 永远
 // 跟 Room2DDemoDayController 一致，绝不出现两套日历。
-public class HotelSimSceneBridge : MonoBehaviour
+public partial class HotelSimSceneBridge : MonoBehaviour
 {
     /// <summary>单例：调试 HUD / 战略层 UI 读它。</summary>
     public static HotelSimSceneBridge Instance { get; private set; }
@@ -42,6 +42,32 @@ public class HotelSimSceneBridge : MonoBehaviour
     /// （会走路、会摸鱼、会被抓、会留瑕疵），比 Sim 的信用额模型好，所以房态归它。
     /// Sim 负责经济那一半。B1b 起同步变成**双向**，裁判在 RoomAuthorityPolicy。</summary>
     public bool MirrorMode { get; private set; } = true;
+    public int LastInterestAccrued { get; private set; }
+    public int LastFacilityUpkeep { get; private set; }
+    public void SyncAmenities()
+    {
+        if (Sim == null) return;
+        Sim.Amenities = (FacilitySystem.GymUnlocked ? HotelAmenities.Gym : HotelAmenities.None)
+            | (FacilitySystem.CasinoUnlocked ? HotelAmenities.Casino : HotelAmenities.None)
+            | (FacilitySystem.PoolUnlocked ? HotelAmenities.Pool : HotelAmenities.None);
+    }
+    public bool NeedsBeginDay => _needsBeginDay;
+
+    public bool TryGetStaffEntry(StaffMember member, out StaffSimEntry entry)
+    {
+        entry = null;
+        if (member == null || Staff == null) return false;
+        foreach (var candidate in Staff.Entries)
+            if (ReferenceEquals(candidate.member, member)) { entry = candidate; return true; }
+        return false;
+    }
+
+    public void ApplyShiftPlan()
+    {
+        if (Sim == null) return;
+        RegisterStaffFromPayroll();
+        Sim.Shifts.ApplyTo(Sim.Staff);
+    }
 
     [Header("Derelict rooms at start")]
     [Tooltip("开局有几间破败房（满是蜘蛛网和垃圾，要派人一次次清出来）。" +
@@ -114,7 +140,9 @@ public class HotelSimSceneBridge : MonoBehaviour
         // 场景里的房/员工在 Start 时可能还没建好，首帧起惰性建账（时序坑，踩过）
         if (!_built && !TryBuild()) return;
 
+        if (IsSuspended) return;
         SyncRooms();
+        SyncAmenities();
         DriveClock();
     }
 
@@ -156,10 +184,8 @@ public class HotelSimSceneBridge : MonoBehaviour
         // 钟面与 v1 的日号对齐，绝不出现两套日历
         Sim.Clock.JumpTo(_bootClock.CurrentDay, _bootClock.CurrentMinute);
 
-        // **日长对齐**：v1 一天 240 真实秒（BalanceConfig），Sim 1x 一天 480 秒。
-        // 不对齐的话 v1 日结时 Sim 才走到 15:00，16:00 起的入住高峰整个被截掉，
-        // 预订客一半永远到不了店（实测就是这么发现的）。2x 让两边同时收工。
-        Sim.Clock.SpeedMultiplier = 2f;
+        // DriveClock consumes the scene clock directly; no second rate conversion.
+        Sim.Clock.SpeedMultiplier = 1f;
 
         Sim.FurnishInheritedRooms();   // 继承的破家具：这家酒店本来就是这么破
         Sim.Warehouse.SetCapacity(Warehouse.DefaultCapacity);   // 仓库会满（容量是场景参数）
@@ -175,17 +201,61 @@ public class HotelSimSceneBridge : MonoBehaviour
         if (pending != null)
         {
             Sim.RestoreFrom(pending);
+            _staffIdByMember.Clear();
+            foreach (var staffEntry in Staff.Entries)
+                if (staffEntry.member != null) _staffIdByMember[staffEntry.member] = staffEntry.staffId;
             // 日长对齐要重设：RestoreFrom 恢复的是存档里的时钟，不含这个场景参数
-            Sim.Clock.SpeedMultiplier = 2f;
+            Sim.Clock.SpeedMultiplier = 1f;
+            var save = FindFirstObjectByType<SaveCoordinator>();
+            var loaded = save != null ? save.LastLoaded : null;
+            if (loaded != null && loaded.resumeWorld && pending.runtime != null)
+            {
+                AwaitingMorningReport = loaded.awaitingMorningReport;
+                LastInterestAccrued = loaded.lastInterestAccrued;
+                LastFacilityUpkeep = loaded.lastFacilityUpkeep;
+                _needsBeginDay = loaded.needsBeginDay;
+                dayController?.RestoreOperationalClock(Clock.CurrentDay, Clock.CurrentMinute, AwaitingMorningReport);
+                // Workers resume by walking to their posts; interrupted cleaning
+                // becomes dirty rather than remaining assigned to a missing task.
+                for (int i = 0; i < Rooms.Count; i++)
+                {
+                    var room = Rooms.Peek(i);
+                    if (room.state == RoomSimState.Cleaning) Rooms.SetState(room.number, RoomSimState.Dirty);
+                    foreach (var legacy in demandLoop.rooms)
+                        if (legacy != null && legacy.roomNumber == room.number)
+                            legacy.SetState(Rooms.At(room.number).state == RoomSimState.Ruined
+                                ? Room2DState.Blocked : ToLegacy(Rooms.At(room.number).state));
+                }
+            }
         }
 
         _built = true;
+        if (economy != null) economy.BindWorldSim(Sim);
+        var coordinator = FindFirstObjectByType<SaveCoordinator>();
+        if (coordinator != null && coordinator.LastLoaded != null) {
+            RestoreDelegationReport(coordinator.LastLoaded.delegationReport);
+#if !UNITY_EDITOR
+            long savedTicks = coordinator.LastLoaded.sim.lastRealUtcTicks;
+            if (savedTicks > 0) {
+                ApplyElapsedDelegation((System.DateTime.UtcNow.Ticks - savedTicks) / (double)System.TimeSpan.TicksPerSecond);
+                coordinator.SaveGame();
+            }
+#endif
+        }
 
         Debug.Log($"[HotelSim] 建账完成：{Rooms.Count} 间房（{Rooms.OpenRoomCount} 营业 / " +
                   $"{Rooms.CountOf(RoomSimState.Ruined)} 破败），{Staff.Count} 名员工，" +
                   $"家具 {Sim.Furniture.Count} 件。房态权威仍在 v1（MirrorMode={MirrorMode}），" +
                   $"Sim 负责经济。");
         return true;
+    }
+
+    private static Room2DState ToLegacy(RoomSimState state)
+    {
+        return state == RoomSimState.Occupied ? Room2DState.Occupied
+            : state == RoomSimState.Ready ? Room2DState.Ready
+            : state == RoomSimState.AwaitingInspection ? Room2DState.AwaitingInspection
+            : state == RoomSimState.Blocked ? Room2DState.Blocked : Room2DState.Dirty;
     }
 
     /// <summary>把 v1 的花名册同步进 Sim 总账——**双向**：雇了要加，解雇要减。
@@ -324,8 +394,8 @@ public class HotelSimSceneBridge : MonoBehaviour
         if (_needsBeginDay)
         {
             // 有债务在身 = 昨天有一笔该还的钱。玩家在晨报上没按还款键就记一次逾期
-            // （涨利率、掉信用评级）——BeginDay 里收口，因为支付发生在晨报上。
-            bool loanWasDue = economy != null && economy.Loan != null && economy.Loan.Balance > 0;
+            // （影响后续借款额度）——BeginDay 里收口，因为支付发生在晨报上。
+            bool loanWasDue = Clock.CurrentDay > 1 && economy != null && economy.Loan != null && economy.Loan.Balance > 0;
             Sim.BeginDay(loanWasDue);
             _needsBeginDay = false;
         }
@@ -333,7 +403,10 @@ public class HotelSimSceneBridge : MonoBehaviour
         Pipeline.ManagerOnFloor = ComputeManagerOnFloor();
         Sim.FrontDeskCoverageAvailable = ComputeFrontDeskCoverage();
 
-        Clock.Advance(Time.deltaTime);
+        // Scene phases and simulation consume the same target minute.
+        if (dayController != null)
+            Clock.FastForwardTo(Mathf.FloorToInt(dayController.Clock.CurrentHour * 60f));
+        else Clock.Advance(Time.deltaTime);
         int budget = Mathf.Max(1, maxTicksPerFrame);
         while (budget-- > 0 && Clock.TryConsumeTick())
         {
@@ -375,14 +448,23 @@ public class HotelSimSceneBridge : MonoBehaviour
     {
         if (Sim == null) return;
 
+        Clock.FastForwardTo(SimClock.DayEndMinute);
+        while (Clock.TryConsumeTick()) Sim.StepMinute();
+
         // Every acquired hotel contributes real portfolio revenue before settlement.
         // Keeping this in the same ledger as room income makes the HUD projection,
         // morning report and safebox agree.
-        Sim.RecordMiscIncome(HotelEmpireProgress.DailyIncome);
+        FindFirstObjectByType<FacilitySystem>()?.CompleteBusinessDay();
+        Sim.RecordMiscIncome(HotelEmpireProgress.IncomeForDay(day));
 
         // 走 Sim 的完整日结（固定成本前置、家具老化、故障判定、装修推进、声誉收口），
         // 而不只是推一下管线——世界场景里现在跑的是同一套经济。
-        Sim.SettleDay();
+        // Interest is capitalised onto the loan once. It is an expense, not a
+        // second cash withdrawal; wages remain payable through the morning report.
+        LastInterestAccrued = economy != null && economy.Loan != null
+            ? economy.Loan.AccrueDailyInterest() : 0;
+        LastFacilityUpkeep = Sim.FacilityDailyUpkeep;
+        Sim.SettleDay(supplies: LastFacilityUpkeep, capitalisedInterest: LastInterestAccrued);
         Sim.Clock.BeginNextDay();
         // 日号与 v1 对齐（v1 的 demoDayIndex 在 Continue 时才 ++，这里跟着它走）
         Sim.Clock.JumpTo(day + 1, SimClock.DayStartMinute);
@@ -423,6 +505,8 @@ public class HotelSimSceneBridge : MonoBehaviour
     }
 
     /// <summary>当前有多少"必须先处理"的事件（M-G 事件权威上收后改读 IncidentScheduler）。</summary>
+    public int BlockingIncidentCount => CountBlockingIncidents();
+
     private int CountBlockingIncidents()
     {
         int n = 0;

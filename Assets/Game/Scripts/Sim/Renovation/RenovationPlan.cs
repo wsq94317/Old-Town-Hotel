@@ -149,6 +149,8 @@ public sealed class SimRenovationJob
     public RenovationPlanKind planKind;
     public RoomTier targetTier;
     public int daysRemaining;
+    public int totalDays;
+    public float Progress => totalDays <= 0 ? 0f : System.Math.Max(0f, System.Math.Min(1f, 1f - daysRemaining / (float)totalDays));
     public readonly List<int> roomNumbers = new List<int>();
 
     /// <summary>true = 破败房复原单（完工后要装家具并把房交给客房部打扫），
@@ -187,6 +189,7 @@ public sealed class SimRenovationQueue
             targetTier = plan.targetTier,
             daysRemaining = RenovationPricing.BlockDaysFor(plan, roomNumbers.Count),
         };
+        job.totalDays = job.daysRemaining;
         job.roomNumbers.AddRange(roomNumbers);
         _jobs.Add(job);
         return job.jobId;
@@ -203,6 +206,7 @@ public sealed class SimRenovationQueue
             reclaimKind = plan.kind,
             daysRemaining = ReclaimPricing.BlockDaysFor(plan, roomNumbers.Count),
         };
+        job.totalDays = job.daysRemaining;
         job.roomNumbers.AddRange(roomNumbers);
         _jobs.Add(job);
         return job.jobId;
@@ -231,7 +235,7 @@ public sealed class SimRenovationQueue
     /// <summary>读档：原样恢复一张在建工单（不重新发号、不重算工期）。</summary>
     public void RestoreJob(int jobId, RenovationPlanKind planKind, RoomTier targetTier,
                            int daysRemaining, IList<int> roomNumbers,
-                           bool isReclaim, ReclaimPlanKind reclaimKind)
+                           bool isReclaim, ReclaimPlanKind reclaimKind, int totalDays = 0)
     {
         var job = new SimRenovationJob
         {
@@ -243,6 +247,10 @@ public sealed class SimRenovationQueue
             reclaimKind = reclaimKind,
         };
         if (roomNumbers != null) job.roomNumbers.AddRange(roomNumbers);
+        int quotedDays = isReclaim
+            ? ReclaimPricing.BlockDaysFor(ReclaimPlan.For(reclaimKind), job.roomNumbers.Count)
+            : RenovationPricing.BlockDaysFor(RenovationPlan.For(planKind), job.roomNumbers.Count);
+        job.totalDays = System.Math.Max(job.daysRemaining, totalDays > 0 ? totalDays : quotedDays);
         _jobs.Add(job);
         if (jobId > _nextJobId) _nextJobId = jobId;
     }
@@ -251,6 +259,13 @@ public sealed class SimRenovationQueue
     public int NextJobIdSeed => _nextJobId + 1;
 
     public void Clear() => _jobs.Clear();
+
+    public SimRenovationJob JobFor(int roomNumber)
+    {
+        for (int i = 0; i < _jobs.Count; i++)
+            if (_jobs[i].roomNumbers.Contains(roomNumber)) return _jobs[i];
+        return null;
+    }
 
     public bool IsRenovating(int roomNumber)
     {

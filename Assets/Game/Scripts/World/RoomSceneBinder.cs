@@ -19,7 +19,7 @@ using Unity.AI.Navigation;
 // 刻意不做的事：这里**不改任何模拟状态**。上色和选中是纯表现层，
 // 出 bug 也弄不坏存档（同 GuestLifeDirector 的规矩）。
 [DisallowMultipleComponent]
-public class RoomSceneBinder : MonoBehaviour
+public partial class RoomSceneBinder : MonoBehaviour
 {
     /// <summary>房号。留空则从物体名 "Room_301" 里解析。</summary>
     [SerializeField] private int roomNumber;
@@ -35,6 +35,7 @@ public class RoomSceneBinder : MonoBehaviour
     private RoomSimState _shownState = (RoomSimState)(-1);
     private bool _shownSelected;
     private int _shownClearingPercent = -1;
+    private string _shownConstruction = "";
     private float _refreshTimer;
     private float _pulseUntil;
     private Vector3 _chipBaseScale;
@@ -80,6 +81,11 @@ public class RoomSceneBinder : MonoBehaviour
         _label = null;
         foreach (var text in GetComponentsInChildren<TextMesh>(includeInactive: true))
             if (text != null) { _label = text; break; }
+        var bundled = Resources.Load<Font>("HotelFonts/NotoSansSC");
+        if (_label != null && bundled != null) {
+            _label.font = bundled;
+            _label.GetComponent<Renderer>().sharedMaterial = bundled.material;
+        }
     }
 
     /// <summary>房态灯：一块小方片，挂在**走廊那一侧的房门口外**。
@@ -180,7 +186,8 @@ public class RoomSceneBinder : MonoBehaviour
         var bridge = HotelSimSceneBridge.Instance;
         if (bridge == null || bridge.Sim == null || roomNumber <= 0) return;
         TickPulse();
-        if (bridge.AwaitingMorningReport) return;     // 晨报期间世界冻结
+        TickConstructionAnimation();
+        // Presentation still refreshes while the morning report freezes simulation.
 
         // 每 0.25 秒够了：状态变化是分钟级的，逐帧刷是白烧手机电池
         _refreshTimer -= Time.deltaTime;
@@ -195,10 +202,13 @@ public class RoomSceneBinder : MonoBehaviour
         int clearingPercent = bridge.Sim.Clearing.IsClearing(roomNumber)
             ? Mathf.RoundToInt(bridge.Sim.Clearing.ProgressOf(roomNumber) * 100f)
             : -1;
+        var job = bridge.Sim.Renovations.JobFor(roomNumber);
+        string construction = job == null ? "" : job.jobId + ":" + job.daysRemaining + ":" + job.totalDays + ":" + GameText.UseChinese;
         if (state == _shownState && selected == _shownSelected
-            && clearingPercent == _shownClearingPercent) return;
+            && clearingPercent == _shownClearingPercent && construction == _shownConstruction) return;
 
         RoomSimState previous = _shownState;
+        _shownConstruction = construction;
         _shownState = state;
         _shownSelected = selected;
         _shownClearingPercent = clearingPercent;
@@ -232,13 +242,15 @@ public class RoomSceneBinder : MonoBehaviour
     {
         // **只染那块状态灯，绝不染墙**（见 EnsureStateChip 的注释：染墙会和
         // 门口遮罩的淡入淡出打架，表现为"颜色闪烁、随玩家位置变"）
-        Color tint = RoomStatePalette.ColorOf(state);
+        var job = sim.Renovations.JobFor(roomNumber);
+        UpdateConstructionView(job);
+        Color tint = job != null ? new Color(1f, 0.67f, 0.18f) : RoomStatePalette.ColorOf(state);
         if (selected) tint = Color.Lerp(tint, Color.white, 0.5f);   // 选中的那间亮一档
         if (_chipMaterial != null) _chipMaterial.color = tint;
 
         if (_label != null)
-            _label.text = roomNumber + "\n" + GameText.T(RoomStatePalette.WordOf(state))
-                        + ClearingSuffix(sim);
+            _label.text = roomNumber + "\n" + (job != null ? ConstructionWord(job) : GameText.T(RoomStatePalette.WordOf(state)))
+                        + (job != null ? "" : ClearingSuffix(sim));
     }
 
     /// <summary>正在清理的破败房要显示进度——玩家指派了清理之后必须看得见它在动。</summary>
@@ -250,6 +262,7 @@ public class RoomSceneBinder : MonoBehaviour
 
     private void OnDestroy()
     {
+        DisposeConstructionView();
         if (_chipMaterial == null) return;
         if (Application.isPlaying) Destroy(_chipMaterial);
         else DestroyImmediate(_chipMaterial);

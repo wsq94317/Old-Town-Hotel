@@ -187,11 +187,32 @@ public class FacilitySystem : MonoBehaviour
 
     private void Update()
     {
+        var worldHost = HotelSimSceneBridge.Instance;
+        if (worldHost != null && (worldHost.IsSuspended || worldHost.AwaitingMorningReport)) return;
         if (dayController == null) return;
         if (_rng == null) _rng = new System.Random(rngSeed); // 热重载自愈
         float hour = dayController.Clock.CurrentHour;
         int day = dayController.CurrentDay;
 
+        ProcessServices(hour, day);
+
+        // 时段人气（每 8 秒调整一次各设施层的闲逛客）
+        _ambienceTimer -= Time.deltaTime;
+        if (_ambienceTimer <= 0f)
+        {
+            _ambienceTimer = 8f;
+            UpdateAmbience(DayPeriodLogic.PeriodFor(hour));
+        }
+    }
+
+    public void CompleteBusinessDay()
+    {
+        if (dayController != null) ProcessServices(22f, dayController.CurrentDay);
+    }
+
+    private void ProcessServices(float hour, int day)
+    {
+        if (_rng == null) _rng = new System.Random(rngSeed);
         // 酒吧晚市 20:00
         if (hour >= 20f && _lastBarDay != day)
         {
@@ -240,13 +261,6 @@ public class FacilitySystem : MonoBehaviour
             CameraShaker.Shake(success ? 0.1f : 0.25f, 0.5f);
         }
 
-        // 时段人气（每 8 秒调整一次各设施层的闲逛客）
-        _ambienceTimer -= Time.deltaTime;
-        if (_ambienceTimer <= 0f)
-        {
-            _ambienceTimer = 8f;
-            UpdateAmbience(DayPeriodLogic.PeriodFor(hour));
-        }
     }
 
     private void UpdateAmbience(DayPeriod period)

@@ -15,14 +15,15 @@ using UnityEngine.UI;
 /// while economy decisions are grouped by the question the player is answering.
 /// </summary>
 [DisallowMultipleComponent]
-public sealed class WorldManagementHud : MonoBehaviour
+public sealed partial class WorldManagementHud : MonoBehaviour
 {
     private enum DeskTab
     {
         Overview,
         Pricing,
         Staff,
-        Assets
+        Assets,
+        Rooms
     }
 
     private enum OpportunityKind
@@ -41,7 +42,7 @@ public sealed class WorldManagementHud : MonoBehaviour
     private static readonly Color Ink = Hex("#1B1713");
     private static readonly Color InkSoft = Hex("#B9AB96");
     private static readonly Color Cream = Hex("#E9D9BC");
-    private static readonly Color Paper = new Color(0.16f, 0.13f, 0.105f, 0.97f);
+    private static readonly Color Paper = Hex("#F8EBD0");
     private static readonly Color Gold = Hex("#C99A45");
     private static readonly Color GoldDark = Hex("#765426");
     private static readonly Color Teal = Hex("#2E6D61");
@@ -49,9 +50,9 @@ public sealed class WorldManagementHud : MonoBehaviour
     private static readonly Color Coral = Hex("#A64E40");
     private static readonly Color Slate = Hex("#6E685E");
     private static readonly Color White = Hex("#F5EAD4");
-    private static readonly Color Glass = new Color(0.075f, 0.065f, 0.055f, 0.95f);
-    private static readonly Color Ledger = new Color(0.105f, 0.087f, 0.07f, 0.98f);
-    private static readonly Color Walnut = new Color(0.19f, 0.135f, 0.10f, 0.97f);
+    private static readonly Color Glass = Hex("#FFF2D9");
+    private static readonly Color Ledger = Hex("#F4E5C7");
+    private static readonly Color Walnut = Hex("#365D50");
     private static readonly Color BrassLine = new Color(0.79f, 0.60f, 0.27f, 0.55f);
 
     private static WorldManagementHud _instance;
@@ -117,6 +118,7 @@ public sealed class WorldManagementHud : MonoBehaviour
 
     private DeskTab _tab;
     private bool _drawerOpen;
+    private bool _drawerScrollReset = true;
     private bool _initializedValues;
     private int _lastCash;
     private int _lastGross;
@@ -130,7 +132,10 @@ public sealed class WorldManagementHud : MonoBehaviour
     private int _skipTargetMinute = -1;
     private int _skipDay = -1;
     private Rect _lastSafeArea;
+    private Vector2Int _lastScreenSize;
     private Coroutine _toastRoutine;
+    private Coroutine _moneyBurstRoutine;
+    private TextMeshProUGUI _moneyBurstText;
     private ManagerPhone.Note _displayedNote;
     private HotelBusinessHotspot _selectedBusiness;
     private OpportunityModel _opportunity;
@@ -252,8 +257,7 @@ public sealed class WorldManagementHud : MonoBehaviour
         instance._refreshTimer = 0f;
     }
 
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
-    private static void InstallForWorldScene()
+    internal static void InstallForWorldScene()
     {
         var bridge = FindFirstObjectByType<HotelSimSceneBridge>();
         if (bridge == null) return;
@@ -272,11 +276,14 @@ public sealed class WorldManagementHud : MonoBehaviour
     {
         WorldManagementHud instance = ActiveInstance;
         if (!IsActive || !instance._safeRoot.gameObject.activeInHierarchy) return false;
+        if (instance._sessionMenu != null && instance._sessionMenu.gameObject.activeInHierarchy) return true;
+        if (instance._hudMode == WorldHudMode.MorningReport) return true;
         if (Contains(instance._topPanel, screenPoint)) return true;
         if (Contains(instance._bottomNav, screenPoint)) return true;
         if (Contains(instance._opportunityBar, screenPoint)) return true;
         if (Contains(instance._alertStrip, screenPoint)) return true;
         if (Contains(instance._returnToManager, screenPoint)) return true;
+        if (Contains(instance._sessionMenuButton, screenPoint)) return true;
         if (Contains(instance._contextSheet, screenPoint)) return true;
         if (instance._drawerOpen && Contains(instance._drawer, screenPoint)) return true;
         return instance._roomCard.gameObject.activeInHierarchy
@@ -314,6 +321,7 @@ public sealed class WorldManagementHud : MonoBehaviour
     private void Update()
     {
         UpdateSafeArea();
+        if (Sim != null && TickSessionMenu()) return;
 
         var bridge = HotelSimSceneBridge.Instance;
         WorldHudMode mode = WorldHudVisibilityPolicy.Resolve(
@@ -343,6 +351,7 @@ public sealed class WorldManagementHud : MonoBehaviour
         RefreshOpportunity();
         RefreshTop();
         RefreshSceneEconomyFeedback();
+        TickJourneyPresentation();
         RefreshAlerts();
         RefreshCameraReturn();
         RefreshContextSheet();
@@ -375,6 +384,7 @@ public sealed class WorldManagementHud : MonoBehaviour
 
     private void TickSimulationSpeed()
     {
+        if (HotelSimSceneBridge.Instance != null && HotelSimSceneBridge.Instance.IsSuspended) return;
         if (_skipTargetMinute < 0)
         {
             if (Time.timeScale != _speed) Time.timeScale = _speed;
@@ -427,6 +437,13 @@ public sealed class WorldManagementHud : MonoBehaviour
         _lastSafebox = Sim.Safebox.Balance;
     }
 
+    private int ExpectedDailyInterest()
+    {
+        var economy = FindFirstObjectByType<EconomySystem>();
+        return economy != null && economy.Loan != null
+            ? Mathf.RoundToInt(economy.Loan.Balance * economy.Loan.DailyInterestRate) : 0;
+    }
+
     private void RefreshEconomySnapshot()
     {
         BreakdownSystem breakdown = FindFirstObjectByType<BreakdownSystem>();
@@ -436,7 +453,8 @@ public sealed class WorldManagementHud : MonoBehaviour
         _economySnapshot = HotelEconomyPresentation.Build(
             Sim,
             incidentLoss,
-            HotelEmpireProgress.PassiveIncomePerMinute);
+            HotelEmpireProgress.IncomeForDay(Sim.Clock.CurrentDay) / HotelEconomyPresentation.RealMinutesPerGameDay,
+            ExpectedDailyInterest(), Sim.FacilityDailyUpkeep);
     }
 
     private void RefreshOpportunity()
@@ -482,7 +500,7 @@ public sealed class WorldManagementHud : MonoBehaviour
                 Kind = OpportunityKind.StopLoss,
                 Title = L("STOP THE LOSS", "立即止损"),
                 Detail = incidentTitle + "  ·  -$" + FormatRate(incidentLoss)
-                         + L("/min until fixed", "/分钟，直到修复"),
+                         + L("/day until fixed", "/营业日，直到修复"),
                 PrimaryLabel = L("SEND MANAGER TO INSPECT", "派经理检查"),
                 Cost = 0,
                 LossAvoidedPerMinute = incidentLoss,
@@ -518,7 +536,7 @@ public sealed class WorldManagementHud : MonoBehaviour
                 Key = "reclaim|" + room.number + "|" + immediateCost,
                 Kind = OpportunityKind.ReclaimRoom,
                 Title = L("OPEN ROOM ", "解锁房间 ") + room.number,
-                Detail = "+$" + FormatRate(gain) + L("/min  ·  payback ", "/分钟  ·  回本 ")
+                Detail = "+$" + FormatRate(gain) + L("/day  ·  payback ", "/营业日  ·  回本 ")
                          + FormatPayback(payback)
                          + L("  ·  +1 sellable room", "  ·  +1间可售房"),
                 PrimaryLabel = L("INVEST & RESTORE  $", "投资并修复  $") + immediateCost,
@@ -546,27 +564,25 @@ public sealed class WorldManagementHud : MonoBehaviour
             {
                 Key = "reception|" + Sim.DeskQueueLength + "|" + cost,
                 Kind = OpportunityKind.Reception,
-                Title = L("RELIEVE RECEPTION", "缓解前台排队"),
-                Detail = L("Queue ", "排队 ") + Sim.DeskQueueLength
-                         + L("  ·  recover about $", "  ·  预计挽回 $")
-                         + FormatRate(gain) + L("/min", "/分钟"),
-                PrimaryLabel = candidate != null
-                    ? L("HIRE ", "招聘 ") + candidate.DisplayName + "  $" + cost
-                    : L("OPEN TEAM DESK", "打开员工面板"),
+                Title = Sim.FrontDeskCoverageAvailable
+                    ? L("RELIEVE RECEPTION", "缓解前台排队")
+                    : L("RECEPTION UNATTENDED", "前台暂时无人值守"),
+                Detail = (Sim.FrontDeskCoverageAvailable
+                    ? L("Guests waiting: ", "等待客人：") + Sim.DeskQueueLength
+                    : L("Check arrivals, breaks and shift coverage first.", "先检查员工是否在上班途中、休息或未排班。"))
+                    + (candidate != null ? L("  · extra wage $", "  · 增员日薪 $") + candidate.DailyWage : ""),
+                PrimaryLabel = L("REVIEW COVERAGE & TEAM", "检查值岗与员工"),
                 Cost = cost,
                 GainPerMinute = gain,
                 Business = FindBusiness(HotelBusinessKind.Reception),
                 Anchor = BusinessAnchor(HotelBusinessKind.Reception),
-                PrimaryAction = candidate != null
-                    ? () => HireFromOpportunity(hiring, candidate)
-                    : () => SelectTab(DeskTab.Staff),
+                PrimaryAction = () => SelectTab(DeskTab.Staff),
                 Score = HotelEconomyPresentation.OpportunityScore(
                     Mathf.Max(1, cost), Sim.Cash, gain, 0f, false, !Sim.FrontDeskCoverageAvailable)
             });
         }
 
-        if (Sim.Rooms.CountOf(RoomSimState.Ruined) == 0)
-        {
+        { // Compare upgrading existing rooms with expansion, even while ruins remain.
             for (int i = 0; i < Sim.Rooms.Count; i++)
             {
                 RoomRecord room = Sim.Rooms.Peek(i);
@@ -577,7 +593,7 @@ public sealed class WorldManagementHud : MonoBehaviour
                     continue;
 
                 RenovationPlan plan = RenovationPlan.For(RenovationPlanKind.Economy);
-                if ((int)plan.targetTier <= (int)room.tier) continue;
+                if ((int)plan.targetTier <= (int)room.tier || !Sim.CanRenovateRoom(room.number, RenovationPlanKind.Economy)) continue;
                 int cashCost = Sim.QuoteRenovation(RenovationPlanKind.Economy, 1);
                 int missingMaterials = Mathf.Max(0, plan.materialsPerRoom - Sim.Materials.Stock);
                 int immediateCost = cashCost + Sim.Materials.PriceFor(missingMaterials);
@@ -595,7 +611,7 @@ public sealed class WorldManagementHud : MonoBehaviour
                     Key = "upgrade|" + room.number + "|" + immediateCost,
                     Kind = OpportunityKind.UpgradeRoom,
                     Title = L("UPGRADE ROOM ", "升级房间 ") + room.number,
-                    Detail = "+$" + FormatRate(gain) + L("/min  ·  payback ", "/分钟  ·  回本 ")
+                    Detail = "+$" + FormatRate(gain) + L("/day  ·  payback ", "/营业日  ·  回本 ")
                              + FormatPayback(payback),
                     PrimaryLabel = L("UPGRADE NOW  $", "立即升级  $") + immediateCost,
                     Cost = immediateCost,
@@ -623,10 +639,10 @@ public sealed class WorldManagementHud : MonoBehaviour
                 Title = L("ACQUIRE HOTEL NO. ", "收购第 ")
                         + (HotelEmpireProgress.HotelCount + 1)
                         + L("", " 家酒店"),
-                Detail = L("Portfolio income +$8.0/min.", "酒店组合收入 +$8.0/分钟。"),
+                Detail = L("Value hotel: about +$480/day after upkeep.", "平价酒店扣除维护费后约 +$480/营业日。"),
                 PrimaryLabel = L("ACQUIRE  $", "收购  $") + hotelCost,
                 Cost = hotelCost,
-                GainPerMinute = 8f,
+                GainPerMinute = 4f,
                 PrimaryAction = AcquireNextHotel,
                 Score = 0f
             };
@@ -685,8 +701,7 @@ public sealed class WorldManagementHud : MonoBehaviour
             Key = "facility|" + floor,
             Kind = OpportunityKind.UnlockFacility,
             Title = title,
-            Detail = L("New guest activity  ·  about +$", "新增客人活动  ·  预计 +$")
-                     + FormatRate(gain) + L("/min", "/分钟"),
+            Detail = FacilityImpactText(kind),
             PrimaryLabel = L("UNLOCK  $", "解锁  $") + cost,
             Cost = cost,
             GainPerMinute = gain,
@@ -711,40 +726,27 @@ public sealed class WorldManagementHud : MonoBehaviour
             + "  " + GameText.T(PhaseScheduler.Label(
                 PhaseScheduler.PhaseFor(clock.CurrentMinute)))
             + speed;
-        _cashLabel.text = L("AVAILABLE  $", "可用现金  $") + Sim.Cash.ToString("N0");
-        _netRateLabel.text = L("EST. ", "预计 ")
+        _cashLabel.text = "$" + Sim.Cash.ToString("N0");
+        _netRateLabel.text = L("EST. NET/DAY ", "预计日结余 ")
                              + (_economySnapshot.NetPerMinute >= 0f ? "+$" : "-$")
-                             + FormatRate(Mathf.Abs(_economySnapshot.NetPerMinute))
-                             + L("/MIN NET", "/分钟净收入");
-        _netRateLabel.color = _economySnapshot.NetPerMinute >= 0f ? TealSoft : Coral;
+                             + FormatRate(Mathf.Abs(_economySnapshot.NetPerMinute));
+        _netRateLabel.color = _economySnapshot.NetPerMinute >= 0f ? Teal : Coral;
 
         int dailyGoal = Mathf.Max(1, _economySnapshot.DailyRevenueGoal);
         float dailyProgress = Mathf.Clamp01(Sim.GrossIncomeToday / (float)dailyGoal);
-        _todayProgressLabel.text = L("TODAY  $", "今日营收  $")
-                                   + Sim.GrossIncomeToday.ToString("N0")
-                                   + " / $" + dailyGoal.ToString("N0");
+        _todayProgressLabel.text = Sim.Safebox.Balance > 0
+            ? L("SALES $", "营收 $") + Sim.GrossIncomeToday.ToString("N0")
+            : L("TODAY  $", "今日营收  $") + Sim.GrossIncomeToday.ToString("N0")
+              + " / $" + dailyGoal.ToString("N0");
         _todayProgressFill.rectTransform.anchorMax =
             new Vector2(dailyProgress, 1f);
 
-        if (_opportunity != null)
-        {
-            int shortfall = Mathf.Max(0, _opportunity.Cost - Sim.Cash);
-            _goalTitleLabel.text = shortfall > 0
-                ? L("NEXT  ·  $", "下一目标  ·  还差 $") + shortfall
-                  + L(" TO ", "  ·  ") + _opportunity.Title
-                : L("READY  ·  ", "可以投资  ·  ") + _opportunity.Title;
-            _goalBenefitLabel.text = _opportunity.Detail;
-            _goalProgressFill.rectTransform.anchorMax = new Vector2(
-                _opportunity.Cost <= 0
-                    ? 1f
-                    : Mathf.Clamp01(Sim.Cash / (float)_opportunity.Cost),
-                1f);
-        }
+        RefreshJourneyGoal();
 
         bool safeboxVisible = Sim.Safebox.Balance > 0;
         _safeboxButton.gameObject.SetActive(safeboxVisible);
         _todayProgressLabel.rectTransform.anchorMax =
-            new Vector2(safeboxVisible ? 0.70f : 1f, 0.75f);
+            new Vector2(.96f, .50f);
         if (!safeboxVisible) return;
 
         _safeboxLabel.text = L("SAFE  +$", "待收  +$")
@@ -778,7 +780,7 @@ public sealed class WorldManagementHud : MonoBehaviour
                                + "  " + tonight.Fraction;
 
         _safeboxLabel.text = Sim.Safebox.Balance > 0
-            ? L("COLLECT PROFIT  +$", "收取利润  +$") + Sim.Safebox.Balance.ToString("N0")
+            ? L("COLLECT RECEIPTS  +$", "收取回款  +$") + Sim.Safebox.Balance.ToString("N0")
             : L("SAFEBOX PROFIT  $0", "保险箱利润  $0");
         _safeboxFill.rectTransform.anchorMax =
             new Vector2(Mathf.Clamp01(Sim.Safebox.FillRatio), 1f);
@@ -870,19 +872,21 @@ public sealed class WorldManagementHud : MonoBehaviour
             : HotelEconomyPresentation.RoomRevenuePerMinute(
                 Sim, room.tier, occupancy);
 
+        var construction = Sim.Renovations.JobFor(number);
         _roomTitle.text = L("ROOM ", "房间 ") + number + "  ·  "
-                          + GameText.T(RoomStatePalette.WordOf(room.state));
+            + (construction != null ? L(construction.isReclaim ? "RESTORING" : "RENOVATING", construction.isReclaim ? "修复中" : "装修中")
+                : GameText.T(RoomStatePalette.WordOf(room.state)));
 
         if (Sim.Renovations.IsRenovating(number))
         {
             int days = Sim.Renovations.DaysRemainingFor(number);
-            _roomHeadline.text = L("INVESTMENT IN PROGRESS", "投资施工中");
+            _roomHeadline.text = L("WORK PROGRESS ", "施工进度 ") + Mathf.RoundToInt(construction.Progress * 100f) + "%";
             _roomDetail.text = days
                                + L(" day(s) to handover  ·  projected contribution +$",
                                    " 天后交付  ·  预计贡献 +$")
                                + FormatRate(HotelEconomyPresentation.RoomRevenuePerMinute(
                                    Sim, room.tier, occupancy))
-                               + L("/min", "/分钟");
+                               + L("/day", "/营业日");
             SetRoomButton(
                 _roomPrimary,
                 _roomPrimaryLabel,
@@ -893,7 +897,7 @@ public sealed class WorldManagementHud : MonoBehaviour
             SetRoomButton(
                 _roomSecondary,
                 _roomSecondaryLabel,
-                L("FURNITURE", "家具配置"),
+                L("WORK DETAILS", "查看施工详情"),
                 OpenAssetsForSelectedRoom,
                 true,
                 Ink);
@@ -916,7 +920,7 @@ public sealed class WorldManagementHud : MonoBehaviour
             int shortfall = Mathf.Max(0, immediateCost - Sim.Cash);
 
             _roomHeadline.text = L("OFF MARKET  ·  +$", "未营业  ·  预计 +$")
-                                 + FormatRate(gain) + L("/min potential", "/分钟");
+                                 + FormatRate(gain) + L("/day potential", "/营业日");
             _roomDetail.text = L("Investment $", "投资 $") + immediateCost
                                + L("  ·  +1 sellable room", "  ·  +1间可售房")
                                + "\n" + L("Expected payback ", "预计回本 ")
@@ -945,7 +949,7 @@ public sealed class WorldManagementHud : MonoBehaviour
             float loss = HotelEconomyPresentation.RoomRevenuePerMinute(
                 Sim, room.tier, occupancy);
             _roomHeadline.text = L("REVENUE PAUSED  ·  -$", "暂停营业  ·  -$")
-                                 + FormatRate(loss) + L("/min", "/分钟");
+                                 + FormatRate(loss) + L("/day", "/营业日");
             _roomDetail.text = L(
                 "Repair protects income already built. The room returns to turnover after the fault is cleared.",
                 "维修用于守住已有收入；故障清除后房间会重新进入周转。");
@@ -967,12 +971,13 @@ public sealed class WorldManagementHud : MonoBehaviour
         }
 
         _roomHeadline.text = "+$" + FormatRate(currentContribution)
-                             + L("/min  ·  ", "/分钟  ·  ")
+                             + L("/day  ·  ", "/营业日  ·  ")
                              + OperationalRoomHeadline(room.state);
 
         RenovationPlan upgrade = RenovationPlan.For(RenovationPlanKind.Economy);
         bool canOfferUpgrade = room.state != RoomSimState.Occupied
-                               && (int)upgrade.targetTier > (int)room.tier;
+                               && (int)upgrade.targetTier > (int)room.tier
+                               && Sim.CanRenovateRoom(number, RenovationPlanKind.Economy);
         if (canOfferUpgrade)
         {
             int cashCost = Sim.QuoteRenovation(RenovationPlanKind.Economy, 1);
@@ -990,7 +995,7 @@ public sealed class WorldManagementHud : MonoBehaviour
 
             _roomDetail.text = OperationalRoomDetail(room.state)
                                + "\n" + L("Recommended upgrade $", "推荐升级 $") + immediateCost
-                               + "  ·  +$" + FormatRate(gain) + L("/min  ·  ", "/分钟  ·  ")
+                               + "  ·  +$" + FormatRate(gain) + L("/day  ·  ", "/营业日  ·  ")
                                + FormatPayback(payback);
             SetRoomButton(
                 _roomPrimary,
@@ -1006,12 +1011,12 @@ public sealed class WorldManagementHud : MonoBehaviour
         {
             _roomDetail.text = OperationalRoomDetail(room.state)
                                + "\n" + L("Current contribution +$", "当前贡献 +$")
-                               + FormatRate(currentContribution) + L("/min.", "/分钟。");
+                               + FormatRate(currentContribution) + L("/day.", "/营业日。");
             SetRoomButton(
                 _roomPrimary,
                 _roomPrimaryLabel,
-                L("OPEN RATE STRATEGY", "调整房价"),
-                () => SelectTab(DeskTab.Pricing),
+                L("SET ROOM PRICE BAND", "设置客房挂牌"),
+                OpenAssetsForSelectedRoom,
                 true,
                 Teal);
         }
@@ -1031,8 +1036,10 @@ public sealed class WorldManagementHud : MonoBehaviour
         int currentRate = room.state == RoomSimState.Ruined
             ? 0
             : Sim.Pricing.PriceFor(Sim.Clock.CurrentDay, room.tier);
+        var construction = Sim.Renovations.JobFor(number);
         _roomTitle.text = L("ROOM ", "房间 ") + number + "  ·  "
-                          + GameText.T(RoomStatePalette.WordOf(room.state));
+            + (construction != null ? L(construction.isReclaim ? "RESTORING" : "RENOVATING", construction.isReclaim ? "修复中" : "装修中")
+                : GameText.T(RoomStatePalette.WordOf(room.state)));
 
         if (Sim.Renovations.IsRenovating(number))
         {
@@ -1124,7 +1131,7 @@ public sealed class WorldManagementHud : MonoBehaviour
                 : L("FRONT DESK UNSTAFFED", "前台无人值守");
             _roomDetail.text = L("A second receptionist reduces abandonment and protects about $",
                                   "增加前台人员可以减少客人流失，预计挽回 $")
-                               + FormatRate(recovered) + L("/min.", "/分钟。");
+                               + FormatRate(recovered) + L("/day.", "/营业日。");
             SetRoomButton(
                 _roomPrimary,
                 _roomPrimaryLabel,
@@ -1178,15 +1185,9 @@ public sealed class WorldManagementHud : MonoBehaviour
                 break;
         }
 
-        _roomHeadline.text = unlocked
-            ? "+$" + FormatRate(gain) + L("/min contribution", "/分钟贡献")
-            : L("EXPANSION AVAILABLE", "可以扩建");
-        _roomDetail.text = unlocked
-            ? L("This facility turns occupancy into additional revenue and hotel demand.",
-                "该设施把入住客流转化为额外收入和酒店需求。")
-            : L("Investment $", "投资 $") + cost
-              + L("  ·  expected +$", "  ·  预计 +$") + FormatRate(gain)
-              + L("/min  ·  visible new guest activity", "/分钟  ·  新增客人活动");
+        _roomHeadline.text = unlocked ? L("FACILITY OPEN", "设施已经开放") : L("EXPANSION AVAILABLE", "可以扩建");
+        _roomDetail.text = FacilityImpactText(business.Kind)
+            + (unlocked ? "" : "\n" + L("Investment $", "投资 $") + cost);
 
         if (unlocked)
         {
@@ -1267,7 +1268,7 @@ public sealed class WorldManagementHud : MonoBehaviour
         {
             _alertLabel.text = L("INCOME AT RISK  -$", "收入损失  -$")
                                + FormatRate(loss)
-                               + L("/min  ·  ", "/分钟  ·  ")
+                               + L("/day  ·  ", "/营业日  ·  ")
                                + active
                                + L(active == 1 ? " issue" : " issues", " 个问题");
             _alertLabel.color = Coral;
@@ -1290,6 +1291,14 @@ public sealed class WorldManagementHud : MonoBehaviour
                        && !rig.IsFollowingTarget
                        && !_drawerOpen;
         _returnToManager.gameObject.SetActive(visible);
+        if (visible)
+        {
+            var manager = FindFirstObjectByType<ManagerController>();
+            var label = _returnToManager.GetComponentInChildren<TextMeshProUGUI>();
+            if (manager != null && label != null)
+                label.text = L("< MANAGER · ", "< 返回经理 · ")
+                    + (FloorMath.FloorIndexForY(manager.transform.position.y) + 1) + L("F", "楼");
+        }
     }
 
     private void RefreshLegacyAlerts()
@@ -1358,12 +1367,12 @@ public sealed class WorldManagementHud : MonoBehaviour
 
         float height = 86f + model.Actions.Count * 42f;
         SetAnchors(_contextSheet, new Vector2(0f, 0f), new Vector2(1f, 0f),
-            new Vector2(8f, 72f), new Vector2(-8f, 72f + Mathf.Min(390f, height)));
+            new Vector2(10f, 88f), new Vector2(-8f, 72f + Mathf.Min(390f, height)));
 
         var title = CreateText("Title", _contextContent, 18f, Gold,
             TextAlignmentOptions.Left, true);
         title.text = model.Title;
-        title.enableWordWrapping = true;
+        title.textWrappingMode = TMPro.TextWrappingModes.Normal;
         title.overflowMode = TextOverflowModes.Overflow;
         var titleLayout = title.gameObject.AddComponent<LayoutElement>();
         titleLayout.preferredHeight = 28f;
@@ -1371,7 +1380,7 @@ public sealed class WorldManagementHud : MonoBehaviour
         var body = CreateText("Body", _contextContent, 12.5f, InkSoft,
             TextAlignmentOptions.TopLeft, false);
         body.text = model.Body;
-        body.enableWordWrapping = true;
+        body.textWrappingMode = TMPro.TextWrappingModes.Normal;
         body.overflowMode = TextOverflowModes.Truncate;
         var bodyLayout = body.gameObject.AddComponent<LayoutElement>();
         bodyLayout.preferredHeight = 38f;
@@ -1659,9 +1668,10 @@ public sealed class WorldManagementHud : MonoBehaviour
                         + Sim.GrossIncomeToday + "|" + Sim.Safebox.Balance + "|"
                         + Sim.RoomIncomeToday + "|" + Sim.MiscIncomeToday + "|"
                         + Sim.UnsettledRoomRevenue + "|" + Sim.Materials.Stock + "|"
-                        + RoomSelection.Selected;
+                        + RoomSelection.Selected + "|" + Sim.OperatingStyle + "|" + Sim.ClearRuinsFirst + "|" + Sim.Journey.Stage + "|" + Sim.Journey.State.profitableStreak;
         switch (_tab)
         {
+            case DeskTab.Rooms: return common + "|" + Sim.Rooms.DirtyBacklog + "|" + Sim.Rooms.SellableCount + "|" + Sim.Renovations.RoomsUnderRenovation;
             case DeskTab.Pricing:
                 return common + "|" + Sim.Pricing.DefaultTemplate;
             case DeskTab.Staff:
@@ -1687,11 +1697,20 @@ public sealed class WorldManagementHud : MonoBehaviour
 
     private void RebuildDrawer()
     {
+        var previousScroll = _drawer.GetComponentInChildren<ScrollRect>();
+        float previousScrollPosition = previousScroll != null ? previousScroll.verticalNormalizedPosition : 1f;
         for (int i = _drawerContent.childCount - 1; i >= 0; i--)
+        {
+            _drawerContent.GetChild(i).gameObject.SetActive(false);
             Destroy(_drawerContent.GetChild(i).gameObject);
+        }
 
         switch (_tab)
         {
+            case DeskTab.Rooms:
+                _drawerTitle.text = L("ROOM OPERATIONS", "客房作战室");
+                BuildRoomOperations();
+                break;
             case DeskTab.Pricing:
                 _drawerTitle.text = L("ROOM RATES", "房价策略");
                 BuildPricingDesk();
@@ -1713,11 +1732,14 @@ public sealed class WorldManagementHud : MonoBehaviour
         UpdateNavState();
         Canvas.ForceUpdateCanvases();
         var scroll = _drawer.GetComponentInChildren<ScrollRect>();
-        if (scroll != null) scroll.verticalNormalizedPosition = 1f;
+        if (scroll != null) scroll.verticalNormalizedPosition = _drawerScrollReset ? 1f : previousScrollPosition;
+        _drawerScrollReset = false;
     }
 
     private void BuildOverviewDesk()
     {
+        BuildCampaignStatus();
+        BuildJourneyDesk();
         int gross = Sim.GrossIncomeToday;
         int roomIncome = Sim.RoomIncomeToday;
         int unsettledRoomRevenue = Sim.UnsettledRoomRevenue;
@@ -1726,8 +1748,8 @@ public sealed class WorldManagementHud : MonoBehaviour
         int wages = Sim.Shifts.DailyWageCost(Sim.Staff, Sim.Clock.CurrentDay);
         int runningMargin = gross - commission - wages;
         AddSection(L("TODAY'S MONEY", "今天的钱在哪里"),
-            L("Check-in reserves an order. Checkout settles its final value; day close moves profit into the safebox.",
-              "入住只锁定订单额；退房时结算最终房费，日结后利润才进入保险箱。"));
+            L("Checkout settles revenue. Receipts enter the safe; wages remain payable and interest increases debt.",
+              "入住锁定订单，退房结算。日结回款进入保险箱，工资仍须支付；利息计入债务。"));
         AddInfoCard(
             L("CURRENT CASHFLOW", "当前现金流"),
             L("Settled rooms  +$", "客房已结算  +$") + roomIncome
@@ -1740,6 +1762,22 @@ public sealed class WorldManagementHud : MonoBehaviour
             runningMargin >= 0 ? Teal : Coral,
             156f);
 
+        AddInfoCard(L("FORECAST & RESERVES", "预测与资金预留"),
+            L("Expected revenue $", "预计日营收 $") + _economySnapshot.ExpectedDailyGross
+            + L(" · wages $", " · 工资 $") + wages
+            + L(" · interest $", " · 利息 $") + ExpectedDailyInterest()
+            + L(" · upkeep $", " · 设施维护 $") + Sim.FacilityDailyUpkeep
+            + "\n" + L("Unpaid wages $", "累计待付工资 $") + Sim.Payroll.Owed
+            + L(" · cash after wage reserve $", " · 预留工资后现金 $") + (Sim.Cash - Sim.Payroll.Owed)
+            + "\n" + L("Estimate: current capacity, 18% room commission assumption; excludes future repairs, refunds and investments.",
+                "按当前房态、客房佣金18%估算；不含未来维修、退款与投资，不是保证收益。"), Gold, 128f);
+        BuildFinanceActions();
+        var save = FindFirstObjectByType<SaveCoordinator>();
+        AddInfoCard(L("PROGRESS PROTECTION", "进度保护"),
+            save != null ? save.StatusText : L("Save unavailable", "存档暂不可用"), Teal, 66f);
+        AddActionButton(L("SAVE NOW", "立即保存进度"), () => {
+            if (save != null) { save.SaveGame(); ShowToast(save.StatusText); ForceDrawerRefresh(); }
+        }, Teal, save != null);
         var tonight = Sim.OccupancyForNight(Sim.Clock.CurrentDay);
         AddInfoCard(
             L("TONIGHT " + tonight.Fraction, "今晚入住 " + tonight.Fraction),
@@ -1753,7 +1791,7 @@ public sealed class WorldManagementHud : MonoBehaviour
 
         if (Sim.Safebox.Balance > 0)
             AddActionButton(
-                L("COLLECT PROFIT  +$", "收取利润  +$") + Sim.Safebox.Balance,
+                L("COLLECT RECEIPTS  +$", "收取回款  +$") + Sim.Safebox.Balance,
                 CollectSafebox,
                 Gold,
                 true);
@@ -1768,10 +1806,12 @@ public sealed class WorldManagementHud : MonoBehaviour
             SkipToNextPhase,
             Ink,
             _skipTargetMinute < 0);
+        BuildDelegationDesk();
     }
 
     private void BuildPricingDesk()
     {
+        BuildOperatingStyles();
         AddSection(L("PRICE IS A PROMISE", "房价也是承诺"),
             L("Higher rates increase margin and guest expectations. The room still needs to deliver.",
               "价格越高，利润与客人期待同时上升；房间品质必须兑现承诺。"));
@@ -1787,11 +1827,11 @@ public sealed class WorldManagementHud : MonoBehaviour
                            + (active ? L("  · ACTIVE", "  · 当前") : "");
             string detail = PriceTemplateConsequence(template)
                             + "\nOLD $" + oldRate + "   BASIC $" + basicRate
-                            + "   BETTER $" + betterRate;
+                            + "   BETTER $" + betterRate + "\n" + PriceForecast(template);
             AddPlanButton(label, detail, () =>
             {
                 Sim.Pricing.DefaultTemplate = captured;
-                ShowToast(L("New rate strategy applied.", "新的房价策略已生效。"));
+                ShowToast(L("New quotes updated. Existing reservations keep their locked price.", "新报价已更新；已售预订仍按下单时锁定的价格结算。"));
                 ForceDrawerRefresh();
             }, active ? Gold : Ink, true);
         }
@@ -1811,10 +1851,17 @@ public sealed class WorldManagementHud : MonoBehaviour
 
     private void BuildStaffDesk()
     {
+        BuildEmployeeActions();
+        AddActionButton(Sim.ClearRuinsFirst ? L("PRIORITY: RESTORE RUINS", "当前优先：清理破败房")
+            : L("PRIORITY: GUEST ROOM TURNOVER", "当前优先：住客房周转"), () => {
+                Sim.ClearRuinsFirst = !Sim.ClearRuinsFirst;
+                ShowToast(L("Applies to the next task. Current work continues.", "从下一单任务生效，当前工序继续完成。"));
+                ForceDrawerRefresh();
+            }, Gold, true);
         int wages = Sim.Shifts.DailyWageCost(Sim.Staff, Sim.Clock.CurrentDay);
         AddSection(L("SERVICE CAPACITY", "服务产能"),
-            L("Saving wages reduces throughput. Bottlenecks directly turn rooms and guests into lost money.",
-              "省工资会降低产能；前台排队和脏房积压都会直接损失收入。"));
+            L("Each role keeps at least one worker. With several employees, lean shifts save wages but reduce throughput.",
+              "每岗至少保留一人；拥有多名员工后，精简排班才会减少人数、省下工资，也降低周转能力。"));
         AddInfoCard(
             L("TODAY'S TEAM", "今日团队"),
             L("On duty ", "在岗 ") + Sim.Staff.OnDutyCount + "/" + Sim.Staff.Count
@@ -1855,7 +1902,7 @@ public sealed class WorldManagementHud : MonoBehaviour
             int total = CountStaff(role);
             int productive = Sim.Staff.ProductiveCountOfRole(role);
             AddPlanButton(
-                RoleName(role) + "  " + productive + "/" + total,
+                RoleName(role) + "  " + Sim.Staff.OnDutyCountOfRole(role) + "/" + total + L(" on duty", " 人在岗"),
                 L("Shift: ", "排班：") + GameText.T(ShiftPlan.LabelOf(tier))
                 + "\n" + RoleConsequence(role),
                 () =>
@@ -1865,7 +1912,8 @@ public sealed class WorldManagementHud : MonoBehaviour
                         ? ShiftTier.Skeleton
                         : (ShiftTier)((int)current + 1);
                     Sim.Shifts.SetTier(captured, next);
-                    ShowToast(L("Shift plan updated for tomorrow.", "排班已更新，将在明天生效。"));
+                    HotelSimSceneBridge.Instance?.ApplyShiftPlan();
+                    ShowToast(L("Shift applied. Off-duty staff leave; returning staff walk to work.", "排班已执行：休班员工离场，上班员工走向岗位。"));
                     ForceDrawerRefresh();
                 },
                 Ink,
@@ -1921,16 +1969,16 @@ public sealed class WorldManagementHud : MonoBehaviour
         if (selectedRoom > 0 && Sim.Rooms.Contains(selectedRoom))
         {
             RoomRecord room = Sim.Rooms.At(selectedRoom);
-            if (room.state != RoomSimState.Ruined)
-            {
-                BuildFurnitureConfiguration(room);
-                AddSection(
-                    L("HOTEL-WIDE INVESTMENTS", "全酒店投资"),
-                    L("Continue below for room expansion, facilities and the next property.",
-                      "继续向下可查看客房扩张、设施与下一家酒店。"));
-            }
+            BuildRoomPriceBands(room);
+            BuildSelectedRoomPlans(room);
         }
+        BuildWarehouseExpansion();
+        AddSection(L("MATERIALS & COMMITMENTS", "材料与资金安排"),
+            L("Stock ", "库存 ") + Sim.Materials.Stock + L(" · unpaid wages $", " · 待付工资 $") + Sim.Payroll.Owed);
+        AddActionButton(L("BUY 10 MATERIALS  $", "购买 10 份材料  $") + Sim.Materials.PriceFor(10),
+            BuyMaterials, Teal, Sim.Cash >= Sim.Materials.PriceFor(10) && Sim.MaterialsThatFit(10) >= 10);
 
+        BuildBatchRenovation();
         AddSection(
             L("VISIBLE GROWTH", "肉眼可见的增长"),
             L("Every investment below changes capacity, guest activity or portfolio income.",
@@ -1943,8 +1991,8 @@ public sealed class WorldManagementHud : MonoBehaviour
             + L("  ·  sellable now ", "  ·  当前可售 ") + Sim.Rooms.SellableCount
             + "\n" + L("Hotel net +$", "本店净收入 +$")
             + FormatRate(_economySnapshot.NetPerMinute)
-            + L("/min  ·  portfolio +$", "/分钟  ·  组合收入 +$")
-            + FormatRate(HotelEmpireProgress.PassiveIncomePerMinute) + L("/min", "/分钟"),
+            + L("/day  ·  portfolio +$", "/营业日  ·  组合收入 +$")
+            + FormatRate(HotelEmpireProgress.PassiveIncomePerMinute) + L("/day", "/营业日"),
             Gold,
             88f);
 
@@ -1995,23 +2043,7 @@ public sealed class WorldManagementHud : MonoBehaviour
                 Gold,
                 true);
 
-        int nextHotel = HotelEmpireProgress.HotelCount + 1;
-        int acquisitionCost = HotelEmpireProgress.NextHotelCost;
-        int shortfall = Mathf.Max(0, acquisitionCost - Sim.Cash);
-        AddSection(
-            L("NEXT PROPERTY", "下一家酒店"),
-            L("Local growth eventually gives way to portfolio growth.",
-              "本店接近成熟后，继续通过收购扩大商业帝国。"));
-        AddPlanButton(
-            L("HOTEL NO. ", "第 ") + nextHotel + L(" ACQUISITION", " 家酒店收购"),
-            L("Cost $", "成本 $") + acquisitionCost
-            + L("  ·  portfolio income +$8.0/min", "  ·  酒店组合收入 +$8.0/分钟")
-            + (shortfall > 0
-                ? "\n" + L("Still needed $", "还差 $") + shortfall
-                : "\n" + L("Capital ready.", "资金已经到位。")),
-            AcquireNextHotel,
-            shortfall == 0 ? Gold : Ink,
-            shortfall == 0);
+        BuildPortfolioChoices();
 
         AddSection(
             L("SAVE", "存档"),
@@ -2096,7 +2128,7 @@ public sealed class WorldManagementHud : MonoBehaviour
                 L("PAY BANK  -$", "偿还贷款  -$") + suggested,
                 () => PayBank(suggested),
                 Coral,
-                suggested > 0 && Sim.Cash > 0);
+                suggested > 0 && Sim.Cash + Sim.Safebox.Balance > 0);
         }
 
         AddSection(L("SAVE SLOTS", "存档槽位"),
@@ -2131,19 +2163,26 @@ public sealed class WorldManagementHud : MonoBehaviour
     {
         AddSection(
             L("ROOM ", "房间 ") + room.number + "  ·  "
-            + GameText.T(RoomStatePalette.WordOf(room.state)),
-            L("Compare total investment with revenue gained per sold night.",
-              "以下按“现金 + 材料市价”计算投入，并用每个售出夜的增收计算回本。"));
+            + (Sim.Renovations.IsRenovating(room.number) ? L("UNDER CONSTRUCTION", "施工中") : GameText.T(RoomStatePalette.WordOf(room.state))),
+            L("Cash plus materials form the investment. Revenue assumes the target price band; construction does not raise prices automatically.",
+              "投入包含现金和材料市价；收益按目标挂牌价估算，装修不会自动涨价。"));
 
         if (Sim.Renovations.IsRenovating(room.number))
         {
+            var job = Sim.Renovations.JobFor(room.number);
             AddInfoCard(
-                L("WORK IN PROGRESS", "施工进行中"),
-                Sim.Renovations.DaysRemainingFor(room.number)
-                + L(" day(s) remaining.", " 天后完工。"),
+                L(job.isReclaim ? "RESTORING" : "RENOVATING", job.isReclaim ? "房间正在修复" : "房间正在装修")
+                    + "  " + Mathf.RoundToInt(job.Progress * 100f) + "%",
+                job.daysRemaining + L(" day(s) remaining. Progress updates at day close.\nPaid and scheduled; cleaning follows handover.",
+                    " 天后完工，进度在每日结算后更新。\n已支付并开工，交付后还需打扫。"),
                 Gold,
-                64f);
-            BuildFurnitureConfiguration(room);
+                108f);
+            var progress = CreatePanel("ConstructionProgressTrack", _drawerContent, BrassLine);
+            progress.gameObject.AddComponent<LayoutElement>().preferredHeight = 10f;
+            var fill = CreatePanel("CompletedWork", progress, Gold);
+            fill.anchorMin = Vector2.zero;
+            fill.anchorMax = new Vector2(job.Progress, 1f);
+            fill.offsetMin = fill.offsetMax = Vector2.zero;
             return;
         }
 
@@ -2202,7 +2241,7 @@ public sealed class WorldManagementHud : MonoBehaviour
                 () => StartRenovation(room.number, captured),
                 kind == RenovationPlanKind.Economy ? Gold : Ink,
                 room.state != RoomSimState.Occupied
-                && gain > 0
+                && Sim.CanRenovateRoom(room.number, kind)
                 && Sim.Cash >= cash
                 && Sim.Materials.Stock >= plan.materialsPerRoom);
         }
@@ -2211,6 +2250,7 @@ public sealed class WorldManagementHud : MonoBehaviour
 
     private void BuildFurnitureConfiguration(RoomRecord room)
     {
+        BuildRoomPackages(room);
         bool occupied = room.state == RoomSimState.Occupied;
         AddSection(
             L("FURNITURE LOADOUT", "家具配置"),
@@ -2408,7 +2448,7 @@ public sealed class WorldManagementHud : MonoBehaviour
                     : "BACK ON SALE  +$";
                 FloatingTextFx.Spawn(
                     position + Vector3.up * 1.4f,
-                    message + FormatRate(contribution) + "/MIN",
+                    message + FormatRate(contribution) + "/DAY",
                     TealSoft,
                     1.15f);
             }
@@ -2625,7 +2665,13 @@ public sealed class WorldManagementHud : MonoBehaviour
     private static void NavigateManagerTo(Vector3 worldPoint)
     {
         ManagerController manager = FindFirstObjectByType<ManagerController>();
-        if (manager != null) manager.MoveTo(worldPoint);
+        if (manager != null)
+        {
+            int managerFloor = FloorMath.FloorIndexForY(manager.transform.position.y);
+            if (managerFloor == FloorMath.FloorIndexForY(worldPoint.y)) manager.MoveTo(worldPoint);
+            else NotifyMessage(L("Manager is on floor ", "经理仍在 ")
+                + (managerFloor + 1) + L(". Use stairs or lift.", " 楼，请通过楼梯或电梯前往。"));
+        }
         FocusWorldPoint(worldPoint);
     }
 
@@ -2705,7 +2751,7 @@ public sealed class WorldManagementHud : MonoBehaviour
     }
 
     private static string FormatRate(float amount) =>
-        amount >= 10f ? amount.ToString("0") : amount.ToString("0.0");
+        (amount * HotelEconomyPresentation.RealMinutesPerGameDay).ToString("0");
 
     private static string OpenWord(bool open) =>
         open ? L("OPEN", "已开放") : L("LOCKED", "未开放");
@@ -2713,9 +2759,9 @@ public sealed class WorldManagementHud : MonoBehaviour
     private static string FormatPayback(int minutes)
     {
         if (minutes >= 99999) return L("NO RETURN", "无法回本");
-        if (minutes <= 120) return minutes + L(" min", " 分钟");
+        if (minutes <= 0) return L("IMMEDIATE", "立即");
         float days = minutes / HotelEconomyPresentation.RealMinutesPerGameDay;
-        return days.ToString(days < 10f ? "0.0" : "0") + L(" days", " 个营业日");
+        return L("~", "约 ") + days.ToString(days < 10f ? "0.0" : "0") + L(" days after handover", " 个营业日（完工后）");
     }
 
     private void StartFreeClearing(int roomNumber)
@@ -2812,7 +2858,7 @@ public sealed class WorldManagementHud : MonoBehaviour
     {
         int amount = Sim.CollectSafebox();
         ShowToast(amount > 0
-            ? L("Profit collected  +$", "利润已收取  +$") + amount
+            ? L("Receipts collected  +$", "回款已收取  +$") + amount
             : L("The safebox is empty.", "保险箱目前是空的。"));
         ForceAllRefresh();
     }
@@ -2835,8 +2881,7 @@ public sealed class WorldManagementHud : MonoBehaviour
             return;
         }
 
-        int paid = Sim.PayLoanInstallment(amount);
-        if (paid > 0) economy.RepayLoan(paid);
+        int paid = economy.RepayLoan(amount);
         ShowToast(paid > 0
             ? L("Paid the bank  -$", "已偿还贷款  -$") + paid
             : L("No cash available for repayment.", "当前没有可用于还款的现金。"));
@@ -2940,7 +2985,7 @@ public sealed class WorldManagementHud : MonoBehaviour
     private void SkipToNextPhase()
     {
         if (_skipTargetMinute >= 0 || Sim == null) return;
-        if (!PhaseScheduler.CanSkip(Sim.Clock.CurrentMinute, 0, out string reason))
+        if (!PhaseScheduler.CanSkip(Sim.Clock.CurrentMinute, HotelSimSceneBridge.Instance != null ? HotelSimSceneBridge.Instance.BlockingIncidentCount : 0, out string reason))
         {
             ShowToast(GameText.T(reason));
             return;
@@ -2966,6 +3011,7 @@ public sealed class WorldManagementHud : MonoBehaviour
 
     private void SetDrawerOpen(bool open)
     {
+        if (open && !_drawerOpen) _drawerScrollReset = true;
         _drawerOpen = open;
         _drawer.gameObject.SetActive(open);
         if (open)
@@ -2992,6 +3038,7 @@ public sealed class WorldManagementHud : MonoBehaviour
 
     private void SelectTab(DeskTab tab)
     {
+        if (_tab != tab) _drawerScrollReset = true;
         if (_drawerOpen && _tab == tab)
         {
             SetDrawerOpen(false);
@@ -3007,8 +3054,10 @@ public sealed class WorldManagementHud : MonoBehaviour
         for (int i = 0; i < _navButtons.Count; i++)
         {
             bool active = _drawerOpen && i == (int)_tab;
-            _navButtons[i].GetComponent<Image>().color = active ? Gold : Paper;
-            _navLabels[i].color = active ? Ink : Cream;
+            _navButtons[i].GetComponent<Image>().color = active ? Teal : RevivalPaper;
+            var icon = _navButtons[i].GetComponentInChildren<HotelGlyph>();
+            if (icon != null) icon.color = active ? Cream : Teal;
+            _navLabels[i].color = active ? Cream : RevivalInk;
         }
     }
 
@@ -3058,20 +3107,26 @@ public sealed class WorldManagementHud : MonoBehaviour
             "第 " + closedDay + " 天已结算  ·  第 " + Sim.Clock.CurrentDay + " 天等待开门");
 
         DaySettlementResult last = Sim.LastSettlement;
-        int net = last.NetProfit;
+        var reportBridge = HotelSimSceneBridge.Instance;
+        int interestAccrued = reportBridge != null ? reportBridge.LastInterestAccrued : 0;
+        int upkeep = reportBridge != null ? reportBridge.LastFacilityUpkeep : 0;
+        int net = last.NetProfit - Sim.WagesAccruedToday - interestAccrued;
         AddMorningInfo(
             net >= 0
                 ? L("THE HOTEL MADE +$", "酒店昨日赚了 +$") + net
                 : L("THE HOTEL LOST -$", "酒店昨日亏了 -$") + Mathf.Abs(net),
-            L("Room income  +$", "客房收入  +$") + Sim.GrossIncomeToday
+            L("Total revenue  +$", "全部营收  +$") + Sim.GrossIncomeToday
+            + "\n" + L("Wages accrued  -$", "本日应计工资  -$") + Sim.WagesAccruedToday
+            + "\n" + L("Facility upkeep  -$", "设施维护费  -$") + upkeep
+            + "\n" + L("Interest added to debt  -$", "计入债务的利息  -$") + interestAccrued
             + "\n" + L("Channel fees  -$", "平台佣金  -$") + Sim.CommissionToday
-            + "\n" + L("Profit into safebox  +$", "进入保险箱的利润  +$") + last.netToSafebox
+            + "\n" + L("Receipts into safebox  +$", "进入保险箱的回款  +$") + last.netToSafebox
             + (last.cashPaidFromReserve > 0
                 ? "\n" + L("Cash used to cover loss  -$", "现金垫付亏损  -$")
                   + last.cashPaidFromReserve
                 : ""),
             net >= 0 ? Teal : Coral,
-            last.cashPaidFromReserve > 0 ? 118f : 96f);
+            last.cashPaidFromReserve > 0 ? 190f : 168f);
 
         AddMorningInfo(
             L("OPERATIONS", "昨日经营"),
@@ -3082,9 +3137,11 @@ public sealed class WorldManagementHud : MonoBehaviour
             Gold,
             82f);
 
+        AddMorningDelegation();
+        AddMorningDiagnosis();
         if (Sim.Safebox.Balance > 0)
             AddMorningAction(
-                L("COLLECT PROFIT  +$", "收取保险箱利润  +$") + Sim.Safebox.Balance,
+                L("COLLECT RECEIPTS  +$", "收取保险箱回款  +$") + Sim.Safebox.Balance,
                 CollectSafebox,
                 Gold,
                 true);
@@ -3142,7 +3199,7 @@ public sealed class WorldManagementHud : MonoBehaviour
                     L("PAY THE BANK  -$", "偿还银行  -$") + suggested,
                     () => PayBank(suggested),
                     Coral,
-                    Sim.Cash > 0);
+                    Sim.Cash + Sim.Safebox.Balance > 0);
         }
 
         IReadOnlyList<HotelSim.RefundRequest> refunds = Sim.PendingRefunds;
@@ -3290,6 +3347,7 @@ public sealed class WorldManagementHud : MonoBehaviour
         BuildContextSheet();
         BuildMorningReport();
         BuildToast();
+        BuildSessionButton();
         UpdateSafeArea(force: true);
         SetDrawerOpen(false);
     }
@@ -3366,7 +3424,7 @@ public sealed class WorldManagementHud : MonoBehaviour
         _morningReport.gameObject.SetActive(false);
     }
 
-    private void BuildTop()
+    private void BuildFirstPassTop()
     {
         _topPanel = CreatePanel("EconomyHeader", _safeRoot, Glass);
         SetAnchors(
@@ -3396,7 +3454,7 @@ public sealed class WorldManagementHud : MonoBehaviour
         _dayTimeLabel.enableAutoSizing = true;
         _dayTimeLabel.fontSizeMin = 9.5f;
         _dayTimeLabel.fontSizeMax = 12.5f;
-        _dayTimeLabel.enableWordWrapping = false;
+        _dayTimeLabel.textWrappingMode = TMPro.TextWrappingModes.NoWrap;
         _dayTimeLabel.overflowMode = TextOverflowModes.Ellipsis;
         SetAnchors(
             _dayTimeLabel.rectTransform,
@@ -3473,7 +3531,7 @@ public sealed class WorldManagementHud : MonoBehaviour
             out unusedGoalLabel,
             "",
             Paper,
-            OpenOpportunity);
+            OpenJourneyObjective);
         SetAnchors(
             goalRect,
             new Vector2(0f, 0f),
@@ -3503,7 +3561,7 @@ public sealed class WorldManagementHud : MonoBehaviour
             InkSoft,
             TextAlignmentOptions.TopLeft,
             false);
-        _goalBenefitLabel.enableWordWrapping = false;
+        _goalBenefitLabel.textWrappingMode = TMPro.TextWrappingModes.NoWrap;
         _goalBenefitLabel.overflowMode = TextOverflowModes.Ellipsis;
         SetAnchors(
             _goalBenefitLabel.rectTransform,
@@ -3623,7 +3681,7 @@ public sealed class WorldManagementHud : MonoBehaviour
             _opportunityBar,
             new Vector2(0f, 0f),
             new Vector2(1f, 0f),
-            new Vector2(8f, 72f),
+            new Vector2(10f, 88f),
             new Vector2(-8f, 132f));
         AddOutline(_opportunityBar, BrassLine, 1f);
         unused.gameObject.SetActive(false);
@@ -3664,7 +3722,7 @@ public sealed class WorldManagementHud : MonoBehaviour
             InkSoft,
             TextAlignmentOptions.TopLeft,
             false);
-        _opportunityDetail.enableWordWrapping = false;
+        _opportunityDetail.textWrappingMode = TMPro.TextWrappingModes.NoWrap;
         _opportunityDetail.overflowMode = TextOverflowModes.Ellipsis;
         SetAnchors(
             _opportunityDetail.rectTransform,
@@ -3689,7 +3747,7 @@ public sealed class WorldManagementHud : MonoBehaviour
             Vector2.zero);
     }
 
-    private void BuildBottomNavigation()
+    private void BuildFirstPassBottomNavigation()
     {
         _bottomNav = CreatePanel("BottomNavigation", _safeRoot, Glass);
         SetAnchors(
@@ -3711,6 +3769,7 @@ public sealed class WorldManagementHud : MonoBehaviour
         AddNavButton(DeskTab.Pricing, L("RATES", "房价"));
         AddNavButton(DeskTab.Staff, L("TEAM", "员工"));
         AddNavButton(DeskTab.Assets, L("EMPIRE", "帝国"));
+        AddNavButton(DeskTab.Rooms, L("ROOMS", "客房"));
     }
 
     private void BuildLegacyBottomNavigation()
@@ -3748,7 +3807,7 @@ public sealed class WorldManagementHud : MonoBehaviour
             TextAlignmentOptions.MidlineLeft, true);
         SetAnchors(_alertLabel.rectTransform, Vector2.zero, new Vector2(0.79f, 1f),
             new Vector2(14f, 4f), new Vector2(-4f, -4f));
-        _alertLabel.enableWordWrapping = true;
+        _alertLabel.textWrappingMode = TMPro.TextWrappingModes.Normal;
 
         RectTransform goRect;
         _alertGoButton = CreateButton("Go", _alertStrip, out goRect, out _alertGoLabel,
@@ -3799,10 +3858,10 @@ public sealed class WorldManagementHud : MonoBehaviour
     {
         _drawer = CreatePanel("ManagementDesk", _safeRoot, Ledger);
         SetAnchors(_drawer, new Vector2(0f, 0f), new Vector2(1f, 0.68f),
-            new Vector2(8f, 72f), new Vector2(-8f, -8f));
+            new Vector2(10f, 88f), new Vector2(-10f, -8f));
         AddOutline(_drawer, BrassLine, 1.4f);
 
-        var headerBand = CreatePanel("HeaderBand", _drawer, Walnut);
+        var headerBand = CreatePanel("HeaderBand", _drawer, Paper);
         SetAnchors(headerBand, new Vector2(0f, 1f), new Vector2(1f, 1f),
             new Vector2(0f, -58f), Vector2.zero);
         headerBand.SetAsFirstSibling();
@@ -3878,7 +3937,7 @@ public sealed class WorldManagementHud : MonoBehaviour
 
         _roomDetail = CreateText("RoomDetail", _roomCard, 12.5f, InkSoft,
             TextAlignmentOptions.TopLeft, false);
-        _roomDetail.enableWordWrapping = true;
+        _roomDetail.textWrappingMode = TMPro.TextWrappingModes.Normal;
         SetAnchors(_roomDetail.rectTransform, new Vector2(0f, 0.22f), new Vector2(1f, 0.68f),
             new Vector2(16f, 5f), new Vector2(-14f, -2f));
         _roomDetail.overflowMode = TextOverflowModes.Truncate;
@@ -3907,7 +3966,7 @@ public sealed class WorldManagementHud : MonoBehaviour
     {
         _contextSheet = CreatePanel("WorldActionSheet", _safeRoot, Ledger);
         SetAnchors(_contextSheet, new Vector2(0f, 0f), new Vector2(1f, 0f),
-            new Vector2(8f, 72f), new Vector2(-8f, 260f));
+            new Vector2(10f, 88f), new Vector2(-8f, 260f));
         AddOutline(_contextSheet, BrassLine, 1.4f);
 
         var accent = CreatePanel("Accent", _contextSheet, Gold);
@@ -3968,7 +4027,7 @@ public sealed class WorldManagementHud : MonoBehaviour
         titleText.text = title;
         var subText = CreateText("Subtitle", item, 11.5f, InkSoft,
             TextAlignmentOptions.TopLeft, false);
-        subText.enableWordWrapping = true;
+        subText.textWrappingMode = TMPro.TextWrappingModes.Normal;
         SetAnchors(subText.rectTransform, Vector2.zero, new Vector2(1f, 0.45f),
             new Vector2(8f, 0f), new Vector2(-8f, 0f));
         subText.text = subtitle;
@@ -3994,14 +4053,14 @@ public sealed class WorldManagementHud : MonoBehaviour
             Vector2.zero, new Vector2(5f, 0f));
         var titleText = CreateText("Title", item, 15f, Cream,
             TextAlignmentOptions.TopLeft, true);
-        SetAnchors(titleText.rectTransform, new Vector2(0f, 0.62f), Vector2.one,
-            new Vector2(14f, 2f), new Vector2(-10f, -8f));
+        SetAnchors(titleText.rectTransform, new Vector2(0f, 1f), Vector2.one,
+            new Vector2(14f, -32f), new Vector2(-10f, -6f));
         titleText.text = title;
         var bodyText = CreateText("Body", item, 12.5f, InkSoft,
             TextAlignmentOptions.TopLeft, false);
-        bodyText.enableWordWrapping = true;
-        SetAnchors(bodyText.rectTransform, Vector2.zero, new Vector2(1f, 0.7f),
-            new Vector2(14f, 8f), new Vector2(-10f, 0f));
+        bodyText.textWrappingMode = TMPro.TextWrappingModes.Normal;
+        SetAnchors(bodyText.rectTransform, Vector2.zero, Vector2.one,
+            new Vector2(14f, 8f), new Vector2(-10f, -36f));
         bodyText.text = body;
     }
 
@@ -4031,7 +4090,7 @@ public sealed class WorldManagementHud : MonoBehaviour
         titleText.text = title;
         var subtitleText = CreateText("Subtitle", item, 11.5f, InkSoft,
             TextAlignmentOptions.TopLeft, false);
-        subtitleText.enableWordWrapping = true;
+        subtitleText.textWrappingMode = TMPro.TextWrappingModes.Normal;
         SetAnchors(subtitleText.rectTransform, Vector2.zero, new Vector2(1f, 0.47f),
             new Vector2(8f, 0f), new Vector2(-8f, 0f));
         subtitleText.text = subtitle;
@@ -4054,16 +4113,16 @@ public sealed class WorldManagementHud : MonoBehaviour
 
         var titleText = CreateText("Title", item, 15.5f, Cream,
             TextAlignmentOptions.TopLeft, true);
-        SetAnchors(titleText.rectTransform, new Vector2(0f, 0.66f), Vector2.one,
-            new Vector2(14f, 2f), new Vector2(-10f, -8f));
+        SetAnchors(titleText.rectTransform, new Vector2(0f, 1f), Vector2.one,
+            new Vector2(14f, -32f), new Vector2(-10f, -6f));
         titleText.text = title;
 
         var bodyText = CreateText("Body", item, 12f, InkSoft,
             TextAlignmentOptions.TopLeft, false);
-        bodyText.enableWordWrapping = true;
+        bodyText.textWrappingMode = TMPro.TextWrappingModes.Normal;
         bodyText.overflowMode = TextOverflowModes.Truncate;
-        SetAnchors(bodyText.rectTransform, Vector2.zero, new Vector2(1f, 0.72f),
-            new Vector2(14f, 8f), new Vector2(-10f, 0f));
+        SetAnchors(bodyText.rectTransform, Vector2.zero, Vector2.one,
+            new Vector2(14f, 8f), new Vector2(-10f, -36f));
         bodyText.text = body;
     }
 
@@ -4101,7 +4160,7 @@ public sealed class WorldManagementHud : MonoBehaviour
         button.interactable = interactable;
         Destroy(ignored.gameObject);
         var element = button.gameObject.AddComponent<LayoutElement>();
-        element.preferredHeight = 74f;
+        element.preferredHeight = Mathf.Max(104f, 68f + detail.Split('\n').Length * 22f);
 
         Color planText = ContrastText(interactable ? color : Slate);
         var titleText = CreateText("Title", rect, 15f, planText,
@@ -4111,7 +4170,7 @@ public sealed class WorldManagementHud : MonoBehaviour
         titleText.text = title;
         var detailText = CreateText("Detail", rect, 11.5f, planText,
             TextAlignmentOptions.TopLeft, false);
-        detailText.enableWordWrapping = true;
+        detailText.textWrappingMode = TMPro.TextWrappingModes.Normal;
         SetAnchors(detailText.rectTransform, Vector2.zero, new Vector2(1f, 0.58f),
             new Vector2(14f, 7f), new Vector2(-12f, 0f));
         detailText.text = detail;
@@ -4128,7 +4187,7 @@ public sealed class WorldManagementHud : MonoBehaviour
         layout.childControlHeight = true;
         layout.childForceExpandWidth = true;
         layout.childForceExpandHeight = true;
-        foreach (float speed in new[] { 0.25f, 1f, 2f })
+        foreach (float speed in new[] { 0f, 0.25f, 1f, 2f })
         {
             float captured = speed;
             RectTransform rect;
@@ -4138,7 +4197,7 @@ public sealed class WorldManagementHud : MonoBehaviour
                 row,
                 out rect,
                 out text,
-                (_speed == speed ? "● " : "") + speed.ToString("0.##") + "x",
+                (_speed == speed ? "● " : "") + (speed == 0 ? L("PAUSE", "暂停") : speed.ToString("0.##") + "x"),
                 _speed == speed ? Gold : Ink,
                 () => SetSpeed(captured));
             button.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
@@ -4148,7 +4207,9 @@ public sealed class WorldManagementHud : MonoBehaviour
     private void ShowMoneyBurst(string message, Color color)
     {
         if (_safeRoot == null || !_safeRoot.gameObject.activeInHierarchy) return;
-        StartCoroutine(MoneyBurstRoutine(message, color));
+        if (_moneyBurstRoutine != null) StopCoroutine(_moneyBurstRoutine);
+        if (_moneyBurstText != null) Destroy(_moneyBurstText.gameObject);
+        _moneyBurstRoutine = StartCoroutine(MoneyBurstRoutine(message, color));
     }
 
     private IEnumerator MoneyBurstRoutine(string message, Color color)
@@ -4160,7 +4221,12 @@ public sealed class WorldManagementHud : MonoBehaviour
             color,
             TextAlignmentOptions.Center,
             true);
-        SetAnchors(text.rectTransform, new Vector2(0.2f, 0.82f), new Vector2(0.8f, 0.82f),
+        _moneyBurstText = text;
+        text.enableAutoSizing = true;
+        text.fontSizeMin = 14f;
+        text.fontSizeMax = 21f;
+        text.textWrappingMode = TextWrappingModes.NoWrap;
+        SetAnchors(text.rectTransform, new Vector2(0.1f, 0.79f), new Vector2(0.9f, 0.79f),
             new Vector2(0f, -24f), new Vector2(0f, 24f));
         text.text = message;
         var group = text.gameObject.AddComponent<CanvasGroup>();
@@ -4170,7 +4236,7 @@ public sealed class WorldManagementHud : MonoBehaviour
         {
             t += Time.unscaledDeltaTime;
             float p = Mathf.Clamp01(t / 1.1f);
-            text.rectTransform.anchoredPosition = start + Vector2.up * (28f * p);
+            text.rectTransform.anchoredPosition = start + Vector2.up * (8f * p);
             group.alpha = 1f - Mathf.Clamp01((p - 0.55f) / 0.45f);
             yield return null;
         }
@@ -4218,26 +4284,25 @@ public sealed class WorldManagementHud : MonoBehaviour
     {
         if (_safeRoot == null || Screen.width <= 0 || Screen.height <= 0) return;
         Rect safe = Screen.safeArea;
-        if (!force && safe == _lastSafeArea) return;
+        if (!force && safe == _lastSafeArea && _lastScreenSize == new Vector2Int(Screen.width, Screen.height)) return;
+        _lastScreenSize = new Vector2Int(Screen.width, Screen.height);
         _lastSafeArea = safe;
 
-        // Device Simulator reports safeArea in the emulated device resolution,
-        // while Screen.width/height can be the scaled editor viewport.
-        Resolution resolution = Screen.currentResolution;
-        float coordinateWidth = safe.xMax > Screen.width + 1f
-            ? Mathf.Max(1f, resolution.width)
-            : Screen.width;
-        float coordinateHeight = safe.yMax > Screen.height + 1f
-            ? Mathf.Max(1f, resolution.height)
-            : Screen.height;
-        _safeRoot.anchorMin = new Vector2(
-            Mathf.Clamp01(safe.xMin / coordinateWidth),
-            Mathf.Clamp01(safe.yMin / coordinateHeight));
-        _safeRoot.anchorMax = new Vector2(
-            Mathf.Clamp01(safe.xMax / coordinateWidth),
-            Mathf.Clamp01(safe.yMax / coordinateHeight));
+        // A stale Device Simulator rectangle must never shrink the UI to a
+        // fraction of an ordinary Game View. Physical-device safe areas remain valid.
+        safe = ValidatedSafeArea(safe, Screen.width, Screen.height);
+        _safeRoot.anchorMin = new Vector2(safe.xMin / Screen.width, safe.yMin / Screen.height);
+        _safeRoot.anchorMax = new Vector2(safe.xMax / Screen.width, safe.yMax / Screen.height);
         _safeRoot.offsetMin = Vector2.zero;
         _safeRoot.offsetMax = Vector2.zero;
+    }
+
+    public static Rect ValidatedSafeArea(Rect safe, int width, int height)
+    {
+        if (safe.width <= 0 || safe.height <= 0 || safe.xMin < 0 || safe.yMin < 0
+            || safe.xMax > width + 1 || safe.yMax > height + 1)
+            return new Rect(0, 0, Mathf.Max(1, width), Mathf.Max(1, height));
+        return safe;
     }
 
     private static void EnsureEventSystem()
@@ -4265,6 +4330,10 @@ public sealed class WorldManagementHud : MonoBehaviour
         image.sprite = RoundedSprite;
         image.type = Image.Type.Sliced;
         image.color = color;
+        if (name == "ManagementDesk" || name == "SelectedRoomInvestment" || name == "WorldActionSheet" || name == "MorningReport" || name == "MenuCard") rect.gameObject.AddComponent<HotelPanelReveal>();
+        if (name == "EconomyHeader" || name == "BottomNavigation" || name == "ManagementDesk" || name == "MenuCard" || name == "InfoCard" || name == "EmployeePortraitCard") {
+            var shadow = rect.gameObject.AddComponent<Shadow>(); shadow.effectColor = new Color(.12f,.16f,.12f,.20f); shadow.effectDistance = new Vector2(0,-4);
+        }
         return rect;
     }
 
@@ -4287,12 +4356,13 @@ public sealed class WorldManagementHud : MonoBehaviour
         button.targetGraphic = image;
         button.transition = Selectable.Transition.ColorTint;
         ColorBlock colors = button.colors;
-        colors.highlightedColor = Color.Lerp(color, White, 0.12f);
-        colors.pressedColor = Color.Lerp(color, Color.black, 0.18f);
-        colors.disabledColor = new Color(Slate.r, Slate.g, Slate.b, 0.55f);
+        colors.highlightedColor = new Color(1.08f,1.08f,1.08f,1);
+        colors.pressedColor = new Color(.84f,.84f,.84f,1);
+        colors.disabledColor = new Color(.7f,.7f,.7f,.6f);
         colors.colorMultiplier = 1f;
         button.colors = colors;
-        if (onClick != null) button.onClick.AddListener(() => onClick());
+        rect.gameObject.AddComponent<HotelButtonMotion>();
+        if (onClick != null) button.onClick.AddListener(() => { HotelAudio.Click(); onClick(); });
 
         label = CreateText("Label", rect, 13.5f, ContrastText(color),
             TextAlignmentOptions.Center, true);
@@ -4313,13 +4383,20 @@ public sealed class WorldManagementHud : MonoBehaviour
         var text = rect.gameObject.AddComponent<TextMeshProUGUI>();
         text.font = RuntimeFont;
         text.fontSize = size;
-        text.color = color;
+        Image surface = null;
+        for (Transform node=parent;node!=null;node=node.parent) {
+            var candidate=node.GetComponent<Image>();
+            if(candidate!=null && candidate.color.a>.3f){surface=candidate;break;}
+        }
+        bool lightSurface = surface != null && surface.color.a > .3f && (surface.color.r*.2126f+surface.color.g*.7152f+surface.color.b*.0722f) > .55f;
+        text.color = lightSurface && (color == Cream || color == White || color == Gold || color == InkSoft)
+            ? (color == InkSoft ? Hex("#726A56") : RevivalInk) : color;
         text.alignment = alignment;
         text.fontStyle = bold ? FontStyles.Bold : FontStyles.Normal;
         text.characterSpacing = 0.35f;
         text.raycastTarget = false;
         text.overflowMode = TextOverflowModes.Truncate;
-        text.enableWordWrapping = false;
+        text.textWrappingMode = TMPro.TextWrappingModes.NoWrap;
         return text;
     }
 
@@ -4354,10 +4431,14 @@ public sealed class WorldManagementHud : MonoBehaviour
         return luminance > 0.43f ? Ink : Cream;
     }
 
+    internal static TMP_FontAsset PresentationFont => RuntimeFont;
+
     private static TMP_FontAsset RuntimeFont
     {
         get
         {
+            if (_runtimeFont != null) return _runtimeFont;
+            _runtimeFont = Resources.Load<TMP_FontAsset>("HotelFonts/HotelCjk");
             if (_runtimeFont != null) return _runtimeFont;
 
             string[] installed = Font.GetOSInstalledFontNames();

@@ -38,8 +38,7 @@ public sealed class HotelBusinessHotspot : MonoBehaviour
 
 public static class HotelBusinessHotspotInstaller
 {
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
-    private static void Install()
+    internal static void Install()
     {
         if (Object.FindFirstObjectByType<HotelSimSceneBridge>() == null) return;
 

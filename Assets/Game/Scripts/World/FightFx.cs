@@ -26,7 +26,7 @@ public class FightFx : MonoBehaviour
         _velocities = new Vector3[count];
         for (int i = 0; i < count; i++)
         {
-            var quad = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            var quad = GameObject.CreatePrimitive(PrimitiveType.Sphere);
             Destroy(quad.GetComponent<Collider>());
             quad.transform.SetParent(transform);
             quad.transform.localPosition = Random.insideUnitSphere * 0.3f;

@@ -30,6 +30,8 @@ public class RoomFurnitureView : MonoBehaviour
 
     private void OnEnable()
     {
+        var preview = transform.Find("RevivalFurniturePreview");
+        if (Application.isPlaying && preview != null) preview.gameObject.SetActive(false);
         if (roomNumber <= 0) roomNumber = RoomSceneBinder.ParseRoomNumber(gameObject.name);
         _doorOnPositiveZ = transform.localPosition.z < 0f;
         EnsureRoot();
@@ -132,6 +134,8 @@ public class RoomFurnitureView : MonoBehaviour
             z = anchor.localZ;
         }
 
+        if (kind.slot == FurnitureSlot.Bed && item.anchorId == 1) { x = -.65f; z = _doorOnPositiveZ ? -1.1f : 1.1f; }
+        if (kind.slot == FurnitureSlot.Seating && item.anchorId == 4) z += _doorOnPositiveZ ? .65f : -.65f;
         model.transform.localPosition = new Vector3(x, 0f, z);
 
         float roomFacing = _doorOnPositiveZ ? 180f : 0f;

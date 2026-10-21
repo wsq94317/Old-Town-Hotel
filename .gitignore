@@ -135,3 +135,10 @@ production/
 /Sim.Tests/[Bb]in/
 /Sim.Tests/[Oo]bj/
 
+
+
+# Local playtest captures, save snapshots and Unity recovery copies
+/Captures/
+/Assets/_Recovery/
+/Assets/_Recovery.meta
+/Generated Image/

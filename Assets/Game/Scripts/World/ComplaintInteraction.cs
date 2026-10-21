@@ -38,6 +38,8 @@ public class ComplaintInteraction : MonoBehaviour
 
     private void Update()
     {
+        var worldHost = HotelSimSceneBridge.Instance;
+        if (worldHost != null && (worldHost.IsSuspended || worldHost.AwaitingMorningReport)) return;
         if (demandLoop == null || manager == null) return;
         if (_rng == null) _rng = new System.Random(rngSeed); // 热重载自愈：Choose 里 NRE 会杀掉整个 OnGUI
 

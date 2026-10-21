@@ -225,6 +225,7 @@ public class WorldInputController : MonoBehaviour
         var facility = hit.collider.GetComponentInParent<StaffFacilityNode>();
         if (facility != null)
         {
+            if (ReturnToManagerIfViewingOtherFloor()) return;
             StaffFacilitySystem.EnsureInScene().OnFacilityTapped(facility, manager);
             ClickMarkerFx.Spawn(facility.Anchor);
             return;
@@ -233,6 +234,7 @@ public class WorldInputController : MonoBehaviour
         var staff = hit.collider.GetComponentInParent<StaffAgent>();
         if (staff != null)
         {
+            if (ReturnToManagerIfViewingOtherFloor()) return;
             var interaction = FindFirstObjectByType<ManagerInteraction>();
             if (interaction != null) { interaction.OnStaffTapped(staff); return; }
         }
@@ -246,15 +248,33 @@ public class WorldInputController : MonoBehaviour
             return;
         }
 
+        if (ReturnToManagerIfViewingOtherFloor()) return;
         WorldManagementHud.ClearWorldSelection();
         if (manager != null && manager.TryMoveTo(movementTarget, out Vector3 destination))
         {
-            ClickMarkerFx.Spawn(movementTarget);
+            ClickMarkerFx.Spawn(destination);
         }
         else
         {
             ClickMarkerFx.SpawnRejected(movementTarget);
         }
+    }
+
+    /// <summary>Remote staff/room inspection never commands movement on a hidden floor.</summary>
+    public bool ReturnToManagerIfViewingOtherFloor()
+    {
+        if (manager == null) manager = FindFirstObjectByType<ManagerController>();
+        if (cameraRig == null) cameraRig = FindFirstObjectByType<ManagerCameraRig>();
+        if (manager == null || cameraRig == null) return false;
+        int actualFloor = FloorMath.FloorIndexForY(manager.transform.position.y);
+        if (actualFloor == cameraRig.ViewedFloor) return false;
+        cameraRig.ReturnToTarget(instant: true);
+        WorldManagementHud.ClearWorldSelection();
+        WorldManagementHud.NotifyMessage(GameText.UseChinese
+            ? "已返回 " + (actualFloor + 1) + " 楼经理身边，请再次点击地面移动。"
+            : "Back at manager (floor " + (actualFloor + 1) + "). Tap again to move.");
+        TapDebug += " -> returned to manager floor; movement cancelled";
+        return true;
     }
 
     /// <summary>Selects the nearest visible doorway footprint intersected by the ray.</summary>

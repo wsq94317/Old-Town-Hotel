@@ -11,13 +11,13 @@ using UnityEngine.SceneManagement;
 /// </summary>
 public static class HotelSceneExpansion
 {
-    public const int ExpandedRoomCount = 24;
-    public const int StartingDerelictRooms = 16;
+    public const int ExpandedRoomCount = 100;
+    public const int StartingDerelictRooms = 92;
 
-    private const float WestEdge = -20f;
+    private const float WestEdge = -115f;
     private const float EastEdge = 10f;
-    private const float ShellCenterX = -5f;
-    private const float ShellWidth = 30f;
+    private const float ShellCenterX = -52.5f;
+    private const float ShellWidth = 125f;
     private const float RoomRowZ = 4f;
     private const float DoorRowZ = 1.5f;
     private const float NorthSouthEdge = 6.5f;
@@ -39,7 +39,7 @@ public static class HotelSceneExpansion
         }
     }
 
-    private static readonly RoomSpec[] AddedRooms =
+    private static readonly RoomSpec[] OriginalAddedRooms =
     {
         new RoomSpec(209, 2, -12.5f, RoomRowZ),
         new RoomSpec(210, 2, -17.5f, RoomRowZ),
@@ -55,8 +55,18 @@ public static class HotelSceneExpansion
         new RoomSpec(312, 3, 7.5f, -RoomRowZ)
     };
 
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
-    private static void Install()
+    private static readonly RoomSpec[] AddedRooms = BuildAddedRooms();
+    private static RoomSpec[] BuildAddedRooms()
+    {
+        var rooms = new List<RoomSpec>(OriginalAddedRooms);
+        for (int floor = 2; floor <= 3; floor++)
+            for (int n = 13; n <= 50; n++)
+                rooms.Add(new RoomSpec(floor * 100 + n, floor,
+                    -22.5f - ((n - 13) / 2) * 5f, n % 2 == 1 ? RoomRowZ : -RoomRowZ));
+        return rooms.ToArray();
+    }
+
+    internal static void Install()
     {
         HotelSimSceneBridge bridge = UnityEngine.Object.FindFirstObjectByType<HotelSimSceneBridge>();
         if (bridge == null) return;
@@ -65,7 +75,7 @@ public static class HotelSceneExpansion
         Transform world = FindRoot(scene, "World");
         Transform roomData = FindRoot(scene, "RoomData");
         if (world == null || roomData == null) return;
-        if (FindRoomEntity(312) != null) return;
+        if (FindRoomEntity(350) != null) return;
 
         Transform floor2 = world.Find("Floor2");
         Transform floor3 = world.Find("Floor3");
@@ -84,7 +94,7 @@ public static class HotelSceneExpansion
 
         ManagerCameraRig cameraRig = UnityEngine.Object.FindFirstObjectByType<ManagerCameraRig>();
         if (cameraRig != null)
-            cameraRig.SetWorldBounds(new Vector2(-18.5f, -5.2f), new Vector2(8.5f, 5.2f));
+            cameraRig.SetWorldBounds(new Vector2(-113.5f, -5.2f), new Vector2(8.5f, 5.2f));
 
         RefreshRoomConsumers();
         RebuildRuntimeNavigation(world);
@@ -129,6 +139,10 @@ public static class HotelSceneExpansion
             spec.Z);
         Room2DEntity entity = entityObject.GetComponent<Room2DEntity>();
         entity.SetIdentity(spec.Floor, spec.Number);
+        if (spec.Number % 100 > 12) {
+            int mix = (spec.Number % 100 - 1) % 6;
+            entity.roomCategory = mix < 3 ? Room2DRoomCategory.Single : mix < 5 ? Room2DRoomCategory.Twin : Room2DRoomCategory.Family;
+        }
         entity.SetState(Room2DState.Ready);
 
         EnsureRoomVisual(spec, floor2, floor3, entity);
@@ -209,11 +223,11 @@ public static class HotelSceneExpansion
         Transform art = floor.Find("ArtPass_LowPoly");
         if (art == null) return;
 
-        SetLocalXAndWidth(art.Find("CutawayTrim_S"), ShellCenterX, 29.72f);
+        SetLocalXAndWidth(art.Find("CutawayTrim_S"), ShellCenterX, ShellWidth - .28f);
         SetLocalZ(art.Find("CutawayTrim_S"), -6.36f);
-        SetLocalX(art.Find("CutawayTrim_W"), -19.86f);
+        SetLocalX(art.Find("CutawayTrim_W"), WestEdge + .14f);
         SetLocalZAndDepth(art.Find("CutawayTrim_W"), 0f, 12.7f);
-        SetLocalXAndWidth(art.Find("CorridorRunner"), -5.35f, 27.2f);
+        SetLocalXAndWidth(art.Find("CorridorRunner"), ShellCenterX - .35f, ShellWidth - 2.8f);
         SetLocalZAndDepth(art.Find("CorridorRunner"), 0f, 2.22f);
         WidenExistingDecor(art);
 
@@ -375,6 +389,8 @@ public static class HotelSceneExpansion
             child.gameObject.SetActive(true);
         }
 
+        surface.size = new Vector3(140f, 35f, 20f);
+        surface.center = new Vector3(ShellCenterX, 12f, 0f);
         surface.BuildNavMesh();
 
         for (int i = 0; i < activeStates.Count; i++)

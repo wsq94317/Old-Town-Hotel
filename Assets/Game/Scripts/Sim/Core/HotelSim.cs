@@ -10,10 +10,16 @@ using System.Collections.Generic;
 //
 // 压力网在此闭环：排班精简 → 清洁慢 → 可售房少 → 到店的人住不进去 → 收入低
 //                → 现金紧 → 被迫清仓价 → 客群恶化 → 事件/清洁负担升。
-public sealed class HotelSim
+public sealed partial class HotelSim
 {
+    public HotelJourney Journey { get; } = new HotelJourney();
+    public void RecordCashCredit(int amount)
+    {
+        if (amount > 0) Cash += amount;
+    }
     /// <summary>一次住宿。身份由 BookingBook 的 Reservation 承载，这里只留结算要用的快照。</summary>
-    private struct Stay
+    [Serializable]
+    public struct Stay
     {
         public int nightlyRate;
         public GuestSegment segment;
@@ -58,6 +64,7 @@ public sealed class HotelSim
     public int TapeExpiredToday { get; private set; }
 
     /// <summary>退款申请（虚报价的代价）。玩家在手机上批准/拒绝。</summary>
+    [Serializable]
     public sealed class RefundRequest
     {
         public int requestId;
@@ -122,6 +129,7 @@ public sealed class HotelSim
     public ReputationBreakdown Breakdown { get; } = new ReputationBreakdown();
 
     /// <summary>一位有预订却没房的客人。玩家在手机上三选一（升级/赔钱/硬赶）。</summary>
+    [Serializable]
     public sealed class OverbookingIncident
     {
         public int incidentId;
@@ -562,6 +570,7 @@ public sealed class HotelSim
 
         if (reservation != null) Bookings.CheckIn(reservation.id, roomNumber);
         ArrivalsCheckedInToday++;
+        Journey.CheckIn();
     }
 
     /// <summary>无视到日结的超售客：按硬赶处理，并额外扣声誉——拖着不处理绝不能划算。</summary>
@@ -623,7 +632,7 @@ public sealed class HotelSim
             if (room.state == RoomSimState.Occupied) continue;    // 有人住着不能开工
             if (Renovations.IsRenovating(number)) continue;
             if (!RenovationWouldHelp(kind, number)) continue;     // 已经没什么可翻的
-            eligible.Add(number);
+            if (!eligible.Contains(number)) eligible.Add(number);
         }
         if (eligible.Count == 0) { reason = "None of those rooms can take this plan right now."; return false; }
 
@@ -707,6 +716,7 @@ public sealed class HotelSim
             float health = 0.2f + (float)_rng.NextDouble() * 0.3f;
             Furniture.FurnishDerelictRoom(roomNumber, newness, health);
         }
+        Journey.RestoreRoom(roomNumber);
         SetPriceBand(roomNumber, RoomTier.Old);       // 交付垫底就只配挂 Old（M-C2 的规矩）
 
         // 这间房刚从"破败"变回库存——**多出来的容量也要立刻算进去**。
@@ -768,7 +778,7 @@ public sealed class HotelSim
             if (!Rooms.Contains(number)) continue;
             if (Rooms.At(number).state != RoomSimState.Ruined) continue;   // 只有破败房能复原
             if (Renovations.IsRenovating(number)) continue;
-            eligible.Add(number);
+            if (!eligible.Contains(number)) eligible.Add(number);
         }
         if (eligible.Count == 0) { reason = "No derelict rooms available to work on."; return false; }
 
@@ -820,6 +830,7 @@ public sealed class HotelSim
                 Furniture.FurnishWithNewRequired(number);      // 新床 + 新卫浴，够挂 Basic
             }
 
+            Journey.RestoreRoom(number);
             Rooms.TryUnlockRuinedRoom(number);   // Ruined → Dirty：施工完是脏房，不是可售
         }
     }
@@ -1235,7 +1246,9 @@ public sealed class HotelSim
         Breakdown.Add(ReputationCause.FurnitureAppeal, appeal);
         if (stay.flawedRoom) Breakdown.Add(ReputationCause.FlawedRoom, flawed);
 
-        float sat = 1f + priceExpectation + bandVsDelivered + segmentStandards
+        float amenities = AmenityBonus(stay.segment);
+        if (amenities > 0) Breakdown.Add(ReputationCause.FacilityComfort, amenities);
+        float sat = amenities + 1f + priceExpectation + bandVsDelivered + segmentStandards
                        + queueWait + appeal + flawed;
         return SimMath.Clamp(sat, ReputationLedger.MinSatisfaction, ReputationLedger.MaxSatisfaction);
     }
@@ -1434,6 +1447,7 @@ public sealed class HotelSim
 
         if (reservation != null) Bookings.CheckIn(reservation.id, roomNumber);
         ArrivalsCheckedInToday++;
+        Journey.CheckIn();
     }
 
     // ── 家具塌了会伤人（用户设计）────────────────────────────────────────────
@@ -1759,7 +1773,7 @@ public sealed class HotelSim
     // ── 日结 ─────────────────────────────────────────────────────────────────
 
     /// <summary>打烊结算。返回结果供晨报展示。</summary>
-    public DaySettlementResult SettleDay(int interest = 0, int scheduledRepayment = 0, int supplies = 0)
+    public DaySettlementResult SettleDay(int interest = 0, int scheduledRepayment = 0, int supplies = 0, int capitalisedInterest = 0)
     {
         // 顺序要紧：超售客的单在待处置期间仍是 Booked，
         // 先跑 no-show 会把"人来了、是你没房"错记成"人没来"。
@@ -1821,10 +1835,10 @@ public sealed class HotelSim
 
         // 欠薪士气链改由**发薪日拖着没付**驱动（见 BeginDay 的 SettlePayrollArrears），
         // 日结这里一律按"没欠薪"处理：钱还没到该付的时候，谈不上欠。
-        Staff.SettleDay(wagesPaid: true);
-        Pipeline.SettleDay(wagesPaid: true);
+        Pipeline.SettleDay(wagesPaid: true); // Owns the same roster: settle it only once.
 
         LastSettlement = result;
+        Journey.CloseDay(Clock.CurrentDay, result.NetProfit - WagesAccruedToday - capitalisedInterest);
         return result;
     }
 
@@ -1867,6 +1881,7 @@ public sealed class HotelSim
                         break;
                 }
                 Furniture.ClearRenovationSelections(number);
+                Journey.RenovateRoom(number);
 
                 ref RoomRecord room = ref Rooms.At(number);
                 room.wear = 0f;
@@ -1936,6 +1951,7 @@ public sealed class HotelSim
     {
         int collected = Safebox.Collect();
         Cash += collected;
+        Journey.Collect(collected);
         return collected;
     }
 
@@ -1962,6 +1978,10 @@ public sealed class HotelSim
     public void CaptureTo(SimState state)
     {
         if (state == null) return;
+        state.runtime = CaptureCheckpoint();
+        state.journey = Journey.Capture();
+        state.operatingStyle = (int)OperatingStyle;
+        state.clearRuinsFirst = ClearRuinsFirst;
 
         // 声誉样本（v8）：以前没存，于是玩了二十天的口碑一读档就归零。
         // 这是把存档真接上之后第一批暴露出来的缺口。
@@ -1975,6 +1995,7 @@ public sealed class HotelSim
         state.payrollMissedPaydays = Payroll.MissedPaydays;
         state.creditScore = Credit.Score;
         state.creditMissedPayments = Credit.MissedPayments;
+        state.creditPaidToday = Credit.PaidToday;
 
         state.junkClearing = new List<JunkClearEntry>();
         foreach (var pair in Clearing.Export())
@@ -2068,6 +2089,7 @@ public sealed class HotelSim
                 planKind = (int)job.planKind,
                 targetTier = (int)job.targetTier,
                 daysRemaining = job.daysRemaining,
+                totalDays = job.totalDays,
                 isReclaim = job.isReclaim,
                 reclaimKind = (int)job.reclaimKind,
             };
@@ -2113,7 +2135,7 @@ public sealed class HotelSim
         if (state.warehouseCapacity > 0) Warehouse.SetCapacity(state.warehouseCapacity);
         Payroll.Restore((PayrollCycle)state.payrollCycle, state.payrollOwed,
                         state.payrollDaysAccrued, state.payrollMissedPaydays);
-        Credit.Restore(state.creditScore, state.creditMissedPayments);
+        Credit.Restore(state.creditScore, state.creditMissedPayments, state.creditPaidToday);
 
         if (state.junkClearing != null)
         {
@@ -2183,7 +2205,7 @@ public sealed class HotelSim
             foreach (var job in state.buildJobs)
                 Renovations.RestoreJob(job.jobId, (RenovationPlanKind)job.planKind,
                                        (RoomTier)job.targetTier, job.daysRemaining, job.rooms,
-                                       job.isReclaim, (ReclaimPlanKind)job.reclaimKind);
+                                       job.isReclaim, (ReclaimPlanKind)job.reclaimKind, job.totalDays);
 
         Staff.RestoreIdSeed(state.nextStaffId);
         if (state.staff != null)
@@ -2191,6 +2213,10 @@ public sealed class HotelSim
                 Staff.RestoreEntryState(s.rosterIndex, s.staffId,
                                         (StaffOperationalState)s.operationalState,
                                         s.fatigue, s.slackMinutesRemaining);
+        RestoreCheckpoint(state.runtime);
+        Journey.Restore(state.journey);
+        OperatingStyle = (HotelOperatingStyle)state.operatingStyle;
+        ClearRuinsFirst = state.clearRuinsFirst;
     }
 
     /// <summary>跑完当天剩余的所有 tick（测试与跳段用）。</summary>

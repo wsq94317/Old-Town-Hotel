@@ -4,7 +4,7 @@
 
 ![Unity](https://img.shields.io/badge/Unity-6000.3-black?logo=unity)
 ![C%23](https://img.shields.io/badge/C%23-90%2B%20scripts-239120?logo=csharp&logoColor=white)
-![Tests](https://img.shields.io/badge/EditMode%20tests-137%20passing-6A9F5C)
+![Tests](https://img.shields.io/badge/EditMode%20tests-780%20passing-6A9F5C)
 ![Platform](https://img.shields.io/badge/target-mobile%20portrait-C99A4A)
 
 <sub>Solo portfolio project by **Percy Wu**. The mechanics are real hotel-operations domain knowledge — front desk, housekeeping, room turnover, RevPAR-style economics — turned into a warm, fun-first management game. See the [changelog](CHANGELOG.md) for development history.</sub>
@@ -16,6 +16,26 @@
 ---
 
 ## 🎮 The game
+
+
+### Textures and interior lighting — 22 October 2026
+
+Walnut grain, lime plaster and woven linen now use original tileable texture assets with world-space PBR shading and surface relief. Beveled furniture edges, folded curtains, cushion shapes, detailed lamps and refreshed reception seating replace the simple hard silhouettes. Window daylight and warm interior fixtures cast local light and shadows; contact shadows and a local reflection capture ground furniture in the rooms. At most eight nearby fixture lights run at once.
+
+Use **Old Town Hotel → Art → Polish Surfaces And Interior Lighting** to rebuild the scene art. Material assets and the shader live in `Assets/Game/Resources/HotelArt/Surfaces`; texture generation prompts are in `Assets/Game/Art/Surfaces/GenerationRecord.json`. These are scene and material changes, with no save format migration.
+
+| Reception | Guest room |
+|:---:|:---:|
+| ![Textured reception](Assets/Screenshots/interior-lighting-lobby.png) | ![Lit guest room](Assets/Screenshots/interior-lighting-room.png) |
+
+Validation for this revision: 780 EditMode tests and 8 PlayMode tests passing, including scene asset loading, room furniture materials, floor visibility and the interior light budget.
+
+### Visible art revision — 22 October 2026
+
+The manager scene now includes articulated stylized characters with walk, idle and role-specific work motion; modeled room interiors and reception dressing; and 24 remodeled bed, sofa, desk and rug variants. Static dressing is combined into shared meshes. Camera-facing room walls use a low cutaway so beds and work crews remain visible. The welcome screen uses an illustrated hotel lobby, while management uses cream cards, icon navigation, employee portraits and room thumbnail cards with direct filters.
+
+Editor menu: **Old Town Hotel → Art → Bake Revival Visuals Into Current Scene**. The baked scene is `Assets/Game/Scenes/Hotel_Manager_25D.unity`; editable art assets are in `Assets/Game/Resources/HotelArt/Revival`. Gameplay still owns condition, room state and construction progress. Art review captures and generation provenance are in `Captures/visual-v2-review.json`. Validation: 780 EditMode and 6 PlayMode tests passing.
+
 
 You've just taken over a faded old-town hotel — and its **$183,000 of inherited debt**. Interest bleeds daily. Every in-game day runs on a real hotel's rhythm:
 
@@ -45,11 +65,11 @@ flowchart LR
 | **Economy** | Inherited debt with daily interest, hotel valuation & value-backed credit line, tiered nightly revenue × stay quality, rolling ★ reputation |
 | **Renovation** | Per-room tier upgrades with cost, build time & batch discounts; feeds room rates and valuation |
 | **The Lounge** | Café side-loop: serve drinks, manage cup & ingredient stock, run the dishwasher |
-| **Persistence** | Single-slot JSON autosave of economy progression at day end |
+| **Persistence** | Three save slots, in-day checkpoints, construction, furniture, guest stays, manager position, warehouse expansion and settings |
 
 ## 🏗️ Engineering
 
-- **Test-first economy** — the entire money model (payroll, loans, valuation, staff, renovation, reputation, checkout revenue) is pure C# behind MonoBehaviour facades, covered by **137 EditMode tests** written red-green-refactor.
+- **Test-first economy** — the entire money model (payroll, loans, valuation, staff, renovation, reputation, checkout revenue) is pure C# behind MonoBehaviour facades, covered by **780 EditMode tests plus four scene integration tests** written red-green-refactor.
 - **Data-driven balance** — every tunable lives in `ScriptableObject` configs (economy constants, renovation tiers, staff archetypes, room balance) and is registered in a design-side tuning-knobs ledger. Balancing never touches code.
 - **Decisions on record** — an ADR set documents every architectural call, including the deliberate evolution from a hard single-worker bottleneck (ADR 0004) to a payroll-driven multi-staff economy (ADR 0008).
 - **Event-driven UI** — a reusable modal system and screen controllers that *bind* to gameplay state (`OnDaySettled`, payroll roster events) rather than own it; view and simulation stay separable.
@@ -70,15 +90,26 @@ CHANGELOG.md         Development history, newest first
 ## ▶️ Running it
 
 1. Open the project in **Unity 6 (6000.3.x or newer)**.
-2. Open `Assets/Game/Scenes/Hotel_Rooms_2D_Proto.unity` and press **Play** — the hotel opens for business automatically.
+2. Open `Assets/Game/Scenes/Hotel_Manager_25D.unity` and press **Play**. Choose **Take Over / Continue** in the welcome menu.
+3. Use **Hotel, Rates, Team, Empire, Rooms** to manage the business. MENU opens help and pauses the whole hotel.
+4. The older Rooms/FrontDesk/Lounge prototype scenes are retained as development references; the manager scene is the supported game entry point.
 
-## 🗺️ Roadmap
+## Playable version — 22 October 2026
 
-- **Juice pass** — audio, tweened UI, coin-flight money feedback, receipt-style day-end printing
-- **Reputation → guest volume** — ★ score driving daily arrivals (the loop's foundation is in)
-- **Staff personality in play** — traits with visible consequences (the clumsy cheap hire, the brilliant one who keeps demanding raises)
-- **Candidate cards** — hiring pool UI with flip-to-reveal candidates
-- **Win condition** — clear the debt, renovate every room, and reopen the grand old hotel
+- 100 physical guest rooms across two guest floors; eight open initially, 92 await recovery.
+- Room operations grid with floor/type/state filters, free clearing, paid restoration and full-floor batch renovation.
+- Visible work barriers, progress, completion, cleaning and inspection; eleven furniture kinds with four appearance choices each.
+- Textured paper characters with walking/working motion and task indicators, room models, incident effects and synthesized original audio.
+- Pricing, booking channels, reservations, overbooking, payroll, supplies, furniture wear, debt, credit and delegated properties share the simulation ledger.
+- Welcome/pause menu, operating handbook, three save slots, audio controls and a grand-reopening goal. Finish by clearing debt, renovating all 100 rooms, paying wages and reaching three stars; continue building afterward.
+
+Verification commands:
+
+```powershell
+dotnet test Sim.Tests/OldTownHotel.Sim.Tests.csproj --no-restore --disable-build-servers -m:1 -nodeReuse:false --verbosity quiet
+```
+
+Run Unity's EditMode suite and `CompleteHotelPlayTest` in PlayMode for actual scene/navigation/construction verification. Player saves are backed up separately from acceptance runs.
 
 ## 👤 About the developer
 

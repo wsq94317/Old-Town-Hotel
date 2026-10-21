@@ -12,7 +12,10 @@ public sealed class EconomySystem : MonoBehaviour
     public PayrollLedger Payroll { get; private set; }
     public LoanAccount Loan { get; private set; }
     public ReputationLedger Reputation { get; private set; }
-    public int Cash { get; private set; }
+    private int _cash;
+    public HotelSim WorldSim { get; private set; }
+    public int Cash { get => WorldSim != null ? WorldSim.Cash : _cash; private set => _cash = value; }
+    public void BindWorldSim(HotelSim sim) => WorldSim = sim;
     public DayLedger LastDayLedger { get; private set; }
 
     private int _pendingCheckoutIncome;
@@ -67,6 +70,7 @@ public sealed class EconomySystem : MonoBehaviour
     // Returns the credited amount (for UI toasts / coin fly).
     public int RecordCheckout(int nightlyRate, float satisfactionMult)
     {
+        if (WorldSim != null) return 0; // Guest settlement belongs to the world simulation.
         if (!EnsureInitialized()) return 0;
         float mult = Mathf.Clamp(satisfactionMult,
                                  ReputationLedger.MinSatisfaction,
@@ -83,6 +87,7 @@ public sealed class EconomySystem : MonoBehaviour
     // samples are checkout satisfaction only; a bar night is not a guest review.
     public void RecordMiscIncome(int amount)
     {
+        if (WorldSim != null) { WorldSim.RecordMiscIncome(amount); return; }
         if (amount <= 0 || !EnsureInitialized()) return;
         _pendingCheckoutIncome += amount;
     }
@@ -97,6 +102,9 @@ public sealed class EconomySystem : MonoBehaviour
     // checkout hook is wired everywhere.
     public DayLedger CloseEconomicDay(int servedGuests)
     {
+        if (WorldSim != null)
+            return LastDayLedger = new DayLedger(WorldSim.GrossIncomeToday,
+                WorldSim.Shifts.DailyWageCost(WorldSim.Staff, WorldSim.Clock.CurrentDay), 0, 0, Cash);
         if (!EnsureInitialized()) return default;
         // 兜底路径也要带上杂项收入（有退房记录时杂项已在 _pendingCheckoutIncome 里）
         int income = _pendingCheckoutCount > 0
@@ -124,7 +132,8 @@ public sealed class EconomySystem : MonoBehaviour
     {
         if (Loan == null || amount <= 0) return 0;
         Loan.Borrow(amount);
-        Cash += amount;
+        if (WorldSim != null) WorldSim.RecordCashCredit(amount);
+        else Cash += amount;
         return amount;
     }
 
@@ -132,7 +141,10 @@ public sealed class EconomySystem : MonoBehaviour
     public int RepayLoan(int amount)
     {
         if (Loan == null) return 0;
-        int payable = Mathf.Min(amount, Cash);
+        int payable = Mathf.Min(amount, Loan.Balance);
+        if (WorldSim != null)
+            return Loan.Repay(WorldSim.PayLoanInstallment(payable));
+        payable = Mathf.Min(payable, Cash);
         int repaid = Loan.Repay(payable);
         Cash -= repaid;
         return repaid;
@@ -145,8 +157,7 @@ public sealed class EconomySystem : MonoBehaviour
         if (candidate == null || !EnsureInitialized()) return false;
         if (signingCost > 0)
         {
-            if (Cash < signingCost) return false;
-            Cash -= signingCost;
+            if (!TrySpend(signingCost)) return false;
         }
         Payroll.Hire(candidate);
         return true;
@@ -218,6 +229,7 @@ public sealed class EconomySystem : MonoBehaviour
     // Deduct `amount` from cash if affordable. Returns true if paid.
     public bool TrySpend(int amount)
     {
+        if (WorldSim != null) return WorldSim.TrySpendCash(amount);
         if (amount <= 0) return true;
         if (Cash < amount) return false;
         Cash -= amount;

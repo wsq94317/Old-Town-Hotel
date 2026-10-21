@@ -16,29 +16,29 @@ MonoBehaviour:
   - kindId: 1
     variants:
     - variantId: 0
-      displayName: Default
-      prefab: {fileID: 225647245791059855, guid: 5a42da83490d2be4da730c5bbe73c195, type: 3}
+      displayName: Concierge
+      prefab: {fileID: 5933381569032123504, guid: 0cb9fc0947fb0dc47b3bbffdc5ae526d, type: 3}
       rendererMaterialOverrides: []
       positionOffset: {x: 0, y: 0, z: 0}
       rotationOffset: {x: 0, y: 0, z: 0}
       scale: {x: 1, y: 1, z: 1}
     - variantId: 1
-      displayName: Variant 2
-      prefab: {fileID: 0}
+      displayName: Garden
+      prefab: {fileID: 3666130960096002882, guid: 981e848c024644f40a70ebfa18aa549e, type: 3}
       rendererMaterialOverrides: []
       positionOffset: {x: 0, y: 0, z: 0}
       rotationOffset: {x: 0, y: 0, z: 0}
       scale: {x: 1, y: 1, z: 1}
     - variantId: 2
-      displayName: Variant 3
-      prefab: {fileID: 0}
+      displayName: Heritage
+      prefab: {fileID: 6142072944645065541, guid: 85e6a436ca202eb42943850b38f9bbfd, type: 3}
       rendererMaterialOverrides: []
       positionOffset: {x: 0, y: 0, z: 0}
       rotationOffset: {x: 0, y: 0, z: 0}
       scale: {x: 1, y: 1, z: 1}
     - variantId: 3
-      displayName: Variant 4
-      prefab: {fileID: 0}
+      displayName: Midnight
+      prefab: {fileID: 7296746528279523476, guid: c1b8d05ec5093f145b9bb4b28f7b98f0, type: 3}
       rendererMaterialOverrides: []
       positionOffset: {x: 0, y: 0, z: 0}
       rotationOffset: {x: 0, y: 0, z: 0}
@@ -46,29 +46,29 @@ MonoBehaviour:
   - kindId: 2
     variants:
     - variantId: 0
-      displayName: Default
-      prefab: {fileID: 9604475754619993, guid: a65002f2b20a82d4ead4f69accebc660, type: 3}
+      displayName: Concierge
+      prefab: {fileID: 4684860298423115691, guid: a204b7ad1067c07418a7cb026faf8e08, type: 3}
       rendererMaterialOverrides: []
       positionOffset: {x: 0, y: 0, z: 0}
       rotationOffset: {x: 0, y: 0, z: 0}
       scale: {x: 1, y: 1, z: 1}
     - variantId: 1
-      displayName: Variant 2
-      prefab: {fileID: 0}
+      displayName: Garden
+      prefab: {fileID: 4881580046708648175, guid: 6e71f162caeb59442a787d359d8ca404, type: 3}
       rendererMaterialOverrides: []
       positionOffset: {x: 0, y: 0, z: 0}
       rotationOffset: {x: 0, y: 0, z: 0}
       scale: {x: 1, y: 1, z: 1}
     - variantId: 2
-      displayName: Variant 3
-      prefab: {fileID: 0}
+      displayName: Heritage
+      prefab: {fileID: 825902214218868332, guid: 0b61b1d36a30a4d41aaa65ef9e2cf93d, type: 3}
       rendererMaterialOverrides: []
       positionOffset: {x: 0, y: 0, z: 0}
       rotationOffset: {x: 0, y: 0, z: 0}
       scale: {x: 1, y: 1, z: 1}
     - variantId: 3
-      displayName: Variant 4
-      prefab: {fileID: 0}
+      displayName: Midnight
+      prefab: {fileID: 7121236315295156976, guid: 507b6e1a61e6dc3438d736c5ccc79f9a, type: 3}
       rendererMaterialOverrides: []
       positionOffset: {x: 0, y: 0, z: 0}
       rotationOffset: {x: 0, y: 0, z: 0}
@@ -76,29 +76,29 @@ MonoBehaviour:
   - kindId: 3
     variants:
     - variantId: 0
-      displayName: Default
-      prefab: {fileID: 6340803996166487876, guid: 2776a705794862947a1362fb01cbf86a, type: 3}
+      displayName: Concierge
+      prefab: {fileID: 2278125186466722759, guid: 0339f7ec928c02148882c8a8ff7adc78, type: 3}
       rendererMaterialOverrides: []
       positionOffset: {x: 0, y: 0, z: 0}
       rotationOffset: {x: 0, y: 0, z: 0}
       scale: {x: 1, y: 1, z: 1}
     - variantId: 1
-      displayName: Variant 2
-      prefab: {fileID: 0}
+      displayName: Garden
+      prefab: {fileID: 7403999096096512243, guid: 42e498f6554c9934a99e7afc1ac73b5b, type: 3}
       rendererMaterialOverrides: []
       positionOffset: {x: 0, y: 0, z: 0}
       rotationOffset: {x: 0, y: 0, z: 0}
       scale: {x: 1, y: 1, z: 1}
     - variantId: 2
-      displayName: Variant 3
-      prefab: {fileID: 0}
+      displayName: Heritage
+      prefab: {fileID: 6239758517715017409, guid: 303f0d0d6ac6e764b8715a55392ecfb5, type: 3}
       rendererMaterialOverrides: []
       positionOffset: {x: 0, y: 0, z: 0}
       rotationOffset: {x: 0, y: 0, z: 0}
       scale: {x: 1, y: 1, z: 1}
     - variantId: 3
-      displayName: Variant 4
-      prefab: {fileID: 0}
+      displayName: Midnight
+      prefab: {fileID: 966773689122409162, guid: 76cfce039df67b34e83f826162eeec0e, type: 3}
       rendererMaterialOverrides: []
       positionOffset: {x: 0, y: 0, z: 0}
       rotationOffset: {x: 0, y: 0, z: 0}
@@ -113,22 +113,22 @@ MonoBehaviour:
       rotationOffset: {x: 0, y: 0, z: 0}
       scale: {x: 1, y: 1, z: 1}
     - variantId: 1
-      displayName: Variant 2
-      prefab: {fileID: 0}
+      displayName: Garden
+      prefab: {fileID: 6208633257311587869, guid: d2fa49cb75888fe42b480e3728706bfa, type: 3}
       rendererMaterialOverrides: []
       positionOffset: {x: 0, y: 0, z: 0}
       rotationOffset: {x: 0, y: 0, z: 0}
       scale: {x: 1, y: 1, z: 1}
     - variantId: 2
-      displayName: Variant 3
-      prefab: {fileID: 0}
+      displayName: Heritage
+      prefab: {fileID: 3010504974528499202, guid: f030c88d21473554593d0c690cd1bc84, type: 3}
       rendererMaterialOverrides: []
       positionOffset: {x: 0, y: 0, z: 0}
       rotationOffset: {x: 0, y: 0, z: 0}
       scale: {x: 1, y: 1, z: 1}
     - variantId: 3
-      displayName: Variant 4
-      prefab: {fileID: 0}
+      displayName: Midnight
+      prefab: {fileID: 4381824999015885673, guid: c589497838653b040ab8940940863bbc, type: 3}
       rendererMaterialOverrides: []
       positionOffset: {x: 0, y: 0, z: 0}
       rotationOffset: {x: 0, y: 0, z: 0}
@@ -143,22 +143,22 @@ MonoBehaviour:
       rotationOffset: {x: 0, y: 0, z: 0}
       scale: {x: 1, y: 1, z: 1}
     - variantId: 1
-      displayName: Variant 2
-      prefab: {fileID: 0}
+      displayName: Garden
+      prefab: {fileID: 8572062876128057411, guid: 6cef37a18c6b23d4f8d733b7a228c374, type: 3}
       rendererMaterialOverrides: []
       positionOffset: {x: 0, y: 0, z: 0}
       rotationOffset: {x: 0, y: 0, z: 0}
       scale: {x: 1, y: 1, z: 1}
     - variantId: 2
-      displayName: Variant 3
-      prefab: {fileID: 0}
+      displayName: Heritage
+      prefab: {fileID: 2851494387247864208, guid: df9a26b459f40934eab0bf1d0b793352, type: 3}
       rendererMaterialOverrides: []
       positionOffset: {x: 0, y: 0, z: 0}
       rotationOffset: {x: 0, y: 0, z: 0}
       scale: {x: 1, y: 1, z: 1}
     - variantId: 3
-      displayName: Variant 4
-      prefab: {fileID: 0}
+      displayName: Midnight
+      prefab: {fileID: 6925613142089061039, guid: cdfbb2a9ee0dc804c87121d859c23793, type: 3}
       rendererMaterialOverrides: []
       positionOffset: {x: 0, y: 0, z: 0}
       rotationOffset: {x: 0, y: 0, z: 0}
@@ -173,22 +173,22 @@ MonoBehaviour:
       rotationOffset: {x: 0, y: 0, z: 0}
       scale: {x: 1, y: 1, z: 1}
     - variantId: 1
-      displayName: Variant 2
-      prefab: {fileID: 0}
+      displayName: Garden
+      prefab: {fileID: 8147704029920203570, guid: 2d4ddcc9834f48342816fa0dc2e07fb6, type: 3}
       rendererMaterialOverrides: []
       positionOffset: {x: 0, y: 0, z: 0}
       rotationOffset: {x: 0, y: 0, z: 0}
       scale: {x: 1, y: 1, z: 1}
     - variantId: 2
-      displayName: Variant 3
-      prefab: {fileID: 0}
+      displayName: Heritage
+      prefab: {fileID: 2921112597538966791, guid: 64d2d18dc40a72d4ebd84d29337c24c5, type: 3}
       rendererMaterialOverrides: []
       positionOffset: {x: 0, y: 0, z: 0}
       rotationOffset: {x: 0, y: 0, z: 0}
       scale: {x: 1, y: 1, z: 1}
     - variantId: 3
-      displayName: Variant 4
-      prefab: {fileID: 0}
+      displayName: Midnight
+      prefab: {fileID: 5577049843851454846, guid: 6f6428e69ccc659478641bc3facc38ee, type: 3}
       rendererMaterialOverrides: []
       positionOffset: {x: 0, y: 0, z: 0}
       rotationOffset: {x: 0, y: 0, z: 0}
@@ -203,22 +203,22 @@ MonoBehaviour:
       rotationOffset: {x: 0, y: 0, z: 0}
       scale: {x: 1, y: 1, z: 1}
     - variantId: 1
-      displayName: Variant 2
-      prefab: {fileID: 0}
+      displayName: Garden
+      prefab: {fileID: 7235990538578635451, guid: 8053ba5ec1f3eb743a518f04b2595e35, type: 3}
       rendererMaterialOverrides: []
       positionOffset: {x: 0, y: 0, z: 0}
       rotationOffset: {x: 0, y: 0, z: 0}
       scale: {x: 1, y: 1, z: 1}
     - variantId: 2
-      displayName: Variant 3
-      prefab: {fileID: 0}
+      displayName: Heritage
+      prefab: {fileID: 4248501744998776795, guid: 20278699f93c99a488bc774f648cc1f5, type: 3}
       rendererMaterialOverrides: []
       positionOffset: {x: 0, y: 0, z: 0}
       rotationOffset: {x: 0, y: 0, z: 0}
       scale: {x: 1, y: 1, z: 1}
     - variantId: 3
-      displayName: Variant 4
-      prefab: {fileID: 0}
+      displayName: Midnight
+      prefab: {fileID: 5012923156157418996, guid: b7a1c60cea0cf764a915aa2d2c8ef88b, type: 3}
       rendererMaterialOverrides: []
       positionOffset: {x: 0, y: 0, z: 0}
       rotationOffset: {x: 0, y: 0, z: 0}
@@ -226,29 +226,29 @@ MonoBehaviour:
   - kindId: 30
     variants:
     - variantId: 0
-      displayName: Default
-      prefab: {fileID: 7322510812451537975, guid: 6a1f628f6b06a684a8fe7ca5549a5dcd, type: 3}
+      displayName: Concierge
+      prefab: {fileID: 7962114877390406525, guid: b5fc6975e8923ca448084f3714061132, type: 3}
       rendererMaterialOverrides: []
       positionOffset: {x: 0, y: 0, z: 0}
       rotationOffset: {x: 0, y: 0, z: 0}
       scale: {x: 1, y: 1, z: 1}
     - variantId: 1
-      displayName: Variant 2
-      prefab: {fileID: 0}
+      displayName: Garden
+      prefab: {fileID: 5378966782087528550, guid: ba4b47013acab91438bbfc7c4542b895, type: 3}
       rendererMaterialOverrides: []
       positionOffset: {x: 0, y: 0, z: 0}
       rotationOffset: {x: 0, y: 0, z: 0}
       scale: {x: 1, y: 1, z: 1}
     - variantId: 2
-      displayName: Variant 3
-      prefab: {fileID: 0}
+      displayName: Heritage
+      prefab: {fileID: 1946333972880552649, guid: 13eb48a8b77280d4e8b206399689467b, type: 3}
       rendererMaterialOverrides: []
       positionOffset: {x: 0, y: 0, z: 0}
       rotationOffset: {x: 0, y: 0, z: 0}
       scale: {x: 1, y: 1, z: 1}
     - variantId: 3
-      displayName: Variant 4
-      prefab: {fileID: 0}
+      displayName: Midnight
+      prefab: {fileID: 6491022352101377339, guid: 445e6f7dcbe16804e90c26afedd10fae, type: 3}
       rendererMaterialOverrides: []
       positionOffset: {x: 0, y: 0, z: 0}
       rotationOffset: {x: 0, y: 0, z: 0}
@@ -256,29 +256,29 @@ MonoBehaviour:
   - kindId: 40
     variants:
     - variantId: 0
-      displayName: Default
-      prefab: {fileID: 9094288303386679514, guid: bbdc59b7c4c121a47bda67e9a0d60025, type: 3}
+      displayName: Concierge
+      prefab: {fileID: 8327975634812769142, guid: 2620845571b11dc4fbc419b1c43696cd, type: 3}
       rendererMaterialOverrides: []
       positionOffset: {x: 0, y: 0, z: 0}
       rotationOffset: {x: 0, y: 0, z: 0}
       scale: {x: 1, y: 1, z: 1}
     - variantId: 1
-      displayName: Variant 2
-      prefab: {fileID: 0}
+      displayName: Garden
+      prefab: {fileID: 6220804043579577145, guid: 67a4238a27772b54fa0d87165ef7927b, type: 3}
       rendererMaterialOverrides: []
       positionOffset: {x: 0, y: 0, z: 0}
       rotationOffset: {x: 0, y: 0, z: 0}
       scale: {x: 1, y: 1, z: 1}
     - variantId: 2
-      displayName: Variant 3
-      prefab: {fileID: 0}
+      displayName: Heritage
+      prefab: {fileID: 3134794338715902351, guid: 8a321511600be80499eaae6b7d0ddbc6, type: 3}
       rendererMaterialOverrides: []
       positionOffset: {x: 0, y: 0, z: 0}
       rotationOffset: {x: 0, y: 0, z: 0}
       scale: {x: 1, y: 1, z: 1}
     - variantId: 3
-      displayName: Variant 4
-      prefab: {fileID: 0}
+      displayName: Midnight
+      prefab: {fileID: 4401642238848018379, guid: e69f2753f7b171c4faa8ca5847342cb7, type: 3}
       rendererMaterialOverrides: []
       positionOffset: {x: 0, y: 0, z: 0}
       rotationOffset: {x: 0, y: 0, z: 0}
@@ -286,29 +286,29 @@ MonoBehaviour:
   - kindId: 50
     variants:
     - variantId: 0
-      displayName: Default
-      prefab: {fileID: 173359118282719350, guid: 6d38bde7e06a12d44a60424f56817e76, type: 3}
+      displayName: Concierge
+      prefab: {fileID: 1341187587763436627, guid: e8fd5316fc7810843bbe405fc2a78977, type: 3}
       rendererMaterialOverrides: []
       positionOffset: {x: 0, y: 0, z: 0}
       rotationOffset: {x: 0, y: 0, z: 0}
       scale: {x: 1, y: 1, z: 1}
     - variantId: 1
-      displayName: Variant 2
-      prefab: {fileID: 0}
+      displayName: Garden
+      prefab: {fileID: 8220290768426182484, guid: 3499122261d8c4342a93cc4a0710e85b, type: 3}
       rendererMaterialOverrides: []
       positionOffset: {x: 0, y: 0, z: 0}
       rotationOffset: {x: 0, y: 0, z: 0}
       scale: {x: 1, y: 1, z: 1}
     - variantId: 2
-      displayName: Variant 3
-      prefab: {fileID: 0}
+      displayName: Heritage
+      prefab: {fileID: 6271276646770024171, guid: 609636a5128a0d84bbc63a634b5f3611, type: 3}
       rendererMaterialOverrides: []
       positionOffset: {x: 0, y: 0, z: 0}
       rotationOffset: {x: 0, y: 0, z: 0}
       scale: {x: 1, y: 1, z: 1}
     - variantId: 3
-      displayName: Variant 4
-      prefab: {fileID: 0}
+      displayName: Midnight
+      prefab: {fileID: 7083147258000330379, guid: 8bc36c7fff256194c83469f8115c3544, type: 3}
       rendererMaterialOverrides: []
       positionOffset: {x: 0, y: 0, z: 0}
       rotationOffset: {x: 0, y: 0, z: 0}
@@ -323,22 +323,22 @@ MonoBehaviour:
       rotationOffset: {x: 0, y: 0, z: 0}
       scale: {x: 1, y: 1, z: 1}
     - variantId: 1
-      displayName: Variant 2
-      prefab: {fileID: 0}
+      displayName: Garden
+      prefab: {fileID: 5851909322533961990, guid: 90b6b4c2b47bb2b41811794b17a29385, type: 3}
       rendererMaterialOverrides: []
       positionOffset: {x: 0, y: 0, z: 0}
       rotationOffset: {x: 0, y: 0, z: 0}
       scale: {x: 1, y: 1, z: 1}
     - variantId: 2
-      displayName: Variant 3
-      prefab: {fileID: 0}
+      displayName: Heritage
+      prefab: {fileID: 4784550710977703158, guid: eb92f79d71d11644c96a60db62a08cfc, type: 3}
       rendererMaterialOverrides: []
       positionOffset: {x: 0, y: 0, z: 0}
       rotationOffset: {x: 0, y: 0, z: 0}
       scale: {x: 1, y: 1, z: 1}
     - variantId: 3
-      displayName: Variant 4
-      prefab: {fileID: 0}
+      displayName: Midnight
+      prefab: {fileID: 694194438256469180, guid: c8695d749469d6b49a606ab17e67a962, type: 3}
       rendererMaterialOverrides: []
       positionOffset: {x: 0, y: 0, z: 0}
       rotationOffset: {x: 0, y: 0, z: 0}

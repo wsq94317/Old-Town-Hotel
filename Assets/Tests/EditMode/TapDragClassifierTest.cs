@@ -163,6 +163,29 @@ namespace OldTownHotel.Tests.EditMode
             Assert.IsFalse(_floorObjects[1].activeSelf);
         }
 
+        [Test]
+        public void GroundTapAfterInspectingLobbyStaff_ReturnsToManagerWithoutMovingHim()
+        {
+            _targetObject.transform.position = new Vector3(2f, FloorMath.BaseYFor(1), 1f);
+            var manager = _targetObject.AddComponent<ManagerController>();
+            var input = _cameraObject.AddComponent<WorldInputController>();
+            typeof(WorldInputController).GetField("manager", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(input, manager);
+            typeof(WorldInputController).GetField("cameraRig", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(input, _rig);
+            Vector3 position = manager.transform.position;
+            Assert.That(manager.TryMoveTo(new Vector3(0f, 0f, 1f), out _), Is.False,
+                "Remote staff navigation must not silently project a lobby command onto floor two.");
+            _rig.FocusOnPoint(new Vector3(0f, 0f, 1f), instant: true);
+            Assert.That(_rig.ViewedFloor, Is.Zero);
+
+            Assert.That(input.ReturnToManagerIfViewingOtherFloor(), Is.True);
+
+            Assert.That(_floors.CurrentFloor, Is.EqualTo(1));
+            Assert.That(_rig.IsFollowingTarget, Is.True);
+            Assert.That(manager.transform.position, Is.EqualTo(position));
+            Assert.That(input.ReturnToManagerIfViewingOtherFloor(), Is.False,
+                "A second tap on the manager's own floor can follow the normal movement route.");
+        }
+
         private void InvokeLateUpdate()
         {
             typeof(ManagerCameraRig)
@@ -229,6 +252,15 @@ namespace OldTownHotel.Tests.EditMode
                 requested,
                 adjacentRoom,
                 0.75f));
+        }
+
+        [Test]
+        public void CommandSnap_RejectsAnotherFloorEvenAtIdenticalHorizontalCoordinates()
+        {
+            Assert.IsFalse(ManagerController.IsAcceptableCommandSnap(
+                new Vector3(1f, 4f, 2f), new Vector3(1f, 0f, 2f), .75f));
+            Assert.IsTrue(ManagerController.IsAcceptableCommandSnap(
+                new Vector3(1f, 4f, 2f), new Vector3(1f, 3.99f, 2f), .75f));
         }
 
         [Test]
@@ -329,7 +361,7 @@ namespace OldTownHotel.Tests.EditMode
         [Test]
         public void Expansion_PreservesSmallOpeningStock()
         {
-            Assert.AreEqual(24, HotelSceneExpansion.ExpandedRoomCount);
+            Assert.AreEqual(100, HotelSceneExpansion.ExpandedRoomCount);
             Assert.AreEqual(
                 8,
                 HotelSceneExpansion.ExpandedRoomCount -

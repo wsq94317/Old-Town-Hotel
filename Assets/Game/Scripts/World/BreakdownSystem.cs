@@ -217,6 +217,8 @@ public class BreakdownSystem : MonoBehaviour
 
     private void Update()
     {
+        var worldHost = HotelSimSceneBridge.Instance;
+        if (worldHost != null && (worldHost.IsSuspended || worldHost.AwaitingMorningReport)) return;
         if (dayController == null) return;
         if (_rng == null) _rng = new System.Random(rngSeed);
         if (!ApplyRestoredWorldStateIfReady()) return;

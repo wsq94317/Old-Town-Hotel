@@ -65,6 +65,9 @@ public class StaffAgent : MonoBehaviour
     private bool _toiletHiding;
     private bool _toiletSlackRecord;
 
+    private float _visibleWorkProgress;
+    public float WorkProgress => _visibleWorkProgress;
+    public int AssignedRoomNumber => _hasTask && _task.Room != null ? _task.Room.roomNumber : 0;
     public StaffMember Member { get; private set; }
     public AgentState State => _state;
     public StaffShiftState ShiftState => _shiftState;
@@ -159,6 +162,9 @@ public class StaffAgent : MonoBehaviour
 
     private void Update()
     {
+        var worldHost = HotelSimSceneBridge.Instance;
+        if (worldHost != null && (worldHost.IsSuspended || worldHost.AwaitingMorningReport)) return;
+        if (HotelSimSceneBridge.Instance != null && HotelSimSceneBridge.Instance.IsSuspended) return;
         ResolveReferences();
         SyncShiftWithClock();
 
@@ -210,6 +216,30 @@ public class StaffAgent : MonoBehaviour
     private void SyncShiftWithClock()
     {
         if (_dayController == null || Member == null) return;
+
+        var bridge = HotelSimSceneBridge.Instance;
+        if (bridge != null && bridge.TryGetStaffEntry(Member, out StaffSimEntry entry))
+        {
+            if (!entry.IsOnDuty)
+            {
+                if (_shiftState != StaffShiftState.OffShift
+                    && _shiftState != StaffShiftState.LeavingMap)
+                {
+                    AbortTask();
+                    FloatingTextFx.Spawn(transform.position, "OFF DUTY", Color.gray);
+                    BeginLeavingMap();
+                }
+                _observedDay = _dayController.CurrentDay;
+                return;
+            }
+            if (_shiftState == StaffShiftState.OffShift
+                && !_dayController.Clock.DayEndReached)
+            {
+                _observedDay = _dayController.CurrentDay;
+                BeginShift();
+                return;
+            }
+        }
 
         if (_observedDay != _dayController.CurrentDay)
         {
@@ -323,6 +353,7 @@ public class StaffAgent : MonoBehaviour
         }
 
         _workTimer = 0f;
+        _visibleWorkProgress = 0f;
         _wallTimer = 0f;
         _state = AgentState.Working;
         _activityState = StaffActivityState.Working;
@@ -362,6 +393,7 @@ public class StaffAgent : MonoBehaviour
 
         _wallTimer += Time.deltaTime;
         if (productive) _workTimer += Time.deltaTime;
+        _visibleWorkProgress = Mathf.Clamp01(_workTimer / Mathf.Max(.01f, duration));
 
         if (!HasDelayMark && _wallTimer > duration * SupervisionTuning.DelayMarkThresholdMultiplier)
             HasDelayMark = true;

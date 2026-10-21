@@ -8,6 +8,7 @@ public class BillboardSprite : MonoBehaviour
     [SerializeField] private float bobAmplitude = 0.06f;
     [SerializeField] private float bobFrequency = 10f;
 
+    private StaffAgent _staff;
     private Camera _cam;
     private NavMeshAgent _agent; // 在父级上；没有也能工作（静止纸片人）
     private Vector3 _baseLocalPos;
@@ -15,10 +16,13 @@ public class BillboardSprite : MonoBehaviour
 
     private void Awake()
     {
+        _staff = GetComponentInParent<StaffAgent>();
         _cam = Camera.main;
         _agent = GetComponentInParent<NavMeshAgent>();
         _baseLocalPos = transform.localPosition;
     }
+
+    private void Start() => _staff = GetComponentInParent<StaffAgent>();
 
     private void LateUpdate()
     {
@@ -49,7 +53,10 @@ public class BillboardSprite : MonoBehaviour
         }
         else
         {
-            transform.localPosition = _baseLocalPos;
+            bool working = _staff != null && _staff.ActivityState == StaffActivityState.Working;
+            float sway = working ? Mathf.Sin(Time.time * 9f) : 0f;
+            transform.localPosition = _baseLocalPos + Vector3.up * (Mathf.Abs(sway) * .035f);
+            if (working) transform.rotation *= Quaternion.Euler(0, 0, sway * 4f);
         }
     }
 }

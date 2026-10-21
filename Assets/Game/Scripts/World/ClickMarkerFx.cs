@@ -28,6 +28,7 @@ public class ClickMarkerFx : MonoBehaviour
         go.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
         go.GetComponent<Renderer>().sharedMaterial = MarkerMaterial(rejected);
         go.AddComponent<ClickMarkerFx>();
+        go.AddComponent<AgentFloorVisibility>();
     }
 
     private static Material MarkerMaterial(bool rejected)

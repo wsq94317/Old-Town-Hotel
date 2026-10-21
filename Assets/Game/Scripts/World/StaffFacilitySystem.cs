@@ -168,6 +168,8 @@ public sealed class StaffFacilitySystem : MonoBehaviour
 
     private void Update()
     {
+        var worldHost = HotelSimSceneBridge.Instance;
+        if (worldHost != null && (worldHost.IsSuspended || worldHost.AwaitingMorningReport)) return;
         ResolveReferences();
         TickDayReset();
         TickPendingInspection();

@@ -53,7 +53,7 @@ public class AgentFloorVisibility : MonoBehaviour
         var all = GetComponentsInChildren<Renderer>(true);
         var list = new System.Collections.Generic.List<Renderer>(all.Length);
         foreach (var r in all)
-            if (r.GetComponent<EmoteBubble>() == null) list.Add(r);
+            if (r.GetComponentInParent<EmoteBubble>() == null) list.Add(r);
         return list.ToArray();
     }
 }

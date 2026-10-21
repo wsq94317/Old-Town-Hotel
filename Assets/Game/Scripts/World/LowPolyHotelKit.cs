@@ -452,7 +452,9 @@ public static class LowPolyHotelKit
         Renderer renderer = part.GetComponent<Renderer>();
         if (renderer != null)
         {
-            renderer.sharedMaterial = MaterialFor(material);
+            renderer.sharedMaterial = HotelSurfaceLibrary.For(name+"_"+material, HotelArtPalette.ColorOf(material));
+            var crafted=HotelCraftMesh.For(name,localScale,primitive);
+            if(crafted!=null){part.GetComponent<MeshFilter>().sharedMesh=crafted;part.transform.localScale=Vector3.one;}
             renderer.shadowCastingMode = material == HotelArtMaterial.Water
                 || material == HotelArtMaterial.GlassBlue
                 ? ShadowCastingMode.Off

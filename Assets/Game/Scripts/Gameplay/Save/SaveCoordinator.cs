@@ -13,6 +13,45 @@ public sealed class SaveCoordinator : MonoBehaviour
     private GameState _lastLoaded;       // 本场景缺席的系统，其存档段落原样带过（防 v1 场景日结清掉 v2 数据）
     [SerializeField] private bool autoLoadOnStart = true;
     [SerializeField] private bool autoSaveOnDayEnd = true;
+    public GameState LastLoaded => _lastLoaded;
+    public string StatusText { get; private set; } = "Auto-save: day close and app background. Manual save available.";
+    private bool _saveAfterSettlement;
+
+    private void LateUpdate()
+    {
+        if (!_saveAfterSettlement) return;
+        _saveAfterSettlement = false;
+        SaveGame(); // All day-end listeners, including the Sim host, have finished.
+    }
+
+    private long _pauseUtcTicks;
+    private float _timeScaleBeforePause = 1f;
+    private void OnApplicationPause(bool paused)
+    {
+        if (_simBridge == null || _simBridge.Sim == null) return;
+        if (paused) {
+            _pauseUtcTicks = System.DateTime.UtcNow.Ticks;
+            _simBridge.IsSuspended = true;
+            _timeScaleBeforePause = Time.timeScale;
+            Time.timeScale = 0f;
+            SaveGame();
+        }
+        else if (_pauseUtcTicks > 0) {
+            double elapsed = (System.DateTime.UtcNow.Ticks - _pauseUtcTicks) / (double)System.TimeSpan.TicksPerSecond;
+            _pauseUtcTicks = 0;
+            _simBridge.ApplyElapsedDelegation(elapsed);
+            _simBridge.IsSuspended = false;
+            Time.timeScale = _timeScaleBeforePause;
+            SaveGame();
+        }
+    }
+
+    private void OnApplicationQuit()
+    {
+#if !UNITY_EDITOR
+        if (_pauseUtcTicks == 0 && _simBridge != null && _simBridge.Sim != null) SaveGame();
+#endif
+    }
 
     private void Awake()
     {
@@ -72,6 +111,14 @@ public sealed class SaveCoordinator : MonoBehaviour
     public GameState Capture()
     {
         var gs = new GameState();
+        gs.presentation = HotelSessionState.Current;
+        var manager = FindFirstObjectByType<ManagerController>();
+        if (manager != null) {
+            gs.presentation.hasManagerPosition = true;
+            gs.presentation.managerX = manager.transform.position.x;
+            gs.presentation.managerY = manager.transform.position.y;
+            gs.presentation.managerZ = manager.transform.position.z;
+        }
         if (economy != null) gs.economy = economy.CaptureState();
         if (renovation != null) gs.renovation = renovation.CaptureState();
         gs.progress.day = dayController != null ? dayController.CurrentDay : 0;
@@ -89,6 +136,14 @@ public sealed class SaveCoordinator : MonoBehaviour
         if (_simBridge != null && _simBridge.Sim != null)
         {
             _simBridge.Sim.CaptureTo(gs.sim);
+            gs.delegationReport = _simBridge.LastDelegation;
+            gs.resumeWorld = true;
+            gs.awaitingMorningReport = _simBridge.AwaitingMorningReport;
+            gs.needsBeginDay = _simBridge.NeedsBeginDay;
+            gs.lastInterestAccrued = _simBridge.LastInterestAccrued;
+            gs.lastFacilityUpkeep = _simBridge.LastFacilityUpkeep;
+            gs.progress.day = gs.sim.day;
+            gs.sim.lastRealUtcTicks = System.DateTime.UtcNow.Ticks;
         }
         else if (_lastLoaded != null && _lastLoaded.sim != null)
         {
@@ -106,13 +161,31 @@ public sealed class SaveCoordinator : MonoBehaviour
         return gs;
     }
 
-    public void SaveGame() => SaveService.Save(Capture());
+    public void SaveGame()
+    {
+        try
+        {
+            SaveService.Save(Capture());
+            StatusText = (GameText.UseChinese ? "已保存至槽位 " : "Saved to slot ")
+                + SaveSlots.ActiveSlot + " · " + System.DateTime.Now.ToString("HH:mm:ss");
+        }
+        catch (System.Exception ex)
+        {
+            StatusText = GameText.UseChinese ? "保存失败：请检查存储空间并重试。" : "Save failed. Check storage and retry.";
+            Debug.LogError("Save failed: " + ex.Message);
+        }
+    }
 
     public void LoadGame()
     {
         var gs = SaveService.Load();
         if (gs == null) return;
         _lastLoaded = gs;
+        HotelSessionState.Current = gs.presentation ?? new HotelPresentationState();
+        if (HotelSessionState.Current.hasManagerPosition) {
+            var manager = FindFirstObjectByType<ManagerController>();
+            manager?.TryRestorePosition(new Vector3(gs.presentation.managerX, gs.presentation.managerY, gs.presentation.managerZ));
+        }
         if (economy != null) economy.RestoreState(gs.economy);
         if (renovation != null) renovation.RestoreState(gs.renovation);
         if (dayController != null) dayController.demoDayIndex = gs.progress.day;
@@ -142,6 +215,7 @@ public sealed class SaveCoordinator : MonoBehaviour
     public void NewGame()
     {
         SaveService.Delete();
+        HotelSessionState.Current = new HotelPresentationState();
         // 静态世界状态一并归零，否则上一局的威望/解锁渗进新档
         ManagerReputation.ResetForNewGame();
         FacilitySystem.ResetForNewGame();
@@ -155,8 +229,12 @@ public sealed class SaveCoordinator : MonoBehaviour
         if (!autoSaveOnDayEnd) return;
         // 日结时 demoDayIndex 还没 ++（Continue 才推进）——存"明天"，读档即是次晨，
         // 否则读档重打第 N 天：收入重复赚、日历原地踏步。
-        var gs = Capture();
-        gs.progress.day = day + 1;
-        SaveService.Save(gs);
+        if (_simBridge != null) _saveAfterSettlement = true;
+        else
+        {
+            var gs = Capture();
+            gs.progress.day = day + 1;
+            SaveService.Save(gs);
+        }
     }
 }

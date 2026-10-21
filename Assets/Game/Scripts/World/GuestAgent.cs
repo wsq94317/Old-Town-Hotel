@@ -211,16 +211,7 @@ public class GuestAgent : MonoBehaviour
         nav.angularSpeed = 720f;
         nav.acceleration = 14f;
 
-        var quad = GameObject.CreatePrimitive(PrimitiveType.Quad);
-        Destroy(quad.GetComponent<Collider>());
-        quad.name = "Visual";
-        quad.transform.SetParent(go.transform);
-        quad.transform.localPosition = new Vector3(0, 0.75f, 0);
-        var quadRenderer = quad.GetComponent<Renderer>();
-        quad.transform.localScale = new Vector3(0.65f, 1.4f, 1f);
-        if (!GeneratedPlaceholderArt.ApplyGuestSprite(quad.transform, quadRenderer, label))
-            quadRenderer.sharedMaterial = GuestMaterial();
-        quad.AddComponent<BillboardSprite>();
+        HotelCharacterArt.Create(go.transform, StaffRole.Manager, true, _all.Count);
 
         go.AddComponent<AgentFloorVisibility>();
         return go.AddComponent<GuestAgent>();

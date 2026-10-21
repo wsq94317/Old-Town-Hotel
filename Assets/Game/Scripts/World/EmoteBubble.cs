@@ -7,6 +7,7 @@ public class EmoteBubble : MonoBehaviour
     public enum Emote { None, Sleep, Delay, Alert, Grudge }
 
     private Renderer _renderer;
+    private TMPro.TextMeshPro _label;
     private Emote _current = Emote.None;
     private FloorVisibilityController _floors;
     private static Material _matSleep, _matDelay, _matAlert, _matGrudge;
@@ -22,6 +23,15 @@ public class EmoteBubble : MonoBehaviour
         quad.AddComponent<BillboardSprite>();
         var bubble = quad.AddComponent<EmoteBubble>();
         bubble._renderer = quad.GetComponent<Renderer>();
+        var text = new GameObject("EmoteMeaning");
+        text.transform.SetParent(quad.transform, false);
+        text.transform.localPosition = new Vector3(0, 0, -.03f);
+        bubble._label = text.AddComponent<TMPro.TextMeshPro>();
+        bubble._label.font = WorldManagementHud.PresentationFont;
+        bubble._label.fontSize = 4;
+        bubble._label.alignment = TMPro.TextAlignmentOptions.Center;
+        bubble._label.rectTransform.sizeDelta = new Vector2(2f, 1.1f);
+        bubble._label.color = Color.white;
         bubble.Show(Emote.None);
         return bubble;
     }
@@ -29,6 +39,10 @@ public class EmoteBubble : MonoBehaviour
     public void Show(Emote emote)
     {
         _current = emote;
+        if (_label != null) {
+            _label.text = emote == Emote.Sleep ? "ZZZ" : emote == Emote.Delay ? "SLOW" : emote == Emote.Grudge ? "GRR" : "!";
+            _label.enabled = emote != Emote.None;
+        }
         if (_renderer == null) return;
         if (emote == Emote.None) { _renderer.enabled = false; return; }
         _renderer.enabled = true;
@@ -43,6 +57,7 @@ public class EmoteBubble : MonoBehaviour
         if (_floors == null) { _floors = FindFirstObjectByType<FloorVisibilityController>(); if (_floors == null) return; }
         _renderer.enabled = _current != Emote.None
             && FloorMath.FloorIndexForY(transform.position.y) == _floors.CurrentFloor;
+        if (_label != null) _label.enabled = _renderer.enabled;
     }
 
     private static Material MaterialFor(Emote e)

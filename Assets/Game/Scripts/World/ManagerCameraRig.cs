@@ -21,6 +21,7 @@ public class ManagerCameraRig : MonoBehaviour
 
     public bool IsFollowingTarget => _followingTarget;
     public Vector3 FocusPoint => _focusPoint;
+    public int ViewedFloor => floors != null ? floors.CurrentFloor : FloorMath.FloorIndexForY(_focusPoint.y);
 
     public void SetWorldBounds(Vector2 minXZ, Vector2 maxXZ)
     {
