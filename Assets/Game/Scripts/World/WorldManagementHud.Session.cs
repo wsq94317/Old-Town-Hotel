@@ -18,7 +18,8 @@ public sealed partial class WorldManagementHud
         RectTransform rect; TextMeshProUGUI text;
         CreateButton("SessionMenu", _safeRoot, out rect, out text, L("MENU / HELP", "菜单 / 帮助"), Walnut,
             () => ShowSessionMenu("main"));
-        SetAnchors(rect, Vector2.up, Vector2.up, new Vector2(8, -252), new Vector2(140, -210));
+        SetAnchors(rect, Vector2.up, Vector2.up, new Vector2(10, -168), new Vector2(76, -132));
+        text.text=L("MENU","菜单");
         _sessionMenuButton = rect;
         text.fontSize = 12;
     }
@@ -89,8 +90,8 @@ public sealed partial class WorldManagementHud
             MenuText(L("Use ROOMS to find any of the 100 rooms. Clearing ruins uses housekeeping; paid restoration needs materials and days. Yellow barriers show construction. Clean and inspect after handover. Repairs restore health; renovation replaces worn furniture. Price promises must match delivered quality.",
                 "在客房作战室查看全部100间房。免费清理占用客房部，付费复原消耗材料与工期；黄黑围挡表示施工中。完工后还要清洁验房。维修恢复健康度，装修更换老家具；挂牌档应符合实际品质。"), 14, Cream, 136);
             MenuText(L("3. Inspect and handle incidents", "3. 巡查与操作"), 17, Gold, 30);
-            MenuText(L("Tap floor to move, drag to inspect, tap a doorway to select a room. Inspect staff and respond to events through their action cards. Viewing another floor does not move the manager: use the lift or stairs. MENU pauses everything; speed and delegation are in the hotel desk.",
-                "点击地面走路，拖动画面巡查，点击门口选择房间。员工与事件有对应操作卡。查看其他楼层不会移动经理，跨层请走楼梯或坐电梯。菜单暂停全酒店；酒店面板可调倍速和托管。"), 14, Cream, 114);
+            MenuText(L("Director mode: tap a whole room to manage it, drag to pan, scroll or pinch to zoom, right-drag or twist two fingers to orbit. The camera panel includes rotation and top view. Use floor and room navigation to reach any wing. Switch to Walk to move your manager personally. MENU pauses everything.",
+                "经营指挥：点整间房处理事务，拖动平移，滚轮/双指缩放，右键拖动/双指旋转。镜头菜单可转向和俯视；楼层与房间导航可直达远翼。切换亲自巡视后可点地面行走。菜单暂停全酒店。"), 14, Cream, 114);
             MenuButton(L("BACK", "返回菜单"), () => ShowSessionMenu("main"));
         }
         else if (page == "slots")
@@ -133,7 +134,7 @@ public sealed partial class WorldManagementHud
             var saveStatus = FindFirstObjectByType<SaveCoordinator>()?.StatusText;
             if (saveStatus != null && (saveStatus.StartsWith("已保存") || saveStatus.StartsWith("Saved") || saveStatus.StartsWith("保存失败")))
                 MenuText(saveStatus,12,TealSoft,32);
-            MenuButton(HotelSessionState.Current.tutorialCompleted ? L("CONTINUE HOTEL", "继续经营") : L("TAKE OVER THE HOTEL", "接手老酒店"), () => {
+            MenuButton(HotelSessionState.Current.tutorialCompleted ? L("CONTINUE HOTEL", "继续经营") : L("ENTER / DIRECTOR MODE", "进入酒店 · 经营指挥"), () => {
                 HotelSessionState.Current.tutorialCompleted = true; CloseSessionMenu();
             });
             MenuButton(L("HOW TO PLAY", "经营手册 / 操作帮助"), () => ShowSessionMenu("help"));

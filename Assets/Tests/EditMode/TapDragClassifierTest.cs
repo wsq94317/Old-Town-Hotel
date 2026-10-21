@@ -193,6 +193,46 @@ namespace OldTownHotel.Tests.EditMode
                 ?.Invoke(_rig, null);
         }
 
+        [Test]
+        public void OrbitChangesAngleWithoutMovingFocusOrManager()
+        {
+            var focus=_rig.FocusPoint;var manager=_targetObject.transform.position;
+            _rig.OrbitBy(90,-15);InvokeLateUpdate();
+            Assert.That(_rig.Yaw,Is.EqualTo(135).Within(.01));
+            Assert.That(_rig.Pitch,Is.EqualTo(35).Within(.01));
+            Assert.That(_rig.FocusPoint,Is.EqualTo(focus));
+            Assert.That(_targetObject.transform.position,Is.EqualTo(manager));
+        }
+        [TestCase(-100,3.5f)]
+        [TestCase(100,24)]
+        [TestCase(6,6)]
+        public void ZoomStaysWithinPlayableLimits(float requested,float expected)
+        { _rig.SetZoom(requested);Assert.That(_rig.Zoom,Is.EqualTo(expected)); }
+        [Test]
+        public void InvalidZoomDoesNotPoisonCameraTransforms()
+        { float before=_rig.Zoom;_rig.SetZoom(float.NaN);_rig.ZoomBy(float.PositiveInfinity);Assert.That(_rig.Zoom,Is.EqualTo(before)); }
+        [Test]
+        public void FloorBrowsingDoesNotTeleportTheManager()
+        {
+            var before=_targetObject.transform.position;_rig.ViewFloor(2);
+            Assert.That(_rig.ViewedFloor,Is.EqualTo(2));Assert.That(_rig.FocusPoint.y,Is.EqualTo(8));
+            Assert.That(_targetObject.transform.position,Is.EqualTo(before));Assert.That(_rig.IsFollowingTarget,Is.False);
+        }
+        [Test]
+        public void CameraCompositionSurvivesPresentationSaveRoundTrip()
+        {
+            _rig.FocusOnPoint(new Vector3(-6,4,3),true);_rig.OrbitBy(135,15);_rig.SetZoom(5);
+            var state=new HotelPresentationState();_rig.CaptureView(state);
+            state=JsonUtility.FromJson<HotelPresentationState>(JsonUtility.ToJson(state));
+            _rig.ResetView();_rig.ViewFloor(0);_rig.RestoreView(state);
+            Assert.That(_rig.FocusPoint,Is.EqualTo(new Vector3(-6,4,3)));
+            Assert.That(_rig.ViewedFloor,Is.EqualTo(1));Assert.That(_rig.Yaw,Is.EqualTo(180));
+            Assert.That(_rig.Pitch,Is.EqualTo(65));Assert.That(_rig.Zoom,Is.EqualTo(5));
+        }
+        [Test]
+        public void OlderPresentationSavesDefaultToDirectorControls()
+        { Assert.That(JsonUtility.FromJson<HotelPresentationState>("{\"soundEnabled\":true}").viewControlMode,Is.Zero); }
+
         private static void SetPrivateField(object instance, string fieldName, object value)
         {
             typeof(ManagerCameraRig)

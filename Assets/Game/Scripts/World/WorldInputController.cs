@@ -6,7 +6,7 @@ using UnityEngine.EventSystems;
 //   Tap（按下→没滑→松手）：经理走到落点 + 绿色点击标记
 //   Drag（按下后滑动超阈值）：拖动相机窥视；松手后相机慢速回正到经理
 // 一旦进入 Drag，本次按压永久失去 Tap 资格（拖回原点松手也不移动）。
-public class WorldInputController : MonoBehaviour
+public partial class WorldInputController : MonoBehaviour
 {
     [SerializeField] private ManagerController manager;
     [SerializeField] private ManagerCameraRig cameraRig;
@@ -37,6 +37,7 @@ public class WorldInputController : MonoBehaviour
 
     private void Update()
     {
+        if(TickCameraInput()) return;
         (bool pressed, Vector2 pos) = ReadPointer();
 
         // ── 模拟触屏"卡指"看门狗 ──
@@ -225,6 +226,7 @@ public class WorldInputController : MonoBehaviour
         var facility = hit.collider.GetComponentInParent<StaffFacilityNode>();
         if (facility != null)
         {
+            if(IsDirectorMode) { WorldManagementHud.NotifyMessage(GameText.UseChinese ? "员工会自主使用设施；切换亲自巡视可进行现场检查。" : "Staff use these facilities themselves. Switch to Walk for a personal inspection."); return; }
             if (ReturnToManagerIfViewingOtherFloor()) return;
             StaffFacilitySystem.EnsureInScene().OnFacilityTapped(facility, manager);
             ClickMarkerFx.Spawn(facility.Anchor);
@@ -234,6 +236,7 @@ public class WorldInputController : MonoBehaviour
         var staff = hit.collider.GetComponentInParent<StaffAgent>();
         if (staff != null)
         {
+            if(IsDirectorMode) { FindFirstObjectByType<ManagerInteraction>()?.InspectStaffRemotely(staff); return; }
             if (ReturnToManagerIfViewingOtherFloor()) return;
             var interaction = FindFirstObjectByType<ManagerInteraction>();
             if (interaction != null) { interaction.OnStaffTapped(staff); return; }
@@ -242,12 +245,15 @@ public class WorldInputController : MonoBehaviour
         // Rooms are selected only through their visible doorway chips. Looking
         // up RoomSceneBinder from the hit collider's parents made every wall,
         // bed and tall invisible room box steal nearby corridor taps.
-        if (TryFindRoomTap(ray, out RoomSceneBinder room))
+        RoomSceneBinder room;
+        if ((IsDirectorMode && cameraRig!=null && TryFindDirectorRoom(ray,cameraRig.ViewedFloor,out room))
+            || TryFindRoomTap(ray, out room))
         {
             WorldManagementHud.SelectRoom(room.RoomNumber);
             return;
         }
 
+        if(IsDirectorMode) { WorldManagementHud.ClearWorldSelection(); return; }
         if (ReturnToManagerIfViewingOtherFloor()) return;
         WorldManagementHud.ClearWorldSelection();
         if (manager != null && manager.TryMoveTo(movementTarget, out Vector3 destination))

@@ -40,6 +40,8 @@ public partial class RoomSceneBinder : MonoBehaviour
     private float _pulseUntil;
     private Vector3 _chipBaseScale;
     private BoxCollider _tapCollider;
+    private Camera _presentationCamera;
+    private ManagerCameraRig _presentationRig;
 
     public int RoomNumber => roomNumber;
 
@@ -185,6 +187,7 @@ public partial class RoomSceneBinder : MonoBehaviour
     {
         var bridge = HotelSimSceneBridge.Instance;
         if (bridge == null || bridge.Sim == null || roomNumber <= 0) return;
+        RefreshReadableLabel(bridge.Sim);
         TickPulse();
         TickConstructionAnimation();
         // Presentation still refreshes while the morning report freezes simulation.
@@ -216,6 +219,22 @@ public partial class RoomSceneBinder : MonoBehaviour
         if (previous >= 0 && previous != state
             && (state == RoomSimState.Ready || state == RoomSimState.Occupied))
             Pulse();
+    }
+
+    private void RefreshReadableLabel(HotelSim sim)
+    {
+        if(_label==null||!sim.Rooms.Contains(roomNumber))return;
+        var billboard=_label.GetComponent<BillboardSprite>();if(billboard!=null)billboard.enabled=false;
+        if(_presentationCamera==null)_presentationCamera=Camera.main;
+        if(_presentationRig==null&&_presentationCamera!=null)_presentationRig=_presentationCamera.GetComponent<ManagerCameraRig>();
+        bool selected=RoomSelection.Selected==roomNumber;
+        var state=sim.Rooms.At(roomNumber).state;
+        bool activity=state==RoomSimState.Cleaning||sim.Renovations.IsRenovating(roomNumber);
+        bool near=_presentationRig==null||_presentationRig.Zoom<10;
+        _label.GetComponent<Renderer>().enabled=selected||activity||near&&state!=RoomSimState.Ruined;
+        _label.characterSize=.047f;
+        _label.transform.localPosition=new Vector3(0,1.35f,0);
+        if(_presentationCamera!=null)_label.transform.rotation=_presentationCamera.transform.rotation;
     }
 
     public void Pulse(float duration = 1.1f)

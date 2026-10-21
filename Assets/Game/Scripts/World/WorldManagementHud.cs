@@ -281,6 +281,8 @@ public sealed partial class WorldManagementHud : MonoBehaviour
         if (Contains(instance._topPanel, screenPoint)) return true;
         if (Contains(instance._bottomNav, screenPoint)) return true;
         if (Contains(instance._empireMap, screenPoint)) return true;
+        if (Contains(instance._sceneToolbar,screenPoint)||Contains(instance._sceneTimeControls,screenPoint)||Contains(instance._sceneViewPanel,screenPoint)
+            ||Contains(instance._sceneFloorPanel,screenPoint)||Contains(instance._sceneNavigator,screenPoint)) return true;
         if (Contains(instance._opportunityBar, screenPoint)) return true;
         if (Contains(instance._alertStrip, screenPoint)) return true;
         if (Contains(instance._returnToManager, screenPoint)) return true;
@@ -351,6 +353,7 @@ public sealed partial class WorldManagementHud : MonoBehaviour
         RefreshEconomySnapshot();
         RefreshOpportunity();
         RefreshTop();
+        RefreshSceneControls();
         RefreshSceneEconomyFeedback();
         TickJourneyPresentation();
         RefreshAlerts();
@@ -366,6 +369,9 @@ public sealed partial class WorldManagementHud : MonoBehaviour
         _hudMode = mode;
 
         bool operations = mode == WorldHudMode.Operations;
+        if(_sceneToolbar!=null)_sceneToolbar.gameObject.SetActive(operations&&!_drawerOpen);
+        if(_sceneTimeControls!=null)_sceneTimeControls.gameObject.SetActive(operations&&!_drawerOpen);
+        if(!operations)CloseScenePanels();
         _topPanel.gameObject.SetActive(operations);
         _bottomNav.gameObject.SetActive(operations);
         _opportunityBar.gameObject.SetActive(operations);
@@ -818,10 +824,11 @@ public sealed partial class WorldManagementHud : MonoBehaviour
             string key = "room|" + number + "|" + room.state + "|" + room.tier
                          + "|" + Sim.Cash + "|" + Sim.Materials.Stock
                          + "|" + Sim.Clearing.ProgressOf(number).ToString("0.00")
-                         + "|" + Sim.Renovations.DaysRemainingFor(number);
+                         + "|" + Sim.Renovations.DaysRemainingFor(number)+"|"+ServicePriorityRevision+"|"+Mathf.FloorToInt(RoomWorkProgress(number)*20);
             if (_roomStateKey == key) return;
             _roomStateKey = key;
             ConfigureRoomCard(room);
+            FitSceneActionCard();
             return;
         }
 
@@ -832,6 +839,7 @@ public sealed partial class WorldManagementHud : MonoBehaviour
             if (_roomStateKey == key) return;
             _roomStateKey = key;
             ConfigureBusinessCard(_selectedBusiness);
+            FitSceneActionCard();
             return;
         }
 
@@ -839,6 +847,7 @@ public sealed partial class WorldManagementHud : MonoBehaviour
         if (_roomStateKey == opportunityKey) return;
         _roomStateKey = opportunityKey;
         ConfigureOpportunityCard(_pinnedOpportunity);
+        FitSceneActionCard();
     }
 
     private void RefreshLegacyRoomCard()
@@ -974,6 +983,7 @@ public sealed partial class WorldManagementHud : MonoBehaviour
             return;
         }
 
+        if(ConfigureServiceRoom(room))return;
         _roomHeadline.text = "+$" + FormatRate(currentContribution)
                              + L("/day  ·  ", "/营业日  ·  ")
                              + OperationalRoomHeadline(room.state);
@@ -1294,6 +1304,7 @@ public sealed partial class WorldManagementHud : MonoBehaviour
                        && rig != null
                        && !rig.IsFollowingTarget
                        && !_drawerOpen;
+        if(_sceneInput!=null&&_sceneInput.IsDirectorMode)visible=false;
         _returnToManager.gameObject.SetActive(visible);
         if (visible)
         {
@@ -3018,6 +3029,7 @@ public sealed partial class WorldManagementHud : MonoBehaviour
 
     private void SetDrawerOpen(bool open)
     {
+        if(open){CloseScenePanels();if(_sceneToolbar!=null)_sceneToolbar.gameObject.SetActive(false);if(_sceneTimeControls!=null)_sceneTimeControls.gameObject.SetActive(false);}
         if (_tab != DeskTab.Assets) _empireMapOpen = false;
         if (!open) _empireMapOpen = false;
         if (open && !_drawerOpen) _drawerScrollReset = true;
@@ -3366,6 +3378,7 @@ public sealed partial class WorldManagementHud : MonoBehaviour
         BuildMorningReport();
         BuildToast();
         BuildSessionButton();
+        BuildSceneControls();
         UpdateSafeArea(force: true);
         SetDrawerOpen(false);
     }
@@ -3936,7 +3949,7 @@ public sealed partial class WorldManagementHud : MonoBehaviour
     {
         _roomCard = CreatePanel("SelectedRoomInvestment", _safeRoot, Ledger);
         SetAnchors(_roomCard, new Vector2(0f, 0f), new Vector2(1f, 0f),
-            new Vector2(8f, 136f), new Vector2(-8f, 430f));
+            new Vector2(8f, 88f), new Vector2(-8f, 288f));
         AddOutline(_roomCard, BrassLine, 1.4f);
 
         var accent = CreatePanel("Accent", _roomCard, Gold);
@@ -3945,19 +3958,18 @@ public sealed partial class WorldManagementHud : MonoBehaviour
 
         _roomTitle = CreateText("RoomTitle", _roomCard, 18f, Gold,
             TextAlignmentOptions.TopLeft, true);
-        SetAnchors(_roomTitle.rectTransform, new Vector2(0f, 0.82f), new Vector2(0.82f, 1f),
-            new Vector2(16f, 0f), new Vector2(0f, -10f));
+        SetAnchors(_roomTitle.rectTransform,Vector2.up,new Vector2(.82f,1),new Vector2(16,-35),new Vector2(0,-7));
 
         _roomHeadline = CreateText("RoomHeadline", _roomCard, 18f, Cream,
             TextAlignmentOptions.TopLeft, true);
-        SetAnchors(_roomHeadline.rectTransform, new Vector2(0f, 0.66f), new Vector2(1f, 0.84f),
-            new Vector2(16f, 0f), new Vector2(-14f, 0f));
+        SetAnchors(_roomHeadline.rectTransform,Vector2.up,Vector2.one,new Vector2(16,-63),new Vector2(-14,-36));
+        _roomHeadline.fontSize=16;
 
         _roomDetail = CreateText("RoomDetail", _roomCard, 12.5f, InkSoft,
             TextAlignmentOptions.TopLeft, false);
         _roomDetail.textWrappingMode = TMPro.TextWrappingModes.Normal;
-        SetAnchors(_roomDetail.rectTransform, new Vector2(0f, 0.22f), new Vector2(1f, 0.68f),
-            new Vector2(16f, 5f), new Vector2(-14f, -2f));
+        SetAnchors(_roomDetail.rectTransform,Vector2.up,Vector2.one,new Vector2(16,-145),new Vector2(-14,-67));
+        _roomDetail.fontSize=11.5f;
         _roomDetail.overflowMode = TextOverflowModes.Truncate;
 
         RectTransform closeRect;
@@ -3970,14 +3982,12 @@ public sealed partial class WorldManagementHud : MonoBehaviour
         RectTransform primaryRect;
         _roomPrimary = CreateButton("Primary", _roomCard, out primaryRect,
             out _roomPrimaryLabel, "", Teal, null);
-        SetAnchors(primaryRect, new Vector2(0f, 0f), new Vector2(0.58f, 0.20f),
-            new Vector2(14f, 10f), new Vector2(-4f, 0f));
+        SetAnchors(primaryRect,Vector2.zero,new Vector2(.58f,0),new Vector2(14,8),new Vector2(-4,48));
 
         RectTransform secondaryRect;
         _roomSecondary = CreateButton("Secondary", _roomCard, out secondaryRect,
             out _roomSecondaryLabel, "", Ink, null);
-        SetAnchors(secondaryRect, new Vector2(0.58f, 0f), new Vector2(1f, 0.20f),
-            new Vector2(4f, 10f), new Vector2(-12f, 0f));
+        SetAnchors(secondaryRect,new Vector2(.58f,0),Vector2.right,new Vector2(4,8),new Vector2(-12,48));
     }
 
     private void BuildContextSheet()

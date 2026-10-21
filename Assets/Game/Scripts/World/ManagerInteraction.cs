@@ -183,6 +183,13 @@ public class ManagerInteraction : MonoBehaviour
         }
     }
 
+    public void InspectStaffRemotely(StaffAgent agent)
+    {
+        if(agent==null)return;
+        _commandAgent=null;_panelAgent=agent;
+        WorldManagementHud.ClearWorldSelection();
+    }
+
     private void Say(string msg)
     {
         _lastMessage = msg;

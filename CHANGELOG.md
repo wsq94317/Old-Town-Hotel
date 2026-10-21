@@ -4,6 +4,14 @@ All notable changes to **Old Town Hotel** are documented here, newest first.
 
 ---
 
+## 2026-10-22 — Director experience
+
+- Made remote hotel direction the default: select whole rooms, inspect staff across floors and prioritize cleaning/inspection without walking the manager to every action. Kept personal movement as a separate Walk mode.
+- Added orbit, zoom, overhead view, desktop and touch gestures, floor selection and an overview of all 50 rooms per guest floor.
+- Added planning pause and 1×/3×/6× speed controls, compact room action cards, camera-facing room labels, selection outlines and adaptive wall cutaways.
+- Persisted camera framing, control mode and the service priority queue without changing existing economic progress.
+- Validated 796 EditMode, 22 PlayMode and 480 simulation tests, including input gestures, overhead label readability, service queue order and cross-floor staff inspection.
+
 ## 2026-10-22 — Room door clearances
 
 - Replaced wall-parallel sliding doors with solid wood doors that swing inward from an inset hinge, clearing corridor walls throughout the opening animation.

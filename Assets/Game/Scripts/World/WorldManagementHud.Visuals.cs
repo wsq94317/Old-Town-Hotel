@@ -14,7 +14,7 @@ public sealed partial class WorldManagementHud
     private void BuildTop()
     {
         _topPanel=CreatePanel("EconomyHeader",_safeRoot,RevivalPaper);
-        SetAnchors(_topPanel,Vector2.up,Vector2.one,new Vector2(10,-152),new Vector2(-10,-10));
+        SetAnchors(_topPanel,Vector2.up,Vector2.one,new Vector2(10,-124),new Vector2(-10,-10));
         var brand=CreateText("Brand",_topPanel,10,Teal,TextAlignmentOptions.MidlineLeft,true);
         brand.text=L("OLD TOWN / FRONT DESK", "老城酒店 / 今日经营");
         SetAnchors(brand.rectTransform,new Vector2(0,.78f),new Vector2(.63f,1),new Vector2(14,0),new Vector2(0,-3));

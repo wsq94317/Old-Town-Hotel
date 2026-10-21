@@ -12,6 +12,30 @@ public class TaskDispatcher : MonoBehaviour
     private readonly HashSet<Room2DEntity> _claimed = new HashSet<Room2DEntity>();
     private readonly HashSet<StaffAgent> _subscribed = new HashSet<StaffAgent>();
     private float _timer;
+    private readonly List<int> _priorityRooms=new List<int>();
+    public int PriorityRevision { get; private set; }
+    public bool IsPriority(int roomNumber)=>_priorityRooms.Contains(roomNumber);
+    public void CaptureTo(WorldState world) { if(world!=null)world.servicePriorityRooms=new List<int>(_priorityRooms); }
+    public void RestoreFrom(WorldState world)
+    {
+        _priorityRooms.Clear();
+        if(world?.servicePriorityRooms!=null)foreach(int room in world.servicePriorityRooms)if(!_priorityRooms.Contains(room))_priorityRooms.Add(room);
+        PriorityRevision++;
+    }
+    public bool PrioritizeRoom(Room2DEntity room,out string message)
+    {
+        if(room==null || (room.currentState!=Room2DState.Dirty && room.currentState!=Room2DState.Cleaning && room.currentState!=Room2DState.AwaitingInspection)) {
+            message=GameText.UseChinese ? "这间房目前不需要清洁或验房。" : "This room does not need service.";return false;
+        }
+        StaffRole role=room.currentState==Room2DState.AwaitingInspection ? StaffRole.Inspector : StaffRole.Housekeeper;
+        bool hasStaff=false;
+        if(spawner!=null)foreach(var agent in spawner.Agents) if(agent!=null&&agent.Member!=null&&agent.Member.Role==role) { hasStaff=true;break; }
+        if(!hasStaff) { message=GameText.UseChinese ? (role==StaffRole.Housekeeper ? "请先招聘一名管家。" : "请先招聘一名验房员。") : "Hire the required staff role first.";return false; }
+        if(!_priorityRooms.Contains(room.roomNumber)){_priorityRooms.Add(room.roomNumber);PriorityRevision++;}
+        Dispatch();
+        message=GameText.UseChinese ? room.roomNumber+" 已设为优先服务，员工空闲后优先处理。" : "Room "+room.roomNumber+" has priority for the next available worker.";
+        return true;
+    }
 
     private void Awake()
     {
@@ -37,7 +61,8 @@ public class TaskDispatcher : MonoBehaviour
             EnsureSubscribed(agent);
 
             var sim = HotelSimSceneBridge.Instance != null ? HotelSimSceneBridge.Instance.Sim : null;
-            StaffTask? task = sim != null && sim.ClearRuinsFirst ? NextJunkClearingTask(agent.Member.Role) : null;
+            StaffTask? task=NextPriorityTask(agent.Member.Role);
+            if(!task.HasValue && sim != null && sim.ClearRuinsFirst) task=NextJunkClearingTask(agent.Member.Role);
             if (!task.HasValue) task = TaskDispatchLogic.NextTaskFor(agent.Member.Role, demandLoop.rooms, _claimed);
             // **脏房优先，清垃圾垫底**：客人在等今天的房，破败房不急一时。
             // 这就是"什么时候清破败房"的真代价——不是钱，是被挪走的工时。
@@ -48,6 +73,20 @@ public class TaskDispatcher : MonoBehaviour
                 _claimed.Add(task.Value.Room);
             }
         }
+    }
+
+    private StaffTask? NextPriorityTask(StaffRole role)
+    {
+        for(int i=0;i<_priorityRooms.Count;i++) {
+            var room=FindRoom(_priorityRooms[i]);
+            if(room==null || room.currentState==Room2DState.Ready || room.currentState==Room2DState.Occupied || room.currentState==Room2DState.Blocked) {
+                _priorityRooms.RemoveAt(i--);PriorityRevision++;continue;
+            }
+            if(_claimed.Contains(room))continue;
+            if(role==StaffRole.Housekeeper && room.currentState==Room2DState.Dirty)return new StaffTask(room,StaffTaskKind.Clean);
+            if(role==StaffRole.Inspector && room.currentState==Room2DState.AwaitingInspection)return new StaffTask(room,StaffTaskKind.Inspect);
+        }
+        return null;
     }
 
     /// <summary>没有脏房要打扫时，客房部去清破败房的垃圾。

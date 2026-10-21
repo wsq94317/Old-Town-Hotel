@@ -4,7 +4,7 @@
 
 ![Unity](https://img.shields.io/badge/Unity-6000.3-black?logo=unity)
 ![C%23](https://img.shields.io/badge/C%23-90%2B%20scripts-239120?logo=csharp&logoColor=white)
-![Tests](https://img.shields.io/badge/EditMode%20tests-788%20passing-6A9F5C)
+![Tests](https://img.shields.io/badge/EditMode%20tests-796%20passing-6A9F5C)
 ![Platform](https://img.shields.io/badge/target-mobile%20portrait-C99A4A)
 
 <sub>Solo portfolio project by **Percy Wu**. The mechanics are real hotel-operations domain knowledge — front desk, housekeeping, room turnover, RevPAR-style economics — turned into a warm, fun-first management game. See the [changelog](CHANGELOG.md) for development history.</sub>
@@ -17,6 +17,20 @@
 
 ## 🎮 The game
 
+
+### Director controls and free camera — 22 October 2026
+
+The main loop now starts in **Director / 经营指挥** mode: select an entire room to restore, upgrade or prioritize its service, and inspect staff remotely. Idle workers take priority rooms before their normal queue while existing jobs finish. The manager remains available in **Walk / 亲自巡视** mode for personal visits and on-site interactions.
+
+Drag to pan; use the wheel or pinch to zoom; right-drag or twist two fingers to orbit. The camera panel provides rotation, overhead view and reset. **Floor / 楼层** changes the viewed floor, and **Room Navigation / 房间导航** shows all 50 rooms on a guest floor with direct travel to any wing. WASD/arrows pan, Q/E rotate, F locates the manager, and Tab switches control mode. Planning pause keeps the camera usable; the speed control cycles through 1×, 3× and 6×.
+
+Walls on the camera side cut away automatically, room text faces the camera, selection outlines identify the target, and compact action cards leave more of the hotel visible. Camera composition, control mode and service priorities are saved alongside existing progress.
+
+| Direct room service | Free overhead camera | Room navigation |
+|:---:|:---:|:---:|
+| ![Director service](Assets/Screenshots/director-service.png) | ![Free camera](Assets/Screenshots/director-free-view.png) | ![Room navigation](Assets/Screenshots/director-navigation.png) |
+
+Validation: 796 EditMode, 22 PlayMode and 480 simulation tests pass. A live 6× operations review completed cleaning/inspection, increased sellable stock and rolled into the next morning without runtime errors.
 
 ### District empire map — 22 October 2026
 

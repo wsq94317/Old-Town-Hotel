@@ -116,6 +116,7 @@ public sealed class SaveCoordinator : MonoBehaviour
     {
         var gs = new GameState();
         gs.presentation = HotelSessionState.Current;
+        FindFirstObjectByType<ManagerCameraRig>()?.CaptureView(gs.presentation);
         var manager = FindFirstObjectByType<ManagerController>();
         if (manager != null) {
             gs.presentation.hasManagerPosition = true;
@@ -131,6 +132,7 @@ public sealed class SaveCoordinator : MonoBehaviour
         // v3 世界层：设施解锁 / 威望 / 胶带复发 / 锁房
         FacilitySystem.CaptureTo(gs.world);
         HotelEmpireProgress.CaptureTo(gs.world);
+        FindFirstObjectByType<TaskDispatcher>()?.CaptureTo(gs.world);
         gs.world.prestige = ManagerReputation.Prestige;
 
         // **模拟内核**（v4-v7 的 sim 段）。以前这一段从来没被写过——SimState 结构
@@ -202,6 +204,7 @@ public sealed class SaveCoordinator : MonoBehaviour
         {
             FacilitySystem.RestoreFrom(gs.world);
             HotelEmpireProgress.RestoreFrom(gs.world);
+            FindFirstObjectByType<TaskDispatcher>()?.RestoreFrom(gs.world);
             ManagerReputation.Restore(gs.world.prestige);
             if (_breakdowns != null) _breakdowns.RestoreFrom(gs.world);
         }

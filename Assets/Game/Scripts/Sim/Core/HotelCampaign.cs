@@ -6,6 +6,9 @@ public sealed class HotelPresentationState
     public bool tutorialCompleted, reopeningCelebrated;
     public bool hasManagerPosition;
     public float managerX, managerY, managerZ;
+    public int viewControlMode; // 0 = director, 1 = walk with the manager. Old saves default to director.
+    public bool hasCameraView;
+    public float cameraX, cameraY, cameraZ, cameraYaw, cameraPitch, cameraZoom;
     public bool soundEnabled = true, musicEnabled = true;
 }
 
