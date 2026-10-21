@@ -25,6 +25,7 @@ public sealed partial class WorldManagementHud
 
     private void BuildPortfolioChoices()
     {
+        AddActionButton(L("OPEN DISTRICT MAP", "打开帝国街区地图"), OpenEmpireMap, Teal, true);
         AddSection(L("CHOOSE YOUR NEXT PROPERTY", "选择下一家酒店的生意"),
             L("Delegated properties have separate operating costs. The resort has a five-day demand cycle; this desk manages them through reports.",
                 "新物业由驻店经理托管，各自承担运营成本；度假店有五日淡旺季，通过此面板管理。"));
@@ -39,10 +40,14 @@ public sealed partial class WorldManagementHud
             L("Expected net receipts $", "预计净回款 $") + HotelEmpireProgress.IncomeForDay(Sim.Clock.CurrentDay)
             + L(" · paid into the hotel safe at day close", " · 日结时汇入酒店保险箱"), Gold, 78f);
         foreach (var kind in new[] { PortfolioHotelKind.Value, PortfolioHotelKind.Business, PortfolioHotelKind.Resort }) {
-            var captured = kind;
-            int cost = HotelEmpireProgress.AcquisitionCost(kind);
+            HotelDistrictSite target = null;
+            foreach(var site in HotelDistrictCatalog.Sites)
+                if(!HotelEmpireProgress.IsOwned(site.Id) && site.Kind==kind && HotelEmpireProgress.IsUnlocked(site)) { target=site; break; }
+            if(target==null) continue;
+            var captured = target;
+            int cost = target.Price;
             int net = HotelEmpireProgress.GrossOf(kind) - HotelEmpireProgress.UpkeepOf(kind);
-            AddPlanButton(PropertyName(kind) + L(" · BUY $", " · 收购 $") + cost,
+            AddPlanButton(L(target.EnglishName,target.Name) + L(" · BUY $", " · 收购 $") + cost,
                 L("Gross $", "日营收 $") + HotelEmpireProgress.GrossOf(kind)
                 + L(" - running cost $", " - 运营费 $") + HotelEmpireProgress.UpkeepOf(kind)
                 + L(" = net $", " = 日净回款 $") + net
@@ -52,9 +57,12 @@ public sealed partial class WorldManagementHud
                 + "\n" + L("Cash after purchase $", "收购后现金 $") + (Sim.Cash - cost)
                 + L(" · unpaid wages $", " · 待付工资 $") + Sim.Payroll.Owed,
                 () => {
-                    bool ok = HotelEmpireProgress.TryAcquire(Sim, captured, out string message);
+                    bool ok = HotelEmpireProgress.TryAcquireSite(Sim, captured.Id, out string message);
                     ShowToast(GameText.T(message));
-                    if (ok) ShowMoneyBurst(L("NEW PROPERTY ACQUIRED!", "新酒店收购成功！"), Gold);
+                    if (ok) {
+                        FindFirstObjectByType<SaveCoordinator>()?.RequestProgressAutosave();
+                        ShowMoneyBurst(L("NEW PROPERTY ACQUIRED!", "新酒店收购成功！"), Gold);
+                    }
                     ForceAllRefresh();
                 }, Gold, Sim.Cash >= cost);
         }

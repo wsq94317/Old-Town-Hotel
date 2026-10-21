@@ -88,12 +88,14 @@ public sealed partial class WorldManagementHud
                 RoomSelection.Select(room.number);
                 FocusRoom(room.number);
                 _tab = DeskTab.Assets;
+                _empireMapOpen = false;
                 SetDrawerOpen(true);
                 ShowToast(JourneyHint(stage));
                 return;
             }
         }
-        _tab = stage == 5 ? DeskTab.Assets : DeskTab.Overview;
+        if(stage==5) { OpenEmpireMap(); ShowToast(JourneyHint(stage)); return; }
+        _tab = DeskTab.Overview;
         SetDrawerOpen(true);
         ShowToast(JourneyHint(stage));
     }

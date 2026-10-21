@@ -4,6 +4,14 @@ All notable changes to **Old Town Hotel** are documented here, newest first.
 
 ---
 
+## 2026-10-22 — Hotel district map
+
+- Replaced the Empire tab's entry with an original illustrated neighbourhood containing seven clickable hotel locations, ownership markers, selection animation and expansion routes.
+- Added unique property purchases and branching prerequisites: Station House opens the market and canal routes; Riverside Grand needs both branches.
+- Connected hotel detail cards to cash, running costs, seasonal net income, daily settlement and purchase autosaves. Kept the existing home renovation and facility controls accessible.
+- Added stable saved site IDs and migration for existing portfolios, including portfolios larger than the map, without losing owned properties or income.
+- Verified 788 EditMode, 11 PlayMode and 480 simulation tests.
+
 ## 2026-07-14 — The Living Hotel
 
 The day/night cycle became real, and the UI started telling the truth.

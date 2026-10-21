@@ -280,6 +280,7 @@ public sealed partial class WorldManagementHud : MonoBehaviour
         if (instance._hudMode == WorldHudMode.MorningReport) return true;
         if (Contains(instance._topPanel, screenPoint)) return true;
         if (Contains(instance._bottomNav, screenPoint)) return true;
+        if (Contains(instance._empireMap, screenPoint)) return true;
         if (Contains(instance._opportunityBar, screenPoint)) return true;
         if (Contains(instance._alertStrip, screenPoint)) return true;
         if (Contains(instance._returnToManager, screenPoint)) return true;
@@ -370,6 +371,9 @@ public sealed partial class WorldManagementHud : MonoBehaviour
         _opportunityBar.gameObject.SetActive(operations);
         _returnToManager.gameObject.SetActive(false);
         _drawer.gameObject.SetActive(operations && _drawerOpen);
+        if (_empireMap != null) _empireMap.gameObject.SetActive(operations && _drawerOpen && _empireMapOpen);
+        if (_empireMapOpen) _drawer.gameObject.SetActive(false);
+        if (_sessionMenuButton != null) _sessionMenuButton.gameObject.SetActive(operations && !_empireMapOpen);
         _roomCard.gameObject.SetActive(false);
         _alertStrip.gameObject.SetActive(false);
         _contextSheet.gameObject.SetActive(false);
@@ -629,17 +633,17 @@ public sealed partial class WorldManagementHud : MonoBehaviour
         OpportunityModel facility = BuildFacilityOpportunity();
         ConsiderOpportunity(ref best, facility);
 
-        if (best == null)
+        if (best == null && HotelEmpireProgress.NextAvailableSite != null)
         {
             int hotelCost = HotelEmpireProgress.NextHotelCost;
+            var nextHotel = HotelEmpireProgress.NextAvailableSite;
             best = new OpportunityModel
             {
                 Key = "empire|hotel" + (HotelEmpireProgress.HotelCount + 1),
                 Kind = OpportunityKind.AcquireHotel,
-                Title = L("ACQUIRE HOTEL NO. ", "收购第 ")
-                        + (HotelEmpireProgress.HotelCount + 1)
-                        + L("", " 家酒店"),
-                Detail = L("Value hotel: about +$480/day after upkeep.", "平价酒店扣除维护费后约 +$480/营业日。"),
+                Title = L("ACQUIRE ", "收购") + L(nextHotel.EnglishName, nextHotel.Name),
+                Detail = L("District expansion · net $", "街区扩张 · 日净回款 $")
+                    + (HotelEmpireProgress.GrossOf(nextHotel.Kind)-HotelEmpireProgress.UpkeepOf(nextHotel.Kind)),
                 PrimaryLabel = L("ACQUIRE  $", "收购  $") + hotelCost,
                 Cost = hotelCost,
                 GainPerMinute = 4f,
@@ -1655,6 +1659,7 @@ public sealed partial class WorldManagementHud : MonoBehaviour
     private void RefreshDrawerIfChanged()
     {
         if (!_drawerOpen) return;
+        if (_empireMapOpen) { RefreshEmpireMap(); return; }
         string key = BuildDrawerStateKey();
         if (_drawerStateKey == key) return;
         _drawerStateKey = key;
@@ -2566,6 +2571,7 @@ public sealed partial class WorldManagementHud : MonoBehaviour
         ShowToast(GameText.T(message));
         if (ok)
         {
+            FindFirstObjectByType<SaveCoordinator>()?.RequestProgressAutosave();
             ShowMoneyBurst(L("HOTEL ACQUIRED  -$", "收购酒店  -$") + cost, Coral);
             StartCoroutine(BumpCash());
         }
@@ -3005,15 +3011,20 @@ public sealed partial class WorldManagementHud : MonoBehaviour
 
     private void OpenAssetsForSelectedRoom()
     {
+        _empireMapOpen = false;
         _tab = DeskTab.Assets;
         SetDrawerOpen(true);
     }
 
     private void SetDrawerOpen(bool open)
     {
+        if (_tab != DeskTab.Assets) _empireMapOpen = false;
+        if (!open) _empireMapOpen = false;
         if (open && !_drawerOpen) _drawerScrollReset = true;
         _drawerOpen = open;
-        _drawer.gameObject.SetActive(open);
+        _drawer.gameObject.SetActive(open && !_empireMapOpen);
+        if (_empireMap != null) _empireMap.gameObject.SetActive(open && _empireMapOpen);
+        if (_sessionMenuButton != null) _sessionMenuButton.gameObject.SetActive(!_empireMapOpen);
         if (open)
         {
             _contextSheet.gameObject.SetActive(false);
@@ -3038,6 +3049,13 @@ public sealed partial class WorldManagementHud : MonoBehaviour
 
     private void SelectTab(DeskTab tab)
     {
+        if (tab == DeskTab.Assets)
+        {
+            if (_drawerOpen && _empireMapOpen) SetDrawerOpen(false);
+            else OpenEmpireMap();
+            return;
+        }
+        _empireMapOpen = false;
         if (_tab != tab) _drawerScrollReset = true;
         if (_drawerOpen && _tab == tab)
         {

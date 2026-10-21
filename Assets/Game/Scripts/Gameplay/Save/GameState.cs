@@ -84,6 +84,7 @@ public sealed class WorldState
     public bool poolUnlocked;
     public int hotelCount = 1;
     public List<int> portfolioKinds = new List<int>();
+    public List<string> portfolioSiteIds = new List<string>();
     public int prestige;
     public List<TapedBreakdownEntry> tapedBreakdowns = new List<TapedBreakdownEntry>();
     public List<int> lockedRooms = new List<int>(); // 次晨自动转 Dirty

@@ -16,6 +16,10 @@ public sealed class SaveCoordinator : MonoBehaviour
     public GameState LastLoaded => _lastLoaded;
     public string StatusText { get; private set; } = "Auto-save: day close and app background. Manual save available.";
     private bool _saveAfterSettlement;
+    public void RequestProgressAutosave()
+    {
+        if (autoSaveOnDayEnd) _saveAfterSettlement = true;
+    }
 
     private void LateUpdate()
     {

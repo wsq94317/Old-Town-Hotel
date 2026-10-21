@@ -75,13 +75,15 @@ namespace OldTownHotel.Tests.EditMode
         public void AcquiredPropertyKeepsItsTypeAndOperatingCostsAfterReload()
         {
             HotelEmpireProgress.ResetForNewGame();
-            var sim = Build(100000);
+            var sim = Build(200000);
+            Assert.That(HotelEmpireProgress.TryAcquireSite(sim, "station", out _), Is.True);
             Assert.That(HotelEmpireProgress.TryAcquire(sim, PortfolioHotelKind.Business, out _), Is.True);
-            Assert.That(sim.Cash, Is.EqualTo(65000));
+            Assert.That(sim.Cash, Is.EqualTo(105000));
             var world = new WorldState(); HotelEmpireProgress.CaptureTo(world);
             HotelEmpireProgress.ResetForNewGame(); HotelEmpireProgress.RestoreFrom(world);
-            Assert.That(HotelEmpireProgress.HotelCount, Is.EqualTo(2));
-            Assert.That(HotelEmpireProgress.DailyIncome, Is.EqualTo(700));
+            Assert.That(HotelEmpireProgress.HotelCount, Is.EqualTo(3));
+            Assert.That(HotelEmpireProgress.IsOwned("canal"), Is.True);
+            Assert.That(HotelEmpireProgress.DailyIncome, Is.EqualTo(1180));
         }
         [Test]
         public void ForecastDeductsWagesCapitalisedInterestAndUpkeep()

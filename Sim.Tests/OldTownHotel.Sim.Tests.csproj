@@ -105,6 +105,8 @@
     <Compile Remove="..\Assets\Tests\EditMode\BreakdownLogicTest.cs" />
     <Compile Remove="..\Assets\Tests\EditMode\SaveSlotTest.cs" />
     <Compile Remove="..\Assets\Tests\EditMode\HotelEconomyPresentationTest.cs" />
+    <!-- District persistence tests use Unity JsonUtility and the rendered-world catalog. -->
+    <Compile Remove="..\Assets\Tests\EditMode\HotelDistrictProgressTest.cs" />
   </ItemGroup>
 
 </Project>

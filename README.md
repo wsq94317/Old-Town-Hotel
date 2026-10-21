@@ -4,7 +4,7 @@
 
 ![Unity](https://img.shields.io/badge/Unity-6000.3-black?logo=unity)
 ![C%23](https://img.shields.io/badge/C%23-90%2B%20scripts-239120?logo=csharp&logoColor=white)
-![Tests](https://img.shields.io/badge/EditMode%20tests-780%20passing-6A9F5C)
+![Tests](https://img.shields.io/badge/EditMode%20tests-788%20passing-6A9F5C)
 ![Platform](https://img.shields.io/badge/target-mobile%20portrait-C99A4A)
 
 <sub>Solo portfolio project by **Percy Wu**. The mechanics are real hotel-operations domain knowledge — front desk, housekeeping, room turnover, RevPAR-style economics — turned into a warm, fun-first management game. See the [changelog](CHANGELOG.md) for development history.</sub>
@@ -17,6 +17,16 @@
 
 ## 🎮 The game
 
+
+### District empire map — 22 October 2026
+
+Tap **Empire / 帝国** to open an illustrated district with seven individual hotels. Start at Old Town Hotel, acquire Station House, then expand along the market and canal routes. Riverside Grand requires both routes. Each hotel pin shows ownership, availability or its locked state; its detail card explains prerequisites, price, operating costs and daily net receipts.
+
+Purchases charge once, open the next locations, update the map and request an autosave. Acquired properties run under resident managers and contribute to the existing daily settlement and seasonal economy. Earlier portfolio saves receive map locations while retaining all owned hotels, types and income. **Home Investment / 本店投资** keeps the original room renovation, warehouse and facility controls available.
+
+![Hotel empire district map](Assets/Screenshots/empire-district-map.png)
+
+Validation: 788 EditMode tests, 11 scene PlayMode tests and 480 simulation tests pass. New coverage includes both unlock routes, affordability, duplicate purchases, old-save migration, map hit testing, purchase feedback and returning to local hotel controls. The original map asset and its generation prompt live in `Assets/Game/Resources/HotelArt/Empire` and `Assets/Game/Art/Empire/GenerationRecord.json`.
 
 ### Textures and interior lighting — 22 October 2026
 
