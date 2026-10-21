@@ -7,7 +7,7 @@ using UnityEngine.AI;
 //   房内亮度 = 门开着 或 屋里有人（关门不再把人闷进黑屋）
 //   员工/客人持工卡/房卡：走近直接开（模拟不受面板打扰）
 //   经理闯进【入住中】房间内部 → WrongRoomDrama（受惊客人+枕头+撵人）
-public class RoomDoor : MonoBehaviour
+public partial class RoomDoor : MonoBehaviour
 {
     // Room data lives outside the editable floor prefabs. Persist the stable room
     // number and resolve the scene object at runtime instead of creating a
@@ -20,7 +20,6 @@ public class RoomDoor : MonoBehaviour
 
     private GameObject _doorVisual;
     private Renderer _overlay;
-    private Vector3 _doorClosedPos;
     private float _openness;
     private float _brightness;
     private bool _targetOpen;
@@ -36,7 +35,7 @@ public class RoomDoor : MonoBehaviour
     private NavMeshAgent _managerAgent;
     private StaffAgentSpawner _spawner;
 
-    private static Material _doorMat, _overlayMat, _cardMat;
+    private static Material _overlayMat, _cardMat;
 
     /// <summary>任意房门面板打开（WorldInputController 拦截世界点击用）。</summary>
     public static bool AnyPanelOpen { get; private set; }
@@ -104,22 +103,11 @@ public class RoomDoor : MonoBehaviour
 
     private void BuildVisuals()
     {
-        var shader = Shader.Find("Universal Render Pipeline/Lit");
-        if (_doorMat == null) _doorMat = new Material(shader) { color = new Color(0.5f, 0.33f, 0.18f) };
-
-        var panel = GameObject.CreatePrimitive(PrimitiveType.Quad);
+        var panel = GameObject.CreatePrimitive(PrimitiveType.Cube);
         KillCollider(panel);
         panel.name = "DoorPanel";
         panel.transform.SetParent(transform);
-        panel.transform.localPosition = Vector3.up * 0.86f;
-        var panelRenderer = panel.GetComponent<Renderer>();
-        if (!GeneratedPlaceholderArt.ApplyNamedWorldSprite(panel.transform, panelRenderer, "env_doorway", 1.8f))
-        {
-            panel.transform.localScale = new Vector3(1.8f, 1.1f, 1f);
-            panelRenderer.sharedMaterial = _doorMat;
-        }
-        panel.AddComponent<BillboardSprite>();
-        AlignDoorPanel(panel.transform, transform.position, interiorCenter);
+        RefreshDoorVisuals();
 
         var ov = GameObject.CreatePrimitive(PrimitiveType.Quad);
         KillCollider(ov);
@@ -144,13 +132,14 @@ public class RoomDoor : MonoBehaviour
         _manager = FindFirstObjectByType<ManagerController>();
         _managerAgent = _manager != null ? _manager.GetComponent<NavMeshAgent>() : null;
         _spawner = FindFirstObjectByType<StaffAgentSpawner>();
+        RefreshDoorVisuals();
 
         var panelT = transform.Find("DoorPanel");
         if (panelT != null)
         {
             _doorVisual = panelT.gameObject;
             AlignDoorPanel(panelT, transform.position, interiorCenter);
-            _doorClosedPos = _doorVisual.transform.localPosition;
+            ApplyDoorPose(_openness);
         }
         var ovT = transform.Find("Darkness");
         if (ovT != null)
@@ -272,9 +261,7 @@ public class RoomDoor : MonoBehaviour
         var billboard = panel.GetComponent<BillboardSprite>();
         if (billboard != null) billboard.enabled = false;
 
-        Vector3 outward = doorPosition - roomInterior;
-        outward.y = 0f;
-        panel.localRotation = Quaternion.Euler(0f, outward.z > 0f ? 180f : 0f, 0f);
+        panel.localRotation = Quaternion.identity;
     }
 
     private void Update()
@@ -397,7 +384,7 @@ public class RoomDoor : MonoBehaviour
         _brightness = Mathf.MoveTowards(_brightness, lit ? 1f : 0f, Time.deltaTime / (lit ? 1.2f : 0.8f));
 
         if (_doorVisual != null)
-            _doorVisual.transform.localPosition = _doorClosedPos + Vector3.right * (1.72f * _openness);
+            ApplyDoorPose(_openness);
         if (_overlay != null)
         {
             var c = _overlay.material.color;

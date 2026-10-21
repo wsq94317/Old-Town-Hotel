@@ -4,6 +4,13 @@ All notable changes to **Old Town Hotel** are documented here, newest first.
 
 ---
 
+## 2026-10-22 — Room door clearances
+
+- Replaced wall-parallel sliding doors with solid wood doors that swing inward from an inset hinge, clearing corridor walls throughout the opening animation.
+- Added clearance around each door leaf, thicker projecting frames, wood panels and brass handles; updated the scene and both editable guest floor prefabs.
+- Shared the decorative meshes and prevented duplicate artwork when updating linked floor instances.
+- Verified all 100 doors at seven opening angles, manager swipe-and-enter navigation, 13 PlayMode tests and 788 EditMode tests.
+
 ## 2026-10-22 — Hotel district map
 
 - Replaced the Empire tab's entry with an original illustrated neighbourhood containing seven clickable hotel locations, ownership markers, selection animation and expansion routes.

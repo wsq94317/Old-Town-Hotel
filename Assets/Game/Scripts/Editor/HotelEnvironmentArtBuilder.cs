@@ -636,13 +636,13 @@ public static class HotelEnvironmentArtBuilder
     {
         var frame = LowPolyHotelKit.NewChild(root, name, position, facesPositiveZ ? 180f : 0f);
         LowPolyHotelKit.Part(frame.transform, "PostL", PrimitiveType.Cube,
-            new Vector3(-0.96f, 0.55f, 0f), new Vector3(0.12f, 1.10f, 0.13f),
+            new Vector3(-0.96f, 0.55f, 0f), new Vector3(0.12f, 1.10f, 0.32f),
             HotelArtMaterial.WoodDark);
         LowPolyHotelKit.Part(frame.transform, "PostR", PrimitiveType.Cube,
-            new Vector3(0.96f, 0.55f, 0f), new Vector3(0.12f, 1.10f, 0.13f),
+            new Vector3(0.96f, 0.55f, 0f), new Vector3(0.12f, 1.10f, 0.32f),
             HotelArtMaterial.WoodDark);
         LowPolyHotelKit.Part(frame.transform, "Header", PrimitiveType.Cube,
-            new Vector3(0f, 1.15f, 0f), new Vector3(2.04f, 0.12f, 0.13f),
+            new Vector3(0f, 1.15f, 0f), new Vector3(2.04f, 0.12f, 0.32f),
             HotelArtMaterial.WoodDark);
         LowPolyHotelKit.Part(frame.transform, "Threshold", PrimitiveType.Cube,
             new Vector3(0f, 0.035f, 0f), new Vector3(1.82f, 0.07f, 0.24f),
