@@ -1,0 +1,18 @@
+{
+  "mode": "built-in image_gen",
+  "use_case": "original in-game framed art",
+  "created": "2026-10-30",
+  "assets": [
+    {
+      "path": "Assets/Game/Resources/HotelArt/Decor/BotanicalPrint.png",
+      "promptSummary": "Original portrait gouache botanical still-life on warm ivory paper: stylized fern fronds, eucalyptus leaves and small ochre flowers, restrained sage and olive palette, tactile brushwork, no frame, text, signature or UI.",
+      "sourceGeneration": "exec-9c519968-6ce3-4fa5-9b79-c4307e7c7d8a"
+    },
+    {
+      "path": "Assets/Game/Resources/HotelArt/Decor/RiversidePrint.png",
+      "promptSummary": "Original portrait gouache painting of an old-town river at sunset, terracotta houses and rooflines, muted teal water, warm cream and ochre highlights, premium boutique-hotel wall art, no frame, text, signature or UI.",
+      "sourceGeneration": "exec-a4cc15ab-c580-41b9-8bd2-2b099b9980fe"
+    }
+  ],
+  "notes": "These are concise records of the generation briefs. Original generated PNG files are used directly as texture assets, not cropped from previews. Frames, models and room finishes are native Unity geometry."
+}

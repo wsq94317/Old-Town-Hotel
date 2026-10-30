@@ -313,6 +313,7 @@ public sealed partial class WorldManagementHud : MonoBehaviour
 
     private void OnDestroy()
     {
+        _studioPreview?.Dispose(); _studioPreview=null;
         if (_instance == this) _instance = null;
     }
 
@@ -324,6 +325,7 @@ public sealed partial class WorldManagementHud : MonoBehaviour
     private void Update()
     {
         UpdateSafeArea();
+        if (_studioOpen) { TickRoomStudio(); return; }
         if (Sim != null && TickSessionMenu()) return;
 
         var bridge = HotelSimSceneBridge.Instance;
@@ -1038,8 +1040,8 @@ public sealed partial class WorldManagementHud : MonoBehaviour
         SetRoomButton(
             _roomSecondary,
             _roomSecondaryLabel,
-            L("FURNITURE", "家具配置"),
-            OpenAssetsForSelectedRoom,
+            L("DESIGN ROOM", "设计客房"),
+            () => OpenRoomStudio(RoomSelection.Selected),
             true,
             Ink);
     }
@@ -2266,6 +2268,7 @@ public sealed partial class WorldManagementHud : MonoBehaviour
 
     private void BuildFurnitureConfiguration(RoomRecord room)
     {
+        AddActionButton(L("OPEN 3D ROOM STUDIO", "打开三维客房工作室"), () => OpenRoomStudio(room.number), Teal, true);
         BuildRoomPackages(room);
         bool occupied = room.state == RoomSimState.Occupied;
         AddSection(

@@ -208,7 +208,7 @@ public partial class RoomSceneBinder : MonoBehaviour
             ? Mathf.RoundToInt(bridge.Sim.Clearing.ProgressOf(roomNumber) * 100f)
             : -1;
         var job = bridge.Sim.Renovations.JobFor(roomNumber);
-        string construction = job == null ? "" : job.jobId + ":" + job.daysRemaining + ":" + job.totalDays + ":" + GameText.UseChinese;
+        string construction = (job == null ? "" : job.jobId + ":" + job.daysRemaining + ":" + job.totalDays) + ":" + GameText.UseChinese + ":design:" + (bridge.Sim.RoomDesigns.For(roomNumber)?.revision??0);
         if (state == _shownState && selected == _shownSelected
             && clearingPercent == _shownClearingPercent && construction == _shownConstruction) return;
 
@@ -271,7 +271,8 @@ public partial class RoomSceneBinder : MonoBehaviour
 
         if (_label != null)
             _label.text = roomNumber + "\n" + (job != null ? ConstructionWord(job) : GameText.T(RoomStatePalette.WordOf(state)))
-                        + (job != null ? "" : ClearingSuffix(sim));
+                        + (job != null ? "" : ClearingSuffix(sim))
+                        + (selected&&!string.IsNullOrWhiteSpace(sim.RoomDesigns.For(roomNumber)?.name)?"\n"+sim.RoomDesigns.For(roomNumber).name:"");
     }
 
     /// <summary>正在清理的破败房要显示进度——玩家指派了清理之后必须看得见它在动。</summary>

@@ -4,7 +4,7 @@
 
 ![Unity](https://img.shields.io/badge/Unity-6000.3-black?logo=unity)
 ![C%23](https://img.shields.io/badge/C%23-90%2B%20scripts-239120?logo=csharp&logoColor=white)
-![Tests](https://img.shields.io/badge/EditMode%20tests-802%20passing-6A9F5C)
+![Tests](https://img.shields.io/badge/EditMode%20tests-840%20passing-6A9F5C)
 ![Platform](https://img.shields.io/badge/target-mobile%20portrait-C99A4A)
 
 <sub>Solo portfolio project by **Percy Wu**. The mechanics are real hotel-operations domain knowledge — front desk, housekeeping, room turnover, RevPAR-style economics — turned into a warm, fun-first management game. See the [changelog](CHANGELOG.md) for development history.</sub>
@@ -17,6 +17,20 @@
 
 ## 🎮 The game
 
+
+### Custom room studio — 30 October 2026
+
+Select a room and choose **Design Room / 设计客房**, or tap the new **design workbench in the lobby**. A live 3D workspace uses the actual game models: drag furniture on a quarter-metre grid, rotate or recolour it, add 14 kinds of decorative objects, and choose from seven wall finishes, six floors and four lighting moods. Orbit the room by dragging empty space; use the view buttons or mouse wheel to zoom. Portrait and landscape layouts keep the catalogue and checkout usable.
+
+Previewing pauses hotel operations and costs nothing. A single checkout shows purchases, finishes and decorative recycling before applying the layout to the real room. Door clearance, room boundaries, furniture overlaps and a walkable centre route are checked before payment. Replaced furniture stays in storage with its identity, wear and faults; occupied, cleaning and construction rooms allow previews and blueprints while installation waits. Undo/redo and discard keep experimentation reversible.
+
+Name a design, save up to four blueprints and copy it into other rooms, reusing matching owned furniture. Three style starters offer garden, reading and gallery themes. Installed decor gives a bounded quality bonus (up to eight percentage points) and segment appeal; repeated identical objects do not multiply the score. Four one-time design commissions reward rooms that actually meet their brief and have been cleaned, inspected and made ready for guests.
+
+| Room design workspace | Installed room | Named blueprints |
+|:---:|:---:|:---:|
+| ![Room studio](Assets/Screenshots/room-studio-design.png) | ![Installed design](Assets/Screenshots/room-studio-installed.png) | ![Design plans](Assets/Screenshots/room-studio-blueprints.png) |
+
+Validation: 840 EditMode, 35 PlayMode and 518 standalone simulation tests, including pointer dragging, reachable catalogue controls, undo/redo, atomic checkout, worn-item storage, blueprint copying, save restoration, commissions and actual navigation in north/south/rotated rooms. Scene tests now use isolated temporary saves instead of the player's current report state. Existing player saves are preserved. The two original paintings and the workbench prefab live in `Assets/Game/Resources/HotelArt/Decor`; generation records are in `Assets/Game/Art/Decor`.
 
 ### Courtyard hotel layout — 22 October 2026
 

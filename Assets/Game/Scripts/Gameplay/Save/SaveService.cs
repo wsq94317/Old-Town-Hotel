@@ -12,11 +12,23 @@ public static class SaveService
     /// <summary>当前槽位的路径。加槽位之前这里是 slot0.json，
     /// 老档由 MigrateLegacySlotIfNeeded 搬进 1 号槽。</summary>
     public static bool ValidationMode => System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--hotel-validation") >= 0;
-    public static string DefaultPath => ValidationMode
+#if UNITY_EDITOR
+    // Scene tests run against their own hotel, independently of the player's current day/report.
+    public static string EditorValidationPath { get; set; }
+#endif
+    public static string DefaultPath =>
+#if UNITY_EDITOR
+        !string.IsNullOrEmpty(EditorValidationPath) ? EditorValidationPath :
+#endif
+        ValidationMode
         ? Path.GetFullPath(Path.Combine(Application.dataPath,"..","ValidationSlot.json"))
         : SaveSlots.PathOf(SaveSlots.ActiveSlot);
 
-    public static string LegacyPath => ValidationMode ? DefaultPath : Path.Combine(Application.persistentDataPath, LegacyFileName);
+    public static string LegacyPath =>
+#if UNITY_EDITOR
+        !string.IsNullOrEmpty(EditorValidationPath) ? EditorValidationPath :
+#endif
+        ValidationMode ? DefaultPath : Path.Combine(Application.persistentDataPath, LegacyFileName);
 
     public static bool HasSave() => File.Exists(DefaultPath) || File.Exists(LegacyPath);
 

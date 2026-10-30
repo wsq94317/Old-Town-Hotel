@@ -18,7 +18,7 @@ public sealed partial class WorldManagementHud
     public static bool SceneCameraInputBlocked {
         get {
             var h=ActiveInstance;if(h==null)return false;
-            return h._drawerOpen || h._hudMode==WorldHudMode.MorningReport
+            return h._studioOpen || h._drawerOpen || h._hudMode==WorldHudMode.MorningReport
                 || (h._sessionMenu!=null&&h._sessionMenu.gameObject.activeInHierarchy)
                 || (h._sceneNavigator!=null&&h._sceneNavigator.gameObject.activeInHierarchy);
         }
@@ -223,7 +223,7 @@ public sealed partial class WorldManagementHud
             : priority ? L("PRIORITY REQUESTED","已安排优先服务")
             : room.state==RoomSimState.AwaitingInspection ? L("PRIORITIZE INSPECTION","优先安排验房") : L("PRIORITIZE CLEANING","优先安排清洁"),
             ()=>PrioritizeRoomService(room.number),!priority&&!cleaning,Teal);
-        SetRoomButton(_roomSecondary,_roomSecondaryLabel,L("FURNISH / UPGRADE","布置 / 升级"),OpenAssetsForSelectedRoom,true,Ink);
+        SetRoomButton(_roomSecondary,_roomSecondaryLabel,L("DESIGN ROOM","设计客房"),()=>OpenRoomStudio(RoomSelection.Selected),true,Ink);
         return true;
     }
     private void PrioritizeRoomService(int number)

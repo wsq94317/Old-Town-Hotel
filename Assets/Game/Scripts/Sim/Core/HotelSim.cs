@@ -264,6 +264,8 @@ public sealed partial class HotelSim
         Renovations = new SimRenovationQueue();
         Materials = new MaterialStore();
         Furniture = new FurnitureLedger();
+        Furniture.DesignBonusProvider=RoomDesigns.QualityBonus;
+        Furniture.DesignAppealProvider=RoomDesigns.AppealFor;
         Bookings = new BookingBook();
         Calendar = new AvailabilityCalendar();
     }
@@ -1978,6 +1980,10 @@ public sealed partial class HotelSim
     public void CaptureTo(SimState state)
     {
         if (state == null) return;
+        state.roomDesigns=RoomDesigns.Capture();
+        state.claimedDesignCommissions=new List<int>(_claimedDesignCommissions);
+        state.designBlueprints=new List<RoomDesignBlueprint>();
+        foreach(var blueprint in RoomDesigns.Blueprints)state.designBlueprints.Add(new RoomDesignBlueprint{slot=blueprint.slot,name=blueprint.name,plan=blueprint.plan.Clone()});
         state.runtime = CaptureCheckpoint();
         state.journey = Journey.Capture();
         state.operatingStyle = (int)OperatingStyle;
@@ -2162,6 +2168,8 @@ public sealed partial class HotelSim
                 Shifts.SetTier((StaffRole)entry.role, (ShiftTier)entry.tier);
 
         // v5：家具 + 材料 + 挂牌档（旧档这些段为空 → 沿用当前场景状态，不覆盖）
+        RoomDesigns.Restore(state.roomDesigns,state.designBlueprints);
+        _claimedDesignCommissions.Clear();if(state.claimedDesignCommissions!=null)foreach(int id in state.claimedDesignCommissions)if(id>=1&&id<=4)_claimedDesignCommissions.Add(id);
         Materials.RestoreFromSave(state.materialStock);
         if (state.furniture != null && state.furniture.Count > 0)
         {

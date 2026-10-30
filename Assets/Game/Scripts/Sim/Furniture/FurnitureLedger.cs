@@ -54,6 +54,8 @@ public sealed class FurnitureLedger
     private readonly Dictionary<int, FurnitureInstance> _byId = new Dictionary<int, FurnitureInstance>();
     private readonly Dictionary<int, List<FurnitureInstance>> _byRoom = new Dictionary<int, List<FurnitureInstance>>();
     private int _nextId;
+    public Func<int,float> DesignBonusProvider;
+    public Func<int,GuestSegment,float> DesignAppealProvider;
 
     public int Count => _all.Count;
     public IReadOnlyList<FurnitureInstance> All => _all;
@@ -186,6 +188,15 @@ public sealed class FurnitureLedger
         }
     }
 
+    public bool MoveToRoom(int instanceId,int roomNumber)
+    {
+        if(!_byId.TryGetValue(instanceId,out var f)||roomNumber<0)return false;
+        if(f.roomNumber==roomNumber)return true;
+        if(_byRoom.TryGetValue(f.roomNumber,out var old))old.Remove(f);
+        f.roomNumber=roomNumber;f.anchorId=roomNumber==0?0:FurnitureAnchors.FirstFreeAnchorFor(FurnitureCatalog.Get(f.kindId).slot,OccupiedAnchorsIn(roomNumber));
+        if(!_byRoom.TryGetValue(roomNumber,out var next)){next=new List<FurnitureInstance>();_byRoom[roomNumber]=next;}next.Add(f);return true;
+    }
+
     /// <summary>移走一件家具（卖掉/替换）。</summary>
     public bool Remove(int instanceId)
     {
@@ -211,7 +222,7 @@ public sealed class FurnitureLedger
             // 于是"糊上继续卖"会把交付水平压下去，虚报挂牌的人立刻吃退款
             sum += FurnitureWearModel.EffectiveDecor(kind.decorPoints, f.newness, f.IsFaulted);
         }
-        return SimMath.Clamp01(sum / FurnitureCatalog.FullyFurnishedDecor);
+        return SimMath.Clamp01(sum / FurnitureCatalog.FullyFurnishedDecor + (DesignBonusProvider?.Invoke(roomNumber)??0));
     }
 
     /// <summary>必备家具（床+卫浴）是否齐全且可用。缺失或故障 → 房间不可售。</summary>
@@ -241,7 +252,7 @@ public sealed class FurnitureLedger
             if (f.IsFaulted) continue;
             sum += FurnitureCatalog.Get(f.kindId).AppealFor(segment);
         }
-        return sum;
+        return sum+(DesignAppealProvider?.Invoke(roomNumber,segment)??0);
     }
 
     /// <summary>房内平均健康度（RoomRecord.wear 由它派生，避免两套衰减系统）。</summary>

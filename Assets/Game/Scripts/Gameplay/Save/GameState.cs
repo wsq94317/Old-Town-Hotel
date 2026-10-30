@@ -202,6 +202,9 @@ public sealed class SimState
     public int nextFurnitureId;
     public List<FurnitureSaveEntry> furniture = new List<FurnitureSaveEntry>();
     public List<RoomBandEntry> roomBands = new List<RoomBandEntry>();
+    public List<RoomDesignPlan> roomDesigns = new List<RoomDesignPlan>();
+    public List<RoomDesignBlueprint> designBlueprints = new List<RoomDesignBlueprint>();
+    public List<int> claimedDesignCommissions = new List<int>();
 
     // v6：预订簿（逐单）+ 故意超售档 + 视野是否已铺开
     public int nextReservationId;

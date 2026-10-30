@@ -4,6 +4,15 @@ All notable changes to **Old Town Hotel** are documented here, newest first.
 
 ---
 
+## 2026-10-30 — Custom room design studio
+
+- Added a full 3D room workspace with actual model thumbnails, furniture dragging, quarter-metre snapping, rotation, visual variants, undo/redo, orbit and zoom controls, plus responsive portrait/landscape UI.
+- Added 14 modeled decorations, seven wall finishes, six floor finishes, four lighting moods and two original framed paintings. Designs replace the real room's shell and furniture poses, including mirrored and rotated rooms.
+- Added preview-first atomic checkout, itemised costs and recycling, storage/reuse of replaced furniture with wear intact, and restrictions for occupied/cleaning/construction rooms. Geometry checks preserve entry and circulation; live objects carve navigation obstacles.
+- Added named four-slot blueprints, cross-room copying, three style starters, bounded quality and guest-segment benefits, and four saved one-time design commissions that require a guest-ready room.
+- Added an authored lobby design workbench, room action entry, operating handbook guidance, selected-room name labels and unscaled placement feedback.
+- Added 38 simulation/EditMode checks and seven scene interaction tests. Isolated scene tests from real save files and their morning-report state. Verified 840 EditMode, 35 PlayMode and 518 standalone simulation tests.
+
 ## 2026-10-22 — Courtyard hotel floor plan
 
 - Replaced the 125-metre strip with four 12-room wings and two garden-end rooms on each guest floor, connected by central and outer circulation loops.

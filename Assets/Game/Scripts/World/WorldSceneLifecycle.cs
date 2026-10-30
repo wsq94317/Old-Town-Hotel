@@ -31,6 +31,8 @@ public static class WorldSceneLifecycle
                 HotelCharacterArt.Create(manager.transform, StaffRole.Manager);
         }
         WarehouseWorldView.Install();
+        RoomDesignDesk.Install();
+        HotelWayfindingVisibility.Install();
         HotelAudio.Ensure();
         HotelLightingDirector.Install();
     }

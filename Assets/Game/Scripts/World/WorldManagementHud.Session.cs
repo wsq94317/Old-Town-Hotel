@@ -92,6 +92,9 @@ public sealed partial class WorldManagementHud
             MenuText(L("3. Inspect and handle incidents", "3. 巡查与操作"), 17, Gold, 30);
             MenuText(L("Director mode: tap a whole room to manage it, drag to pan, scroll or pinch to zoom, right-drag or twist two fingers to orbit. The camera panel includes rotation and top view. Use floor and room navigation to reach any wing. Switch to Walk to move your manager personally. MENU pauses everything.",
                 "经营指挥：点整间房处理事务，拖动平移，滚轮/双指缩放，右键拖动/双指旋转。镜头菜单可转向和俯视；楼层与房间导航可直达远翼。切换亲自巡视后可点地面行走。菜单暂停全酒店。"), 14, Cream, 114);
+            MenuText(L("4. Design a signature room", "4. 布置你的特色客房"), 17, Gold, 30);
+            MenuText(L("Select a room and choose Design Room, or tap the design desk in the lobby. Drag and rotate furniture, choose finishes and decor, then apply the quoted design. Previewing is free and pauses the hotel. Save up to four named blueprints to copy into other rooms. Installed decor improves quality and guest appeal. Clean and inspect before claiming design commissions in Plans.",
+                "选择客房后点设计客房，或点击大堂的设计工作台。拖动旋转家具，更换墙地面、灯光并添加摆件，确认报价后应用。预览免费并暂停酒店；可保存四份命名方案，复制到其他房间。实际布置会提升品质和客群吸引力；清洁验房后，在方案页领取设计委托奖励。"), 14, Cream, 152);
             MenuButton(L("BACK", "返回菜单"), () => ShowSessionMenu("main"));
         }
         else if (page == "slots")

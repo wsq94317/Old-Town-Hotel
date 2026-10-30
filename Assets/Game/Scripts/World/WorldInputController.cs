@@ -37,6 +37,7 @@ public partial class WorldInputController : MonoBehaviour
 
     private void Update()
     {
+        if(WorldManagementHud.RoomStudioOpen) { CancelCameraPointer(); return; }
         if(TickCameraInput()) return;
         (bool pressed, Vector2 pos) = ReadPointer();
 
@@ -215,6 +216,8 @@ public partial class WorldInputController : MonoBehaviour
         }
 
         // 点到员工 → 交给监督交互（近=开面板，远=走过去）
+        var designDesk=hit.collider.GetComponentInParent<RoomDesignDesk>();
+        if(designDesk!=null) { WorldManagementHud.OpenRoomStudio(); return; }
         var business = hit.collider.GetComponentInParent<HotelBusinessHotspot>();
         if (business != null)
         {

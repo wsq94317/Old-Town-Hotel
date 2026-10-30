@@ -35,6 +35,7 @@ public class RoomFurnitureView : MonoBehaviour
         if (roomNumber <= 0) roomNumber = RoomSceneBinder.ParseRoomNumber(gameObject.name);
         _doorOnPositiveZ = HotelFloorPlan.LocalDoorSide(transform)>0;
         EnsureRoot();
+        if(Application.isPlaying&&GetComponent<RoomDecorationView>()==null)gameObject.AddComponent<RoomDecorationView>();
         _refreshTimer = 0f;
     }
 
@@ -62,6 +63,8 @@ public class RoomFurnitureView : MonoBehaviour
         _refreshTimer = 0.5f;
         Sync(bridge.Sim);
     }
+
+    public void RefreshNow(){var sim=HotelSimSceneBridge.Instance?.Sim;if(sim!=null)Sync(sim);}
 
     private void Sync(HotelSim sim)
     {
@@ -149,6 +152,15 @@ public class RoomFurnitureView : MonoBehaviour
         {
             model.transform.localRotation = Quaternion.Euler(0f, roomFacing, faultTilt);
             model.transform.localScale = Vector3.one;
+        }
+
+        var designed=HotelSimSceneBridge.Instance?.Sim?.RoomDesigns.For(roomNumber);
+        if(designed!=null){
+            var pose=designed.pieces.Find(p=>!p.IsDecoration&&p.instanceId==item.instanceId&&p.kindId==item.kindId)
+                ??RoomDesignGeometry.DefaultFurniture(item,item.instanceId);
+            model.transform.localPosition=HotelRoomDesignArt.LocalPosition(pose,_doorOnPositiveZ);
+            model.transform.localRotation=Quaternion.Euler(0,HotelRoomDesignArt.LocalYaw(pose,_doorOnPositiveZ),item.IsFaulted?faultTilt:0);
+            RoomDecorationView.AddObstacle(model,item.kindId);
         }
 
         // Wall-mounted pieces sit above the floor; all other procedural models use floor-level origins.
