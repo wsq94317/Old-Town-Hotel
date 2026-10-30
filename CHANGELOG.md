@@ -11,6 +11,7 @@ All notable changes to **Old Town Hotel** are documented here, newest first.
 - Added preview-first atomic checkout, itemised costs and recycling, storage/reuse of replaced furniture with wear intact, and restrictions for occupied/cleaning/construction rooms. Geometry checks preserve entry and circulation; live objects carve navigation obstacles.
 - Added named four-slot blueprints, cross-room copying, three style starters, bounded quality and guest-segment benefits, and four saved one-time design commissions that require a guest-ready room.
 - Added an authored lobby design workbench, room action entry, operating handbook guidance, selected-room name labels and unscaled placement feedback.
+- Made painting catalogue cards display their original artwork directly, and preserved the aspect ratio of every product preview.
 - Added 38 simulation/EditMode checks and seven scene interaction tests. Isolated scene tests from real save files and their morning-report state. Verified 840 EditMode, 35 PlayMode and 518 standalone simulation tests.
 
 ## 2026-10-22 — Courtyard hotel floor plan

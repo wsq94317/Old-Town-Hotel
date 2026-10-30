@@ -12,7 +12,7 @@ public sealed partial class WorldManagementHud
         foreach(Transform child in _studioContent){child.gameObject.SetActive(false);Destroy(child.gameObject);}
         if(_studioCategory==0)BuildStudioFurniture();
         else if(_studioCategory==1){StudioNote(L("14 objects · up to 8 per room · varied pieces improve appeal","14 种摆件 · 每间最多 8 件 · 不同品类提升设计评分与客群偏好"));
-            int i=0;RectTransform row=null;foreach(var kind in RoomDecorCatalog.All){if(i++%3==0)row=StudioRow(126);var k=kind;StudioProduct(row,"Decor_"+k.id,L(k.en,k.cn),"$"+k.price+" · +"+k.score,_studioPreview.Thumbnail(k.id),()=>StudioAddDecor(k.id));}}
+            int i=0;RectTransform row=null;foreach(var kind in RoomDecorCatalog.All){if(i++%3==0)row=StudioRow(126);var k=kind;Texture preview=k.id==RoomDecorCatalog.BotanicalArt?Resources.Load<Texture2D>("HotelArt/Decor/BotanicalPrint"):k.id==RoomDecorCatalog.AbstractArt?Resources.Load<Texture2D>("HotelArt/Decor/RiversidePrint"):_studioPreview.Thumbnail(k.id);StudioProduct(row,"Decor_"+k.id,L(k.en,k.cn),"$"+k.price+" · +"+k.score,preview,()=>StudioAddDecor(k.id));}}
         else if(_studioCategory==2||_studioCategory==3){bool wall=_studioCategory==2;StudioNote(L("Finishes are charged only when you apply the design.","饰面在应用时结算；保留当前款式不重复收费。"));int i=0;RectTransform row=null;
             foreach(var style in wall?RoomSurfaceCatalog.Walls:RoomSurfaceCatalog.Floors){if(i++%3==0)row=StudioRow(104);var s=style;bool selected=(wall?_studioDraft.plan.wallStyle:_studioDraft.plan.floorStyle)==s.id;var card=StudioProduct(row,"Surface_"+s.id,L(s.en,s.cn),(selected?L("SELECTED · ","已选 · "):"")+"$"+s.price,null,()=>{StudioChange(()=>{if(wall)_studioDraft.plan.wallStyle=s.id;else _studioDraft.plan.floorStyle=s.id;});RebuildStudioCatalogue();});
                 var sample=CreatePanel("FinishSample",card,Hex(s.colour));SetAnchors(sample,new Vector2(0,.45f),Vector2.one,new Vector2(8,0),new Vector2(-8,-7));sample.GetComponent<Image>().raycastTarget=false;
@@ -34,7 +34,7 @@ public sealed partial class WorldManagementHud
     {
         RectTransform card;TextMeshProUGUI label;CreateButton(id,row,out card,out label,"",Hex("#F9F3E2"),()=>action());label.gameObject.SetActive(false);
         card.gameObject.AddComponent<LayoutElement>().flexibleWidth=1;
-        if(texture!=null){var image=CreateRect("ModelThumbnail",card).gameObject.AddComponent<RawImage>();image.texture=texture;image.raycastTarget=false;SetAnchors(image.rectTransform,new Vector2(0,.36f),Vector2.one,new Vector2(5,0),new Vector2(-5,-5));}
+        if(texture!=null){var area=CreateRect("ThumbnailArea",card);SetAnchors(area,new Vector2(0,.36f),Vector2.one,new Vector2(5,0),new Vector2(-5,-5));var image=CreateRect("ModelThumbnail",area).gameObject.AddComponent<RawImage>();image.texture=texture;image.raycastTarget=false;Stretch(image.rectTransform);var aspect=image.gameObject.AddComponent<AspectRatioFitter>();aspect.aspectMode=AspectRatioFitter.AspectMode.FitInParent;aspect.aspectRatio=texture.width/(float)texture.height;}
         var title=CreateText("Name",card,11,RevivalInk,TextAlignmentOptions.Center,true);title.text=name;title.textWrappingMode=TextWrappingModes.Normal;SetAnchors(title.rectTransform,new Vector2(0,.17f),new Vector2(1,.39f),new Vector2(3,0),new Vector2(-3,0));title.raycastTarget=false;
         var price=CreateText("Price",card,10,Teal,TextAlignmentOptions.Center,false);price.text=detail;SetAnchors(price.rectTransform,Vector2.zero,new Vector2(1,.18f),new Vector2(3,1),new Vector2(-3,0));price.raycastTarget=false;return card;
     }
